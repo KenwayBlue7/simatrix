@@ -1,0 +1,6 @@
+{
+  "title": "Projection of Points",
+  "description": "Visualize how a point projects onto the Horizontal (HP) and Vertical (VP) planes across all four quadrants, building the spatial intuition behind first- and third-angle projection.",
+  "difficulty": "beginner",
+  "tags": ["engineering-graphics", "projection-of-points", "quadrants"]
+}

@@ -1,0 +1,6 @@
+{
+  "title": "Simple Positions",
+  "description": "Project solids in simple positions: rest the base on the HP or the VP so the axis stays perpendicular to one reference plane, set the base orientation, and draw the three first-angle views. No inclination — axis upright or horizontal only.",
+  "difficulty": "beginner",
+  "tags": ["engineering-graphics", "orthographic-projection", "solids", "simple-positions", "hp-vp"]
+}

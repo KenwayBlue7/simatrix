@@ -1,0 +1,6 @@
+{
+  "title": "Spatial Framework",
+  "description": "Build the projection framework itself: orbit a point through the four quadrants formed by the HP and VP, then fold the planes flat into the first-angle orthographic layout.",
+  "difficulty": "beginner",
+  "tags": ["engineering-graphics", "quadrants", "first-angle-projection", "hp-vp", "orthographic-projection"]
+}

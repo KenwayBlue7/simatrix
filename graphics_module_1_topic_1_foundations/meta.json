@@ -1,0 +1,6 @@
+{
+  "title": "Engineering Graphics Foundations",
+  "description": "Learn the four BIS line types (visible, hidden, centre, dimension) on a real, orbitable 3D bearing block. Spin the part and watch visible edges become hidden edges live, with a true line-of-sight hidden-line classifier.",
+  "difficulty": "beginner",
+  "tags": ["engineering-graphics", "line-types", "bis", "hidden-lines", "bearing-block"]
+}

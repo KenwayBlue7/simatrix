@@ -1,0 +1,981 @@
+/*
+  ============================================================
+  shell.css — Module 1 SHARED CHROME (single source of truth)
+  ============================================================
+  The generic shell/chrome lifted verbatim from points.html's <style> block
+  (mirror-identical to lines.html). Every lesson page links this once:
+      <link rel="stylesheet" href="./src/shell.css">
+  Page-specific tweaks (rare) stay in a tiny inline <style> on the page.
+
+  NOTE: this file lives in src/, so the bundled-font URLs are one level up
+  (../assets/fonts/…) — that is the only edit vs the page's inline copy.
+  The Lines construction-aid TOKENS (--construct/--locus/--tl-green and their
+  *-ink text variants) now live in :root below, so the engine's readTokens and
+  the page CSS share one source. The Lines construction-UI COMPONENT CSS
+  (swatches, con-legend, traces/TL panels) stays page-local in lines.html.
+*/
+
+/*
+  Bundled web fonts (DESIGN.shared.md typography). Local subset woff2 in
+  ../assets/fonts/ — no runtime Google Fonts fetch, so the sim still works
+  offline after the initial load (relative paths per CLAUDE.md). Atkinson
+  Hyperlegible for UI/body, IBM Plex Mono for numeric readouts.
+  font-display:swap paints immediately in the system fallback, then swaps in.
+*/
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  font-style: normal; font-weight: 400; font-display: swap;
+  src: url("../assets/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Atkinson Hyperlegible";
+  font-style: normal; font-weight: 700; font-display: swap;
+  src: url("../assets/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+}
+@font-face {
+  font-family: "IBM Plex Mono";
+  font-style: normal; font-weight: 400; font-display: swap;
+  src: url("../assets/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+}
+
+/*
+  ============================================================
+  Design tokens — Simatrix "Modern Drafting Bench" (light, locked)
+  ============================================================
+  Single source of truth for every colour, space, and motion value.
+  JS reads these via getComputedStyle(...).getPropertyValue('--token'),
+  never hard-codes hex. See DESIGN.shared.md + CLAUDE.md.
+
+  Neutrals are authored in OKLCH (warm hue ~90, chroma 0.006–0.014 so no
+  neutral is a dead grey) and stored as the resolved sRGB hex because
+  THREE.Color cannot parse oklch(). The OKLCH intent is noted per token.
+  No #000 / #fff anywhere (DESIGN.shared.md "Don't").
+*/
+:root {
+  /* --- Surfaces (clinical palette: neutral gray + white working surfaces, tonal layering not shadows) --- */
+  --color-paper:        #ffffff; /* pure-white base — viewport floor + raised control fills */
+  --color-panel:        #f5f5f5; /* neutral grey working surface — dock/cards, one tonal step BELOW paper */
+  --color-solid-fill:   #e7e1d4; /* oklch(0.90 0.013 88)  — solid faces, so ink edges read */
+
+  /* --- Ink (warm near-black) — deepened for high-contrast CAD legibility --- */
+  --color-ink:          #221f18; /* oklch(0.24 0.012 80)  — body text + visible edges (~16:1 on paper) */
+  --color-ink-secondary:#564e3c; /* oklch(0.44 0.016 80)  — secondary text + labels (~7:1 on panel) */
+
+  /* --- Mid neutral --- */
+  --color-bench-grey:   #938b7b; /* oklch(0.62 0.012 88) — hidden-edge linework, inactive, slider rest */
+  --color-border:       #d9d2c3; /* oklch(0.865 0.012 88) — crisp 1px structural seams (Ink Border Rule) */
+  --color-track:        #cfc8b8; /* oklch(0.83 0.013 88)  — recessed slider groove (reads below border) */
+
+  /* --- The one interaction accent (technical blue) — confident, AA on paper --- */
+  --color-accent:        #1f66b5; /* oklch(0.52 0.14 252) — focus, primary action, selection (5.6:1 vs paper) */
+  --color-accent-strong: #17539b; /* oklch(0.45 0.14 252) — hover / active */
+  --color-accent-soft:   #e3ecf7; /* oklch(0.94 0.025 252) — current-step wash, hint background */
+  --color-focus:         var(--color-accent);
+  /* Soft focus/drag halo, derived from the accent so it stays a single source. */
+  --ring-focus:          0 0 0 3px color-mix(in srgb, var(--color-accent) 26%, transparent);
+  /* Warm-tinted shadow for transient overlays only (term-definition popover, banner). */
+  --shadow-md:           0 4px 16px color-mix(in srgb, var(--color-ink) 12%, transparent);
+
+  /* --- Status (UI only, always paired with an icon — DESIGN.shared.md "Color is never alone") --- */
+  --color-success:       #2e7d52; /* oklch(0.56 0.10 158) — step complete, with check icon (AA on paper) */
+  --color-success-soft:  #e2efe8; /* oklch(0.94 0.03 158) — complete wash */
+
+  /*
+    --- Domain colours (inside the viewport only, not chrome) ---
+    Two-Cue Rule: each carries a non-colour cue too.
+  */
+  --color-hp-line: #007f7c; /* oklch(0.53 0.11 192) — HP projection: teal, SOLID (held off blue so it never reads as the chrome accent; 4.57:1 on paper) */
+  --color-vp-line: #bc5d1e; /* oklch(0.58 0.12 55) — VP projection: amber, DASHED (teal↔amber is the CVD-safe pair; 4.19:1 on paper) */
+  --color-pp-line: #7a5ea6; /* oklch(0.55 0.10 305) — PP projection: violet, the third (profile) plane; held off the chrome blue (h305 vs 252) and clear of teal/amber; ~4.5:1 on paper */
+
+  /*
+    --- Lines-only construction-aid domain colours (Projection of Straight Lines) ---
+    Consumed by lines.html's Traces / True-Length overlays and by the engine via
+    lines.js cfg.tokens (construct/locus/tl-green → COL). Module-1 specific, NOT
+    part of the shared Module 2 system, but promoted here so the engine's
+    readTokens and the page CSS share one source (no hard-coded hex in any shell).
+    HT reuses HP teal, VT reuses VP amber. Base values drive linework + colour
+    swatches; the *-ink variants are the darker, AA-clearing forms for small
+    inline text on panel/paper. Two-Cue Rule still applies in-scene (dash/label/
+    weight pair every hue). The .readout/.con-legend/.vp-toggles component CSS that uses
+    these stays page-local in lines.html. */
+  --construct:     #8a8275; /* neutral drafting-aid grey — construction / projector lines */
+  --locus:         #7b4fb5; /* violet — rotation-locus arcs (held off the chrome blue) */
+  --tl-green:      #1f8a4c; /* green — the true-length result line (distinct from --color-success) */
+  --hp-ink:        #00706c; /* darker HP teal — small inline swatch text */
+  --vp-ink:        #9c4a14; /* darker VP amber — small inline swatch text */
+  --construct-ink: #5e564a; /* darker construct grey — small inline text */
+  --locus-ink:     #6a3fa3; /* darker locus violet — small inline text */
+  --tl-green-ink:  #166b3c; /* darker true-length green — small inline text */
+
+  /* --- Spacing scale (4px base) --- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+
+  /* --- Radius --- */
+  --radius-xs: 4px;  /* crisp control corners (checkbox, inputs) */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+
+  /* --- Type --- */
+  /* Bundled Atkinson Hyperlegible (DESIGN.shared.md), system stack as fallback while
+     the woff2 loads / if it 404s. BlinkMacSystemFont covers older Chromium. */
+  --font-sans: "Atkinson Hyperlegible", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Bundled IBM Plex Mono for numeric readouts; system monospace as fallback. */
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", monospace;
+  --text-xs: 0.75rem;   /* group labels, uppercase technical headers */
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lead: 1.125rem;
+  --text-title: 1.35rem; /* step title */
+
+  /* --- Motion (subtle, exponential ease-out — DESIGN.shared.md) --- */
+  --dur-fast: 150ms;
+  --dur-base: 200ms;
+  --dur-step: 380ms; /* step-panel swap / rail advance */
+  --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+
+  /* --- Layering (z-index ladder; later increments add the components that sit here) --- */
+  --z-term:      60;  /* term popover */
+  --z-compare:   90;  /* Compare card frame (#compare-card); #c2d floats just above it */
+  --z-notice:   100;  /* mobile notice */
+  --z-overlay:  120;  /* full-viewport modal (problem library) */
+  --z-toast:    130;  /* success toast */
+  --z-restoring:150;  /* WebGL context-lost "Restoring 3D view…" chip */
+  --z-boot:     200;  /* boot diagnostic */
+
+  /* --- Compare workbench (Lines): height of the docked live-parameter rail that
+     replaces the collapsed wizard while the side-by-side split is open. The number box
+     now rides the label line (name · value · unit) and the slider owns its own full-width
+     row beneath, so the field is two lines: space-2 top + ~27px label-with-input + space-1
+     gap + 44px slider row + space-2 bottom ≈ 91px, rounded to 96 so nothing clips under the
+     rail's overflow:hidden (Impeccable polish, iteration 2). --- */
+  --compare-rail-h: 96px;
+}
+
+*,*::before,*::after{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{
+  display:flex;overflow:hidden;
+  font-family:var(--font-sans);font-size:16px;font-weight:400;line-height:1.6;
+  color:var(--color-ink);background:var(--color-paper);
+  -webkit-font-smoothing:antialiased;
+}
+
+/* Visible focus ring everywhere; never removed. */
+:focus-visible{outline:none;box-shadow:var(--ring-focus);border-radius:var(--radius-xs)}
+
+/* Screen-reader only */
+.sr{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+
+/* ─────────────────────────────────────────────────────────────
+   WIZARD PANEL — quiet chrome, paper/panel tones. Brand + chapnav
+   stack above the card+rail row (.wizard-main).
+   ───────────────────────────────────────────────────────────── */
+#wizard{
+  flex:0 0 auto;width:clamp(340px,34vw,460px);height:100%;order:2; /* order:2 → panel sits on the RIGHT */
+  background:var(--color-panel);border-left:1px solid var(--color-border);
+  padding:var(--space-5) var(--space-4);
+  display:flex;flex-direction:column;gap:var(--space-3);
+}
+/* The card + rail sit side by side in their own row beneath the brand / chapnav. */
+.wizard-main{flex:1 1 auto;min-height:0;display:flex;flex-direction:row;gap:var(--space-4)}
+.brand{
+  font-size:.75rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  color:var(--color-ink-secondary);margin:0;text-decoration:none;
+}
+@media (hover:hover) and (pointer:fine){.brand:hover{color:var(--color-ink)}}
+.brand span{color:var(--color-accent)}
+
+/* Chapter switcher — the seven lesson tabs. Wraps onto multiple rows so the full
+   set flows inside the narrow wizard panel instead of overflowing it. */
+.chapnav{display:flex;flex-wrap:wrap;gap:var(--space-1)}
+.chap{font:600 .8125rem/1 var(--font-sans);color:var(--color-ink-secondary);text-decoration:none;padding:7px 13px;border-radius:999px;border:1px solid var(--color-border);background:var(--color-paper)}
+@media (hover:hover) and (pointer:fine){.chap:hover{background:var(--color-panel)}}
+.chap.on{background:var(--color-accent);color:var(--color-paper);border-color:var(--color-accent)}
+.chap:active{transform:scale(.97)}
+.chap:focus-visible{box-shadow:var(--ring-focus);border-radius:999px}
+
+/* --- Step rail: vertical numbered spine with a hairline connector --- */
+#step-rail{
+  position:relative;flex:0 0 auto;order:2; /* rail sits to the RIGHT of the card */
+  width:64px;margin:0;padding:var(--space-2) 0;
+  list-style:none;display:flex;flex-direction:column;justify-content:space-between;
+}
+/* The connecting spine sits behind the markers; opaque markers cover it between steps. */
+#step-rail::before{
+  content:"";position:absolute;left:50%;top:30px;bottom:30px;
+  width:2px;transform:translateX(-50%);background:var(--color-border);
+}
+.rail__item{position:relative;display:flex}
+.rail__btn{
+  flex:1 1 auto;min-width:44px;display:flex;flex-direction:column;align-items:center;
+  gap:var(--space-1);margin:0;padding:var(--space-1) 0;
+  border:0;background:none;font:inherit;color:inherit;text-align:center;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.rail__btn:disabled{cursor:default}
+.rail__marker{
+  width:34px;height:34px;display:grid;place-items:center;
+  border:1.5px solid var(--color-border);border-radius:50%;
+  background:var(--color-paper); /* opaque — masks the spine between markers */
+  font-family:var(--font-mono);font-size:var(--text-sm);font-weight:700;color:var(--color-ink-secondary);
+  transition:background var(--dur-base) var(--ease-standard),
+             border-color var(--dur-base) var(--ease-standard),
+             color var(--dur-base) var(--ease-standard),
+             box-shadow var(--dur-base) var(--ease-standard),
+             transform var(--dur-fast) var(--ease-standard);
+}
+.rail__label{font-size:var(--text-xs);line-height:1.2;color:var(--color-ink-secondary);max-width:60px}
+/* Upcoming = hollow + faint (shape cue, not colour alone). */
+.rail__item.is-upcoming .rail__marker{opacity:.5}
+.rail__item.is-upcoming .rail__label{opacity:.5}
+/* Current = filled accent + bold label. */
+.rail__item.is-current .rail__marker{
+  background:var(--color-accent);border-color:var(--color-accent);color:var(--color-paper);
+  box-shadow:0 0 0 4px var(--color-accent-soft);
+}
+.rail__item.is-current .rail__label{color:var(--color-ink);font-weight:700}
+/* Complete = filled success + check glyph (JS swaps the marker text to ✓). */
+.rail__item.is-complete .rail__marker{
+  background:var(--color-success);border-color:var(--color-success);color:var(--color-paper);
+}
+.rail__item.is-complete .rail__label{color:var(--color-ink-secondary)}
+/* Press feedback: the round marker depresses when its jump button is pressed (Module 2 parity;
+   no hover-preview halo — M2 doesn't add one). */
+.rail__btn:active:not(:disabled) .rail__marker{transform:scale(.94)}
+.rail__btn:focus-visible{outline:none}
+.rail__btn:focus-visible .rail__marker{box-shadow:var(--ring-focus)}
+
+/* Step card — lives in the .wizard-main row (order 1, left) and scrolls internally.
+   No flex `gap`: like Module 2's #step-card, the vertical rhythm is margin-based per
+   element (eyebrow 4 / title 8 / lead 24px), so the header cadence matches M2 exactly. */
+.step-card{
+  order:1;flex:1 1 auto;min-width:0;overflow-y:auto;
+  background:var(--color-paper);border:1px solid var(--color-border);border-radius:var(--radius-md);
+  padding:var(--space-5) var(--space-4);
+  display:flex;flex-direction:column;
+}
+/* Floating padded scrollbar pill — platform standard (DESIGN.md §5.11, ADR-032). 10px WebKit
+   channel, transparent track, ~4px thumb floating clear via a 3px transparent border +
+   background-clip:padding-box, tinted to --color-border (Quiet Chrome — matches the step
+   connector lines). IMPORTANT: `scrollbar-width` stays UNSET on the base rule — Chrome 121+
+   drops the ::-webkit-scrollbar pseudo-elements the moment it is declared — so it is scoped
+   to Firefox only in the @supports guard below. */
+.step-card::-webkit-scrollbar{width:10px}
+.step-card::-webkit-scrollbar-track{background:transparent}
+.step-card::-webkit-scrollbar-thumb{
+  background:var(--color-border);
+  background-clip:padding-box;
+  border:3px solid transparent;
+  border-radius:999px;
+}
+@supports (-moz-appearance:none){
+  .step-card{scrollbar-width:thin;scrollbar-color:var(--color-border) transparent}
+}
+/* Motion palette (M2 parity). All collapse to instant under prefers-reduced-motion (below). */
+@keyframes panelIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes resetConfirmIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+@keyframes hintStepIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes libraryIn{from{opacity:0;transform:scale(.98)}to{opacity:1;transform:none}}
+.step-card.swap{animation:panelIn var(--dur-step) var(--ease-standard)}
+/* Step typography — mirrors Module 2's .card__eyebrow / .card__title / .card__lead exactly
+   (the engine fills these by id, so the class names differ but the type must not). The eyebrow
+   is mono; the lead is the SMALLER --text-sm muted line that sits UNDER the body prose in the
+   M2 hierarchy (lead < body). Per-element bottom margins carry the rhythm (no card gap). */
+.eyebrow{font-family:var(--font-mono);font-size:var(--text-xs);letter-spacing:.07em;text-transform:uppercase;color:var(--color-ink-secondary);margin:0 0 var(--space-1)}
+/* Eyebrow row — the "Step X of Y" indicator sits left, the Practice-problems pill right (M2).
+   The row owns the bottom margin so the wrapped eyebrow stays flush (mirrors M2). */
+.card__eyebrow-row{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2);margin:0 0 var(--space-1)}
+.card__eyebrow-row .eyebrow{margin:0}
+.card__eyebrow-row .library-entry{align-self:center}
+.step-title{font-size:var(--text-title);font-weight:700;line-height:1.2;letter-spacing:-.01em;margin:0 0 var(--space-2)}
+.step-lead{font-size:var(--text-sm);font-weight:400;line-height:1.55;max-width:60ch;color:var(--color-ink-secondary);margin:0 0 var(--space-5)}
+.step-body{display:flex;flex-direction:column;gap:var(--space-2);margin:0 0 var(--space-5)}
+.step-body p{margin:0;max-width:60ch;font-size:var(--text-sm);line-height:1.45;color:var(--color-ink-secondary)}
+.step-body b{font-weight:700}
+
+/* Inline term definition (signature): dotted-underline accent button — Module 2 parity:
+   darker accent-strong ink, 2px underline offset, default underline weight, no hover shift. */
+.term{
+  font:inherit;color:var(--color-accent-strong);background:none;border:0;padding:0;cursor:help;
+  text-decoration:underline dotted;text-underline-offset:2px;
+}
+
+/* Revealed controls. The bottom margin replaces the removed card gap, spacing the controls
+   from the hint/nav; it collapses to nothing on steps with no controls (:empty → display:none). */
+.controls{display:flex;flex-direction:column;gap:var(--space-4);margin:0 0 var(--space-5)}
+.controls:empty{display:none}
+.ctrl[hidden]{display:none}
+.ctrl-label{display:block;font-size:.875rem;font-weight:400;color:var(--color-ink);margin-bottom:var(--space-1)}
+.ctrl-row{display:flex;align-items:center;gap:var(--space-3);min-height:44px}
+
+/* Slider — minimal: thin 3px groove, borderless 14px accent dot, 44px hit row.
+   The transparent 44px input height IS the hit area — do not shrink it. Firefox keeps
+   the accent moz-range-progress fill; focus/active swaps to accent-strong + ring. */
+input[type=range]{
+  -webkit-appearance:none;appearance:none;
+  flex:1;height:44px;background:transparent;cursor:pointer;margin:0;
+  --p:0%;
+}
+input[type=range]::-webkit-slider-runnable-track{
+  height:3px;border-radius:999px;
+  background:var(--color-track);
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;border-radius:50%;margin-top:-5.5px;
+  background:var(--color-accent);border:none;box-shadow:none;
+  transition:box-shadow var(--dur-fast) var(--ease-standard),background var(--dur-fast) var(--ease-standard);
+}
+input[type=range]:focus-visible::-webkit-slider-thumb,
+input[type=range]:active::-webkit-slider-thumb{
+  background:var(--color-accent-strong);box-shadow:var(--ring-focus);
+}
+input[type=range]:disabled::-webkit-slider-thumb{background:var(--color-bench-grey)}
+input[type=range]::-moz-range-track{height:3px;border-radius:999px;background:var(--color-track)}
+input[type=range]::-moz-range-progress{height:3px;border-radius:999px;background:var(--color-accent)}
+input[type=range]::-moz-range-thumb{
+  width:14px;height:14px;border:none;border-radius:50%;
+  background:var(--color-accent);box-shadow:none;
+  transition:box-shadow var(--dur-fast) var(--ease-standard),background var(--dur-fast) var(--ease-standard)}
+input[type=range]:focus-visible{box-shadow:none}
+input[type=range]:focus-visible::-moz-range-thumb,
+input[type=range]:active::-moz-range-thumb{
+  background:var(--color-accent-strong);box-shadow:var(--ring-focus)}
+input[type=range]:disabled::-moz-range-thumb{background:var(--color-bench-grey)}
+
+/* Numeric input / select */
+.num{
+  width:74px;flex:none;padding:var(--space-2);text-align:right;
+  font:400 .875rem/1.2 var(--font-mono);font-variant-numeric:tabular-nums;
+  color:var(--color-ink);background:var(--color-paper);
+  border:1px solid var(--color-border);border-radius:var(--radius-xs);
+}
+.unit{font:400 .875rem/1.2 var(--font-mono);color:var(--color-ink-secondary)}
+
+/* ── Module 2 `.field` control system (4pt grid) ──────────────────────────────
+   Used by the Points / Lines sims for a roomier slider+number layout. The legacy
+   `.ctrl-label` / `.ctrl-row` / `.num` / `.unit` rules above stay for the five intro
+   lessons. `.field__range` carries flex sizing only — the global `input[type=range]`
+   rules above supply the track/thumb visuals (so the sim's sliders stay consistent).
+   `.ctrl[hidden]{display:none}` (above) out-specifies `.field{display:flex}`, so the
+   engine's progressive disclosure still hides a `.ctrl.field` wrapper. */
+.field{display:flex;flex-direction:column;gap:var(--space-1)}
+.field__label{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-2);font-size:var(--text-sm)}
+/* flex:1 lets the name fill the label line and push any value/unit that share the line (the Lines
+   fields fold the number box up here) to the right edge; harmless for fields whose label is name-only. */
+.field__name{flex:1 1 auto;min-width:0;color:var(--color-ink)}
+.field__row{display:flex;align-items:center;gap:var(--space-3);min-height:44px}
+.field__range{flex:1 1 auto;min-width:0}
+.field__num{
+  flex:0 0 auto;width:4.5rem;padding:var(--space-2);text-align:right;
+  font-family:var(--font-mono);font-size:var(--text-sm);font-variant-numeric:tabular-nums;
+  color:var(--color-ink);background:var(--color-paper);
+  border:1px solid var(--color-border);border-radius:var(--radius-xs);
+}
+.field__num:focus{outline:none;border-color:var(--color-accent);box-shadow:var(--ring-focus)}
+.field__unit{flex:0 0 auto;font-family:var(--font-mono);color:var(--color-ink-secondary)}
+
+/* Inline control feedback — validation + over-slider-range notes. Neutral and
+   plain-spoken, not alarming; the encouraging-tutor voice holds even for errors. */
+.ctrl-note{display:flex;gap:var(--space-2);align-items:flex-start;margin-top:var(--space-2);font-size:.8125rem;line-height:1.45;color:var(--color-ink-secondary)}
+.ctrl-note[hidden]{display:none}
+.ctrl-note .ico{flex:none;width:15px;height:15px;margin-top:1px;color:var(--color-ink-secondary)}
+select{
+  width:100%;min-height:44px;padding:0 var(--space-5) 0 var(--space-3);
+  font:inherit;color:var(--color-ink);background-color:var(--color-paper);
+  border:1px solid var(--color-border);border-radius:var(--radius-xs);cursor:pointer;
+  appearance:none;
+  /* Module 2's SVG chevron (the data-URI hex is ink-secondary; a CSS var can't live inside
+     a data-URI, so M2 hard-codes it here too — the single sanctioned exception). */
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23564e3c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;
+  background-position:right var(--space-3) center;
+}
+
+/* Quadrant reference table */
+.qt{width:100%;border-collapse:collapse;font:400 .8125rem/1.2 var(--font-mono);font-variant-numeric:tabular-nums}
+.qt th,.qt td{padding:var(--space-1) var(--space-2);border:1px solid var(--color-border);text-align:center}
+.qt th{background:var(--color-paper);font-weight:700;color:var(--color-ink-secondary)}
+.qt tr.qa td{color:var(--color-accent);font-weight:700;background:var(--color-accent-soft)}
+
+/* Hint callout — full wash, leading icon, never a side stripe */
+.hint{
+  display:flex;gap:var(--space-2);align-items:flex-start;
+  background:var(--color-accent-soft);color:var(--color-ink);
+  border-radius:var(--radius-sm);padding:var(--space-3);font-size:var(--text-sm);line-height:1.5;
+}
+.hint[hidden]{display:none}
+.hint .ico{flex:none;width:18px;height:18px;color:var(--color-accent)}
+
+/* Buttons */
+.btn{
+  font:inherit;min-height:44px;padding:0 var(--space-4);cursor:pointer;
+  border-radius:var(--radius-sm);border:1px solid transparent;
+  display:inline-flex;align-items:center;justify-content:center;gap:var(--space-2);
+}
+.btn:disabled{opacity:.45;cursor:default}
+/* Press states (Emil Kowalski tactility): all buttons press IN (scale .97) — Module 2 parity.
+   Hover tints gated to fine pointers. */
+.btn-primary{background:var(--color-accent);color:var(--color-paper);border-color:var(--color-accent)}
+.btn-primary:active:not(:disabled){transform:scale(.97)}
+.btn-secondary{background:var(--color-paper);color:var(--color-ink);border-color:var(--color-border)}
+.btn-secondary:active:not(:disabled){transform:scale(.97)}
+.btn-ghost{background:transparent;color:var(--color-ink-secondary);border-color:transparent}
+.btn-ghost:active:not(:disabled){transform:scale(.97)}
+@media (hover:hover) and (pointer:fine){
+  .btn-primary:hover:not(:disabled){background:var(--color-accent-strong);border-color:var(--color-accent-strong)}
+  .btn-secondary:hover:not(:disabled){background:var(--color-panel)}
+  .btn-ghost:hover:not(:disabled){background:color-mix(in srgb,var(--color-ink) 6%,transparent)}
+}
+/* Radius-matched focus ring (global ring uses radius-xs; buttons are radius-sm). */
+.btn:focus-visible,.btn--nav:focus-visible{box-shadow:var(--ring-focus);border-radius:var(--radius-sm)}
+
+/* BEM button modifiers for the card-footer nav (Module 2 parity) */
+.btn--primary{color:var(--color-paper);background:var(--color-accent);border-color:var(--color-accent)}
+.btn--primary:active:not(:disabled){background:var(--color-accent-strong);border-color:var(--color-accent-strong);transform:scale(.97)}
+.btn--ghost{min-height:36px;padding:0 var(--space-3);font-size:var(--text-sm);color:var(--color-ink-secondary);background:transparent;border-color:transparent}
+.btn--ghost:active:not(:disabled){transform:scale(.97)}
+@media (hover:hover) and (pointer:fine){
+  .btn--primary:hover:not(:disabled){background:var(--color-accent-strong);border-color:var(--color-accent-strong)}
+  .btn--ghost:hover:not(:disabled){background:var(--color-panel);border-color:var(--color-border)}
+}
+.btn--block{width:100%}
+.btn[hidden]{display:none}
+
+/* Card-footer navigation (Back / Next / Reset), pinned to the bottom of the card */
+.card__nav{
+  margin-top:auto;display:flex;align-items:center;gap:var(--space-3);
+  padding-top:var(--space-4);border-top:1px solid var(--color-border);
+}
+#reset-control{margin-right:auto}            /* ghost Reset pinned left of Back / Next */
+.card__nav .btn--nav{min-width:88px}
+
+/* ─────────────────────────────────────────────────────────────
+   VIEWPORT — loud subject. Canvas sizing is JS-controlled.
+   ───────────────────────────────────────────────────────────── */
+#sim-viewport{position:relative;flex:1 1 0;display:flex;flex-direction:column;min-width:0;background:var(--color-paper)}
+#canvas-area{flex:1 1 0;position:relative;overflow:hidden;min-height:0}
+#c3d,#c2d{position:absolute;display:block}
+
+/* CSS2D viewport labels — live DOM text (CSS2DObject) the engine positions at 3D points
+   via alb()/albBox(); re-projected every frame so they stay vector-sharp at any zoom.
+   Colour / font-family / font-size are set inline by the engine from the call args + COL
+   tokens (no hard-coded hex here). Never intercept pointer events, so drag-to-orbit and
+   PiP-click pass through to the canvas beneath. */
+.lbl{line-height:1;white-space:nowrap;user-select:none;pointer-events:none}
+.lbl--chip{
+  background:color-mix(in srgb,var(--color-paper) 88%,transparent);
+  border:1px solid currentColor;border-radius:var(--radius-xs);padding:2px 5px;
+}
+
+/* ─────────────────────────────────────────────────────────────
+   SHARED VIEWPORT CHROME (injected by src/chrome.js into #sim-viewport)
+   ───────────────────────────────────────────────────────────── */
+/* Wizard collapse/expand chevron — top-right of the viewport, abutting the panel.
+   44px hit target (DESIGN.md floor). z-index:30 keeps it above the viewport linework. */
+.wizard-toggle{
+  position:absolute;top:var(--space-3);right:var(--space-3);z-index:30;
+  width:44px;height:44px;display:grid;place-items:center;padding:0;
+  color:var(--color-ink-secondary);background:var(--color-panel);
+  border:1px solid var(--color-border);border-radius:var(--radius-sm);cursor:pointer;
+  transition:background var(--dur-fast) var(--ease-standard),
+             border-color var(--dur-fast) var(--ease-standard),
+             color var(--dur-fast) var(--ease-standard),
+             transform var(--dur-fast) var(--ease-standard);
+}
+.wizard-toggle:active{transform:scale(.97)}
+.wizard-toggle:focus-visible{outline:none;box-shadow:var(--ring-focus)}
+.wizard-toggle__icon{width:20px;height:20px;transition:transform var(--dur-base) var(--ease-standard)}
+@media (hover:hover) and (pointer:fine){
+  .wizard-toggle:hover{background:var(--color-paper);border-color:var(--color-bench-grey);color:var(--color-ink)}
+}
+/* Collapsed (desktop): drop the wizard out of the flex row — #sim-viewport (flex:1 1 0)
+   reclaims the width automatically — and flip the chevron back toward the panel. */
+body.wizard-collapsed #wizard{display:none}
+body.wizard-collapsed .wizard-toggle__icon{transform:rotate(180deg)}
+
+/* ---- Onboarding chips (Inc3, ported from Module 2): the one-time orbit hint, the
+   contextual spotlights (queued one at a time), and the transient reflow note. The
+   spotlight dot reads the HP/VP/ink tokens so a chip carries colour AND label (Two-Cue
+   Rule); no hard-coded hex. The DOM is injected by src/chrome.js, wired by onboarding.js. */
+.vp-hint{
+  position:absolute;left:50%;bottom:var(--space-5);
+  /* Centring offset carried in both states so the entrance translate doesn't fight it. */
+  transform:translateX(-50%) translateY(6px);z-index:3;
+  display:flex;align-items:center;gap:var(--space-2);
+  padding:var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  background:var(--color-panel);border:1px solid var(--color-border);
+  border-radius:var(--radius-md);box-shadow:var(--shadow-md);
+  font-size:var(--text-sm);color:var(--color-ink);
+  opacity:0; /* fades in via .is-visible; collapses instantly under reduced motion */
+  transition:opacity var(--dur-base) var(--ease-standard),
+             transform var(--dur-base) var(--ease-standard);
+}
+.vp-hint.is-visible{opacity:1;transform:translateX(-50%) translateY(0)}
+.vp-hint[hidden]{display:none}
+.vp-hint__icon{flex:none;width:18px;height:18px;color:var(--color-ink-secondary)}
+.vp-hint__dismiss{
+  position:relative; /* anchors the 44px hit-area ::before below */
+  flex:none;width:28px;height:28px; /* painted glyph stays small; ::before lifts the HIT area to 44px */
+  display:grid;place-items:center;padding:0;font-size:18px;line-height:1;
+  color:var(--color-ink-secondary);background:none;border:0;
+  border-radius:var(--radius-xs);cursor:pointer;
+  transition:background var(--dur-fast) var(--ease-standard),
+             color var(--dur-fast) var(--ease-standard);
+}
+.vp-hint__dismiss:focus-visible{outline:none;box-shadow:var(--ring-focus)}
+/* 44px hit-area floor (DESIGN.md) — transparent, centred; enlarges only the hit target. */
+.vp-hint__dismiss::before{
+  content:"";position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:100%;height:100%;min-width:44px;min-height:44px;
+}
+
+/* Spotlight = the .vp-hint chip with a leading colour dot tying the hint to its linework. */
+.vp-spotlight__dot{flex:none;width:9px;height:9px;border-radius:50%;background:var(--color-ink-secondary)}
+.vp-spotlight--hp  .vp-spotlight__dot{background:var(--color-hp-line)}
+.vp-spotlight--vp  .vp-spotlight__dot{background:var(--color-vp-line)}
+.vp-spotlight--ink .vp-spotlight__dot{background:var(--color-ink-secondary)}
+.vp-spotlight__text{text-wrap:balance}
+
+/* Reflow note — a brief accent-wash banner floated top-centre (engine flowNote()).
+   aria-hidden + pointer-events:none: informational only, never intercepts an orbit drag. */
+.vp-note{
+  position:absolute;left:50%;top:var(--space-5);
+  transform:translateX(-50%) translateY(-6px);z-index:3;
+  display:flex;align-items:center;gap:var(--space-2);
+  max-width:min(30rem,calc(100% - var(--space-6)));
+  padding:var(--space-2) var(--space-3);
+  background:var(--color-accent-soft);border:1px solid var(--color-border);
+  border-radius:var(--radius-sm);box-shadow:var(--shadow-md);
+  font-size:var(--text-sm);line-height:1.35;color:var(--color-ink);
+  pointer-events:none;
+  opacity:0;
+  transition:opacity var(--dur-base) var(--ease-standard),
+             transform var(--dur-base) var(--ease-standard);
+}
+.vp-note.is-visible{opacity:1;transform:translateX(-50%) translateY(0)}
+.vp-note[hidden]{display:none}
+.vp-note__icon{flex:none;width:18px;height:18px;color:var(--color-accent)}
+.vp-note__text{text-wrap:balance}
+@media (hover:hover) and (pointer:fine){
+  .vp-hint__dismiss:hover{background:var(--color-border);color:var(--color-ink)}
+}
+
+/* ============================================================
+   Inc5 — feedback & resilience
+   ============================================================ */
+
+/* Success toast — a calm win confirmation (engine showToast). Fixed top-centre, above the
+   Problem Library overlay (z 120) so it reads as the library opens, below the context-lost
+   chip. Success green + a check glyph (Two-Cue Rule), never gamified fanfare. Transient
+   floating surface → it earns the overlay shadow (the Flat-Ink rule's exception). */
+.sim-toast{
+  position:fixed;left:50%;top:var(--space-5);transform:translateX(-50%);z-index:var(--z-toast);
+  display:flex;align-items:center;gap:var(--space-2);
+  padding:var(--space-3) var(--space-4);
+  font-size:var(--text-sm);color:var(--color-ink);
+  background:var(--color-success-soft);border:1px solid var(--color-success);
+  border-radius:var(--radius-md);box-shadow:var(--shadow-md);
+  opacity:0;transition:opacity var(--dur-base) var(--ease-standard);
+}
+.sim-toast.is-visible{opacity:1}
+.sim-toast[hidden]{display:none}
+.sim-toast__icon{flex:none;width:20px;height:20px;color:var(--color-success)}
+
+/* WebGL context-loss recovery chip — floats over the live viewport while the GPU resets.
+   Transient overlay → the overlay shadow applies. Auto-hidden once the context is restored. */
+.sim-restoring{
+  position:fixed;left:50%;top:var(--space-5);transform:translateX(-50%);z-index:var(--z-restoring);
+  padding:var(--space-2) var(--space-4);
+  font-size:var(--text-sm);color:var(--color-ink);
+  background:var(--color-panel);border:1px solid var(--color-border);
+  border-radius:var(--radius-md);box-shadow:var(--shadow-md);
+}
+.sim-restoring[hidden]{display:none}
+
+/* Inline two-state Reset confirm — replaces the ghost Reset on the same spot; Back / Next
+   step aside while it is armed so the choice stands alone. (resetConfirmIn keyframe already
+   defined in :root's animation set.) */
+.card__nav.is-reset-armed .btn--nav{display:none}
+.reset-confirm{
+  display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-1) var(--space-2);
+  font-size:var(--text-sm);
+  animation:resetConfirmIn var(--dur-fast) var(--ease-standard);
+}
+.reset-confirm[hidden]{display:none}
+.reset-confirm__prompt{color:var(--color-ink)}
+.reset-confirm__sep{color:var(--color-bench-grey);user-select:none}
+/* Verbs stay ghost like Reset, but meet the 44px target floor (compound selector wins over
+   .btn--ghost regardless of source order). */
+.reset-confirm .reset-confirm__action{min-height:44px;padding:0 var(--space-2)}
+
+/* Per-step done-badge — quiet success tick inside the step card (engine toggles .is-on). */
+.done-badge{
+  display:none;align-items:center;gap:var(--space-2);
+  margin:var(--space-2) 0 0;
+  font-size:var(--text-sm);font-weight:700;color:var(--color-success);
+}
+.done-badge.is-on{display:flex}
+.done-badge__icon{flex:none;width:18px;height:18px}
+
+/* ============================================================
+   Inc6 — Problem Library (Points / Lines only; injected by chrome.js)
+   ============================================================ */
+
+/* "Practice problems" entry — a quiet ghost action sharing the step card's eyebrow row,
+   right of the "Step X of Y" label (Module 2 parity: transparent ghost, not a filled pill). */
+.library-entry{
+  flex:none;display:inline-flex;align-items:center;gap:var(--space-2);
+  min-height:44px;margin-right:calc(var(--space-2) * -1);padding:0 var(--space-2);
+  font:inherit;font-size:var(--text-sm);color:var(--color-ink-secondary);
+  background:transparent;border:1px solid transparent;border-radius:var(--radius-sm);cursor:pointer;
+  transition:background var(--dur-fast) var(--ease-standard),border-color var(--dur-fast) var(--ease-standard),
+             color var(--dur-fast) var(--ease-standard),transform var(--dur-fast) var(--ease-standard);
+}
+.library-entry__icon{flex:none;width:18px;height:18px}
+.library-entry:not(:disabled):active{transform:scale(.97)}
+.library-entry:focus-visible{outline:none;box-shadow:var(--ring-focus);border-radius:var(--radius-sm)}
+@media (hover:hover) and (pointer:fine){.library-entry:hover{background:var(--color-paper);border-color:var(--color-border);color:var(--color-ink)}}
+
+/* Active-problem panel — the pinned statement + scaffolded hints + self-check, above the card. */
+#active-problem{
+  flex:0 0 auto;display:flex;flex-direction:column;gap:var(--space-2);
+  padding:var(--space-3);
+  background:var(--color-paper);border:1px solid var(--color-border);border-radius:var(--radius-md); /* content surface reads pure white on the grey panel shell */
+  animation:panelIn var(--dur-step) var(--ease-standard);
+}
+#active-problem[hidden]{display:none}
+.active-problem__head{display:flex;align-items:baseline;justify-content:space-between;gap:var(--space-2)}
+.active-problem__eyebrow{margin:0;font-size:var(--text-xs);font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--color-ink-secondary)}
+.active-problem__toggle{flex:none}
+.active-problem__statement{margin:0;font-size:var(--text-sm);line-height:1.5;color:var(--color-ink)}
+#active-problem.is-collapsed .active-problem__statement{
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.active-problem__hint-btn{align-self:flex-start}
+.active-problem__hints{padding:var(--space-2) var(--space-3);background:var(--color-accent-soft);border-radius:var(--radius-sm)}
+.active-problem__hints[hidden]{display:none}
+.hint-steps{margin:0;padding-left:var(--space-4);display:flex;flex-direction:column;gap:var(--space-1)}
+.hint-steps li{font-size:var(--text-sm);line-height:1.5;animation:hintStepIn var(--dur-base) var(--ease-standard)}
+.active-problem__actions{display:flex;align-items:center;justify-content:space-between;gap:var(--space-2)}
+.active-problem__complete{align-self:stretch;justify-content:center}
+.active-problem__complete[hidden]{display:none}
+
+/* Self-check status line — neutral copy, turning success-green with a check on a match. */
+.match-status{display:flex;align-items:center;gap:var(--space-1);margin:0;font-size:var(--text-sm);color:var(--color-ink-secondary)}
+.match-status__icon{flex:none;width:18px;height:18px;color:var(--color-success)}
+.match-status--ok{color:var(--color-success);font-weight:700}
+
+/* Full-viewport library overlay (z 120). Appended to <body> by chrome.js. */
+.problem-library{
+  position:fixed;inset:0;z-index:var(--z-overlay);
+  display:flex;flex-direction:column;background:var(--color-paper); /* the problems page is a white content surface */
+  animation:libraryIn var(--dur-step) var(--ease-standard);
+}
+.problem-library[hidden]{display:none}
+.problem-library__header{
+  flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);
+  padding:var(--space-4) var(--space-5);border-bottom:1px solid var(--color-border);
+}
+.problem-library__title{margin:0;font-size:var(--text-title);font-weight:700;letter-spacing:-.01em}
+.problem-library__close{
+  flex:none;width:44px;height:44px;display:grid;place-items:center;padding:0;
+  border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-paper);
+  color:var(--color-ink-secondary);cursor:pointer;
+  transition:background var(--dur-fast) var(--ease-standard),color var(--dur-fast) var(--ease-standard),transform var(--dur-fast) var(--ease-standard);
+}
+.problem-library__close svg{width:20px;height:20px}
+.problem-library__close:not(:disabled):active{transform:scale(.97)}
+.problem-library__close:focus-visible{outline:none;box-shadow:var(--ring-focus);border-radius:var(--radius-sm)}
+@media (hover:hover) and (pointer:fine){.problem-library__close:hover{background:var(--color-panel);color:var(--color-ink)}}
+.problem-library__confirm{
+  display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-1) var(--space-2);
+  padding:var(--space-2) var(--space-5);
+  background:var(--color-accent-soft);border-bottom:1px solid var(--color-border);font-size:var(--text-sm);
+}
+.problem-library__confirm[hidden]{display:none}
+.problem-library__confirm-text{color:var(--color-ink)}
+.problem-library .reset-confirm__action{min-height:44px;padding:0 var(--space-2)}
+.problem-library__body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:var(--space-5)}
+.problem-library__inner{max-width:1100px;margin:0 auto}
+.problem-group{margin:0 0 var(--space-6)}
+.problem-group__title{margin:0 0 var(--space-1);font-size:var(--text-xs);font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--color-ink-secondary)}
+.problem-group__blurb{margin:0 0 var(--space-3);font-size:var(--text-sm);color:var(--color-ink-secondary)}
+.problem-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:var(--space-3)}
+.problem-card{
+  display:flex;flex-direction:column;gap:var(--space-1);text-align:left;
+  font-family:var(--font-sans);   /* a <button> won't inherit the body font — pin it to the design-system sans */
+  padding:var(--space-3) var(--space-4);
+  background:var(--color-paper);border:1px solid var(--color-border);border-radius:var(--radius-md);cursor:pointer;
+  transition:background var(--dur-fast) var(--ease-standard),border-color var(--dur-fast) var(--ease-standard),
+             box-shadow var(--dur-fast) var(--ease-standard),transform var(--dur-fast) var(--ease-standard);
+}
+.problem-card__title{font-family:var(--font-sans);font-size:var(--text-base);font-weight:700;color:var(--color-ink)}
+.problem-card__hint{
+  font-family:var(--font-sans);font-size:var(--text-sm);line-height:1.45;color:var(--color-ink-secondary);
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+}
+.problem-card:not(:disabled):active{transform:scale(.99)}
+.problem-card:focus-visible{outline:none;box-shadow:var(--ring-focus);border-radius:var(--radius-md)}
+@media (hover:hover) and (pointer:fine){
+  .problem-card:hover{background:var(--color-accent-soft);border-color:var(--color-accent);box-shadow:var(--shadow-md)}
+}
+
+/* ---- Viewport cluster (Inc4): top-left stack of quick-view chips, the connector toggle,
+   and the Compare chip. The engine reveals each per lesson; hidden ones collapse out. */
+.vp-cluster{
+  position:absolute;top:10%;left:var(--space-3);z-index:25; /* 10% top offset leaves room for host overlays */
+  display:flex;flex-direction:column;gap:var(--space-2);align-items:flex-start;
+}
+
+/* Quick-view chips (Top / Front / Side) — a segmented pill group. */
+.qv-group{display:inline-flex;gap:2px;padding:3px;
+  background:var(--color-panel);border:1px solid var(--color-border);border-radius:999px}
+.qv-group[hidden]{display:none}
+.quick-view{
+  font:600 .8125rem/1 var(--font-sans);min-height:32px;padding:0 var(--space-3);
+  border:0;border-radius:999px;background:transparent;color:var(--color-ink-secondary);cursor:pointer;
+  transition:background var(--dur-fast) var(--ease-standard),color var(--dur-fast) var(--ease-standard),
+             transform var(--dur-fast) var(--ease-standard);
+}
+.quick-view:not(:disabled):active{transform:scale(.97)}
+.quick-view:focus-visible{outline:none;box-shadow:var(--ring-focus);border-radius:999px}
+@media (hover:hover) and (pointer:fine){.quick-view:hover{background:var(--color-paper);color:var(--color-ink)}}
+/* The picked camera view stays lit (radio group; engine clears on a manual orbit). */
+.quick-view.is-active{background:var(--color-accent);color:var(--color-paper)}
+@media (hover:hover) and (pointer:fine){.quick-view.is-active:hover{background:var(--color-accent-strong);color:var(--color-paper)}}
+/* Orbit-lock cue: a drag on a rotate-locked ortho view nudges the latched chip (engine
+   cueOrthoLock) — "disengage this view to orbit". Reduced motion keeps the ring, drops the shake. */
+@keyframes qvLockNudge{
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-3px)}
+  40%{transform:translateX(3px)}
+  60%{transform:translateX(-2px)}
+  80%{transform:translateX(2px)}
+}
+.qv-lock-cue{animation:qvLockNudge 320ms var(--ease-standard);box-shadow:var(--ring-focus)}
+@media (prefers-reduced-motion:reduce){.qv-lock-cue{animation:none}}
+
+/* Shared chip (Compare + connector toggle). `.on` / aria-pressed mark the active state. */
+.vp-chip{
+  display:inline-flex;align-items:center;gap:var(--space-2);min-height:36px;padding:0 var(--space-3);
+  font:600 .8125rem/1 var(--font-sans);color:var(--color-ink-secondary);
+  background:var(--color-panel);border:1px solid var(--color-border);border-radius:999px;cursor:pointer;
+  transition:background var(--dur-fast) var(--ease-standard),border-color var(--dur-fast) var(--ease-standard),
+             color var(--dur-fast) var(--ease-standard),transform var(--dur-fast) var(--ease-standard);
+}
+.vp-chip[hidden]{display:none}
+.vp-chip svg{flex:none;width:16px;height:16px}
+.vp-chip:not(:disabled):active{transform:scale(.97)}
+.vp-chip:focus-visible{outline:none;box-shadow:var(--ring-focus);border-radius:999px}
+@media (hover:hover) and (pointer:fine){.vp-chip:hover{background:var(--color-paper);border-color:var(--color-bench-grey);color:var(--color-ink)}}
+.vp-chip.on,.vp-chip[aria-pressed="true"]{background:var(--color-accent);color:var(--color-paper);border-color:var(--color-accent)}
+
+/* ---- Compare card (Inc4): a floating drawing-sheet frame. Transient overlay → the
+   Flat-Ink rule permits a shadow here. #c2d is floated over .compare-card__stage by
+   layout() (position:fixed), so the stage itself is just a sizing reference. */
+.compare-card{
+  position:fixed;z-index:var(--z-compare);display:flex;flex-direction:column;overflow:hidden;
+  background:var(--color-paper);border:1px solid var(--color-border);
+  border-radius:var(--radius-md);box-shadow:var(--shadow-md);
+}
+.compare-card[hidden]{display:none}
+/* Sits below the wizard-toggle chevron (top-right, 44px) so the card never covers it. */
+.compare-card[data-size="compact"]{
+  top:calc(var(--space-3) + 44px + var(--space-2));right:var(--space-3);
+  width:min(420px,38vw);height:min(320px,42vh);
+}
+.compare-card[data-size="expanded"]{
+  top:50%;left:50%;transform:translate(-50%,-50%);right:auto;
+  width:76vw;height:74vh;
+}
+/* Docked side-by-side split (engine adds .is-split via cfg.compareSplit + desktop, while the
+   EXPANDED Compare card is open). The card docks to the RIGHT HALF of the viewport region
+   (#sim-viewport is the positioned ancestor) while layout() shrinks #c3d to the left half.
+   Docked, not floating → a hairline seam, no shadow/radius (Flat-Ink rule). Higher specificity
+   (.is-split + [data-size]) beats the centered rule above. Both Points and Lines opt in
+   (cfg.compareSplit); mobile never gets .is-split (the Compare card is a bottom sheet there).
+   On Lines the split also enters WORKBENCH mode (see below): the wizard collapses for a true
+   50/50 and the live-parameter rail docks under both panes. */
+.compare-card.is-split[data-size="expanded"]{
+  position:absolute;inset:0 0 0 auto;left:auto;transform:none;
+  width:50%;height:auto;
+  border:0;border-left:1px solid var(--color-border);border-radius:0;box-shadow:none;
+}
+/* In workbench mode the live-parameter rail docks across the BOTTOM of #sim-viewport, so the
+   split card must stop above it. #canvas-area (flex:1) already auto-shrinks by the rail height,
+   so #c3d follows; this only needs to pull the absolutely-positioned card's bottom up. The
+   position:fixed #c2d follows the card stage rect via layout(), so it tracks automatically. */
+body.compare-workbench .compare-card.is-split[data-size="expanded"]{ bottom:var(--compare-rail-h); }
+
+/* ---- Workbench rail (Lines): the docked live-parameter strip that replaces the collapsed
+   wizard during the expanded Compare split. A flat paper bar separated by a single hairline
+   top border (Flat-Ink rule — docked/persistent, so NO shadow). Injected empty by chrome.js;
+   the engine re-parents the geometry-driver .ctrl fields into it on enter and back on exit.
+   It is the last flex child of #sim-viewport, so #canvas-area (flex:1) shrinks by its height. */
+#workbench-rail{
+  flex:0 0 var(--compare-rail-h);height:var(--compare-rail-h);
+  display:flex;align-items:center;justify-content:space-evenly;gap:0;
+  padding:var(--space-2) 0;
+  background:var(--color-paper);border-top:1px solid var(--color-border);
+  overflow:hidden;
+}
+#workbench-rail[hidden]{display:none}
+/* Each re-parented .ctrl.field keeps its stacked label-over-row layout but shares the row width
+   evenly. The 44px slider row preserves the hit-target rule; tabular mono readouts are unchanged
+   (same DOM nodes). The φ validity note is suppressed in the compact rail.
+   IMPECCABLE POLISH (Compare Workbench, iter 2): every override below is scoped to #workbench-rail so
+   the wizard's vertical .field layout is untouched. The number box now lives on the LABEL line
+   (name … value · unit) and the slider OWNS its own full-width row beneath, so the track is no longer
+   pinched by the readout. The narrower fields create slack that space-evenly distributes. */
+/* Each parameter is a tidy unit: hold a natural ~15rem width (narrower than before, so the slider
+   track is slimmer) and let space-evenly drop the leftover rail width into EQUAL gaps — between the
+   five units AND before the first / after the last, so the end gaps read as matching padding (this is
+   why the rail's own gap and horizontal padding are 0). Shrinks on narrower (still desktop) widths. */
+#workbench-rail .field{flex:0 1 15rem;min-width:0;gap:0;margin:0}
+#workbench-rail .field__label{font-size:var(--text-sm);line-height:1;color:var(--color-ink-secondary)}
+/* Long names ("Distance from VP (end A)") truncate rather than wrap, so the label stays one line tall
+   and the field never spills past the rail (full text lives on the slider's aria-label). flex:1 pushes
+   the value + unit to the label's right edge. */
+#workbench-rail .field__name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Pull the slider row up under its label so the pair hugs tight (gap:0 is the floor; this goes
+   further). Keeps the 44px hit target — only the vertical offset within the 96px rail changes. */
+#workbench-rail .field__row{min-height:44px;margin-top:calc(var(--space-2) * -1)}
+/* Tabular values are ≤200mm / ≤90° (3 glyphs): 3.5rem holds them, and compact padding keeps the
+   label line short so the two-line field fits the rail height. */
+#workbench-rail .field__num{width:3.5rem;padding:var(--space-1) var(--space-2)}
+#workbench-rail .ctrl-note{display:none}
+
+/* The 2D-drawing card header (title tab + close/expand) is redundant in the Lines Compare split:
+   the split is permanent while open and the top-right viewport chevron already closes it (the engine
+   rewires #wizard-toggle to compare.hide() in workbench mode). Hide it so the drawing gets the full
+   card height. Scoped to .compare-workbench, so Points' floating-PiP head is untouched. */
+body.compare-workbench .compare-card__head{display:none}
+.compare-card__head{
+  flex:0 0 auto;display:flex;align-items:center;gap:var(--space-1);
+  padding:var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+  background:var(--color-panel);border-bottom:1px solid var(--color-border);
+}
+.compare-card__tab{
+  flex:1 1 auto;font:700 .6875rem/1 var(--font-sans);letter-spacing:.05em;text-transform:uppercase;
+  color:var(--color-ink-secondary);
+}
+.compare-card__btn{
+  flex:none;width:32px;height:32px;display:grid;place-items:center;padding:0;
+  border:0;background:none;color:var(--color-ink-secondary);cursor:pointer;border-radius:var(--radius-xs);
+  transition:background var(--dur-fast) var(--ease-standard),color var(--dur-fast) var(--ease-standard),
+             transform var(--dur-fast) var(--ease-standard);
+}
+/* The author `display:grid` above would otherwise beat the UA `[hidden]{display:none}` rule, so a
+   `hidden` head button (e.g. the engine hides #compare-expand for split-only Compare lessons) would
+   still show. Restore `hidden` for these buttons. */
+.compare-card__btn[hidden]{display:none}
+.compare-card__btn svg{width:18px;height:18px}
+.compare-card__btn:not(:disabled):active{transform:scale(.97)}
+.compare-card__btn:focus-visible{outline:none;box-shadow:var(--ring-focus)}
+@media (hover:hover) and (pointer:fine){.compare-card__btn:hover{background:var(--color-border);color:var(--color-ink)}}
+.compare-card__stage{flex:1 1 auto;position:relative;min-height:0;background:var(--color-paper)}
+
+/* ---- First-angle symbol badge (Inc4): bottom-right, fades in while the sheet is folded. */
+.fa-symbol{
+  position:absolute;right:var(--space-4);bottom:var(--space-4);z-index:6;
+  width:76px;padding:var(--space-2) var(--space-3);
+  background:color-mix(in srgb,var(--color-paper) 90%,transparent);
+  border:1px solid var(--color-border);border-radius:var(--radius-sm);color:var(--color-ink);
+  opacity:0;transition:opacity var(--dur-base) var(--ease-standard);
+}
+.fa-symbol[hidden]{display:none}
+.fa-symbol.is-visible{opacity:1}
+.fa-symbol svg{display:block;width:100%;height:auto}
+
+/* Term popover (signature) — fixed so it escapes the card scroll clip */
+#term-pop{
+  position:fixed;z-index:var(--z-term);max-width:280px;
+  display:block;visibility:hidden;opacity:0;
+  transform:translateY(4px) scale(.96);transform-origin:top left;
+  transition:opacity var(--dur-fast) var(--ease-standard),
+             transform var(--dur-fast) var(--ease-standard),
+             visibility 0s linear var(--dur-fast);
+  background:var(--color-accent-soft);color:var(--color-ink);
+  border:1px solid var(--color-border);border-radius:var(--radius-sm);
+  box-shadow:var(--shadow-md);
+  padding:var(--space-3);font-size:.875rem;line-height:1.45;
+}
+#term-pop.show{visibility:visible;opacity:1;transform:none;transition-delay:0s}
+#term-pop .pt{font-weight:700;display:block;margin-bottom:2px}
+
+/* Mobile notice */
+#mobile-note{
+  position:fixed;inset:auto 12px 12px 12px;z-index:80;display:none;
+  background:var(--color-paper);border:1px solid var(--color-border);border-radius:var(--radius-md);
+  box-shadow:var(--shadow-md);padding:var(--space-3) var(--space-4);
+  font-size:.875rem;color:var(--color-ink);align-items:flex-start;gap:var(--space-3);
+}
+#mobile-note button{flex:none}
+
+/* ─────────────────────────────────────────────────────────────
+   MOBILE / NARROW (≤768px) — stack the lesson under a pinned viewport.
+   The 3D/2D view stays at the top of the screen while the step card
+   scrolls beneath it, so adjusting a control never hides the result.
+   Canvas pixel sizing stays JS-owned (layout()); CSS only sets the
+   area's box. The PiP is dropped here — the toggle bar is the switcher.
+   ───────────────────────────────────────────────────────────── */
+@media(max-width:768px){
+  html{height:auto}
+  body{flex-direction:column;height:auto;min-height:100%;overflow:visible}
+
+  /* Flat-Ink rule: the pinned viewport separates from the scrolling lesson by a
+     hairline plus the paper→panel tonal seam, not a shadow (shadows are for
+     transient overlays only). */
+  #sim-viewport{
+    order:-1;position:sticky;top:0;z-index:30;flex:none;
+    height:clamp(280px,46vh,440px);
+    border-bottom:1px solid var(--color-border);
+  }
+  /* Compare card → full-width bottom sheet (no room for a side-by-side at this width). */
+  .compare-card[data-size="compact"],.compare-card[data-size="expanded"]{
+    top:auto;bottom:0;left:0;right:0;transform:none;
+    width:100%;height:55vh;border-radius:var(--radius-md) var(--radius-md) 0 0;
+  }
+  /* No workbench rail on mobile — the split (and thus the rail) never engages below 768px. */
+  #workbench-rail{display:none}
+  .vp-cluster{left:var(--space-2);gap:var(--space-1)} /* top stays 10% (host-overlay clearance) */
+
+  #wizard{
+    flex:none;width:100%;height:auto;overflow:visible;
+    border-left:0;padding:var(--space-4) var(--space-4) var(--space-6);gap:var(--space-4);
+  }
+  /* Stack the card above the rail; the card no longer scrolls on its own (the page does). */
+  .wizard-main{flex-direction:column;min-height:0}
+  .step-card{overflow-y:visible;flex:1 1 auto;min-height:0}
+  /* Step rail reflows from a vertical spine into a horizontal strip beneath the card. */
+  #step-rail{
+    order:2;flex:0 0 auto;flex-direction:row;width:100%;
+    padding:var(--space-3) 0 0;
+  }
+  #step-rail::before{
+    left:30px;right:30px;top:calc(var(--space-3) + 17px);bottom:auto;
+    width:auto;height:2px;transform:translateY(-50%);
+  }
+
+  #mobile-note{display:flex}
+
+  /* Wizard stacks BELOW the pinned viewport, so the chevron points along that axis
+     (drawer-from-bottom): +90° offset over the desktop left/right states. */
+  .wizard-toggle__icon{transform:rotate(90deg)}
+  body.wizard-collapsed .wizard-toggle__icon{transform:rotate(-90deg)}
+  /* Collapsed: the panel is display:none, so let the sticky viewport reclaim the
+     freed height instead of leaving blank space below it (it is a fixed clamp()
+     height otherwise). */
+  body.wizard-collapsed #sim-viewport{flex:1 1 auto;height:auto;min-height:60vh}
+}
+
+/* Reduced motion: collapse all transitions/animations to instant. */
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:.001ms!important;transition-duration:.001ms!important;scroll-behavior:auto!important}
+}

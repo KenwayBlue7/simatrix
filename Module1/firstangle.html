@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="color-scheme" content="light only"/>
+<title>First-Angle Projection · Simatrix</title>
+
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
+
+<!-- Boot diagnostic: turns a blank page into an actionable message. Self-removed by the engine on success. -->
+<script>
+(function(){
+  function overlay(title, detail){
+    if(document.getElementById('boot-error')) return;
+    var add=function(){
+      var d=document.createElement('div'); d.id='boot-error'; d.setAttribute('role','alert');
+      d.style.cssText='position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:24px;background:#efebe1;font-family:system-ui,sans-serif';
+      d.innerHTML='<div style="max-width:560px;border:1px solid #d9d2c3;border-radius:10px;padding:24px 28px;background:#faf8f3;color:#221f18">'
+        +'<h1 style="margin:0 0 10px;font-size:18px;font-weight:700">'+title+'</h1>'
+        +'<div style="font-size:14px;line-height:1.65;color:#564e3c">'+detail+'</div></div>';
+      document.body.appendChild(d);
+    };
+    if(document.body) add(); else window.addEventListener('DOMContentLoaded',add);
+  }
+  function code(s){return '<code style="background:#efebe1;padding:2px 5px;border-radius:4px">'+s+'</code>';}
+  window.addEventListener('error',function(e){
+    overlay('The lesson hit an error', code((e&&e.message)||'Unknown error')+'<br><br>Open the browser console (F12 → Console) and share the first red error.');
+  });
+  window.addEventListener('unhandledrejection',function(e){
+    overlay('The lesson hit an error', code((e&&e.reason)||'Unhandled promise rejection'));
+  });
+  setTimeout(function(){
+    if(window.__simStarted) return;
+    if(location.protocol==='file:'){
+      overlay('Open this through a web server, not a file',
+        'This page is open as a '+code('file://')+' URL, which browsers block from loading ES modules, so nothing runs and the page stays blank.<br><br>'
+        +'Serve the folder over HTTP instead. With XAMPP started, open:<br><br>'+code('http://localhost/Simatrix/Module1/'));
+    } else {
+      overlay('The lesson didn’t finish loading',
+        'The page loaded but the 3D module didn’t initialise.<br><br>'
+        +'• It needs internet on first load (Three.js loads from a CDN).<br>'
+        +'• Open the console (F12) and share the first red error.');
+    }
+  }, 6000);
+})();
+</script>
+
+<link rel="stylesheet" href="./src/shell.css"/>
+</head>
+<body>
+
+<!-- ════════ STEPPER PANEL ════════ -->
+<aside id="wizard">
+  <a class="brand" href="./index.html">Simatrix <span>·</span> First-Angle Projection</a>
+
+  <nav class="chapnav" aria-label="Chapters">
+    <a href="./index.html" class="chap">Planes</a>
+    <a href="./linetypes.html" class="chap">Line types</a>
+    <a href="./dimensioning.html" class="chap">Dimensioning</a>
+    <a href="./quadrants.html" class="chap">Quadrants</a>
+    <a href="./firstangle.html" class="chap on" aria-current="page">First-angle</a>
+    <a href="./points.html" class="chap">Points</a>
+    <a href="./lines.html" class="chap">Lines</a>
+  </nav>
+
+  <div class="wizard-main">
+  <section class="step-card" id="step-card" aria-live="off">
+    <p class="eyebrow" id="eyebrow">Step 1 of 3</p>
+    <h1 class="step-title" id="step-title">A point in the first angle</h1>
+    <p class="step-lead" id="step-lead"></p>
+    <div class="step-body" id="step-body"></div>
+
+    <!-- Static control wrappers; the engine shows only those the step needs -->
+    <div class="controls" id="controls">
+      <div class="ctrl" data-ctrl="anim" hidden>
+        <button id="btn-anim" class="btn btn-primary" style="width:100%">▶ Animate the fold</button>
+      </div>
+    </div>
+
+    <div class="hint" id="hint" hidden>
+      <svg class="ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+        <circle cx="12" cy="12" r="9"/><line x1="12" y1="11" x2="12" y2="16"/><circle cx="12" cy="7.5" r="1" fill="currentColor" stroke="none"/>
+      </svg>
+      <span id="hint-text"></span>
+    </div>
+
+    <footer class="card__nav">
+      <div id="reset-control">
+        <button id="btn-reset" class="btn btn--ghost" type="button">Reset</button>
+      </div>
+      <button id="btn-back" class="btn btn-secondary btn--nav" type="button">Back</button>
+      <button id="btn-next" class="btn btn--primary btn--nav" type="button">Next</button>
+    </footer>
+  </section>
+
+  <ol id="step-rail" aria-label="Lesson steps"></ol>
+  </div>
+</aside>
+
+<!-- ════════ VIEWPORT (single 3D window) ════════ -->
+<div id="sim-viewport">
+  <div id="canvas-area">
+    <canvas id="c3d" role="img" aria-label="3D view of a point in the first angle and the fold from 3D into a flat drawing. The step instructions and the text summary below describe what to look at."></canvas>
+  </div>
+  <!-- Mirrors the viewport's computed result as text for assistive tech. -->
+  <div id="vp-status" class="sr" role="status" aria-live="polite" aria-atomic="true"></div>
+</div>
+
+<!-- Inline term popover -->
+<div id="term-pop" role="tooltip"></div>
+
+<!-- Mobile notice -->
+<div id="mobile-note" role="note">
+  <span>The 3D view stays pinned at the top while you scroll through the steps. Drag it to orbit, then animate the fold.</span>
+  <button id="mobile-dismiss" class="btn btn-secondary" style="padding:0 var(--space-4)">Got it</button>
+</div>
+
+<!-- Live region: announces step changes -->
+<div id="live" class="sr" role="status" aria-live="polite"></div>
+
+<script type="module" src="./firstangle.js"></script>
+</body>
+</html>

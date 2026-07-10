@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-05-29T05:30:00Z",
+  "title": "Design System: Simatrix Guided Stepper",
+  "extensions": {
+    "colorMeta": {
+      "accent": { "role": "primary", "displayName": "Technical Blue", "canonical": "oklch(0.52 0.14 252)", "tonalRamp": ["oklch(0.20 0.08 252)", "oklch(0.30 0.11 252)", "oklch(0.40 0.13 252)", "oklch(0.52 0.14 252)", "oklch(0.63 0.13 252)", "oklch(0.75 0.10 252)", "oklch(0.86 0.06 252)", "oklch(0.94 0.025 252)"] },
+      "hp-teal": { "role": "secondary", "displayName": "HP Teal", "canonical": "oklch(0.53 0.11 192)", "tonalRamp": ["oklch(0.22 0.06 192)", "oklch(0.32 0.08 192)", "oklch(0.43 0.10 192)", "oklch(0.53 0.11 192)", "oklch(0.64 0.10 192)", "oklch(0.75 0.08 192)", "oklch(0.86 0.05 192)", "oklch(0.94 0.03 192)"] },
+      "vp-amber": { "role": "tertiary", "displayName": "VP Amber", "canonical": "oklch(0.58 0.12 55)", "tonalRamp": ["oklch(0.25 0.06 55)", "oklch(0.36 0.09 55)", "oklch(0.47 0.11 55)", "oklch(0.58 0.12 55)", "oklch(0.68 0.11 55)", "oklch(0.78 0.09 55)", "oklch(0.88 0.06 55)", "oklch(0.94 0.04 55)"] },
+      "paper": { "role": "neutral", "displayName": "Drafting Paper", "canonical": "oklch(0.985 0.008 90)", "tonalRamp": ["oklch(0.24 0.012 88)", "oklch(0.40 0.012 88)", "oklch(0.55 0.012 88)", "oklch(0.62 0.012 88)", "oklch(0.83 0.013 88)", "oklch(0.90 0.013 88)", "oklch(0.95 0.009 90)", "oklch(0.985 0.008 90)"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "oklch(0.24 0.012 80)", "tonalRamp": ["oklch(0.20 0.012 80)", "oklch(0.24 0.012 80)", "oklch(0.34 0.014 80)", "oklch(0.44 0.016 80)", "oklch(0.55 0.014 82)", "oklch(0.62 0.012 88)", "oklch(0.78 0.011 88)", "oklch(0.90 0.010 88)"] },
+      "success": { "role": "status", "displayName": "Success Green", "canonical": "oklch(0.56 0.10 158)", "tonalRamp": ["oklch(0.24 0.05 158)", "oklch(0.34 0.07 158)", "oklch(0.45 0.09 158)", "oklch(0.56 0.10 158)", "oklch(0.67 0.09 158)", "oklch(0.78 0.07 158)", "oklch(0.88 0.05 158)", "oklch(0.94 0.03 158)"] }
+    },
+    "typographyMeta": {
+      "title": { "displayName": "Step Title", "purpose": "The tutor's headline for the current step's idea." },
+      "lead": { "displayName": "Step Lead", "purpose": "The one-sentence explanation under the title." },
+      "body": { "displayName": "Body", "purpose": "Instructions, notes, and hint copy." },
+      "label": { "displayName": "Label / Eyebrow", "purpose": "Uppercase group titles and the Step X of 5 eyebrow." },
+      "value": { "displayName": "Numeric Value", "purpose": "Every live numeric readout and precise text entry; tabular figures." }
+    },
+    "shadows": [
+      { "name": "overlay", "value": "0 4px 16px color-mix(in srgb, #221f18 12%, transparent)", "purpose": "Warm-tinted soft shadow for transient floating overlays only: term popover, orbit-hint chip, mobile banner." },
+      { "name": "focus-halo", "value": "0 0 0 3px color-mix(in srgb, #1f66b5 26%, transparent)", "purpose": "Diffuse accent ring on focused or dragged controls." }
+    ],
+    "motion": [
+      { "name": "ease-standard", "value": "cubic-bezier(0.22, 1, 0.36, 1)", "purpose": "Out-quint easing for all state transitions; ease-out only, no bounce." },
+      { "name": "dur-fast", "value": "150ms", "purpose": "Micro feedback: hover, toggle, dismiss." },
+      { "name": "dur-base", "value": "200ms", "purpose": "Standard control-state and chip transitions." },
+      { "name": "dur-step", "value": "380ms", "purpose": "Step-panel swap (fade + translateY)." }
+    ],
+    "breakpoints": [
+      { "name": "mobile", "value": "767px", "purpose": "At or below: wizard stacks above the viewport; a dismissible 'Best experienced on desktop' banner appears. The sim is never blocked." }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one loud action per step (Add, Next, Draw, Flatten).",
+      "html": "<button class=\"ds-btn-primary\">Add solid to scene</button>",
+      "css": ".ds-btn-primary { font: 700 1rem 'Atkinson Hyperlegible', system-ui, sans-serif; min-height: 44px; padding: 0 16px; color: #faf8f3; background: #1f66b5; border: 1px solid #1f66b5; border-radius: 6px; cursor: pointer; transition: background 150ms cubic-bezier(0.22,1,0.36,1), transform 150ms cubic-bezier(0.22,1,0.36,1); } .ds-btn-primary:hover { background: #17539b; border-color: #17539b; } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, #1f66b5 26%, transparent); }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Text-only tertiary action (Reset); transparent at rest.",
+      "html": "<button class=\"ds-btn-ghost\">Reset</button>",
+      "css": ".ds-btn-ghost { font: 400 0.875rem 'Atkinson Hyperlegible', system-ui, sans-serif; min-height: 36px; padding: 0 12px; color: #564e3c; background: transparent; border: 1px solid transparent; border-radius: 6px; cursor: pointer; transition: background 150ms cubic-bezier(0.22,1,0.36,1); } .ds-btn-ghost:hover { background: #efebe1; border-color: #d9d2c3; } .ds-btn-ghost:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, #1f66b5 26%, transparent); }"
+    },
+    {
+      "name": "Parameter Slider",
+      "kind": "input",
+      "refersTo": null,
+      "description": "Thin recessed track with an accent knob; the full 44px row is the hit area.",
+      "html": "<input class=\"ds-slider\" type=\"range\" min=\"0\" max=\"90\" value=\"45\" aria-label=\"Angle, 45 degrees\" />",
+      "css": ".ds-slider { -webkit-appearance: none; appearance: none; width: 220px; height: 44px; background: transparent; cursor: pointer; } .ds-slider::-webkit-slider-runnable-track { height: 4px; border-radius: 2px; background: #cfc8b8; } .ds-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; margin-top: -6px; border-radius: 50%; background: #1f66b5; border: 2px solid #faf8f3; box-shadow: 0 0 0 1px #d9d2c3; } .ds-slider:focus-visible::-webkit-slider-thumb { background: #17539b; box-shadow: 0 0 0 1px #1f66b5, 0 0 0 3px color-mix(in srgb, #1f66b5 26%, transparent); }"
+    },
+    {
+      "name": "Drafting-Square Toggle",
+      "kind": "custom",
+      "refersTo": "toggle-box",
+      "description": "Custom checkbox as a crisp drafting square; shows a lock when disabled by the rotation hierarchy.",
+      "html": "<label class=\"ds-toggle\"><input type=\"checkbox\" checked /><span>Face inclination &rarr; HP</span></label>",
+      "css": ".ds-toggle { display: flex; align-items: center; gap: 12px; min-height: 44px; font: 400 0.875rem 'Atkinson Hyperlegible', system-ui, sans-serif; color: #221f18; cursor: pointer; } .ds-toggle input { -webkit-appearance: none; appearance: none; width: 18px; height: 18px; margin: 0; border: 1px solid #938b7b; border-radius: 4px; background: #faf8f3 no-repeat center; cursor: pointer; } .ds-toggle input:checked { background-color: #1f66b5; border-color: #1f66b5; background-image: url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='10' viewBox='0 0 12 10' fill='none'%3E%3Cpath d='M1 5L4.5 8.5L11 1.5' stroke='%23faf8f3' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E\"); } .ds-toggle input:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, #1f66b5 26%, transparent); }"
+    },
+    {
+      "name": "Numeric Input",
+      "kind": "input",
+      "refersTo": "numeric-input",
+      "description": "Precise tabular-mono entry for textbook problems; right-aligned with a unit suffix.",
+      "html": "<input class=\"ds-num\" type=\"text\" inputmode=\"decimal\" value=\"45.0\" aria-label=\"Angle, exact value\" />",
+      "css": ".ds-num { width: 4.5rem; padding: 8px; text-align: right; font: 400 0.875rem 'IBM Plex Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; color: #221f18; background: #faf8f3; border: 1px solid #d9d2c3; border-radius: 4px; } .ds-num:hover { border-color: #938b7b; } .ds-num:focus { outline: none; border-color: #1f66b5; box-shadow: 0 0 0 3px color-mix(in srgb, #1f66b5 26%, transparent); }"
+    },
+    {
+      "name": "Step Rail",
+      "kind": "nav",
+      "refersTo": "rail-marker-current",
+      "description": "The wizard's progress spine: complete (check), current (filled accent), upcoming (hollow). Shape carries state, not color alone.",
+      "html": "<ol class=\"ds-rail\"><li class=\"ds-rail__item is-complete\"><span class=\"ds-rail__dot\">&#10003;</span>Add</li><li class=\"ds-rail__item is-current\"><span class=\"ds-rail__dot\">2</span>Position</li><li class=\"ds-rail__item is-upcoming\"><span class=\"ds-rail__dot\">3</span>Label</li></ol>",
+      "css": ".ds-rail { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 16px; font: 400 0.75rem 'Atkinson Hyperlegible', system-ui, sans-serif; } .ds-rail__item { display: flex; flex-direction: column; align-items: center; gap: 4px; color: #564e3c; } .ds-rail__dot { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid #d9d2c3; background: #faf8f3; font: 700 0.875rem 'IBM Plex Mono', monospace; color: #564e3c; } .ds-rail__item.is-complete .ds-rail__dot { background: #2e7d52; border-color: #2e7d52; color: #faf8f3; } .ds-rail__item.is-current .ds-rail__dot { background: #1f66b5; border-color: #1f66b5; color: #faf8f3; box-shadow: 0 0 0 4px #e3ecf7; } .ds-rail__item.is-current { color: #221f18; font-weight: 700; } .ds-rail__item.is-upcoming { opacity: 0.5; }"
+    },
+    {
+      "name": "Inline Term Definition",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Dotted-underline term that reveals a plain-language popover on hover/focus/tap; defined on first appearance.",
+      "html": "<p style=\"font:400 1rem 'Atkinson Hyperlegible',system-ui,sans-serif;color:#221f18;\">Distance from the <span class=\"ds-term\">HP<span class=\"ds-term__pop\">The Horizontal Plane: the flat floor the solid rests above. Looking straight down gives the top view.</span></span> (horizontal floor).</p>",
+      "css": ".ds-term { position: relative; color: #17539b; text-decoration: underline dotted; text-underline-offset: 2px; cursor: help; } .ds-term__pop { position: absolute; top: calc(100% + 6px); left: 0; z-index: 10; width: max-content; max-width: 32ch; padding: 12px; font-size: 0.875rem; line-height: 1.45; text-decoration: none; color: #221f18; background: #e3ecf7; border: 1px solid #d9d2c3; border-radius: 6px; box-shadow: 0 4px 16px color-mix(in srgb, #221f18 12%, transparent); opacity: 0; visibility: hidden; transition: opacity 150ms cubic-bezier(0.22,1,0.36,1); } .ds-term:hover .ds-term__pop, .ds-term:focus-visible .ds-term__pop { opacity: 1; visibility: visible; }"
+    },
+    {
+      "name": "Hint Callout",
+      "kind": "custom",
+      "refersTo": "hint-callout",
+      "description": "Persistent accent-wash note for guidance when a step might confuse. Full tint, never a side-stripe.",
+      "html": "<p class=\"ds-hint\"><svg viewBox=\"0 0 20 20\" fill=\"none\" stroke=\"#1f66b5\" stroke-width=\"1.5\" width=\"18\" height=\"18\" aria-hidden=\"true\"><circle cx=\"10\" cy=\"10\" r=\"8\"/><path d=\"M10 9v5M10 6h.01\" stroke-linecap=\"round\"/></svg><span>Each label stays pinned to its corner as you rotate the view.</span></p>",
+      "css": ".ds-hint { display: flex; gap: 8px; align-items: flex-start; margin: 0; padding: 12px; background: #e3ecf7; border-radius: 6px; font: 400 0.875rem 'Atkinson Hyperlegible', system-ui, sans-serif; line-height: 1.5; color: #221f18; } .ds-hint svg { flex: none; margin-top: 1px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Patient Tutor's Paper",
+    "overview": "The surface a warm one-on-one tutor sketches on, beside an anxious first-year. Warm off-white drafting paper with dark warm-grey ink, deliberately not clinical, because warmth lowers intimidation. The chrome is near-monochrome and quiet so the only loud things are the geometry in the viewport and the single ink-blue accent that walks the learner from step to step. Saturation is rationed to two jobs: the functional plane encodings inside the 3D scene (HP teal, VP amber) and the one blue accent that guides the wizard. It must read as real engineering software with the intimidation stripped out, never a toy.",
+    "keyCharacteristics": [
+      "Warm drafting-paper light theme; no dark variant, no #000, no #fff.",
+      "Near-monochrome chrome plus one technical-blue accent for guidance only.",
+      "Functional viewport color (HP teal, VP amber) lives almost entirely inside the 3D scene.",
+      "Flat ink-on-paper depth: tonal layering and hairlines over shadows.",
+      "Legibility-first type (Atkinson Hyperlegible) and tabular mono numerics (IBM Plex Mono).",
+      "Soft radii, generous spacing, 44px minimum targets, every color paired with a second cue."
+    ],
+    "rules": [
+      { "name": "The Quiet Chrome Rule", "body": "The blue accent covers at most ~10% of any screen. The eye must land on the viewport, not the UI.", "section": "colors" },
+      { "name": "The Chrome-Only Blue Rule", "body": "Blue belongs to the guidance layer and never appears as a domain color in the viewport. The drawing is HP teal and VP amber. This is what lets a learner tell guidance from drawing, even on a washed-out projector.", "section": "colors" },
+      { "name": "The Two-Cue Rule", "body": "No color carries meaning alone: HP is teal plus solid weight plus label; VP is amber plus dashed weight plus label; success is green plus a check; disabled is faint plus a lock.", "section": "colors" },
+      { "name": "The Two-Weight Rule", "body": "Atkinson ships 400 and 700 only. Build hierarchy from size and the 700 bold, never a 500/600 weight that does not exist.", "section": "typography" },
+      { "name": "The Tabular Rule", "body": "Every value the math depends on is IBM Plex Mono with tabular figures, so numbers do not jitter as they update.", "section": "typography" },
+      { "name": "The Flat-Ink Rule", "body": "Surfaces are flat at rest. Never cast a shadow on the 3D solid; a shadow is only ever lifting a transient overlay off the page.", "section": "elevation" },
+      { "name": "The Border-Over-Shadow Rule", "body": "Structure comes from a single crisp hairline, not a drop shadow.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the blue accent to ~10% of the chrome and let the viewport be the loud subject.",
+      "Do keep blue in the chrome only; the drawing is HP teal (#007f7c) and VP amber (#bc5d1e).",
+      "Do pair every color signal with a second cue (dash, weight, label, icon, arrow, shape).",
+      "Do read every color from a CSS custom property; JS and Three.js read the live token, never a hard-coded hex.",
+      "Do convey depth with tonal layering (paper to panel to solid-fill) and 1px hairlines.",
+      "Do keep every interactive target at least 44px, with a visible accent focus halo.",
+      "Do build type hierarchy from size and the 700 bold; set all numerics in IBM Plex Mono tabular.",
+      "Do collapse all motion to instant under prefers-reduced-motion; the simulation still updates."
+    ],
+    "donts": [
+      "Don't put blue linework inside the viewport, or let HP read as the chrome accent.",
+      "Don't use gamified edtech devices: no mascots, confetti, badges, streaks, points, or cartoon geometry.",
+      "Don't drift glossy or architectural-viz: no glassmorphism, PBR renders, soft consumer gradients, or drop-shadow-heavy cards.",
+      "Don't reach for marketing-site polish: no gradient text, background-clip:text, hero imagery, or parallax.",
+      "Don't default to dark IDE chrome or expose every control at once.",
+      "Don't use border-left/border-right greater than 1px as a colored accent stripe.",
+      "Don't cast a shadow on the 3D solid, or use a shadow anywhere except a transient floating overlay.",
+      "Don't use #000 or #fff, a 500/600 font weight, or color as the only signal."
+    ]
+  }
+}

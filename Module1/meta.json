@@ -1,0 +1,6 @@
+{
+  "title": "Engineering Graphics — Foundations of Projection",
+  "description": "Learn technical drawing in 3D through seven interactive, orbitable guided-stepper lessons: the two reference planes (HP & VP), the types of engineering lines and dimensioning on a machine part, the four dihedral quadrants, and first-angle projection with the planes unfolding about the xy line — then two simulations for projecting points and straight lines onto the HP and VP across all four quadrants, with traces and true length. Follows First Angle Projection (SP 46:2003 / BIS).",
+  "difficulty": "beginner",
+  "tags": ["engineering-graphics", "technical-drawing", "line-types", "dimensioning", "reference-planes", "quadrants", "first-angle", "projection-of-points", "projection-of-lines", "traces", "hp-vp", "3d"]
+}

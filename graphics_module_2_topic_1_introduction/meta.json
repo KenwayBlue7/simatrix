@@ -1,0 +1,6 @@
+{
+  "title": "Introduction to Solids",
+  "description": "Explore the anatomy of 3D solids — apex, central axis OP, surface generators, and base vertices — across polyhedra (prisms, pyramids, cube) and solids of revolution (cylinders, cones).",
+  "difficulty": "beginner",
+  "tags": ["engineering-graphics", "solids", "polyhedra", "solids-of-revolution", "3d"]
+}

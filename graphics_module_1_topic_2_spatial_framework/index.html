@@ -1,0 +1,1193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light only" />
+  <!-- <title> MUST equal meta.json.title (ADR-026 / RULES.md §1.12). -->
+  <title>Spatial Framework</title>
+  <meta name="description" content="Build the projection framework itself: orbit a point through the four quadrants formed by the HP and VP, then fold the planes flat into the first-angle orthographic layout." />
+
+  <!--
+    See ../CLAUDE.md. The guided-step wizard (5-step rail + card, driven by
+    src/stepper.js from src/spatialSteps.js), the 3D content (hvPlanes.js, point.js,
+    the anim.js fold), and the CSS2D label layer (src/labelLayer.js — plane/point
+    callouts, I–IV numerals, the #fa-symbol badge) are all wired through src/main.js.
+    Platform contract: the import map, the boot watchdog, the bundled fonts, and the
+    root DESIGN.md token set (ADR-033, ADR-007 orchestrator pattern).
+
+    Three.js is loaded as CDN ES modules ONLY, pinned to 0.160.0 (RULES.md §2.2–§2.4).
+    No build step, no bundler, no npm. This import map is the exact platform contract.
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <!--
+    Boot watchdog (classic script, runs before the ES module). The sim's only runtime
+    network dependency is the pinned Three.js CDN module; if it is blocked or the
+    module fails to evaluate, init() never runs and the iframe would sit blank. This
+    arms a calm, self-healing fallback. main.js clears it on a successful boot.
+  -->
+  <script>
+    (function () {
+      window.__simBooted = false;
+      var WEBGL_COPY = {
+        title: 'Your browser could not start the 3D view',
+        body: 'This simulation needs hardware-accelerated graphics (WebGL), which looks switched off or unavailable here. Turn on hardware acceleration in your browser settings, or open this in a recent Chrome, Edge, or Firefox, then reload.',
+      };
+      window.__showSimFallback = function (variant) {
+        if (window.__simBooted) return;
+        var el = document.getElementById('sim-fallback');
+        if (!el) return;
+        if (variant === 'webgl') {
+          var t = document.getElementById('sim-fallback-title');
+          var b = document.getElementById('sim-fallback-body');
+          if (t) t.textContent = WEBGL_COPY.title;
+          if (b) b.textContent = WEBGL_COPY.body;
+        }
+        el.hidden = false;
+      };
+      window.addEventListener('error', function () {
+        if (!window.__simBooted) window.__showSimFallback();
+      });
+      window.__simBootTimer = window.setTimeout(function () {
+        if (!window.__simBooted) window.__showSimFallback();
+      }, 15000);
+      document.addEventListener('DOMContentLoaded', function () {
+        var btn = document.getElementById('sim-fallback-reload');
+        if (btn) btn.addEventListener('click', function () { window.location.reload(); });
+      });
+    })();
+  </script>
+
+  <style>
+    /*
+      Bundled web fonts (DESIGN.md typography / RULES.md §2.15). Local subset woff2 in
+      ./assets/fonts/ — no runtime Google Fonts fetch, so the sim works offline after
+      the initial load. Atkinson Hyperlegible (UI/body), IBM Plex Mono (numbers).
+    */
+    @font-face {
+      font-family: "Atkinson Hyperlegible";
+      font-style: normal; font-weight: 400; font-display: swap;
+      src: url("./assets/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Atkinson Hyperlegible";
+      font-style: normal; font-weight: 700; font-display: swap;
+      src: url("./assets/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "IBM Plex Mono";
+      font-style: normal; font-weight: 400; font-display: swap;
+      src: url("./assets/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+    }
+
+    /*
+      ============================================================
+      Design tokens — Simatrix "Modern Drafting Bench" (light, locked)
+      ============================================================
+      Single runtime source of truth for colour/space/motion. JS reads these via
+      getComputedStyle(...).getPropertyValue('--token') — never hard-codes hex
+      (RULES.md §4.1). Mirrors the root DESIGN.md token table exactly (§2.1). Unlike
+      the Foundations topic, the HP/VP/PP plane hues ARE kept here — this topic's
+      whole subject is the HP/VP quadrant framework and the first-angle fold, so
+      `--color-hp-line` / `--color-vp-line` will be load-bearing once the plane and
+      projection leaf modules are built. `--color-pp-line` stays defined-but-unused
+      (Module 1 convention, DESIGN.md §7/§8) unless a profile view is added later.
+    */
+    :root {
+      /* --- Surfaces (clinical palette: neutral gray + white working surfaces, tonal layering not shadows) --- */
+      --color-paper:        #ffffff; /* pure-white base */
+      --color-panel:        #f5f5f5; /* neutral grey working surface — one tonal step BELOW paper */
+      --color-solid-fill:   #e7e1d4; /* solid faces, so ink edges read */
+
+      /* --- Ink (warm near-black) --- */
+      --color-ink:          #221f18;
+      --color-ink-secondary:#564e3c;
+
+      /* --- Mid neutral --- */
+      --color-bench-grey:   #938b7b;
+      --color-border:       #d9d2c3;
+      --color-track:        #cfc8b8;
+
+      /* --- The one interaction accent (technical blue) — chrome only (§4.5) --- */
+      --color-accent:        #1f66b5;
+      --color-accent-strong: #17539b;
+      --color-accent-soft:   #e3ecf7;
+      --color-focus:         var(--color-accent);
+      --ring-focus:          0 0 0 3px color-mix(in srgb, var(--color-accent) 26%, transparent);
+      --shadow-md:           0 4px 16px color-mix(in srgb, var(--color-ink) 12%, transparent);
+
+      /* --- Status (UI only, always paired with an icon — §4.6) --- */
+      --color-success:       #2e7d52;
+      --color-success-soft:  #e2efe8;
+
+      /* --- Functional projection-plane encodings (Two-Cue Rule, DESIGN.md §2.1/§2.3) --- */
+      --color-hp-line: #007f7c; /* HP Teal — solid */
+      --color-vp-line: #bc5d1e; /* VP Amber — dashed */
+      --color-pp-line: #7a5ea6; /* PP Violet — defined-but-unused in Module 1 today */
+
+      /* --- Spacing scale (4px base) --- */
+      --space-1: 4px;  --space-2: 8px;  --space-3: 12px;
+      --space-4: 16px; --space-5: 24px; --space-6: 32px;
+
+      /* --- Radius --- */
+      --radius-xs: 4px; --radius-sm: 6px; --radius-md: 10px;
+
+      /* --- Type --- */
+      --font-sans: "Atkinson Hyperlegible", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", monospace;
+      --text-xs: 0.75rem; --text-sm: 0.875rem; --text-base: 1rem;
+      --text-lead: 1.125rem; --text-title: 1.35rem;
+
+      /* --- Motion (subtle ease-out — DESIGN.md) --- */
+      --dur-fast: 150ms; --dur-base: 200ms; --dur-step: 380ms;
+      --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+
+      /* --- Layering (rungs from the platform z-ladder, DESIGN.md §4.3) --- */
+      --z-term: 60;
+      --z-notice: 100;
+    }
+
+    /* ============================================================
+       Normalize / base
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      font-size: var(--text-base);
+      color: var(--color-ink);
+      background: var(--color-paper);
+      overflow: hidden;
+      font-variant-numeric: tabular-nums;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      display: flex;
+      flex-direction: row;
+      position: relative;
+    }
+    button { font: inherit; color: inherit; }
+
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
+
+    /* ============================================================
+       Viewport — WebGL canvas mounts here (main.js)
+       ============================================================ */
+    #sim-viewport {
+      position: relative;
+      flex: 1 1 0;
+      min-width: 0;
+      height: 100%;
+      background: var(--color-paper);
+      order: 1; /* viewport on the LEFT, wizard on the right */
+    }
+    #sim-viewport canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none; /* drag-to-orbit, no scroll/zoom hijack */
+      -webkit-user-select: none;
+      user-select: none;
+    }
+    .vp-hint {
+      position: absolute;
+      bottom: var(--space-4);
+      left: var(--space-4);
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--color-paper) 88%, transparent);
+      border: 1px solid var(--color-border);
+      color: var(--color-ink-secondary);
+      font-size: var(--text-sm);
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    /* CSS2D viewport labels (src/labelLayer.js) — live DOM nodes (CSS2DObject) the
+       renderer re-projects every frame, so they stay vector-sharp at any zoom
+       (RULES.md §3.27). Colours ride the same tokens as the geometry they name;
+       chips take the boxed "engineering software" look (Module 1's .lbl--chip:
+       border in currentColor over a paper-tinted wash). Never intercept pointer
+       events, so drag-to-orbit passes through. */
+    .lbl {
+      line-height: 1;
+      white-space: nowrap;
+      user-select: none;
+      pointer-events: none;
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: var(--text-sm);
+    }
+    .lbl--chip {
+      background: color-mix(in srgb, var(--color-paper) 88%, transparent);
+      border: 1px solid currentColor;
+      border-radius: var(--radius-xs);
+      padding: 2px 5px;
+      font-size: var(--text-xs);
+    }
+    .lbl--hp { color: var(--color-hp-line); }
+    .lbl--vp { color: var(--color-vp-line); }
+    .lbl--ink { color: var(--color-ink); }
+    .lbl--xy { color: var(--color-ink); font-size: var(--text-xs); }
+    /* Quadrant numerals I–IV: the room P occupies reads ink + 700; the others
+       recede to bench grey + 400 — colour is never the only cue (Two-Cue, §4.6).
+       They sit over the dense grid "cage", so each gets a solid --color-paper backdrop
+       with a hairline --color-border edge (a boxed chip) to pop clearly off the linework;
+       the active/inactive state stays cued by text colour + weight, not the box. */
+    .lbl--quad {
+      color: var(--color-bench-grey);
+      font-weight: 400;
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xs);
+      padding: 1px 7px;
+    }
+    .lbl--quad.is-active { color: var(--color-ink); font-weight: 700; border-color: var(--color-ink-secondary); }
+
+    /* First-angle symbol badge (SP 46:2003) — bottom-right of the viewport, faded
+       in by src/labelLayer.js on the steps that set showSymbol (step 5). Ported
+       from Module 1's shell.css so the badge reads identically across the family.
+       The global [hidden] rule handles display:none. */
+    .fa-symbol {
+      position: absolute;
+      right: var(--space-4);
+      bottom: var(--space-4);
+      z-index: 6;
+      width: 76px;
+      padding: var(--space-2) var(--space-3);
+      background: color-mix(in srgb, var(--color-paper) 90%, transparent);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      color: var(--color-ink);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity var(--dur-base) var(--ease-standard);
+    }
+    .fa-symbol.is-visible { opacity: 1; }
+    .fa-symbol svg { display: block; width: 100%; height: auto; }
+
+    /* ============================================================
+       Wizard dock (right) — guided-step rail + card. stepper.js owns
+       this chrome (renders copy from spatialSteps.js, gates Next);
+       the parameter controls for HP/VP distances arrive with the
+       geometry leaves (see ../CLAUDE.md).
+       ============================================================ */
+    #wizard {
+      order: 2;
+      flex: 0 0 auto;
+      width: clamp(340px, 34vw, 460px);
+      height: 100%;
+      background: var(--color-panel);
+      border-left: 1px solid var(--color-border);
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-5) var(--space-4);
+      overflow: hidden;
+    }
+    /* The card + rail sit side by side in one row beneath the column-level
+       wizard chrome, so those two can pin across the full panel width
+       (DESIGN.md §4.5). */
+    .wizard-main {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: row;
+      gap: var(--space-4);
+    }
+    #step-card {
+      flex: 1 1 auto;
+      min-width: 0;
+      order: 1; /* card first (left within the wizard), rail after it */
+      display: flex;
+      flex-direction: column;
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-5) var(--space-4);
+      overflow-y: auto;
+    }
+    /* Floating padded scrollbar pill — platform standard (DESIGN.md §5.11, ADR-032). A 10px WebKit
+       channel with a ~4px thumb that floats clear of both edges via a 3px transparent border +
+       background-clip:padding-box, tinted to --color-border on a transparent track. IMPORTANT:
+       `scrollbar-width` stays UNSET on the base rule so Chrome 121+ keeps the pseudo-elements; it is
+       set to `thin` for Firefox only, in the @supports guard below. */
+    #step-card::-webkit-scrollbar { width: 10px; }
+    #step-card::-webkit-scrollbar-track { background: transparent; }
+    #step-card::-webkit-scrollbar-thumb {
+      background: var(--color-border);
+      background-clip: padding-box;
+      border: 3px solid transparent;
+      border-radius: 999px;
+    }
+    @supports (-moz-appearance: none) {
+      #step-card {
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-border) transparent;
+      }
+    }
+    .card__eyebrow {
+      margin: 0 0 var(--space-1);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--color-ink-secondary);
+    }
+    .card__title {
+      margin: 0 0 var(--space-2);
+      font-size: var(--text-title);
+      line-height: 1.2;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .card__lead {
+      margin: 0;
+      max-width: 60ch;
+      font-size: var(--text-sm);
+      line-height: 1.55;
+      color: var(--color-ink-secondary);
+    }
+    .card__body {
+      margin-top: var(--space-3);
+      font-size: var(--text-sm);
+      line-height: 1.55;
+    }
+    .card__body p { margin: 0 0 var(--space-3); max-width: 60ch; }
+    .card__body b { font-weight: 700; }
+    /* Inline glossary terms — dotted underline is the second cue (Two-Cue Rule);
+       src/terms.js reveals the #term-pop definition on hover / focus / tap. */
+    .term {
+      padding: 0;
+      border: 0;
+      background: none;
+      cursor: help;
+      color: var(--color-accent-strong);
+      border-bottom: 1px dotted var(--color-accent-strong);
+      font-size: inherit;
+      line-height: inherit;
+    }
+
+    /* Inline term-definition popover (DESIGN.md §5.7) — ONE fixed #term-pop for
+       the whole wizard (the Module-1 family singleton on the z-ladder's --z-term
+       rung), filled from the TERMS glossary and placed by src/terms.js. Fixed so
+       it escapes the step card's overflow clip; flips above the term when out of
+       room below. pointer-events off so it never steals the hover that opened
+       it. Reveal is JS-driven (.is-open) so it is positioned before it shows;
+       the transition collapses to instant under reduced motion (global rule). */
+    #term-pop {
+      position: fixed;
+      z-index: var(--z-term);
+      max-width: 32ch;
+      padding: var(--space-3);
+      font-size: var(--text-sm);
+      line-height: 1.45;
+      color: var(--color-ink);
+      background: var(--color-accent-soft);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(4px) scale(0.96);
+      transform-origin: top left;
+      transition: opacity var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard),
+                  visibility 0s linear var(--dur-fast);
+    }
+    #term-pop.is-open { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+    #term-pop .term-pop__title { display: block; font-weight: 700; margin-bottom: 2px; }
+    .card__hint {
+      margin: var(--space-2) 0 0;
+      padding: var(--space-3) var(--space-4);
+      background: var(--color-accent-soft);
+      border: 1px solid color-mix(in srgb, var(--color-accent) 25%, var(--color-border));
+      border-radius: var(--radius-sm);
+      font-size: var(--text-sm);
+      line-height: 1.5;
+    }
+
+    /* --- Step rail: vertical numbered spine with a hairline connector.
+       Byte-identical to the Module-1 family master (Topic 1 / Module 2): the <ol>
+       IS the rail — a flex column with justify-content:space-between, so the five
+       markers spread evenly across the FULL height of the card, and the ::before
+       spine (top:30px / bottom:30px) reaches from the first marker centre to the
+       last. --- */
+    #step-rail {
+      position: relative;
+      flex: 0 0 auto;
+      order: 2; /* rail sits to the RIGHT of the card (card comes first) */
+      width: 64px;
+      margin: 0;
+      padding: var(--space-2) 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    /* The connecting spine sits behind the markers; opaque markers cover it
+       between steps so it reads as one continuous line. */
+    #step-rail::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 30px;
+      bottom: 30px;
+      width: 2px;
+      transform: translateX(-50%);
+      background: var(--color-border);
+    }
+    .rail__item {
+      position: relative;
+      display: flex; /* lays out the single full-height button child */
+    }
+    /* Marker + label wrapped in a real button so completed / current steps are
+       keyboard-focusable jump targets; upcoming steps render disabled. */
+    .rail__btn {
+      flex: 1 1 auto;
+      min-width: 44px; /* honours the 44px target floor even for short labels */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-1);
+      margin: 0;
+      padding: var(--space-1) 0;
+      border: 0;
+      background: none;
+      font: inherit;
+      color: inherit;
+      text-align: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .rail__btn:disabled { cursor: default; }
+    .rail__marker {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 1.5px solid var(--color-border);
+      border-radius: 50%;
+      background: var(--color-paper); /* opaque — masks the spine between markers */
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      font-weight: 700;
+      color: var(--color-ink-secondary);
+      transition: background var(--dur-base) var(--ease-standard),
+                  border-color var(--dur-base) var(--ease-standard),
+                  color var(--dur-base) var(--ease-standard),
+                  box-shadow var(--dur-base) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .rail__label {
+      font-size: var(--text-xs);
+      line-height: 1.2;
+      color: var(--color-ink-secondary);
+      max-width: 60px;
+    }
+    /* State cues are never colour-alone (Two-Cue Rule): upcoming = hollow + faint;
+       current = filled accent + bold label; complete = filled success + ✓ glyph. */
+    .rail__item.is-upcoming .rail__marker { opacity: 0.5; }
+    .rail__item.is-upcoming .rail__label  { opacity: 0.5; }
+    .rail__item.is-current .rail__marker {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: var(--color-paper);
+      box-shadow: 0 0 0 4px var(--color-accent-soft);
+    }
+    .rail__item.is-current .rail__label { color: var(--color-ink); font-weight: 700; }
+    .rail__item.is-complete .rail__marker {
+      background: var(--color-success);
+      border-color: var(--color-success);
+      color: var(--color-paper);
+    }
+    .rail__item.is-complete .rail__label { color: var(--color-ink-secondary); }
+    .rail__btn:active:not(:disabled) .rail__marker { transform: scale(0.94); }
+    .rail__btn:focus-visible { outline: none; }
+    .rail__btn:focus-visible .rail__marker { box-shadow: var(--ring-focus); }
+
+    /* --- Per-step action panels (progressive disclosure) --- */
+    .step-panel {
+      margin-top: var(--space-4);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--color-border);
+    }
+    .panel__label {
+      margin: 0 0 var(--space-2);
+      font-size: var(--text-sm);
+      font-weight: 700;
+    }
+    .quad-picker { display: flex; gap: var(--space-2); }
+    .quad-btn { flex: 1 1 0; min-width: 44px; font-family: var(--font-mono); }
+    .quad-btn[aria-pressed="true"] {
+      background: var(--color-accent-soft);
+      border-color: var(--color-accent);
+      box-shadow: inset 0 0 0 1px var(--color-accent);
+    }
+    .fold-actions { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: var(--space-3); }
+    /* Orbit-lock cue: a drag on the rotate-locked flat answer sheet nudges the Unfold button
+       (main.js cueOrthoLock) — "unfold to orbit". Reduced motion keeps the ring, drops the shake. */
+    @keyframes qvLockNudge {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-3px); }
+      40% { transform: translateX(3px); }
+      60% { transform: translateX(-2px); }
+      80% { transform: translateX(2px); }
+    }
+    .qv-lock-cue { animation: qvLockNudge 320ms var(--ease-standard); box-shadow: var(--ring-focus); }
+    @media (prefers-reduced-motion: reduce) { .qv-lock-cue { animation: none; } }
+    .done-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      color: var(--color-success);
+      font-size: var(--text-sm);
+      font-weight: 700;
+    }
+
+    /* --- Card navigation (Back / Next) --- */
+    .card__nav {
+      margin-top: auto;
+      padding-top: var(--space-4);
+      display: flex;
+      justify-content: space-between;
+      gap: var(--space-3);
+    }
+    .card__nav #btn-next { margin-left: auto; }
+    .btn:disabled { opacity: 0.55; cursor: default; }
+
+    :where(button, [tabindex]):focus-visible {
+      outline: none;
+      box-shadow: var(--ring-focus);
+    }
+
+    /* ============================================================
+       Point P control group — the native Module-2 control primitives
+       (.dock__group / .dock__group-title / .field), reused inside the step
+       card. There is NO separate "parameter dock": #controls is revealed by
+       src/uiManager.js as part of the card's progressive disclosure (present
+       only while the point is on stage), so the sliders read as native step
+       content. Token-only, flat ink-on-paper — identical to the Module 2 master.
+       ============================================================ */
+    #controls { margin-top: var(--space-5); }
+    .dock__group { display: flex; flex-direction: column; gap: var(--space-3); }
+    .dock__group-title {
+      margin: 0 0 var(--space-1);
+      padding-bottom: var(--space-2);
+      font-size: var(--text-xs);
+      font-weight: 700; /* Two-Weight Rule: the Label role (700, uppercase eyebrow) per DESIGN.md */
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--color-ink-secondary);
+      border-bottom: 1px solid var(--color-border);
+    }
+    .dock__note {
+      margin: 0;
+      max-width: 60ch;
+      font-size: var(--text-sm);
+      line-height: 1.45;
+      color: var(--color-ink-secondary);
+    }
+
+    /* --- Slider + numeric field (Module 2 dock pattern) --- */
+    .field { display: flex; flex-direction: column; gap: var(--space-1); }
+    .field__label {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-2);
+      font-size: var(--text-sm);
+    }
+    .field__name { color: var(--color-ink); }
+    .field__row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      min-height: 44px; /* touch target */
+    }
+    .field__range {
+      flex: 1 1 auto;
+      min-width: 0;
+      height: 44px;            /* full 44px touch/hit target around a thin 4px track */
+      margin: 0;
+      background: transparent; /* track is drawn on the pseudo-elements below */
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .field__range::-webkit-slider-runnable-track { height: 3px; border-radius: 999px; background: var(--color-track); }
+    .field__range::-moz-range-track { height: 3px; border-radius: 999px; background: var(--color-track); }
+    .field__range::-moz-range-progress { height: 3px; border-radius: 999px; background: var(--color-accent); }
+    .field__range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      margin-top: -5.5px;      /* centre the 14px dot on the 3px track */
+      border-radius: 50%;
+      background: var(--color-accent);
+      border: none;            /* minimal borderless dot */
+      box-shadow: none;
+      transition: box-shadow var(--dur-fast) var(--ease-standard),
+                  background var(--dur-fast) var(--ease-standard);
+    }
+    .field__range::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      border: none;
+      box-shadow: none;
+      transition: box-shadow var(--dur-fast) var(--ease-standard),
+                  background var(--dur-fast) var(--ease-standard);
+    }
+    .field__range:focus-visible { outline: none; }
+    .field__range:focus-visible::-webkit-slider-thumb,
+    .field__range:active::-webkit-slider-thumb {
+      background: var(--color-accent-strong);
+      box-shadow: var(--ring-focus);
+    }
+    .field__range:focus-visible::-moz-range-thumb,
+    .field__range:active::-moz-range-thumb {
+      background: var(--color-accent-strong);
+      box-shadow: var(--ring-focus);
+    }
+    .field__range:disabled { cursor: not-allowed; }
+    .field__range:disabled::-webkit-slider-thumb { background: var(--color-bench-grey); }
+    .field__range:disabled::-moz-range-thumb     { background: var(--color-bench-grey); }
+    .field__num {
+      flex: 0 0 auto;
+      width: 4.5rem;
+      padding: var(--space-2);
+      text-align: right;
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      font-variant-numeric: tabular-nums;
+      color: var(--color-ink);
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xs);
+      transition: border-color var(--dur-fast) var(--ease-standard),
+                  box-shadow var(--dur-fast) var(--ease-standard);
+    }
+    .field__num:focus,
+    .field__select:focus {
+      outline: none;
+      border-color: var(--color-accent);
+      box-shadow: var(--ring-focus);
+    }
+    .field__unit {
+      flex: 0 0 auto;
+      width: 2ch; /* "mm" */
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--color-ink-secondary);
+    }
+    .field__select {
+      width: 100%;
+      min-height: 44px;
+      padding: var(--space-2) var(--space-5) var(--space-2) var(--space-3);
+      font: inherit;
+      font-size: var(--text-sm);
+      color: var(--color-ink);
+      background-color: var(--color-paper);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23564e3c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right var(--space-3) center;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xs);
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+      transition: border-color var(--dur-fast) var(--ease-standard),
+                  box-shadow var(--dur-fast) var(--ease-standard);
+    }
+    input:disabled, select:disabled { opacity: 0.45; cursor: not-allowed; }
+    .field--disabled .field__name { opacity: 0.55; }
+
+    /* ============================================================
+       Mobile advisory — banner only, never blocks the sim (§2.13)
+       ============================================================ */
+    #mobile-notice {
+      position: fixed;
+      left: var(--space-4);
+      right: var(--space-4);
+      bottom: var(--space-4);
+      z-index: var(--z-notice);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      padding: var(--space-3) var(--space-4);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+    }
+    #mobile-notice .notice__text { margin: 0; font-size: var(--text-sm); }
+    .notice__dismiss {
+      flex: 0 0 auto;
+      min-height: 40px;
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-paper);
+      cursor: pointer;
+    }
+
+    /* ============================================================
+       WebGL context-loss chip + boot/runtime fallback
+       ============================================================ */
+    .sim-restoring {
+      position: fixed;
+      top: var(--space-4);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 150;
+      padding: var(--space-2) var(--space-4);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+      font-size: var(--text-sm);
+    }
+
+    /* Success toast — the calm "lesson complete" win confirmation (Module 2
+       pattern, ported from the Topic 1 sibling). Fixed top-centre, success green
+       + a check glyph (Two-Cue Rule), never gamified fanfare. z-index 130: below
+       the context-lost chip (150), matching the sibling. aria-hidden: #sim-status
+       already narrates the win, so this is not a second live region. Fades via
+       .is-visible (instant under reduced motion). */
+    .sim-toast {
+      position: fixed;
+      left: 50%;
+      top: var(--space-5);
+      transform: translateX(-50%);
+      z-index: 130;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-4);
+      font-size: var(--text-sm);
+      color: var(--color-ink);
+      background: var(--color-success-soft);
+      border: 1px solid var(--color-success);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+      opacity: 0;
+      transition: opacity var(--dur-base) var(--ease-standard);
+    }
+    .sim-toast.is-visible { opacity: 1; }
+    .sim-toast[hidden] { display: none; }
+    .sim-toast__icon { flex: none; width: 20px; height: 20px; color: var(--color-success); }
+    .sim-fallback {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-6);
+      background: var(--color-paper);
+    }
+    .sim-fallback__inner { max-width: 30rem; text-align: center; }
+    .sim-fallback__icon { width: 48px; height: 48px; color: var(--color-bench-grey); margin-bottom: var(--space-4); }
+    .sim-fallback__title { font-size: var(--text-title); margin: 0 0 var(--space-3); }
+    .sim-fallback__body { color: var(--color-ink-secondary); line-height: 1.5; margin: 0 0 var(--space-5); }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      min-height: 44px;
+      padding: var(--space-3) var(--space-4);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      font-size: var(--text-base);
+      font-weight: 400;
+      cursor: pointer;
+      transition: border-color var(--dur-fast) var(--ease-standard),
+                  background var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .btn:active:not(:disabled) { transform: scale(0.97); }
+    .btn--primary {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: var(--color-panel);
+    }
+    .btn--primary:hover:not(:disabled) { background: var(--color-accent-strong); border-color: var(--color-accent-strong); }
+    /* Ghost (Reset) — Module 2 parity: smaller, borderless, secondary ink. */
+    .btn--ghost {
+      min-height: 36px;
+      padding: 0 var(--space-3);
+      font-size: var(--text-sm);
+      font-weight: 400;
+      color: var(--color-ink-secondary);
+      background: transparent;
+      border-color: transparent;
+    }
+    .btn--block { width: 100%; }
+
+    /* Inline two-state Reset confirm (Module 2 pattern): the ghost Reset arms into
+       "Reset everything? · Yes / Cancel" on this same spot, so a stray click can't
+       wipe progress. Back / Next step aside while armed; only "Yes" resets. */
+    #reset-control { margin-right: auto; } /* ghost Reset pinned left of Back / Next */
+    .card__nav.is-reset-armed #btn-back,
+    .card__nav.is-reset-armed #btn-next { display: none; }
+    .reset-confirm {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-1) var(--space-2);
+      font-size: var(--text-sm);
+      animation: resetConfirmIn var(--dur-fast) var(--ease-standard);
+    }
+    .reset-confirm[hidden] { display: none; }
+    .reset-confirm__prompt { color: var(--color-ink); }
+    .reset-confirm__sep { color: var(--color-bench-grey); user-select: none; }
+    .reset-confirm .reset-confirm__action { min-height: 44px; padding: 0 var(--space-2); }
+    @keyframes resetConfirmIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* ---- Wizard hide/show toggle (Module 2 pattern): a floating chevron pinned to the
+       viewport's top-right. Collapses the step panel for a larger 3D view; the chevron
+       flips when collapsed and the viewport reflows to full width via flex (the
+       ResizeObserver in main.js re-syncs the renderer). */
+    .wizard-toggle {
+      position: absolute;
+      top: var(--space-3);
+      right: var(--space-3);
+      z-index: 5;
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .wizard-toggle:hover { background: var(--color-paper); border-color: var(--color-bench-grey); color: var(--color-ink); }
+    }
+    .wizard-toggle:active { transform: scale(0.97); }
+    .wizard-toggle:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .wizard-toggle__icon {
+      width: 20px;
+      height: 20px;
+      transition: transform var(--dur-base) var(--ease-standard);
+    }
+    /* Collapsed: drop the wizard out of the flex row (viewport takes the space)
+       and flip the chevron to point back toward where the panel will reappear. */
+    body.wizard-collapsed #wizard { display: none; }
+    body.wizard-collapsed .wizard-toggle__icon { transform: rotate(180deg); }
+
+    /* ============================================================
+       Reduced motion — collapse animation to instant (§4.13)
+       ============================================================ */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+
+    /* Narrow screens: shrink the wizard, stack the card above the rail, and reflow
+       the vertical spine into a horizontal strip (family standard). The mobile notice
+       advises desktop; the sim still runs. */
+    @media (max-width: 767px) {
+      #wizard { width: 300px; }
+      .wizard-main { flex-direction: column; }
+      #step-card { order: 1; flex: 1 1 auto; min-height: 0; }
+      #step-rail {
+        order: 2;
+        flex: 0 0 auto;
+        flex-direction: row;
+        width: 100%;
+        padding: var(--space-3) 0 0;
+      }
+      #step-rail::before {
+        left: 30px;
+        right: 30px;
+        top: calc(var(--space-3) + 17px);
+        bottom: auto;
+        width: auto;
+        height: 2px;
+        transform: translateY(-50%);
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Boot/runtime failure fallback (CDN blocked, connection dropped, or WebGL off).
+       Calm, on-brand, never a raw error trace. role="alert" so AT announces it. -->
+  <div id="sim-fallback" class="sim-fallback" role="alert" hidden>
+    <div class="sim-fallback__inner">
+      <svg class="sim-fallback__icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M24 8 40 17 24 26 8 17Z" />
+        <path d="M40 17V31L24 40 8 31V17" />
+        <path d="M8.5 8.5 39.5 39.5" />
+      </svg>
+      <h1 class="sim-fallback__title" id="sim-fallback-title">We could not load the simulation</h1>
+      <p class="sim-fallback__body" id="sim-fallback-body">It looks like the connection dropped while the 3D tools were starting up. Check your internet connection, then reload to try again.</p>
+      <button type="button" class="btn btn--primary" id="sim-fallback-reload">Reload the simulation</button>
+    </div>
+  </div>
+
+  <!-- Transient WebGL context-loss recovery chip (GPU reset / long backgrounding). -->
+  <div id="sim-context-lost" class="sim-restoring" role="status" hidden>
+    <span>Restoring the 3D view&hellip;</span>
+  </div>
+
+  <!-- Success toast — the "lesson complete" win. aria-hidden: #sim-status narrates it. -->
+  <div id="sim-toast" class="sim-toast" aria-hidden="true" hidden>
+    <svg class="sim-toast__icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 10.5 8.5 15 16 5.5" />
+    </svg>
+    <span class="sim-toast__text"></span>
+  </div>
+
+  <!-- Mobile advisory. Hidden until main.js confirms a < 768px viewport. -->
+  <aside id="mobile-notice" role="status" hidden>
+    <p class="notice__text">Best experienced on desktop.</p>
+    <button id="mobile-notice-dismiss" class="notice__dismiss" type="button">Dismiss</button>
+  </aside>
+
+  <!-- ============================================================
+       Viewport — the HP/VP scene (main.js orchestrates the geometry
+       leaves; src/labelLayer.js owns the CSS2D names + the badge below)
+       ============================================================ -->
+  <main id="sim-viewport" aria-label="Engineering graphics viewport.">
+    <!-- Hide/show the guided-steps panel to enlarge the 3D view. Floats over the
+         canvas so it stays reachable in both states (inline chrome script toggles
+         the body class; the ResizeObserver in main.js re-syncs the renderer). -->
+    <button id="wizard-toggle" class="wizard-toggle" type="button" aria-controls="wizard" aria-expanded="true" title="Hide steps panel">
+      <svg class="wizard-toggle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 6l6 6-6 6" />
+      </svg>
+      <span class="sr-only">Toggle steps panel</span>
+    </button>
+
+    <p class="vp-hint">Drag to orbit · scroll to zoom</p>
+
+    <!-- First-angle projection symbol badge (SP 46:2003): revealed by
+         src/labelLayer.js while a step sets showSymbol (step 5 — The Standard).
+         Decorative confirmation — the step card carries the explanation — so it
+         stays aria-hidden. Markup ported from Module 1's chrome.js. -->
+    <div id="fa-symbol" class="fa-symbol" aria-hidden="true" hidden>
+      <svg viewBox="0 0 96 40" fill="none" stroke="currentColor" stroke-width="1.6"
+           stroke-linejoin="round" aria-hidden="true">
+        <path d="M8 8 L8 32 L40 26 L40 14 Z"/>
+        <circle cx="66" cy="20" r="12"/><circle cx="66" cy="20" r="6"/>
+      </svg>
+    </div>
+  </main>
+
+  <!-- ============================================================
+       Wizard — guided-step rail + card. stepper.js drives everything
+       here: copy renders from spatialSteps.js, panels reveal per step,
+       Next gates on completion. Rail labels mirror STEPS titles.
+       ============================================================ -->
+  <aside id="wizard" aria-label="Guided steps">
+    <div class="wizard-main">
+    <!-- Step rail — the vertical numbered spine (family standard: the <ol> IS the
+         rail, a flex column with justify-content:space-between so the markers spread
+         evenly over the full card height, exactly like Module 2 / Topic 1). -->
+    <ol id="step-rail" aria-label="Lesson steps">
+      <li class="rail__item" data-step="1"><button type="button" class="rail__btn"><span class="rail__marker" aria-hidden="true">1</span><span class="rail__label">Reference Planes</span></button></li>
+      <li class="rail__item" data-step="2"><button type="button" class="rail__btn"><span class="rail__marker" aria-hidden="true">2</span><span class="rail__label">Four Quadrants</span></button></li>
+      <li class="rail__item" data-step="3"><button type="button" class="rail__btn"><span class="rail__marker" aria-hidden="true">3</span><span class="rail__label">First-Angle Setup</span></button></li>
+      <li class="rail__item" data-step="4"><button type="button" class="rail__btn"><span class="rail__marker" aria-hidden="true">4</span><span class="rail__label">Fold (Rabattement)</span></button></li>
+      <li class="rail__item" data-step="5"><button type="button" class="rail__btn"><span class="rail__marker" aria-hidden="true">5</span><span class="rail__label">Standard</span></button></li>
+    </ol>
+
+    <section id="step-card">
+      <p class="card__eyebrow">Step <span id="step-current">1</span> of <span id="step-total">5</span></p>
+      <h2 class="card__title" id="step-title"></h2>
+      <p class="card__lead" id="step-lead"></p>
+      <div class="card__body" id="step-body"></div>
+      <p class="card__hint" id="step-hint" hidden></p>
+
+      <!-- Step 2 — move P between the four rooms. Roman numerals match the
+           viewport's I–IV labels; the aria-labels carry the plain-words meaning. -->
+      <div class="step-panel" data-step="2" hidden>
+        <p class="panel__label" id="quad-label">Move point P amongst Quadrants</p>
+        <div class="quad-picker" role="group" aria-labelledby="quad-label">
+          <button type="button" class="btn quad-btn" data-quadrant="Q1" aria-pressed="true"
+                  aria-label="Quadrant one — above HP, in front of VP">I</button>
+          <button type="button" class="btn quad-btn" data-quadrant="Q2" aria-pressed="false"
+                  aria-label="Quadrant two — above HP, behind VP">II</button>
+          <button type="button" class="btn quad-btn" data-quadrant="Q3" aria-pressed="false"
+                  aria-label="Quadrant three — below HP, behind VP">III</button>
+          <button type="button" class="btn quad-btn" data-quadrant="Q4" aria-pressed="false"
+                  aria-label="Quadrant four — below HP, in front of VP">IV</button>
+        </div>
+      </div>
+
+      <!-- Step 4 — the fold trigger. Reversible; folding unlocks Next. -->
+      <div class="step-panel" data-step="4" hidden>
+        <div class="fold-actions">
+          <button type="button" class="btn btn--primary btn--block" id="btn-fold">Fold HP down</button>
+          <button type="button" class="btn btn--block" id="btn-unfold" hidden>Unfold back to 3D</button>
+          <span class="done-badge" id="done-fold" hidden>✓ Folded into the first-angle layout</span>
+        </div>
+      </div>
+
+      <!-- ============================================================
+           Point P controls — a NATIVE Module-2 control group (.dock__group /
+           .field), NOT a separate "parameter dock". src/uiManager.js reveals
+           #controls through the card's progressive disclosure: the group only
+           exists while the point is on stage (hidden on steps 1 and 5, shown
+           steps 2–4), so it reads as part of the current step rather than a
+           bolted-on panel. Every change routes through simController.commit(),
+           never the scene directly (RULES.md §3.2). Values are the lesson's mm
+           (ADR-018). uiManager binds by the control IDs below, so this block
+           works wherever it sits in the card. ================================ -->
+      <div id="controls" hidden>
+        <div class="dock__group" role="group" aria-labelledby="controls-title">
+          <h3 class="dock__group-title" id="controls-title">Point&nbsp;P</h3>
+          <p class="dock__note">Distances are in millimetres (mm). 1 world unit = 10 mm.</p>
+
+          <div class="field" id="field-disthp">
+            <label class="field__label" for="rng-disthp"><span class="field__name">Distance from HP</span></label>
+            <div class="field__row">
+              <input class="field__range" type="range" id="rng-disthp" min="1" max="40" step="1" />
+              <input class="field__num" type="text" id="num-disthp" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Distance from horizontal plane, exact value in millimetres" />
+              <span class="field__unit" aria-hidden="true">mm</span>
+            </div>
+          </div>
+
+          <div class="field" id="field-distvp">
+            <label class="field__label" for="rng-distvp"><span class="field__name">Distance from VP</span></label>
+            <div class="field__row">
+              <input class="field__range" type="range" id="rng-distvp" min="1" max="40" step="1" />
+              <input class="field__num" type="text" id="num-distvp" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Distance from vertical plane, exact value in millimetres" />
+              <span class="field__unit" aria-hidden="true">mm</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card__nav">
+        <!-- Ghost Reset routes through the single simAPI.reset() path (RULES.md §2.9),
+             guarded by the two-state confirm (inline chrome script). -->
+        <div id="reset-control">
+          <button id="btn-reset" class="btn btn--ghost" type="button">Reset</button>
+          <div id="reset-confirm" class="reset-confirm" role="group" aria-label="Reset confirmation" hidden>
+            <span class="reset-confirm__prompt">Reset everything?</span>
+            <span class="reset-confirm__sep" aria-hidden="true">·</span>
+            <button id="btn-reset-yes" class="btn btn--ghost reset-confirm__action" type="button" aria-label="Yes, reset everything">Yes</button>
+            <span class="reset-confirm__sep" aria-hidden="true">/</span>
+            <button id="btn-reset-cancel" class="btn btn--ghost reset-confirm__action" type="button" aria-label="Cancel reset">Cancel</button>
+          </div>
+        </div>
+        <button type="button" class="btn" id="btn-back" hidden>Back</button>
+        <button type="button" class="btn btn--primary" id="btn-next">Next</button>
+      </div>
+    </section>
+    </div>
+  </aside>
+
+  <!-- Inline term-definition popover (DESIGN.md §5.7) — the ONE fixed tooltip
+       src/terms.js fills from the TERMS glossary and anchors to whichever
+       `.term` button is hovered/focused/tapped. Singleton (Module-1 family
+       pattern) because the step bodies re-render each step. -->
+  <div id="term-pop" role="tooltip"></div>
+
+  <!-- Live region for state narration (screen readers). -->
+  <div id="sim-status" class="sr-only" role="status" aria-live="polite"></div>
+
+  <script type="module" src="./src/main.js"></script>
+
+  <!-- Inline chrome wiring (Module 2 parity): the wizard hide/show toggle + the
+       two-state Reset confirm. Chrome-only — "Yes" is the single reset trigger and
+       routes through window.simAPI.reset() (RULES.md §2.9, no second reset path). -->
+  <script>
+    (function () {
+      var status = document.getElementById('sim-status');
+      var say = function (msg) { if (status) status.textContent = msg; };
+
+      /* --- Wizard hide/show --- */
+      var toggle = document.getElementById('wizard-toggle');
+      if (toggle) {
+        toggle.addEventListener('click', function () {
+          var collapsed = document.body.classList.toggle('wizard-collapsed');
+          toggle.setAttribute('aria-expanded', String(!collapsed));
+          toggle.title = collapsed ? 'Show steps panel' : 'Hide steps panel';
+          say(collapsed ? 'Steps panel hidden.' : 'Steps panel shown.');
+        });
+      }
+
+      /* --- Two-state Reset confirm --- */
+      var btnReset = document.getElementById('btn-reset');
+      var confirmBox = document.getElementById('reset-confirm');
+      var btnYes = document.getElementById('btn-reset-yes');
+      var btnCancel = document.getElementById('btn-reset-cancel');
+      var cardNav = btnReset && btnReset.closest('.card__nav');
+      if (!btnReset || !confirmBox || !btnYes || !btnCancel) return;
+
+      var armed = false;
+
+      function arm() {
+        if (armed) return;
+        armed = true;
+        btnReset.hidden = true;
+        confirmBox.hidden = false;
+        if (cardNav) cardNav.classList.add('is-reset-armed');
+        btnCancel.focus();
+        say('Reset everything? Choose Yes to clear your work, or Cancel to keep it.');
+      }
+      function disarm(returnFocus) {
+        if (!armed) return;
+        armed = false;
+        confirmBox.hidden = true;
+        btnReset.hidden = false;
+        if (cardNav) cardNav.classList.remove('is-reset-armed');
+        if (returnFocus) btnReset.focus();
+      }
+
+      btnReset.addEventListener('click', arm);
+      btnYes.addEventListener('click', function () {
+        disarm(true);
+        if (window.simAPI && typeof window.simAPI.reset === 'function') window.simAPI.reset();
+      });
+      btnCancel.addEventListener('click', function () {
+        disarm(true);
+        say('Reset cancelled.');
+      });
+      /* Escape backs out; tabbing or clicking away abandons the prompt. */
+      confirmBox.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { e.stopPropagation(); disarm(true); say('Reset cancelled.'); }
+      });
+      confirmBox.addEventListener('focusout', function (e) {
+        if (armed && !confirmBox.contains(e.relatedTarget)) disarm(false);
+      });
+      document.addEventListener('pointerdown', function (e) {
+        if (armed && !confirmBox.contains(e.target)) disarm(false);
+      });
+    })();
+  </script>
+</body>
+</html>

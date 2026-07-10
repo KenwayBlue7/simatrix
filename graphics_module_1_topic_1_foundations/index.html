@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light only" />
+  <!-- <title> MUST equal meta.json.title (ADR-026 / RULES.md §1.12). -->
+  <title>Engineering Graphics Foundations</title>
+  <meta name="description" content="Learn the four BIS line types on a real, orbitable 3D bearing block — visible edges become hidden edges live as you spin the part." />
+
+  <!--
+    Three.js is loaded as CDN ES modules ONLY, pinned to 0.160.0 (RULES.md §2.2–§2.4).
+    No build step, no bundler, no npm. This import map is the exact platform contract.
+
+    three-mesh-bvh (0.7.8) accelerates the hidden-line occlusion raycaster — it builds a
+    spatial Bounding Volume Hierarchy over the bearing block's triangles so each line-of-
+    sight ray tests a handful of bounded nodes instead of all ~800 triangles. The raycaster
+    is the heart of the lesson (solid Type A vs dashed Type E/F), so this dependency is
+    REQUIRED, not an optimisation. Pulled in the SAME way as Three.js — a pinned CDN ES
+    module, no npm / no build step (ADR-001). Its raw ESM build imports a bare `three`, which
+    resolves through this very map; 0.7.8's peerDependency is three ">= 0.151.0", so it is
+    compatible with the pinned 0.160.0.
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+      "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.8/build/index.module.js"
+    }
+  }
+  </script>
+
+  <!--
+    Boot watchdog (classic script, runs before the ES module). The sim's only runtime
+    network dependency is the pinned Three.js CDN module; if it is blocked or the
+    module fails to evaluate, init() never runs and the iframe would sit blank. This
+    arms a calm, self-healing fallback. main.js clears it on a successful boot.
+  -->
+  <script>
+    (function () {
+      window.__simBooted = false;
+      var WEBGL_COPY = {
+        title: 'Your browser could not start the 3D view',
+        body: 'This simulation needs hardware-accelerated graphics (WebGL), which looks switched off or unavailable here. Turn on hardware acceleration in your browser settings, or open this in a recent Chrome, Edge, or Firefox, then reload.',
+      };
+      window.__showSimFallback = function (variant) {
+        if (window.__simBooted) return;
+        var el = document.getElementById('sim-fallback');
+        if (!el) return;
+        if (variant === 'webgl') {
+          var t = document.getElementById('sim-fallback-title');
+          var b = document.getElementById('sim-fallback-body');
+          if (t) t.textContent = WEBGL_COPY.title;
+          if (b) b.textContent = WEBGL_COPY.body;
+        }
+        el.hidden = false;
+      };
+      window.addEventListener('error', function () {
+        if (!window.__simBooted) window.__showSimFallback();
+      });
+      window.__simBootTimer = window.setTimeout(function () {
+        if (!window.__simBooted) window.__showSimFallback();
+      }, 15000);
+      document.addEventListener('DOMContentLoaded', function () {
+        var btn = document.getElementById('sim-fallback-reload');
+        if (btn) btn.addEventListener('click', function () { window.location.reload(); });
+      });
+    })();
+  </script>
+
+  <style>
+    /*
+      Bundled web fonts (DESIGN.md typography / RULES.md §2.15). Local subset woff2 in
+      ./assets/fonts/ — no runtime Google Fonts fetch, so the sim works offline after
+      the initial load. Atkinson Hyperlegible (UI/body), IBM Plex Mono (numbers).
+    */
+    @font-face {
+      font-family: "Atkinson Hyperlegible";
+      font-style: normal; font-weight: 400; font-display: swap;
+      src: url("./assets/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Atkinson Hyperlegible";
+      font-style: normal; font-weight: 700; font-display: swap;
+      src: url("./assets/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "IBM Plex Mono";
+      font-style: normal; font-weight: 400; font-display: swap;
+      src: url("./assets/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+    }
+
+    /*
+      ============================================================
+      Design tokens — Simatrix "Modern Drafting Bench" (light, locked)
+      ============================================================
+      Single runtime source of truth for colour/space/motion. JS reads these via
+      getComputedStyle(...).getPropertyValue('--token') — never hard-codes hex
+      (RULES.md §4.1). Mirrors the root DESIGN.md / Module 2 master token set; the
+      viewport-line tokens (ink / ink-secondary / bench-grey) are the ones this
+      topic's line-type map consumes. The HP/VP/PP plane hues are intentionally
+      ABSENT — this is a single pictorial view, not orthographic projection
+      (topic DESIGN.md §1).
+    */
+    :root {
+      /* --- Surfaces (clinical palette: neutral gray + white working surfaces, tonal layering not shadows) --- */
+      --color-paper:        #ffffff; /* pure-white base */
+      --color-panel:        #f5f5f5; /* neutral grey working surface — one tonal step BELOW paper */
+      --color-solid-fill:   #e7e1d4; /* solid faces, so ink edges read */
+
+      /* --- Ink (warm near-black) — visible edges (Type A) + body text --- */
+      --color-ink:          #221f18;
+      --color-ink-secondary:#564e3c; /* secondary text + Type G centre lines */
+
+      /* --- Mid neutral — hidden edges (Type E/F), borders, slider rest --- */
+      --color-bench-grey:   #938b7b;
+      --color-border:       #d9d2c3;
+      --color-track:        #cfc8b8;
+
+      /* --- The one interaction accent (technical blue) — chrome only (§4.5) --- */
+      --color-accent:        #1f66b5;
+      --color-accent-strong: #17539b;
+      --color-accent-soft:   #e3ecf7;
+      --color-focus:         var(--color-accent);
+      --ring-focus:          0 0 0 3px color-mix(in srgb, var(--color-accent) 26%, transparent);
+      --shadow-md:           0 4px 16px color-mix(in srgb, var(--color-ink) 12%, transparent);
+
+      /* --- Status (UI only, always paired with an icon — §4.6) --- */
+      --color-success:       #2e7d52;
+      --color-success-soft:  #e2efe8;
+
+      /* --- Spacing scale (4px base) --- */
+      --space-1: 4px;  --space-2: 8px;  --space-3: 12px;
+      --space-4: 16px; --space-5: 24px; --space-6: 32px;
+
+      /* --- Radius --- */
+      --radius-xs: 4px; --radius-sm: 6px; --radius-md: 10px;
+
+      /* --- Type --- */
+      --font-sans: "Atkinson Hyperlegible", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", monospace;
+      --text-xs: 0.75rem; --text-sm: 0.875rem; --text-base: 1rem;
+      --text-lead: 1.125rem; --text-title: 1.35rem;
+
+      /* --- Motion (subtle ease-out — DESIGN.md) --- */
+      --dur-fast: 150ms; --dur-base: 200ms; --dur-step: 380ms;
+      --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+
+      /* --- Layering --- */
+      --z-notice: 100;
+    }
+
+    /* ============================================================
+       Normalize / base
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; }
+    /* The HTML `hidden` attribute must always win. Class/id rules that set an explicit
+       `display` (e.g. .sim-fallback, #mobile-notice, .btn) tie with the UA `[hidden]`
+       rule on specificity and, coming later in source order, would otherwise override
+       it — leaving the boot fallback permanently covering a perfectly good sim. */
+    [hidden] { display: none !important; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      font-size: var(--text-base);
+      color: var(--color-ink);
+      background: var(--color-paper);
+      overflow: hidden;
+      font-variant-numeric: tabular-nums;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      display: flex;
+      flex-direction: row;
+      position: relative;
+    }
+    button { font: inherit; color: inherit; }
+
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
+
+    /* ============================================================
+       Viewport — WebGL canvas + CSS2D overlay mount here (main.js)
+       ============================================================ */
+    #sim-viewport {
+      position: relative;
+      flex: 1 1 0;
+      min-width: 0;
+      height: 100%;
+      background: var(--color-paper);
+      order: 1; /* viewport on the LEFT, wizard on the right */
+    }
+    #sim-viewport canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none; /* drag-to-orbit, no scroll/zoom hijack */
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    /* Line-type callouts — CSS2DObject pills naming each BIS type in the viewport.
+       Quiet ink-on-paper (no viewport blue, §4.5); the TEXT carries the meaning. */
+    .vp-callout {
+      font-family: var(--font-sans);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      line-height: 1;
+      color: var(--color-ink);
+      background: color-mix(in srgb, var(--color-paper) 90%, transparent);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xs);
+      padding: 3px 6px;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    /* Dimension values — mono tabular size pills (Type B). The OUTER element is only a
+       positioning anchor (CSS2DRenderer owns its transform); the visible pill box lives on
+       the inner text span so it rotates WITH the text and always wraps it snugly. */
+    .vp-dim-value {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-weight: 400;
+      line-height: 1;
+      color: var(--color-ink);
+      white-space: nowrap;
+      user-select: none;
+      font-variant-numeric: tabular-nums;
+    }
+    /* Inner text wrapper for a dimension pill. CSS2DRenderer commandeers the OUTER
+       element's `transform` to place the pill in screen space, so any text ROTATION has
+       to live on this inner span (labelLayer.js sets it). Aligned mode rotates the
+       vertical (height) value −90° so it reads up from the right edge, the BIS default;
+       unidirectional keeps every value horizontal. */
+    .vp-dim-value__text {
+      display: inline-block;
+      background: color-mix(in srgb, var(--color-paper) 92%, transparent);
+      border-radius: var(--radius-xs);
+      padding: 1px 4px;
+      transform-origin: center;
+      transition: transform var(--dur-base) var(--ease-standard);
+    }
+
+    /* Floating viewport controls (Front View + Turn 90°) + orbit hint.
+       (This topic's .vp-cluster equivalent.) */
+    .vp-controls {
+      position: absolute;
+      top: 10%; /* leaves room for host overlays */
+      left: var(--space-4);
+      display: flex;
+      gap: var(--space-2);
+      z-index: 5;
+    }
+    /* Two SEPARATE viewport pill buttons (Front View + Turn 90°) — each a standalone rounded chip
+       in the Module 2 pill idiom (panel fill, hairline border, semibold ink-secondary text),
+       sitting side by side with a gap (from .vp-controls) rather than fused into one segmented
+       container. A transparent centred ::before lifts each chip's pointer/touch target to the
+       44px floor. The latched Front View chip (aria-pressed="true") fills solid accent while the
+       orthographic elevation is live. */
+    .vp-chip {
+      position: relative;       /* anchors the 44px hit-area ::before */
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;         /* painted pill; the ::before lifts the HIT area to 44px */
+      padding: 0 var(--space-3);
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      background: var(--color-panel);
+      color: var(--color-ink-secondary);
+      font-family: var(--font-sans);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      line-height: 1;
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    /* Transparent centred hit-area — lifts each chip's pointer/touch target to the 44px floor
+       without growing the painted pill (the real element keeps the focus ring). */
+    .vp-chip::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100%;
+      height: 100%;
+      min-width: 44px;
+      min-height: 44px;
+    }
+    .vp-chip:hover { background: var(--color-paper); border-color: var(--color-accent); }
+    .vp-chip:active:not(:disabled) { transform: scale(0.97); }
+    .vp-chip:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    /* Latched Front View — the chip carries aria-pressed="true" while the orthographic elevation
+       is live, so it fills solid accent (like Module 2's latched view) and the current projection
+       mode reads at a glance. */
+    .vp-chip[aria-pressed="true"] { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-paper); }
+    .vp-chip[aria-pressed="true"]:hover { background: var(--color-accent-strong); border-color: var(--color-accent-strong); color: var(--color-paper); }
+    .vp-hint {
+      position: absolute;
+      bottom: var(--space-4);
+      left: var(--space-4); /* bottom-LEFT, clear of the centred L dimension value */
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--color-paper) 88%, transparent);
+      border: 1px solid var(--color-border);
+      color: var(--color-ink-secondary);
+      font-size: var(--text-sm);
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    /* ---- Wizard hide/show toggle (Module 2 pattern): a floating chevron pinned to the
+       viewport's top-right. Collapses the step panel for a larger 3D view; the chevron
+       flips when collapsed and the viewport reflows to full width via flex (the
+       ResizeObserver in main.js re-syncs the renderer). */
+    .wizard-toggle {
+      position: absolute;
+      top: var(--space-3);
+      right: var(--space-3);
+      z-index: 5;
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .wizard-toggle:hover { background: var(--color-paper); border-color: var(--color-bench-grey); color: var(--color-ink); }
+    }
+    .wizard-toggle:active { transform: scale(0.97); }
+    .wizard-toggle:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .wizard-toggle__icon {
+      width: 20px;
+      height: 20px;
+      transition: transform var(--dur-base) var(--ease-standard);
+    }
+    /* Collapsed: drop the wizard out of the flex row (viewport takes the space)
+       and flip the chevron to point back toward where the panel will reappear. */
+    body.wizard-collapsed #wizard { display: none; }
+    body.wizard-collapsed .wizard-toggle__icon { transform: rotate(180deg); }
+
+    /* ============================================================
+       Wizard dock (right) — the guided 4-step rail + card
+       ============================================================ */
+    #wizard {
+      order: 2;
+      flex: 0 0 auto;
+      width: clamp(340px, 34vw, 460px);
+      height: 100%;
+      background: var(--color-panel);
+      border-left: 1px solid var(--color-border);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      padding: var(--space-5) var(--space-4);
+      overflow: hidden;
+    }
+
+    /* The card + rail sit side by side in one row: the white step card on the
+       LEFT (order 1), the vertical progress rail on the RIGHT (order 2). */
+    .wizard-main {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: row;
+      gap: var(--space-4);
+    }
+
+    /* --- Step rail: vertical numbered spine with a hairline connector --- */
+    #step-rail {
+      position: relative;
+      flex: 0 0 auto;
+      order: 2; /* rail sits to the RIGHT of the card (card comes first) */
+      width: 64px;
+      margin: 0;
+      padding: var(--space-2) 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    /* The connecting spine sits behind the markers; opaque markers cover it
+       between steps so it reads as one continuous line. */
+    #step-rail::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 30px;
+      bottom: 30px;
+      width: 2px;
+      transform: translateX(-50%);
+      background: var(--color-border);
+    }
+    .rail__item {
+      position: relative;
+      display: flex; /* lays out the single full-height button child */
+    }
+    /* Marker + label are wrapped in a real button so completed and current steps
+       are keyboard-focusable jump targets; upcoming steps render disabled. */
+    .rail__btn {
+      flex: 1 1 auto;
+      min-width: 44px; /* honours the 44px target floor even for short labels */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-1);
+      margin: 0;
+      padding: var(--space-1) 0;
+      border: 0;
+      background: none;
+      font: inherit;
+      color: inherit;
+      text-align: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .rail__btn:disabled { cursor: default; }
+    .rail__marker {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 1.5px solid var(--color-border);
+      border-radius: 50%;
+      background: var(--color-paper); /* opaque — masks the spine between markers */
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      font-weight: 700;
+      color: var(--color-ink-secondary);
+      transition: background var(--dur-base) var(--ease-standard),
+                  border-color var(--dur-base) var(--ease-standard),
+                  color var(--dur-base) var(--ease-standard),
+                  box-shadow var(--dur-base) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .rail__label {
+      font-size: var(--text-xs);
+      line-height: 1.2;
+      color: var(--color-ink-secondary);
+      max-width: 60px;
+    }
+    /* Upcoming = hollow + faint (shape cue, not colour alone). */
+    .rail__item.is-upcoming .rail__marker { opacity: 0.5; }
+    .rail__item.is-upcoming .rail__label  { opacity: 0.5; }
+    /* Current = filled accent + bold label. */
+    .rail__item.is-current .rail__marker {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: var(--color-paper);
+      box-shadow: 0 0 0 4px var(--color-accent-soft);
+    }
+    .rail__item.is-current .rail__label { color: var(--color-ink); font-weight: 700; }
+    /* Complete = filled success + check glyph (JS swaps the marker text to ✓). */
+    .rail__item.is-complete .rail__marker {
+      background: var(--color-success);
+      border-color: var(--color-success);
+      color: var(--color-paper);
+    }
+    .rail__item.is-complete .rail__label { color: var(--color-ink-secondary); }
+    .rail__btn:active:not(:disabled) .rail__marker { transform: scale(0.94); }
+    .rail__btn:focus-visible { outline: none; }
+    .rail__btn:focus-visible .rail__marker { box-shadow: var(--ring-focus); }
+
+    /* --- Step card: the bordered white box where the tutor speaks --- */
+    #step-card {
+      flex: 1 1 auto;
+      min-width: 0;
+      order: 1; /* card first (left within the wizard), rail after it */
+      display: flex;
+      flex-direction: column;
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      overflow: hidden; /* the card never scrolls; the inner region does, so the nav stays pinned */
+    }
+
+    /* Inner scroll region: the header + step body scroll HERE, so the nav footer beneath it
+       is always visible at the card bottom (Back/Next can no longer sit below the fold). A
+       minimal, token-aware scrollbar is shown so the student can see there is more content
+       below the fold — the "Visibility of System Status" fix — while staying quiet enough to
+       keep the app-like feel. */
+    .card__scroll {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      padding: var(--space-5) var(--space-4) var(--space-4);
+    }
+    /* Chrome / Edge / Safari (WebKit + Blink): a thin, floating pill tinted to the structural
+       border token (--color-border, ~1.28:1 on the card paper — faintly visible, "Quiet Chrome"),
+       on a transparent track, no native arrow buttons. The channel is 10px but the
+       thumb carries a 3px transparent border + background-clip:padding-box, so only the inner
+       4px is painted — the pill floats 3px clear of both edges (the card paper shows through
+       the border). IMPORTANT — these ::-webkit-scrollbar rules only render while
+       `scrollbar-width` is UNSET: Chrome 121+ disables the legacy pseudo-elements the moment
+       `scrollbar-width` is declared and falls back to its ~11px native thin bar. So we keep
+       `scrollbar-width` out of the base rule and scope it to Firefox only, below. */
+    .card__scroll::-webkit-scrollbar { width: 10px; }
+    .card__scroll::-webkit-scrollbar-track { background: transparent; }
+    .card__scroll::-webkit-scrollbar-thumb {
+      background: var(--color-border);
+      background-clip: padding-box;
+      border: 3px solid transparent;
+      border-radius: 999px;
+    }
+    /* Firefox only — it has no ::-webkit-scrollbar, so it gets the standard thin tinted bar
+       (no padding-box floating trick available). The `-moz-appearance` @supports guard is true
+       in Firefox and false in Blink, which keeps the floating pill above intact in Chrome/Edge. */
+    @supports (-moz-appearance: none) {
+      .card__scroll {
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-border) transparent;
+      }
+    }
+
+    .card__eyebrow {
+      margin: 0 0 var(--space-1);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--color-ink-secondary);
+    }
+    .card__title {
+      margin: 0 0 var(--space-2);
+      font-size: var(--text-title);
+      line-height: 1.2;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .card__lead {
+      margin: 0 0 var(--space-5);
+      max-width: 60ch;
+      font-size: var(--text-sm);
+      line-height: 1.55;
+      color: var(--color-ink-secondary);
+    }
+
+    /* Step body — the textbook-grade prose beneath the lead; carries inline glossary terms.
+       Secondary ink so the prose sits a step quieter than the bold Type A title/heading,
+       matching Module 2's body-text hierarchy (.card__lead / .dock__note read ink-secondary). */
+    /* .step-post-body carries the "How it is drawn" paragraph, painted BELOW the reveal
+       controls (so they aren't buried below the fold). It shares .step-body's
+       typography; a top margin separates it from the controls above, and :empty collapses
+       that margin on Step 1 (which has no post-body). */
+    .step-body, .step-post-body {
+      max-width: 60ch;
+      font-size: var(--text-sm);
+      line-height: 1.6;
+      color: var(--color-ink-secondary);
+    }
+    .step-body { margin: 0 0 var(--space-5); }
+    .step-post-body { margin: var(--space-5) 0 0; }
+    .step-post-body:empty { margin: 0; }
+    .step-body p, .step-post-body p { margin: 0 0 var(--space-3); color: var(--color-ink-secondary); }
+    .step-body p:last-child, .step-post-body p:last-child { margin-bottom: 0; }
+    .step-body b, .step-post-body b { font-weight: 700; }
+
+    /* Inline glossary trigger — a quiet dotted-underline word inside the prose. */
+    .term {
+      font: inherit;
+      color: var(--color-accent-strong);
+      background: none;
+      border: 0;
+      padding: 0;
+      cursor: help;
+      text-decoration: underline dotted;
+      text-underline-offset: 2px;
+    }
+    .term:hover { color: var(--color-accent); }
+    .term:focus-visible {
+      outline: none;
+      border-radius: var(--radius-xs);
+      box-shadow: var(--ring-focus);
+    }
+
+    /* One shared glossary popover, positioned by terms.js. Fixed so it escapes the step
+       card's overflow clip; pointer-events:none so hovering it never steals the hover. */
+    #term-pop {
+      position: fixed;
+      z-index: 30;
+      top: 0;
+      left: 0;
+      width: max-content;
+      max-width: 32ch;
+      padding: var(--space-3);
+      font-size: var(--text-sm);
+      font-weight: 400;
+      line-height: 1.45;
+      text-align: left;
+      color: var(--color-ink);
+      background: var(--color-accent-soft);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transform: scale(0.96);
+      transition: opacity var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard),
+                  visibility var(--dur-fast) var(--ease-standard);
+    }
+    #term-pop.is-open {
+      opacity: 1;
+      visibility: visible;
+      transform: none;
+    }
+
+    .card__body { flex: 1 1 auto; }
+
+    .step-panel { display: flex; flex-direction: column; gap: var(--space-5); }
+    .step-panel[hidden] { display: none; }
+    .step-panel.is-active { animation: panelIn var(--dur-step) var(--ease-standard); }
+    @keyframes panelIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      min-height: 44px;
+      padding: var(--space-3) var(--space-4);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      font-size: var(--text-base);
+      font-weight: 400; /* Module 2 parity: base .btn is non-bold (its master uses font:inherit ⇒ 400) */
+      cursor: pointer;
+      transition: border-color var(--dur-fast) var(--ease-standard),
+                  background var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .btn:active:not(:disabled) { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn--primary {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: var(--color-panel);
+    }
+    .btn--primary:hover:not(:disabled) { background: var(--color-accent-strong); border-color: var(--color-accent-strong); }
+    /* Secondary — a real bordered button on the same paper background as Back (identical rest
+       state: paper fill + ink text + 400 weight), so it reads as one quiet button family. It is
+       quieter than the blue primary by LACKING the accent fill, not by a grey tint. Used by the
+       Step-4 "Inspect arrowhead" utility, which as a borderless ghost was too faint to look
+       pressable. */
+    .btn--secondary {
+      background: var(--color-paper);
+      border-color: var(--color-border);
+      color: var(--color-ink);
+    }
+    .btn--secondary:hover:not(:disabled) { border-color: var(--color-accent); background: var(--color-solid-fill); }
+    /* Ghost (Reset) — matches Module 2 exactly: smaller, borderless, secondary ink, and a
+       regular (non-bold) weight, so it reads as a quiet utility next to Back / Next. */
+    .btn--ghost {
+      min-height: 36px;
+      padding: 0 var(--space-3);
+      font-size: var(--text-sm);
+      font-weight: 400;
+      color: var(--color-ink-secondary);
+      background: transparent;
+      border-color: transparent;
+    }
+    .btn--block { width: 100%; }
+
+    /* Inline two-state Reset confirm (Module 2 pattern): the ghost Reset arms into
+       "Reset everything? · Yes / Cancel" on this same spot, so a stray click can't
+       wipe progress. Back / Next step aside while armed; only "Yes" resets. */
+    .card__nav.is-reset-armed .btn--nav { display: none; }
+    .reset-confirm {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-1) var(--space-2);
+      font-size: var(--text-sm);
+      animation: resetConfirmIn var(--dur-fast) var(--ease-standard);
+    }
+    .reset-confirm[hidden] { display: none; }
+    .reset-confirm__prompt { color: var(--color-ink); }
+    .reset-confirm__sep { color: var(--color-bench-grey); user-select: none; }
+    .reset-confirm .reset-confirm__action { min-height: 44px; padding: 0 var(--space-2); }
+    @keyframes resetConfirmIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .done-badge {
+      display: none;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-sm);
+      background: var(--color-success-soft);
+      color: var(--color-success);
+      font-size: var(--text-sm);
+      font-weight: 700;
+    }
+    .done-badge.is-on { display: inline-flex; }
+    .step-hint {
+      color: var(--color-ink-secondary);
+      font-size: var(--text-sm);
+      line-height: 1.5;
+      margin: 0;
+    }
+
+    /* Dimensioning-system toggle (Step 4) — Aligned vs Unidirectional dimension text.
+       A quiet segmented control; the active segment carries the one interaction accent. */
+    .dim-mode { display: flex; flex-direction: column; gap: var(--space-2); }
+    .dim-mode__label {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-ink-secondary);
+    }
+    .seg {
+      display: flex;
+      gap: 3px;
+      padding: 3px;
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+    }
+    .seg__btn {
+      flex: 1 1 0;
+      min-height: 36px;
+      padding: var(--space-2) var(--space-3);
+      border: 0;
+      border-radius: var(--radius-xs);
+      background: transparent;
+      color: var(--color-ink-secondary);
+      font-size: var(--text-sm);
+      font-weight: 700;
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard);
+    }
+    .seg__btn:hover:not(.is-active) { color: var(--color-ink); }
+    .seg__btn.is-active {
+      background: var(--color-accent);
+      color: var(--color-panel);
+    }
+    .seg__btn:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+
+    /* Nav footer — pinned at the card bottom, OUTSIDE the scroll region, so Back / Next are
+       always in view no matter how long the step body runs. Ghost Reset pinned left of them. */
+    .card__nav {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      flex: 0 0 auto;
+      margin: 0;
+      padding: var(--space-4);
+      border-top: 1px solid var(--color-border);
+      background: var(--color-paper); /* opaque: scrolled body never bleeds under the footer */
+    }
+    #reset-control { margin-right: auto; } /* ghost Reset pinned left of Back / Next */
+    .card__nav .btn--nav { min-width: 88px; }
+
+    :where(button, [tabindex]):focus-visible {
+      outline: none;
+      box-shadow: var(--ring-focus);
+    }
+
+    /* ============================================================
+       Mobile advisory — banner only, never blocks the sim (§2.13)
+       ============================================================ */
+    #mobile-notice {
+      position: fixed;
+      left: var(--space-4);
+      right: var(--space-4);
+      bottom: var(--space-4);
+      z-index: var(--z-notice);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      padding: var(--space-3) var(--space-4);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+    }
+    #mobile-notice .notice__text { margin: 0; font-size: var(--text-sm); }
+    .notice__dismiss {
+      flex: 0 0 auto;
+      min-height: 40px;
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-paper);
+      cursor: pointer;
+    }
+
+    /* ============================================================
+       WebGL context-loss chip + boot/runtime fallback
+       ============================================================ */
+    .sim-restoring {
+      position: fixed;
+      top: var(--space-4);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 150;
+      padding: var(--space-2) var(--space-4);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+      font-size: var(--text-sm);
+    }
+    .sim-fallback {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-6);
+      background: var(--color-paper);
+    }
+    .sim-fallback__inner { max-width: 30rem; text-align: center; }
+    .sim-fallback__icon { width: 48px; height: 48px; color: var(--color-bench-grey); margin-bottom: var(--space-4); }
+    .sim-fallback__title { font-size: var(--text-title); margin: 0 0 var(--space-3); }
+    .sim-fallback__body { color: var(--color-ink-secondary); line-height: 1.5; margin: 0 0 var(--space-5); }
+
+    /* Success toast — the calm "Complete lesson" win confirmation (Module 2 pattern).
+       Fixed top-centre, success green + a check glyph (Two-Cue Rule), never gamified
+       fanfare. aria-hidden: #sim-status already narrates the win, so this is not a
+       second live region. Fades via .is-visible (instant under reduced motion). */
+    .sim-toast {
+      position: fixed;
+      left: 50%;
+      top: var(--space-5);
+      transform: translateX(-50%);
+      z-index: 130;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-4);
+      font-size: var(--text-sm);
+      color: var(--color-ink);
+      background: var(--color-success-soft);
+      border: 1px solid var(--color-success);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+      opacity: 0;
+      transition: opacity var(--dur-base) var(--ease-standard);
+    }
+    .sim-toast.is-visible { opacity: 1; }
+    .sim-toast[hidden] { display: none; }
+    .sim-toast__icon { flex: none; width: 20px; height: 20px; color: var(--color-success); }
+
+    /* ============================================================
+       Reduced motion — collapse animation to instant (§4.13)
+       ============================================================ */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        transition-duration: 0.001ms !important;
+      }
+    }
+
+    /* Narrow screens: shrink the wizard, stack the card above the rail, and reflow
+       the vertical spine into a horizontal strip. The mobile notice advises desktop;
+       the sim still runs. */
+    @media (max-width: 767px) {
+      #wizard { width: 300px; }
+      .wizard-main { flex-direction: column; }
+      #step-card { order: 1; flex: 1 1 auto; min-height: 0; }
+      #step-rail {
+        order: 2;
+        flex: 0 0 auto;
+        flex-direction: row;
+        width: 100%;
+        padding: var(--space-3) 0 0;
+      }
+      #step-rail::before {
+        left: 30px;
+        right: 30px;
+        top: calc(var(--space-3) + 17px);
+        bottom: auto;
+        width: auto;
+        height: 2px;
+        transform: translateY(-50%);
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Boot/runtime failure fallback (CDN blocked, connection dropped, or WebGL off).
+       Calm, on-brand, never a raw error trace. role="alert" so AT announces it. -->
+  <div id="sim-fallback" class="sim-fallback" role="alert" hidden>
+    <div class="sim-fallback__inner">
+      <svg class="sim-fallback__icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M24 8 40 17 24 26 8 17Z" />
+        <path d="M40 17V31L24 40 8 31V17" />
+        <path d="M8.5 8.5 39.5 39.5" />
+      </svg>
+      <h1 class="sim-fallback__title" id="sim-fallback-title">We could not load the simulation</h1>
+      <p class="sim-fallback__body" id="sim-fallback-body">It looks like the connection dropped while the 3D tools were starting up. Check your internet connection, then reload to try again.</p>
+      <button type="button" class="btn btn--primary" id="sim-fallback-reload">Reload the simulation</button>
+    </div>
+  </div>
+
+  <!-- Transient WebGL context-loss recovery chip (GPU reset / long backgrounding). -->
+  <div id="sim-context-lost" class="sim-restoring" role="status" hidden>
+    <span>Restoring the 3D view&hellip;</span>
+  </div>
+
+  <!-- Success toast — the "Complete lesson" win. aria-hidden: #sim-status narrates it. -->
+  <div id="sim-toast" class="sim-toast" aria-hidden="true" hidden>
+    <svg class="sim-toast__icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 10.5 8.5 15 16 5.5" />
+    </svg>
+    <span class="sim-toast__text"></span>
+  </div>
+
+  <!-- Mobile advisory. Hidden until main.js confirms a < 768px viewport. -->
+  <aside id="mobile-notice" role="status" hidden>
+    <p class="notice__text">Best experienced on desktop.</p>
+    <button id="mobile-notice-dismiss" class="notice__dismiss" type="button">Dismiss</button>
+  </aside>
+
+  <!-- ============================================================
+       Viewport — the orbitable Bearing Block (canvas + CSS2D overlay)
+       ============================================================ -->
+  <main id="sim-viewport" aria-label="Engineering graphics viewport. Drag to orbit the bearing block.">
+    <!-- Hide/show the guided-steps panel to enlarge the 3D view. Floats over the
+         canvas so it stays reachable in both states (inline chrome script toggles
+         the body class; the ResizeObserver in main.js re-syncs the renderer). -->
+    <button id="wizard-toggle" class="wizard-toggle" type="button" aria-controls="wizard" aria-expanded="true" title="Hide steps panel">
+      <svg class="wizard-toggle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 6l6 6-6 6" />
+      </svg>
+      <span class="sr-only">Toggle steps panel</span>
+    </button>
+
+    <div class="vp-controls">
+      <!-- Keyboard-friendly orbit: turns the part in 90° steps so a keyboard-only learner can
+           watch visible edges become hidden without a mouse drag (the mouse can still orbit freely). -->
+      <button type="button" class="vp-chip" id="btn-turn" title="Turn the part 90 degrees to see visible edges become hidden">Turn 90&deg;</button>
+      <!-- The X-ray (hide the solid to reveal the hidden edges) is the Step-2 lesson button
+           in the wizard, not a standalone viewport toggle. -->
+    </div>
+    <p class="vp-hint">Drag to orbit · scroll to zoom</p>
+  </main>
+
+  <!-- ============================================================
+       Wizard — guided 4-step line-type lesson
+       ============================================================ -->
+  <aside id="wizard" aria-label="Guided steps">
+    <div class="wizard-main">
+      <ol id="step-rail" aria-label="Progress">
+        <li class="rail__item" data-step="1"><button type="button" class="rail__btn"><span class="rail__marker">1</span><span class="rail__label">Type A</span></button></li>
+        <li class="rail__item" data-step="2"><button type="button" class="rail__btn"><span class="rail__marker">2</span><span class="rail__label">Type E/F</span></button></li>
+        <li class="rail__item" data-step="3"><button type="button" class="rail__btn"><span class="rail__marker">3</span><span class="rail__label">Type G</span></button></li>
+        <li class="rail__item" data-step="4"><button type="button" class="rail__btn"><span class="rail__marker">4</span><span class="rail__label">Type B</span></button></li>
+      </ol>
+
+      <!--
+        Not a live region. #sim-status (role="status", aria-live="polite") is the single
+        announcement channel — stepper.js narrates "Step X of N" there on every transition.
+        A live region on the whole card would double-announce step changes.
+      -->
+      <section id="step-card">
+        <!-- Everything above the nav scrolls in here; the footer below stays pinned so the
+             primary Back / Next controls are never buried under a long step body. -->
+        <div class="card__scroll">
+        <header>
+          <p class="card__eyebrow">Step <span id="step-current">1</span> of <span id="step-total">4</span></p>
+          <!-- tabindex=-1 so stepper.js can move focus here on each step change (keyboard/SR
+               users land on the new heading instead of a stale or hidden control). -->
+          <h2 class="card__title" id="step-title" tabindex="-1">Continuous thick: visible edges</h2>
+          <p class="card__lead" id="step-lead"></p>
+          <!-- Textbook-grade step prose (What it is / Why / How) + inline glossary term
+               buttons; painted by stepper.js from foundationSteps.js STEPS[n].body. -->
+          <div class="step-body" id="step-body"></div>
+        </header>
+
+        <div class="card__body">
+          <!-- Step 1 — the block + Type A visible edges are already shown; just orbit. -->
+          <div class="step-panel" data-step="1">
+            <p class="step-hint">Drag anywhere in the view to orbit the part. The wide solid lines are the visible (Type A) edges.</p>
+          </div>
+
+          <!-- Step 2 — reveal hidden lines. -->
+          <div class="step-panel" data-step="2" hidden>
+            <button type="button" class="btn btn--primary btn--block" id="btn-hidden">Reveal hidden lines</button>
+            <span class="done-badge" id="done-hidden">✓ Hidden lines shown</span>
+          </div>
+
+          <!-- Step 3 — reveal centre lines. -->
+          <div class="step-panel" data-step="3" hidden>
+            <button type="button" class="btn btn--primary btn--block" id="btn-centre">Reveal centre lines</button>
+            <span class="done-badge" id="done-centre">✓ Centre lines shown</span>
+          </div>
+
+          <!-- Step 4 — reveal dimensions, then complete the lesson (terminal). -->
+          <div class="step-panel" data-step="4" hidden>
+            <button type="button" class="btn btn--primary btn--block" id="btn-dim">Reveal dimensions</button>
+            <span class="done-badge" id="done-dim">✓ Dimensions shown</span>
+            <!-- Dimensioning system: Aligned (value reads along the dimension line) vs
+                 Unidirectional (every value horizontal). Surfaced by stepper.js once the
+                 dimensions are shown; drives the height value's rotation via main.js. -->
+            <div class="dim-mode" id="dim-mode" role="group" aria-label="Dimension text orientation" hidden>
+              <span class="dim-mode__label">Dimension text</span>
+              <div class="seg">
+                <button type="button" class="seg__btn is-active" id="dim-aligned" data-mode="aligned" aria-pressed="true">Aligned</button>
+                <button type="button" class="seg__btn" id="dim-uni" data-mode="uni" aria-pressed="false">Unidirectional</button>
+              </div>
+            </div>
+            <!-- Micro-zoom: dolly the camera close to a dimension arrowhead so the 3:1 ratio and
+                 the 2–3 mm extension-line overshoot are legible. Toggles to "Reset view". -->
+            <button type="button" class="btn btn--secondary btn--block" id="btn-zoom-arrow">Inspect arrowhead</button>
+            <!-- No explicit "Complete lesson" button: revealing the Type B dimensions IS the
+                 lesson's final action, so completion (success toast + the footer note) latches
+                 the moment they appear. -->
+          </div>
+        </div>
+
+        <!-- "How it is drawn" prose — painted below the reveal controls so the interactive
+             buttons are never buried below the fold. -->
+        <div class="step-post-body" id="step-post-body"></div>
+        </div><!-- /.card__scroll -->
+
+        <footer class="card__nav">
+          <!-- Ghost Reset routes through the single simAPI.reset() path; pinned left of
+               Back / Next inside the card footer. -->
+          <div id="reset-control">
+            <button id="btn-reset" class="btn btn--ghost" type="button">Reset</button>
+            <!-- Two-state confirm (Module 2 pattern): armed by the inline chrome
+                 script; only "Yes" lets the reset through. -->
+            <div id="reset-confirm" class="reset-confirm" role="group" aria-label="Reset confirmation" hidden>
+              <span class="reset-confirm__prompt">Reset everything?</span>
+              <span class="reset-confirm__sep" aria-hidden="true">·</span>
+              <button id="btn-reset-yes" class="btn btn--ghost reset-confirm__action" type="button" aria-label="Yes, reset everything">Yes</button>
+              <span class="reset-confirm__sep" aria-hidden="true">/</span>
+              <button id="btn-reset-cancel" class="btn btn--ghost reset-confirm__action" type="button" aria-label="Cancel reset">Cancel</button>
+            </div>
+          </div>
+          <button id="btn-back" class="btn btn--nav" type="button" hidden>Back</button>
+          <button id="btn-next" class="btn btn--primary btn--nav" type="button">Next</button>
+          <!-- Terminal step has no "Next" and no inline completion note: the success toast
+               (fired once by simController.completeLesson) is the sole completion feedback. -->
+        </footer>
+      </section>
+    </div>
+  </aside>
+
+  <!-- Live region for state narration (screen readers). -->
+  <div id="sim-status" class="sr-only" role="status" aria-live="polite"></div>
+
+  <!-- Single shared glossary popover — positioned/filled by terms.js. Fixed, so it lives at
+       the top level (outside the step card's overflow clip). -->
+  <div id="term-pop" role="tooltip" aria-hidden="true"></div>
+
+  <script type="module" src="./src/main.js"></script>
+
+  <!-- Inline chrome wiring (Module 2 parity): the wizard hide/show toggle + the
+       two-state Reset confirm. Chrome-only — the sim itself is untouched; "Yes"
+       re-dispatches the original Reset click so stepper.js's handler (the one
+       simAPI.reset() path, RULES.md §2.9) runs exactly as before. -->
+  <script>
+    (function () {
+      var status = document.getElementById('sim-status');
+      var say = function (msg) { if (status) status.textContent = msg; };
+
+      /* --- Wizard hide/show --- */
+      var toggle = document.getElementById('wizard-toggle');
+      if (toggle) {
+        toggle.addEventListener('click', function () {
+          var collapsed = document.body.classList.toggle('wizard-collapsed');
+          toggle.setAttribute('aria-expanded', String(!collapsed));
+          toggle.title = collapsed ? 'Show steps panel' : 'Hide steps panel';
+          say(collapsed ? 'Steps panel hidden.' : 'Steps panel shown.');
+        });
+      }
+
+      /* --- Two-state Reset confirm --- */
+      var btnReset = document.getElementById('btn-reset');
+      var confirmBox = document.getElementById('reset-confirm');
+      var btnYes = document.getElementById('btn-reset-yes');
+      var btnCancel = document.getElementById('btn-reset-cancel');
+      var cardNav = btnReset && btnReset.closest('.card__nav');
+      if (!btnReset || !confirmBox || !btnYes || !btnCancel) return;
+
+      var armed = false;
+      var passthrough = false; /* lets the confirmed click reach stepper.js */
+
+      function arm() {
+        if (armed) return;
+        armed = true;
+        btnReset.hidden = true;
+        confirmBox.hidden = false;
+        if (cardNav) cardNav.classList.add('is-reset-armed');
+        btnCancel.focus();
+        say('Reset everything? Choose Yes to clear your work, or Cancel to keep it.');
+      }
+      function disarm(returnFocus) {
+        if (!armed) return;
+        armed = false;
+        confirmBox.hidden = true;
+        btnReset.hidden = false;
+        if (cardNav) cardNav.classList.remove('is-reset-armed');
+        if (returnFocus) btnReset.focus();
+      }
+
+      /* Capture-phase guard: swallow the raw Reset click (before stepper.js's own
+         handler) and arm the confirm instead. */
+      document.addEventListener('click', function (e) {
+        if (passthrough) return;
+        if (e.target !== btnReset && !btnReset.contains(e.target)) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        arm();
+      }, true);
+
+      btnYes.addEventListener('click', function () {
+        disarm(true);
+        passthrough = true;
+        btnReset.click(); /* the original handler → simAPI.reset() */
+        passthrough = false;
+      });
+      btnCancel.addEventListener('click', function () {
+        disarm(true);
+        say('Reset cancelled.');
+      });
+      /* Escape backs out; tabbing or clicking away abandons the prompt. */
+      confirmBox.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { e.stopPropagation(); disarm(true); say('Reset cancelled.'); }
+      });
+      confirmBox.addEventListener('focusout', function (e) {
+        if (armed && !confirmBox.contains(e.relatedTarget)) disarm(false);
+      });
+      document.addEventListener('pointerdown', function (e) {
+        if (armed && !confirmBox.contains(e.target)) disarm(false);
+      });
+    })();
+  </script>
+</body>
+</html>

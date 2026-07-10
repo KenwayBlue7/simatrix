@@ -1,0 +1,6 @@
+{
+  "title": "Orthographic Projection of Solids",
+  "description": "Visualize how 3D solids project onto the Horizontal (HP) and Vertical (VP) planes, with adjustable inclination, orientation, and rotation.",
+  "difficulty": "intermediate",
+  "tags": ["engineering-graphics", "orthographic-projection", "solids", "hp-vp", "3d"]
+}
