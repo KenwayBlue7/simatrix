@@ -1067,7 +1067,10 @@ function exitWorkbench() {
  * PP, negative = left — the negative-PP walk the distRP slider now allows). A
  * datum tick + a lateral dimension appear only when the point is off the profile
  * plane. One scale governs both axes and is fitted so a far point or a large
- * lateral offset still frames without clipping. Colours
+ * lateral offset still frames without clipping. distHP, distVP and distRP are drawn
+ * as formal BIS SP 46:2003 Type-B dimensions — extension lines (≈1 mm gap off the
+ * mark, ≈2 mm overshoot), a continuous narrow dimension line, filled 3:1 arrowheads,
+ * and centered value text over a paper break — not plain numbers. Colours
  * + fonts read the design tokens at draw time — never hard-coded (RULES.md §4.1).
  */
 function drawCompare() {
@@ -1136,23 +1139,8 @@ function drawCompare() {
   ctx.fillText('X', inset - 12, cy);
   ctx.fillText('Y', w - inset + 12, cy);
 
-  // Off the profile plane → mark the centre datum (where PP cuts the XY line, the
-  // reference the lateral distance is read from) and dimension the offset, so the
-  // negative-PP walk reads against a fixed origin instead of drifting silently.
-  const latMM = Math.round(lat);
-  if (latMM !== 0) {
-    ctx.strokeStyle = benchGrey;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(cx, cy - 7);
-    ctx.lineTo(cx, cy + 7);
-    ctx.stroke();
-    ctx.font = `400 11px ${mono}`;
-    ctx.fillStyle = inkSoft;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    ctx.fillText(`${Math.abs(latMM)}`, (cx + px) / 2, cy - 5);
-  }
+  // (The centre datum tick + the lateral / height / depth values are drawn below as
+  // formal BIS Type-B dimensions, after the shared projector — see the dimension block.)
 
   // The shared projector — SOLID Type-B continuous thin, bench-grey, through both
   // views and the line. ADR-016: in the 2D drawing the HP/VP distinction is already
@@ -1167,15 +1155,87 @@ function drawCompare() {
   ctx.lineTo(px, Math.max(yPrime, yTop, cy) + 10);
   ctx.stroke();
 
-  // Quiet mono dimensions beside each half of the projector (signed mm, the
-  // same numbers the P(x, y, z) read-out teaches). Skipped at 0 — no clutter
-  // for an on-plane view.
-  ctx.font = `400 11px ${mono}`;
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillStyle = inkSoft;
-  if (Math.round(dPrime) !== 0) ctx.fillText(`${Math.abs(Math.round(dPrime))}`, px + 10, (cy + yPrime) / 2);
-  if (Math.round(dTop) !== 0) ctx.fillText(`${Math.abs(Math.round(dTop))}`, px + 10, (cy + yTop) / 2);
+  // ── Formal BIS SP 46:2003 Type-B dimensions ───────────────────────────────
+  // Replace the plain value texts with true dimensions: extension lines (≈1 mm gap
+  // off the measured mark, ≈2 mm overshoot past the dimension line), a continuous
+  // narrow dimension line, FILLED 3:1 arrowheads at each terminator, and centered
+  // value text over a paper break. Gap / overshoot / arrow sizes are PAPER-mm (BIS is
+  // a paper spec) → px, so the proportions read the same at any drawing scale; the
+  // value text is the TRUE model mm the P(x, y, z) read-out teaches. Quiet ink-secondary
+  // tone at 1px — narrower than the ink XY reference line (Two-Weight linework).
+  const MM = 3.78;              // px per paper-mm at ~96dpi — carries the BIS proportions
+  const DIM_GAP = MM * 1;       // extension-line gap off the measured feature
+  const DIM_OVER = MM * 2;      // extension-line overshoot past the dimension line
+  const DIM_ARROW = MM * 2.6;   // arrowhead length; half-width = LEN / 6 → 3:1 length:width
+  const DIM_OFF_V = 30;         // px: vertical dims stood off to the projector's right
+  const DIM_OFF_H = 26;         // px: the lateral dim stood off above the XY line
+  const dimCol = inkSoft;
+
+  // Filled 3:1 arrowhead (BIS SP 46): isosceles triangle, length : width = 3 : 1, so
+  // half-width = length / 6. (dirx, diry) is the UNIT direction the tip points along.
+  const arrow = (tipx, tipy, dirx, diry) => {
+    const bx = tipx - dirx * DIM_ARROW, by = tipy - diry * DIM_ARROW; // base centre
+    const nx = -diry, ny = dirx, hw = DIM_ARROW / 6;                  // ⟂; full width = LEN/3
+    ctx.beginPath();
+    ctx.moveTo(tipx, tipy);
+    ctx.lineTo(bx + nx * hw, by + ny * hw);
+    ctx.lineTo(bx - nx * hw, by - ny * hw);
+    ctx.closePath();
+    ctx.fillStyle = dimCol;
+    ctx.fill();
+  };
+
+  // One linear dimension between features A(ax,ay) and B(bx,by), the dimension line
+  // stood off perpendicular by (ox,oy). Arrowheads point OUTWARD to the extension lines;
+  // the value sits centered on the dim line over a paper break. Skipped at 0 (on-plane).
+  const linearDim = (ax, ay, bx, by, ox, oy, valueMM) => {
+    if (Math.round(valueMM) === 0) return;
+    const ol = Math.hypot(ox, oy) || 1, ux = ox / ol, uy = oy / ol; // extension unit dir
+    const adx = ax + ox, ady = ay + oy;   // A projected onto the dimension line
+    const bdx = bx + ox, bdy = by + oy;   // B projected onto the dimension line
+    ctx.strokeStyle = dimCol;
+    ctx.lineWidth = 1;
+    ctx.beginPath();                       // extension lines: gap → overshoot
+    ctx.moveTo(ax + ux * DIM_GAP, ay + uy * DIM_GAP);
+    ctx.lineTo(adx + ux * DIM_OVER, ady + uy * DIM_OVER);
+    ctx.moveTo(bx + ux * DIM_GAP, by + uy * DIM_GAP);
+    ctx.lineTo(bdx + ux * DIM_OVER, bdy + uy * DIM_OVER);
+    ctx.stroke();
+    ctx.beginPath();                       // dimension line
+    ctx.moveTo(adx, ady);
+    ctx.lineTo(bdx, bdy);
+    ctx.stroke();
+    const dx = bdx - adx, dy = bdy - ady, dl = Math.hypot(dx, dy) || 1;
+    const tx = dx / dl, ty = dy / dl;
+    arrow(adx, ady, -tx, -ty);             // arrowheads outward along the dim line
+    arrow(bdx, bdy, tx, ty);
+    const text = `${Math.abs(Math.round(valueMM))}`;
+    const mx = (adx + bdx) / 2, my = (ady + bdy) / 2;
+    ctx.font = `400 11px ${mono}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const tw = ctx.measureText(text).width + 6;
+    ctx.fillStyle = paper;                 // paper break so the dim line never crosses the text
+    ctx.fillRect(mx - tw / 2, my - 8, tw, 16);
+    ctx.fillStyle = dimCol;
+    ctx.fillText(text, mx, my);
+  };
+
+  // distHP — p′ height above the XY line (front view). Vertical dim, right of the projector.
+  linearDim(px, cy, px, yPrime, DIM_OFF_V, 0, dPrime);
+  // distVP — p depth below the XY line (top view). Vertical dim, right of the projector.
+  linearDim(px, cy, px, yTop, DIM_OFF_V, 0, dTop);
+  // distRP — lateral offset from the centre datum (where PP cuts the XY line). Redraw the
+  // datum tick as the dimension's origin, then dimension datum → shared projector.
+  if (Math.round(lat) !== 0) {
+    ctx.strokeStyle = benchGrey;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 7);
+    ctx.lineTo(cx, cy + 7);
+    ctx.stroke();
+    linearDim(cx, cy, px, cy, 0, -DIM_OFF_H, lat);
+  }
 
   // The two views. ADR-016: a thick dot = paper halo + colour disc (the halo lifts
   // the disc clear of the projector + XY line). Two-Cue Rule: each carries its

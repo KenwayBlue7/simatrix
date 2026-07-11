@@ -520,6 +520,18 @@ Every rule is formatted:
 > **§6.18 ❌ NEVER** "fix" the 2D projectors back to dashed, the dots back to crosses, or the 3D
 > projectors to solid — these look like regressions but are deliberate. *(ADR-016)*
 
+> **§6.19 ✅ DO** draw every 2D/orthographic dimension as BIS SP 46:2003 **Type B** — continuous
+> narrow lines, extension lines with a ~1 mm gap + ~2 mm overshoot, and **3:1** arrowheads (length :
+> width = 3 : 1, so half-width = length/6). Use the **FILLED** arrowhead on the Points Canvas2D
+> Compare sheet; use the **OPEN 3:1 chevron** in `Module2/src/projectionDrawer.js` (a filled head
+> needs a `Mesh` and breaks its single-`LineSegments2` disposal contract). Dimension linework reads
+> `--color-ink`; CSS2D labels read `--font-mono` / `--text-xs`. *(ADR-041, ADR-016)*
+
+> **§6.20 ✅ DO** treat `projectionDrawer.js`'s `dimensionGroup` like `ppGroup` — the consumer parents
+> and step-gates it (it is NOT added to the returned `group`), and it is reached by held reference in
+> `setResolution` + `dispose` (CSS2D label nodes pulled from the DOM per §3.5). **❌ NEVER** auto-add it
+> to `group` or leave its CSS2D nodes undisposed. *(ADR-041, ADR-004)*
+
 ---
 
 ## Section 7 — Cross-Module Harmony Rules

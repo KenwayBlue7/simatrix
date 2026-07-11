@@ -262,6 +262,7 @@ let vpAxisInset = 0;
 let showLabelsFlag = false;      // Step 3 on
 let showProjectionsFlag = false; // Step 4 on — top (HP) + front (VP) views
 let showSideViewFlag = false;    // Step 5 on — profile plane (PP) revealed + side view drawn
+let showDimensionsFlag = false;  // Step 6 (optional) on — BIS Type-B dimension layer revealed (ADR-041)
 /** De-clutter toggle (default on): hides BOTH connector sets — the upright 3D→2D
  *  connectors and the flattened projectors — when the learner wants a cleaner drawing.
  *  Persists across rebuild() because every rebuild ends in applyFoldVisual, which reads
@@ -917,6 +918,24 @@ function applyProfilePlaneVisibility(on) {
 }
 
 /**
+ * Show or hide the BIS Type-B dimension layer (projectionDrawer hpDimensionGroup +
+ * vpDimensionGroup, ADR-041) as a unit. WebGLRenderer honours each group's .visible for the
+ * fat dimension lines and the filled-arrowhead mesh, but the r160 CSS2DRenderer ignores ancestor
+ * visibility, so each numeric CSS2D label needs its own per-object toggle (same gotcha as the PP pill).
+ * @param {boolean} on
+ */
+function applyDimensionVisibility(on) {
+  if (!activeProjection) return;
+  // Toggle BOTH view groups as a unit: the top-view dims (world space) and the front-view
+  // dims (VP fold pivot). Each CSS2D label needs its own .visible flip because the r160
+  // CSS2DRenderer ignores ancestor visibility (same gotcha as the PP pill).
+  for (const g of [activeProjection.hpDimensionGroup, activeProjection.vpDimensionGroup]) {
+    g.visible = on;
+    g.traverse((obj) => { if (obj.isCSS2DObject) obj.visible = on; });
+  }
+}
+
+/**
  * Draw or clear the orthographic projections to match showProjectionsFlag + the
  * current mesh. All three views (HP/VP/PP) are computed in one edge pass, but the PP
  * side view only BECOMES VISIBLE once the side-view step is reached: the PP subgroup
@@ -958,6 +977,17 @@ function refreshProjections() {
   // trace the upright solid back to the PP, parallel to the HP/VP connectors. They stay
   // hidden until the side-view step; applyFoldVisual gates them on showSideViewFlag.
   shapeGroup.add(activeProjection.ppConnectorGroup);
+
+  // Dimensions annotate the top + front views, split per view so each rides the right hinge
+  // (ADR-041 fold fix): the TOP-view dims stay flat in world space under shapeGroup (like the
+  // flat connectors), while the FRONT-view dims go under vpFoldGroup so they fold down flat WITH
+  // the VP grid + front view instead of standing upright after the flatten. Both built in the
+  // upright world frame, held hidden until the learner reveals them at Step 6
+  // (setDimensionsVisible); the projectionDrawer dispose() / setResolution reach them by held
+  // reference regardless of parent (ADR-041).
+  shapeGroup.add(activeProjection.hpDimensionGroup);
+  vpFoldGroup.add(activeProjection.vpDimensionGroup);
+  applyDimensionVisibility(showDimensionsFlag);
 }
 
 /**
@@ -1120,6 +1150,40 @@ function setSideViewVisible(on) {
       onUpdate: (o) => {
         setObjectOpacity(proj.ppGroup, o);
         if (showConnectorsFlag) setObjectOpacity(proj.ppConnectorGroup, o);
+      },
+    });
+  }
+}
+
+/**
+ * Step 6 (optional): reveal the BIS Type-B dimension layer on the top + front views —
+ * overall width / height + the distances from HP / VP, with FILLED 3:1 arrowheads
+ * (projectionDrawer hpDimensionGroup + vpDimensionGroup, ADR-041). The layer was built in refreshProjections
+ * but held hidden; this un-hides it and draws it on. Idempotent; the flag persists across
+ * rebuilds (refreshProjections re-asserts it via applyDimensionVisibility).
+ * @param {boolean} on
+ */
+function setDimensionsVisible(on) {
+  showDimensionsFlag = on;
+  applyDimensionVisibility(on);
+
+  // Draw-on (DESIGN.md): fade the dimensions in from nothing, mirroring the HP/VP + side-view
+  // reveals. Seed at 0 so the linework grows in rather than flashing at full weight (the tween
+  // snaps to full instantly under reduced motion). The numeric labels are CSS2D, so their reveal
+  // is the visibility toggle above, not this opacity rise.
+  if (on && activeProjection) {
+    const proj = activeProjection; // capture: a later toggle may null the module ref
+    // Seed both view groups at 0 and fade them on together (top-view + front-view dims).
+    setObjectOpacity(proj.hpDimensionGroup, 0);
+    setObjectOpacity(proj.vpDimensionGroup, 0);
+    tween({
+      from: 0,
+      to: 1,
+      duration: DRAW_DURATION_MS,
+      ease: easeDraw, // gentle ease-out so the dimensions glide on and settle
+      onUpdate: (o) => {
+        setObjectOpacity(proj.hpDimensionGroup, o);
+        setObjectOpacity(proj.vpDimensionGroup, o);
       },
     });
   }
@@ -2225,6 +2289,7 @@ window.simAPI = {
     showLabelsFlag = false;
     showProjectionsFlag = false;
     showSideViewFlag = false;
+    showDimensionsFlag = false;
     showConnectorsFlag = true; // restore the de-clutter default; sync its checkbox below
     if (connectorToggleEl) connectorToggleEl.checked = true;
     foldProgress = 0;
@@ -2318,6 +2383,7 @@ const simController = {
   setLabels(on) { setLabelsVisible(on); },
   setProjections(on) { setProjectionsVisible(on); },
   setSideView(on) { setSideViewVisible(on); },
+  setDimensions(on) { setDimensionsVisible(on); },
 
   /** De-clutter toggle for the dashed connector lines (persists across rebuild). */
   setConnectors(on) { setConnectorsVisible(on); },

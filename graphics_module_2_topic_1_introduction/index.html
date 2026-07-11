@@ -91,17 +91,17 @@
     :root {
       /* --- Surfaces (clinical palette: neutral gray + white working surfaces, tonal layering not shadows) --- */
       --color-paper:        #ffffff; /* pure-white base — viewport floor + raised control fills */
-      --color-panel:        #f5f5f5; /* neutral grey working surface — sidebar / panel, one tonal step BELOW paper */
+      --color-panel:        #f0f2f5; /* clinical cool grey working surface (LAB) — sidebar / panel, one tonal step BELOW paper */
       --color-solid-fill:   #e7e1d4; /* solid faces, so ink edges read */
 
       /* --- Ink (warm near-black) --- */
-      --color-ink:          #221f18; /* body text + visible edges (~16:1 on paper) */
-      --color-ink-secondary:#564e3c; /* secondary text + labels + the axis chain line */
+      --color-ink:          #06070b; /* clinical near-black (LAB) — body text + visible edges (~20:1 on paper) */
+      --color-ink-secondary:#5a5d66; /* clinical cool grey (LAB) — secondary text + labels + the axis chain line */
 
       /* --- Mid neutral --- */
       --color-bench-grey:   #938b7b; /* generators, inactive linework, disabled lock cue */
-      --color-border:       #d9d2c3; /* crisp 1px structural seams */
-      --color-track:        #cfc8b8; /* recessed groove (reads below border) */
+      --color-border:       #e0e1e5; /* clinical cool grey (LAB) — crisp 1px structural seams */
+      --color-track:        #e0e1e5; /* recessed groove, now == --color-border (ADR-040) */
 
       /* --- The one interaction accent (technical blue) --- */
       --color-accent:        #1f66b5; /* focus, selection (5.6:1 vs paper) */
@@ -201,6 +201,7 @@
       height: 100%;
       overflow-y: auto;
       padding: var(--space-5) var(--space-4);
+      padding-right: var(--space-3); /* scrollbar gutter — pill floats centered in its track (ADR-032) */
       background: var(--color-paper); /* content area reads pure white (panel grey is chrome-only) */
       border-right: 1px solid var(--color-border); /* flat seam, no shadow */
     }
@@ -323,6 +324,7 @@
       height: 100%;
       overflow-y: auto;
       padding: var(--space-5) var(--space-4);
+      padding-right: var(--space-3); /* scrollbar gutter — pill floats centered in its track (ADR-032) */
       background: var(--color-paper); /* content area reads pure white (panel grey is chrome-only) */
       border-left: 1px solid var(--color-border);
       display: flex;

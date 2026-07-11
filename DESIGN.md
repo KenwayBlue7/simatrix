@@ -8,13 +8,13 @@ colors:
   accent-strong: "#17539b"
   accent-soft: "#e3ecf7"
   paper: "#ffffff"
-  panel: "#f5f5f5"
+  panel: "#f0f2f5"
   solid-fill: "#e7e1d4"
-  ink: "#221f18"
-  ink-secondary: "#564e3c"
+  ink: "#06070b"
+  ink-secondary: "#5a5d66"
   bench-grey: "#938b7b"
-  border: "#d9d2c3"
-  track: "#cfc8b8"
+  border: "#e0e1e5"
+  track: "#e0e1e5"
   hp-line: "#007f7c"
   vp-line: "#bc5d1e"
   pp-line: "#7a5ea6"
@@ -89,7 +89,7 @@ named rule, this file wins.** Never hard-code design values in CSS or JS — con
 
 **Creative North Star: "The Patient Tutor's Paper."** This is the surface a patient one-on-one tutor works
 on, beside an anxious first-year who is sure they are "bad at this." A clean clinical sheet — pure-white
-base (`#ffffff`) with neutral-gray working surfaces (`#f5f5f5`) and dark ink — matching the web team's
+base (`#ffffff`) with neutral-gray working surfaces (`#f0f2f5`) and dark ink — matching the web team's
 host-site palette so the sim reads as one seamless page, not a tinted inset. Calm comes from clarity and
 order, not from tint: the patience lives in the voice, the pacing, and the quiet chrome. The chrome is
 near-monochrome and quiet so the only things that raise their voice are the **content in the viewport** and
@@ -104,18 +104,20 @@ deliberately not clinical" framing is retired in favour of the web team's clinic
 Every value below is the **live CSS custom property** in `Module2/index.html` (`:root`) and
 `Module1/src/shell.css` (`:root`). The two files were confirmed **identical** for every shared `--color-*`
 token. Authored in OKLCH for intent, stored as resolved sRGB hex because `THREE.Color` cannot parse
-`oklch()`.
+`oklch()`. The four clinical neutrals (`panel`, `ink`, `ink-secondary`, `border`) were re-derived from the
+platform's clinical LAB source and cooled off their former warm values on **2026-07-11 (ADR-040)** — the
+accent and every HP/VP/PP domain encoding were deliberately left untouched.
 
 | Token (`--color-…`) | Value | OKLCH intent | Semantic meaning |
 |---|---|---|---|
 | `paper` | `#ffffff` | — | Pure-white base **and content surfaces**: app + viewport background; raised control fills; the step card, `#active-problem` (statement + hints), `.problem-card`, the `.problem-library` page, and the `.compare-card` frame + stage. *(Clinical palette; paper/panel tones swapped 2026-07-09, Phase 1 Corrections; content surfaces returned to white in the same phase.)* |
-| `panel` | `#f5f5f5` | — | Neutral-gray working surface (host-site match): the wizard/dock shell (step rail included) and viewport chrome chips (wizard toggle, quick-views, connector, `.vp-hint`/spotlights), one tonal step **below** paper. The former `host-white` token is retired — content cards sit on `paper` against this grey shell. |
+| `panel` | `#f0f2f5` | LAB (clinical) | Neutral cool-gray working surface (host-site match): the wizard/dock shell (step rail included) and viewport chrome chips (wizard toggle, quick-views, connector, `.vp-hint`/spotlights), one tonal step **below** paper. The former `host-white` token is retired — content cards sit on `paper` against this grey shell. *(Cooled from `#f5f5f5` to the clinical LAB neutral 2026-07-11, ADR-040.)* |
 | `solid-fill` | `#e7e1d4` | 0.90 0.013 88 | Rendered 3D geometry faces, light enough that dark ink edges read. **Canonical name is `solid-fill`** — see §8. *(Still the shipped warm value; re-derivation as a neutral gray is a later code phase.)* |
-| `ink` | `#221f18` | 0.24 0.012 80 | Primary text + visible geometry edges (~16:1 on paper). |
-| `ink-secondary` | `#564e3c` | 0.44 0.016 80 | Secondary text, leads, helper copy. |
-| `bench-grey` | `#938b7b` | 0.62 0.012 88 | Hidden-edge linework, reference grids, inactive linework, disabled lock cue. |
-| `border` | `#d9d2c3` | 0.865 0.012 88 | Crisp 1px structural seams and dividers. |
-| `track` | `#cfc8b8` | 0.83 0.013 88 | Recessed slider groove, one step below border. |
+| `ink` | `#06070b` | LAB (clinical) | Primary text + visible geometry edges (~20:1 on paper). *(Cooled from warm `#221f18` to the clinical LAB near-black 2026-07-11, ADR-040.)* |
+| `ink-secondary` | `#5a5d66` | LAB (clinical) | Secondary text, leads, helper copy (~6.6:1 on paper, AA). *(Cooled from warm `#564e3c` 2026-07-11, ADR-040.)* |
+| `bench-grey` | `#938b7b` | 0.62 0.012 88 | Hidden-edge linework, reference grids, inactive linework, disabled lock cue. **CRITICAL: 3.4:1 contrast. Strictly for non-text linework and disabled UI only. Fails AA for text.** |
+| `border` | `#e0e1e5` | LAB (clinical) | Crisp 1px structural seams and dividers. *(Cooled from warm `#d9d2c3` 2026-07-11, ADR-040; ~1.31:1 as the scrollbar-pill tint — see §5.11.)* |
+| `track` | `#e0e1e5` | LAB (clinical) | Recessed slider groove. Harmonized to equal `--color-border` so the slider groove matches the scrollbar-pill tint (the former warm `#cfc8b8` was the last neutral missed by ADR-040 — 2026-07-11). |
 | `accent` | `#1f66b5` | 0.52 0.14 252 | The one interaction accent: current step, primary action, selection, slider fill, focus ring (~5.6:1 on paper). |
 | `accent-strong` | `#17539b` | 0.45 0.14 252 | Accent hover / active. |
 | `accent-soft` | `#e3ecf7` | 0.94 0.025 252 | Current-step pill, hint callouts, term popovers. |
@@ -238,7 +240,7 @@ exist only as a thin exception for transient overlays that must float above the 
 **The Flat-Ink Rule.** Surfaces are flat at rest. Never cast a shadow on rendered geometry, and never use
 elevation as decoration. If a shadow is not lifting a transient overlay off the page, it is wrong.
 
-**The Border-Over-Shadow Rule.** Structure comes from a single crisp hairline (`#d9d2c3`), not a drop
+**The Border-Over-Shadow Rule.** Structure comes from a single crisp hairline (`#e0e1e5`), not a drop
 shadow. Cards and panels are separated by tone and seam, not by float.
 
 **The Host-Integration White Exception (retired 2026-07-09, Phase 1 Part 2).** Under the clinical
@@ -247,7 +249,7 @@ split by role: **content surfaces** — the step card, `#active-problem` (statem
 hints), `.problem-card`, the `.problem-library` problems page, and the `.compare-card` frame —
 sit on pure white (`--color-paper` `#ffffff`), while **chrome chips** (wizard toggle, quick-view /
 connector chips, `.vp-hint`/spotlights, restore chip) sit on the neutral-gray shell surface
-(`--color-panel` `#f5f5f5`, which also paints the wizard/dock shell). A card keeps the standard
+(`--color-panel` `#f0f2f5`, which also paints the wizard/dock shell). A card keeps the standard
 hairline so its seam reads crisp without a shadow (Border-Over-Shadow still holds — the white-on-gray
 tonal jump carries the separation). Token discipline is unchanged: never use a bare `#fff`/`#000`
 literal — always consume the token.
@@ -295,7 +297,7 @@ viewport on the left. This is the shared layout shape for every guided-stepper s
   flex-direction: column }`), separated by a single 1px `border-left` (`--color-border`) — a flat seam,
   no shadow (Border-Over-Shadow, §4.2).
 - **Background mandate (strict):** the **3D viewport background is `var(--color-paper)` (`#ffffff`)** and
-  the **wizard panel background is `var(--color-panel)` (`#f5f5f5`)** — one tonal step below paper. These
+  the **wizard panel background is `var(--color-panel)` (`#f0f2f5`)** — one tonal step below paper. These
   are non-negotiable: never hard-code the hex, never swap the two tones, and never paint the viewport in
   the panel tone or vice-versa. (The step card sits on the same white panel surface; §4.4, §5.5.)
 - **Wizard contents (module-scoped):**
@@ -338,7 +340,7 @@ pairs any colour signal with a second cue.
 
 ### 5.2 Sliders
 
-- **Track:** a thin 4px recessed groove in Track grey (`#cfc8b8`), pill-rounded; the travelled portion fills
+- **Track:** a thin 4px recessed groove in Track grey (`#e0e1e5`, = `--color-border`), pill-rounded; the travelled portion fills
   with the accent (WebKit via the `--p` custom property; Firefox via `::-moz-range-progress`).
 - **Thumb:** a 16px accent knob with a 2px paper gap-ring and a hairline edge, flat at rest; the diffuse halo
   appears only on hover/focus/drag.
@@ -446,7 +448,7 @@ continues below the fold. The pill is deliberately quiet (Quiet Chrome, §2.3) b
   `background-clip: padding-box`**, so only the inner **~4px** paints and the pill floats 3px clear of
   both edges (the container's paper shows through the border). `border-radius: 999px`; **transparent
   track; no native arrow buttons.**
-- **Tint:** thumb is **`--color-border`** (`#d9d2c3`, ~1.28:1 on the card paper — faintly visible). Read
+- **Tint:** thumb is **`--color-border`** (`#e0e1e5`, ~1.31:1 on the card paper — faintly visible). Read
   the token, never hard-code (§6.2). *`--color-panel` (~1.12:1) is too invisible; `--color-bench-grey` is
   too loud — both were tried and rejected (ADR-032).*
 - **Firefox:** `scrollbar-width: thin` + `scrollbar-color: var(--color-border) transparent`, scoped to an

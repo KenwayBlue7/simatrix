@@ -956,6 +956,16 @@ unset — a non-obvious Chrome-121 gotcha, now documented inline and in DESIGN.m
 `graphics_module_1_topic_1_foundations` (`.card__scroll`) and **backported for platform parity** to the
 Module 2 master (`Module2/`: `#step-card`, `.problem-library__body`) and the intro topic
 (`graphics_module_2_topic_1_introduction/`: `#shape-rail`, `#anatomy-panel`).
+**Amended 2026-07-11 (scrollbar gutter):** the floating pill also needs horizontal breathing room so
+it never overlaps the scrolling content. The first approach reserved that room as a **`+12px` right
+gutter** — an asymmetric `padding-right` that pushed the content column left so the thumb sat in the
+added strip on the right edge. That was reframed to a **centered flat gutter** of `var(--space-3)`
+(still 12px, but read as the pill *floating centered in its own track* rather than a one-sided pad),
+and critically the value is now sourced from the spacing scale token, not a raw `12px` literal
+(ADR-003 / DESIGN.md §6). Landed in `graphics_module_1_topic_1_foundations` (`.card__scroll`:
+`padding-right: var(--space-3)`, comment "pill floats centered in its track"); the `template_starter`
+scaffold still carries the older "+12px scrollbar gutter" wording and is the remaining sweep target so
+new modules cut from it inherit the centered-gutter framing.
 **Status:** Active
 
 ---
@@ -1157,6 +1167,139 @@ the sheet keeps the drawing in proportion automatically.
 `SHEET2D_SPAN = (SHEET/2)*10`, not a bare `100`. Cross-references **ADR-014** (the 3D perspective
 auto-zoom — the deliberate counterpart that this ADR carves the 2D drawing out of).
 **Status:** Active
+
+---
+
+## ADR-039: Flatten every topic/module sub-repository into one unified `Simatrix` monorepo
+
+**Date:** 2026-07-10
+**Decision:** All of the previously independent topic and module folders — each of which carried its
+own inner `.git` directory and its own detached commit history — are **collapsed into a single
+`Simatrix` monorepo** rooted at `C:\xampp\htdocs\Simatrix`. The inner `.git` folders are **deleted**;
+there is now exactly **one** git repository, one working tree, and one commit history for the whole
+platform. Module1, Module2, and every `graphics_module_*_topic_*` folder are ordinary sub-directories
+of that single repo, no longer nested repositories or submodules.
+**Why:** The documentation system was just centralized onto **one root source of truth** — DESIGN.md,
+PRODUCT.md, PLATFORM-RULES.md, ARCHITECTURE.md, and this DECISIONS.md all live at the repo root and
+describe the platform as a whole. Version control must match that shape. Per-folder repositories forced
+either git submodules or a set of disconnected histories, both of which make a platform-wide change
+(touching a shared doc plus several topic folders in one logical edit) impossible to capture as a single
+atomic commit, and make cross-cutting git hooks and history search unreliable.
+**Alternatives rejected:** (a) *Keep separate sub-repositories and wire them together with git
+submodules* — rejected: submodule pins, detached HEADs, and the two-step commit dance add maintenance
+cost with no offsetting benefit for a single-team, single-deploy platform. (b) *Preserve each subfolder's
+detached history by grafting/importing it into the monorepo* — rejected: the sub-repos were remote-less
+and their histories held no shared value worth the merge complexity; a clean slate was chosen
+deliberately over reconstructing tangled parallel histories.
+**Consequences:** Platform-wide commits are now trivial — one edit spanning a root doc and several
+topic folders is a single commit. Version control, tagging, and git hooks are unified and centralized.
+The trade-off, accepted knowingly: the pre-flatten commit histories of the remote-less subfolders were
+**dropped**, so the monorepo begins from a clean-slate baseline rather than a reconstructed timeline.
+Reflected in **ARCHITECTURE.md §2** (the codebase map now states the platform is one unified git
+monorepo).
+**Status:** Active
+
+---
+
+## ADR-040: Cool the four residual warm neutrals (panel, ink, ink-secondary, border) to the clinical LAB values — accent and domain encodings untouched
+
+**Date:** 2026-07-11
+**Decision:** Four neutral tokens are re-derived from the platform's clinical **LAB** source (the
+"Chromatic Architecture" definitions), converted to resolved sRGB hex because `THREE.Color` cannot parse
+CSS `lab()`: `--color-panel` `#f5f5f5`→`#f0f2f5`, `--color-ink` `#221f18`→`#06070b`,
+`--color-ink-secondary` `#564e3c`→`#5a5d66`, `--color-border` `#d9d2c3`→`#e0e1e5`. Applied at all **seven**
+`:root` definition sites (`Module2/index.html`, `Module1/src/shell.css`, and the five topic `index.html`
+files) and synced into the root `DESIGN.md` token table. The guidance **accent** (`#1f66b5` + strong/soft),
+`success`, the **HP/VP/PP domain encodings**, `solid-fill`, `track`, `bench-grey`, and the Module-1
+construction-aid tokens are all deliberately **left unchanged**.
+**Why:** It completes the 2026-07-09 clinical-palette reversal — the warm `#221f18` ink and `#d9d2c3`
+border were relics of the retired warm-paper era. Cooling only the neutrals harmonizes them to the web
+team's cool-neutral clinical source while keeping the one ink-blue guidance accent (Quiet Chrome /
+Chrome-Only Blue) and the CVD-tuned Two-Cue domain hues exactly as specified.
+**Alternatives rejected:** (a) *Inject the LAB file wholesale* — rejected: it is a foreign shadcn-style
+theme whose token names (`--primary`, `--accent`, `--brand`, …) do not map to `--color-*`, whose
+`--primary` resolves to an electric `#4c3bf7` (breaks Quiet Chrome), whose `--accent` is a near-white gray
+`#f0f2f5` (a semantic inversion of the loud-blue guidance accent), and which carries **no** HP/VP/PP
+encodings (breaks Two-Cue). (b) *Also cool the accent and domain hues* — rejected: the accent is the sole
+guidance colour and HP-teal/VP-amber are CVD-tuned; both are rule-protected. (c) *Panel-only minimal remap*
+— considered, but the fuller neutral set gives a coherent cool ramp.
+**Consequences:** Contrast re-measured on white: `ink` **improves** to ~20:1; `ink-secondary` ~6.6:1 (still
+AA, below its former AAA-7 headroom); `border` as the scrollbar-pill tint drops to ~1.31:1 (fainter than
+the former ~1.50, still above the ADR-032 ~1.28 floor). The Module 1 per-page **boot diagnostics** keep
+their hard-coded warm hex — a deliberate pre-CSS fallback exempt from ADR-003 (§8 gap 4), so they remain a
+warm island visible only on a boot error. The legacy per-module `DESIGN.md` copies still show the old hex;
+they are already superseded by the root file (ADR-022). ADR-003 is unaffected — colours are still read from
+tokens at runtime; only the stored values changed.
+**Status:** Active
+
+---
+
+## ADR-041: 2D dimensioning is BIS SP 46:2003 Type B — filled 3:1 arrowheads on both the Canvas2D sheet and the Three.js dimension layer
+
+**Date:** 2026-07-11
+**Decision:** Both orthographic surfaces gain formal dimensioning. **Points** (`graphics_module_1_topic_3_points/main.js`
+`drawCompare()`): distHP / distVP / distRP become Type-B dimensions — extension lines (≈1 mm gap off the
+mark, ≈2 mm overshoot), a continuous narrow dimension line, **FILLED** 3:1 arrowheads, and centered value
+text over a paper break — replacing the plain mono numbers. **Module 2** (`Module2/src/projectionDrawer.js`):
+a new `dimensionGroup` carries overall width / height + distances from HP / VP for the top and front views,
+as one 1.0px `--color-ink` `LineSegments2` (extension + dimension lines) with **FILLED** 3:1 triangle
+arrowheads carried in a separate `--color-ink` `MeshBasicMaterial` triangle soup (see the 2026-07-11
+amendment — originally open chevrons), plus CSS2D `--font-mono` / `--text-xs` labels. The 3:1 ratio is
+realised as an isosceles arrowhead of length `L` and
+full width `L/3` (half-width `L/6`). Gap / overshoot / arrow sizes are paper-space (a paper spec), the value
+text is the true model mm (world extent × 10, ADR-018).
+**Why:** SP 46 is the binding Indian drafting standard the lessons teach; plain numbers beside a projector
+are not a drawing. The 3:1 arrowhead and the extension-line gap/overshoot are the recognisable Type-B cues.
+**Alternatives rejected:** (a) *Open 3:1 chevron arrowheads in Module 2* — **originally chosen** (a filled
+arrowhead is a solid polygon that cannot live in a `LineSegments2`, so the open chevron kept the whole dimension
+layer in one batched line object — cheap dispose, one `setResolution` target — while preserving the ratio cue),
+but **overturned the same day**; see the amendment below. (b) *Auto-add
+`dimensionGroup` to the returned `group`* — rejected: it would measure the sheet before the dimensioning
+step and fight the fold; instead the consumer parents + step-gates it, exactly like `ppGroup` /
+`flatConnectorGroup`. (c) *Scale gap/overshoot in model mm* — rejected: they would shrink/grow with the
+drawing; paper-space keeps the standard proportions at any zoom.
+**Consequences:** `projectionDrawer.js` header note 3 (which read "3D TextMeshPro dimension labels are NOT
+ported") is amended — labels are not ported *as TextMeshPro*, but a CSS2D dimensioning layer now exists
+(RULES.md §8.4 — no silent reversal). The layer is **inert until a consumer parents `dimensionGroup`**, so
+nothing changes on screen until `Module2/main.js` wires + step-gates it; the `simple_positions` clone's
+`projectionDrawer.js` copy is a pending **merge** (RULES.md §1.4/§1.5), not a blind copy — it already
+diverges on PP-hinge comments. `drawDimensions:false` suppresses the whole layer. Token discipline holds:
+line colour reads `--color-ink`; label DOM consumes `--font-mono` / `--text-xs` / `--color-ink` /
+`--color-paper` (ADR-003).
+
+**Amended 2026-07-11 (single group → SPLIT `hpDimensionGroup` + `vpDimensionGroup`, fold-survival — MANDATORY):**
+The single `dimensionGroup` described above is **superseded**: the dimension layer **MUST be split into two
+groups** to survive the Step-6 cinematic fold. Step 6 folds the VP (and its front view) flat about the ground
+line while the HP top view stays put in world space, so a single dimension group parented anywhere is wrong —
+parent it to `shapeGroup` and the front-view dims stand upright after the flatten; parent it to `vpFoldGroup`
+and the top-view dims fold off the sheet. So `projectionDrawer.js` now emits **`hpDimensionGroup`** (top-view
+dimensions) and **`vpDimensionGroup`** (front-view dimensions), and the consumer **MUST** parent
+`hpDimensionGroup` to the world `shapeGroup` (stays flat, like `flatConnectorGroup`) and `vpDimensionGroup`
+to `vpFoldGroup` (folds down WITH the VP grid + front view). Both are built in the upright world frame, held
+hidden until Step 6; `applyDimensionVisibility` toggles **both** groups — and each CSS2D label's own `.visible`,
+since the r160 `CSS2DRenderer` ignores ancestor visibility — as a unit. The Step-6 reveal is now a **toggle**
+(button swaps *Show dimensions* ↔ *Hide dimensions*), not a one-shot. A single group is a regression; do not
+re-merge them. The `simple_positions` clone was brought to **full parity** the same day: its `main.js` now
+parents both split groups + gates them on `showDimensionsFlag` behind the Step-6 toggle, closing the
+consumer gap recorded in memory `module2-clone-parity-gap`.
+**Amended 2026-07-11 (open→filled reversal):** The open-chevron choice for Module 2 (Alternative (a) above) is
+**overturned**. SP 46:2003 exam grading marks against the solid BIS wedge, so both orthographic surfaces now use
+**FILLED** 3:1 arrowheads (textbook fidelity, ADR-018), not an open "<". Mechanism (`Module2/src/projectionDrawer.js`):
+`pushLinearDim` routes each arrowhead into a separate flat `arrowPos` triangle buffer (never the line batch);
+`buildArrowMesh` packs it into ONE `MeshBasicMaterial({ color: --color-ink, side: THREE.DoubleSide })` triangle
+soup added to `dimensionGroup` — the same filled form `annotations.js` (Bearing Block) already uses. The "a fill
+can't live in a `LineSegments2`" objection is resolved by giving the fill its own `Mesh` while the extension +
+dimension LINES stay batched; the disposal contract holds because `dispose()` now tears down ANY material (not just
+`LineMaterial`) in the same group traversal, so the mesh's geometry + material are freed with the layer. Module 2
+is now **wired** (no longer inert): `main.js` parents `activeProjection.dimensionGroup` under `shapeGroup` in
+`refreshProjections`, gates it on a new `showDimensionsFlag`, and a Step-6 "Show dimensions" button (`stepper.js`
+→ `simController.setDimensions`) reveals it with a draw-on fade — the r160 `CSS2DRenderer` ignores ancestor
+visibility, so the numeric labels get their own per-object toggle. The `simple_positions` clone **merge landed**
+(`projectionDrawer.js` forward-copied); its stale `projectPP` comment (PP hinge about *local Y / the VP∩PP line*)
+was reconciled to *local X / the HP∩PP line* to match that clone's own `main.js` fold (`PP_FOLD_TARGET`).
+**Status:** Active (Module 2 arrowheads **overturned open→filled** the same day; dimension layer **split into
+`hpDimensionGroup` + `vpDimensionGroup` for fold-survival** and made a Show/Hide toggle; `simple_positions`
+clone at full parity — see amendments)
 
 ---
 

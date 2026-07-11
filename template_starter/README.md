@@ -16,10 +16,9 @@ This file tells you, file by file, what to copy unchanged, what to adapt, and wh
 grounded in the actual differences between the master and its two existing deploy copies.
 
 **The single most important rule for Cases A and B: `Module2/` is the master and the single
-source of truth for the solids engine** (ADR-009, RULES.md §1.1, ARCHITECTURE.md §9.1). For a new
-3D-solids topic (Case A) you **duplicate `template_starter/`** (the stripped boilerplate) and restore
-the solid generators from `Module2/` (Section 3.2) — never clone a topic copy, and never a
-half-remembered structure. The folder names (`graphics_module_2_topic_1_introduction`,
+source of truth** (ADR-009, RULES.md §1.1, ARCHITECTURE.md §9.1). For a new 3D-solids topic
+(Case A), **you start by copying `Module2/`** — never a topic copy, and never a half-remembered
+structure. The folder names (`graphics_module_2_topic_1_introduction`,
 `graphics_module_2_topic_2_simple_positions`) do **not** reveal that they are copies of `Module2`,
 so you cannot infer the master from the directory listing — you have to know it, and now you do.
 
@@ -91,37 +90,20 @@ that the root docs summarize but the CLAUDE.md states operationally.
 
 Decide this **before** you create a folder. The case determines your template.
 
-| Case | You are building… | Where to start | Example |
+| Case | You are building… | Template to copy | Example |
 |---|---|---|---|
-| **A** | A new **3D-solids topic** in the Module 2 family | **Duplicate `template_starter/`**, then copy the seven solid files back in from `Module2/` (Section 3.2) | "Sectional Views", "Auxiliary Projections" |
+| **A** | A new **3D-solids topic** in the Module 2 family | **`Module2/`** (the master) | "Sectional Views", "Auxiliary Projections" |
 | **B** | A new **drawing-foundations lesson** in the Module 1 family | **`Module1/`** (add a thin page) | "Conics", "Development of Surfaces" |
-| **C** | A whole **new subject module** (new discipline) | **Duplicate `template_starter/`** — the stripped boilerplate (Section 5) | Mechanical, Electrical, Civil |
+| **C** | A whole **new subject module** (new discipline) | *(none — build fresh from `../CLAUDE.module-template.md` + `../PLATFORM-RULES.md`; Module 2/Module 1 are reference examples only, Section 5.1)* | Mechanical, Electrical, Civil |
 
-> **`template_starter/` is the boilerplate** (minted + finalised 2026-07-11): a copy of the Module 2
-> master with the 3D-solids geometry stripped, `problems.js`/`terms.js` emptied to stubs, the guided
-> stepper reset to three placeholder steps, and the 50/50 Compare View pre-injected. New builds now
-> **duplicate it** instead of copying `Module2/` and deleting domain files by hand. It is **fully
-> sanitised**: `main.js` is rewritten to a clean empty-scene boot (it imports only the platform leaves —
-> `stepper`, `terms`, `onboarding`, `anim` — plus Three.js and `OrbitControls`, with a
-> disposal-contract-only `rebuild()`), and every Engineering-Graphics domain leaf (`iShape.js`,
-> `meshAnalyzer.js`, `projectionDrawer.js`, `vertexLabeler.js`, `problemLibrary.js`) plus the local
-> `DESIGN.md` is already removed. So each case below spells out only what you **add or wire in** — there
-> is no leftover domain code to delete.
-
-**Case A — New topic within the Module 2 family.** Same subject (Engineering Graphics, projection of
-3D solids), new sub-topic. Start from **`template_starter/`** — the stripped boilerplate that already
-carries the platform skeleton, the guided-stepper chrome, the emptied `problems.js`/`terms.js` stubs,
-and the 50/50 Compare View pre-injected. Because a solids topic still needs the geometry engine, copy
-the seven solid files (`cube`/`cone`/`cylinder`/`genericPrism`/`genericPyramid`/`genericSolid`/
-`shapeData`) back in from `Module2/src/` — **`Module2/` stays the reference solids implementation** —
-and re-add their imports in `main.js` (Section 3.2). From there you adapt the data layer, the stepper
-sequence, the controls, and the copy, gating content with the single `ENABLED_TIERS` flag in
-`src/problems.js` (ADR-009, RULES.md §1.6). *(If your topic reuses nearly all of Module 2's solid
-machinery, cloning `Module2/` whole and simplifying down is still a legitimate shortcut — you then
-just re-do the strip that `template_starter/` already did for you.)* The two existing topics bracket
-the range: **Topic 2 (Simple Positions)** is a *near-faithful* clone; **Topic 1 (Introduction)** is a
-*heavy* adaptation that drops the whole projection/stepper/problem layer and adds `anatomy.js` +
-`gallery.js` (ARCHITECTURE.md §2, §8).
+**Case A — New topic within the Module 2 family.** Same subject (Engineering Graphics, projection
+of 3D solids), new sub-topic. You copy the whole master and *simplify down* for the topic, gating
+content with the single `ENABLED_TIERS` flag in `src/problems.js` (ADR-009, RULES.md §1.6). The
+geometry engine, the rebuild pipeline, the design tokens, and the platform contract all stay; you
+adapt the data layer, the stepper sequence, the controls, and the copy. The two existing examples
+bracket the range: **Topic 2 (Simple Positions)** is a *near-faithful* clone (9 of 18 `src/` files
+byte-identical), and **Topic 1 (Introduction)** is a *heavy* adaptation (drops the whole
+projection/stepper/problem layer, adds `anatomy.js` + `gallery.js`) (ARCHITECTURE.md §2, §8).
 
 **Case B — New topic within the Module 1 family.** Same foundations subject, new lesson. You do
 **not** copy a whole folder — Module 1 is one shared engine serving seven thin pages, so a new
@@ -129,18 +111,14 @@ lesson is **a new thin HTML page + a small orchestrator `*.js` + pure data files
 edit `engine.js`** to add it (ADR-011, RULES.md §3.28). This is structurally different from Case A.
 
 **Case C — A whole new subject module.** A new discipline (Mechanical, Electrical, Civil, CS).
-**Duplicate `template_starter/`** — it already has the Engineering-Graphics 3D-solids geometry
-stripped, the domain leaves removed, `problems.js`/`terms.js` emptied to stubs, the guided stepper
-reset to placeholder steps, and the 50/50 Compare View pre-injected, so you fill empty seams instead of
-deleting domain files by hand. You still (1) replace the copied `CLAUDE.md` — it is still Module 2's,
-titled for Engineering Graphics — with the filled-in `../CLAUDE.module-template.md`; (2) wire `main.js`
-to your own domain geometry — it boots clean and empty (a disposal-contract-only `rebuild()`), so you
-build your geometry into that empty seam; (3) adapt or replace the platform leaves that still ship as
-stubs (`uiManager.js`, `onboarding.js`) for your own controls and hints — the solids-only domain leaves
-(`iShape.js`, `meshAnalyzer.js`, `projectionDrawer.js`, `vertexLabeler.js`, `problemLibrary.js`) are
-already gone, so there is nothing to delete; and (4) write your own `ARCHITECTURE.md`, `DECISIONS.md`,
-and `RULES.md` before development starts (Section 5.4) — new, local files, not entries in the root ones.
-Decide 2D vs 3D as your own pattern choice (Section 5.1). See the full Case C walkthrough in Section 5.
+Unlike Case A/B, you do **not** copy `Module2/` or `Module1/` — those are Engineering Graphics'
+own codebases, and copying one would drag in its domain-specific engine files (shape generators,
+projection drawer, problem library) and a `CLAUDE.md` that points at the Engineering-Graphics-only
+root `ARCHITECTURE.md`/`DECISIONS.md`/`RULES.md`. Instead you start from
+`../CLAUDE.module-template.md` + `../PLATFORM-RULES.md` and build your own architecture, deciding
+2D vs 3D as your own pattern choice (Section 5.1). You write your own `ARCHITECTURE.md`,
+`DECISIONS.md`, and `RULES.md` before development starts (Section 5.4) — they are new, local
+files, not entries in the root ones.
 
 ---
 
@@ -164,43 +142,29 @@ topic name. **Worked example:** `graphics_module_2_topic_3_sectional_views`.
 > §1.7, ADR-020). Do not read lineage from it. The human-facing title lives in `meta.json`, and a
 > topic title may carry no number at all (e.g. "Simple Positions", RULES.md §1.9).
 
-### 3.2 Duplicate `template_starter/`, then restore the solids
+### 3.2 Copy the master, whole
 
-From the Simatrix root, duplicate the boilerplate:
+From the Simatrix root:
 
 ```powershell
 # PowerShell (primary shell on this machine)
-Copy-Item -Recurse template_starter graphics_module_2_topic_3_sectional_views
+Copy-Item -Recurse Module2 graphics_module_2_topic_3_sectional_views
 ```
 ```bash
 # Git Bash equivalent
-cp -r template_starter graphics_module_2_topic_3_sectional_views
+cp -r Module2 graphics_module_2_topic_3_sectional_views
 ```
 
-`template_starter/` already has the tool metadata (`.claude/`, `.impeccable/`) removed and a fresh
-`CHANGELOG.md`, so there is nothing to scrub. It also already has the 3D-solids geometry stripped, the
-Compare View pre-injected, and `problems.js` / `terms.js` / `stepper.js` reset to stubs.
-
-Because a Module 2 solids topic **needs** the geometry engine, copy the seven solid files back in from
-`Module2/src/` (the reference solids implementation):
-
-```bash
-cp Module2/src/{cube,cone,cylinder,genericPrism,genericPyramid,genericSolid,shapeData}.js \
-   graphics_module_2_topic_3_sectional_views/src/
-```
-
-> ⚠️ **The boilerplate's `main.js` is sanitised — it does NOT import the solid generators**; it boots a
-> clean empty scene. So for a solids topic you re-add the imports for the generators you copied back in
-> (above) plus their `rebuild()` / `ShapeType` wiring — importing only the solids your topic teaches
-> (topic 1 uses two; topic 2 uses the full set minus `slantAngle`). Keep `assets/`, `index.html`,
-> `main.js`, `meta.json`, and the whole `src/` tree; replace `CLAUDE.md` per Section 3.7.
+Then **delete the master's own git/scratch metadata** from the copy so it doesn't inherit Module 2's
+history: remove the copied `.git/`, `.claude/`, and `.impeccable/` folders and `CHANGELOG.md`
+(start the topic's changelog fresh). Keep `assets/`, `index.html`, `main.js`, `meta.json`, `CLAUDE.md`,
+and the entire `src/` tree.
 
 ### 3.3 File-by-file: keep exactly as copied (the shared contracts)
 
-These are the shared engine — **byte-identical to `Module2/src/`** (md5 match, 2026-06-28). The six
-shape generators + `shapeData.js` arrive via the `Module2/` copy in Section 3.2; `anim.js`,
-`meshAnalyzer.js`, and `vertexLabeler.js` already ship inside `template_starter/` unchanged from
-Module 2. Either way, **do not touch them** in the topic — if one needs a fix, fix it in `Module2/`
+These were confirmed **byte-identical** between `Module2/src/` and
+`graphics_module_2_topic_2_simple_positions/src/` (md5 match, 2026-06-28). They are the shared
+engine; copy them and **do not touch them** in the topic. If one needs a fix, fix it in `Module2/`
 and re-copy (RULES.md §1.3, §1.4):
 
 | File | Why it must stay identical |
@@ -220,11 +184,8 @@ and re-copy (RULES.md §1.3, §1.4):
 
 ### 3.4 File-by-file: adapt (the topic-specific content)
 
-These are the topic-specific files — the ones that **diverged** between `Module2/src/` and topic 2's
-`src/`. In `template_starter/` several already arrive as **empty stubs** (`problems.js`, `terms.js`)
-or **placeholder steps** (`stepper.js`), so here you *fill* them rather than trim Module 2's content
-down; `shapeData.js` arrives via the `Module2/` restore in Section 3.2. Change only the
-topic-specific parts — what "adapt" concretely means is taken from how topic 2 actually differs:
+These **diverged** between `Module2/src/` and topic 2's `src/`. Copy them, then change only the
+topic-specific parts. What "adapt" concretely means is taken from how topic 2 actually differs:
 
 | File | What you adapt |
 |---|---|
@@ -386,13 +347,12 @@ A Module 1 lesson is almost entirely **pure data** passed into `initSim()`:
 
 ## Section 5: Case C Step-by-Step — New Subject Module
 
-> **Revised 2026-07-11.** A new discipline (Mechanical, Electrical, Civil, CS) does not follow the
-> Engineering Graphics master/deploy model (Sections 3–4 above), and it does not share the root
-> `ARCHITECTURE.md`/`DECISIONS.md`/`RULES.md` — only the platform-wide layer (`DESIGN.md`,
-> `PRODUCT.md`, `PLATFORM-RULES.md`). You now **duplicate `template_starter/`** — the boilerplate that
-> already IS the stripped platform skeleton (Section 5.2) — instead of hand-assembling one or copying
-> `Module2/` and deleting its domain files by hand. If you expected to build the skeleton from scratch
-> per `CLAUDE.module-template.md`, that was the old guidance — this section supersedes it.
+> **Revised 2026-07-02.** A new discipline (Mechanical, Electrical, Civil, CS) does not follow the
+> Engineering Graphics master/deploy model (Sections 3–4 above) — it is not a copy of `Module2/` or
+> `Module1/`, and it does not share the root `ARCHITECTURE.md`/`DECISIONS.md`/`RULES.md`. It shares
+> only the platform-wide layer (`DESIGN.md`, `PRODUCT.md`, `PLATFORM-RULES.md`) and builds
+> everything else fresh, per `CLAUDE.module-template.md`. If you expected to copy `Module2/` or
+> `Module1/` wholesale here, that was the old guidance — this section supersedes it.
 
 ### 5.1 Decide your architecture pattern: 3D orchestrator or 2D multi-lesson?
 
@@ -412,57 +372,39 @@ decide and record:
 
 Record which pattern you chose and why as the first entry in your own `DECISIONS.md`.
 
-### 5.2 Duplicate `template_starter/` — the platform skeleton is already built
+### 5.2 Build the platform skeleton fresh
 
-You no longer hand-assemble the skeleton or copy `Module2/` and delete its domain files. Duplicate
-the boilerplate instead:
+Do not copy the `Module2/` or `Module1/` folder. Build a new folder containing only the
+platform-level pieces every Simatrix sim needs — all documented in `../PLATFORM-RULES.md` §1
+(Platform & Runtime Contract):
 
-```bash
-cp -r template_starter my_new_subject_module
-```
+- The import map, pinned to an exact version of whatever library you depend on (no UMD global, no
+  `@latest`).
+- `window.simAPI` exposing `pause()`, `resume()`, `reset()`.
+- `meta.json` with all four required fields.
+- The dismissible mobile notice below 768px.
+- The bundled `woff2` fonts (Atkinson Hyperlegible + IBM Plex Mono) — copy these three files
+  unchanged from any existing module; they are the platform's own shared typography, not
+  Engineering-Graphics content.
+- `../CLAUDE.module-template.md`, copied in as your `CLAUDE.md` and filled in per its own
+  instructions.
 
-`template_starter/` already contains exactly the platform-level pieces every Simatrix sim needs
-(`../PLATFORM-RULES.md` §1) with the Engineering-Graphics content stripped:
-
-- The import map pinned to `three@0.160.0`, `window.simAPI` (`pause`/`resume`/`reset`), `meta.json`
-  (all four fields), the dismissible < 768px mobile notice, the boot watchdog + WebGL fallback, and
-  the bundled `woff2` fonts (Atkinson Hyperlegible + IBM Plex Mono) — all present and platform-generic.
-- The **3D-solids geometry stripped** (`cube`/`cone`/`cylinder`/`genericPrism`/`genericPyramid`/
-  `genericSolid`/`shapeData` removed), `problems.js` + `terms.js` emptied to stubs, and `stepper.js`
-  reset to three placeholder steps.
-- The **50/50 Compare View pre-injected** (`#compare-card` + `#compare-canvas`, the empty
-  `#workbench-rail`, and the `.compare-card` / `body.compare-split` / `#workbench-rail` CSS), so a
-  dual-mode "workbench" split is available the moment you wire it.
-
-Two things you MUST still do after duplicating (the boilerplate is sanitised, so there is no domain
-code to delete — you fill empty seams):
-
-1. **Replace `CLAUDE.md`.** It is still Module 2's (titled "Engineering Graphics Viewer") — overwrite
-   it with `../CLAUDE.module-template.md`, filled in per its own instructions. Never keep a `CLAUDE.md`
-   that points at the root `ARCHITECTURE.md`/`DECISIONS.md`/`RULES.md`.
-2. **Wire `main.js` to your domain.** `main.js` is already sanitised to a clean empty-scene boot — it
-   imports only the platform leaves (`stepper`, `terms`, `onboarding`, `anim`) plus Three.js /
-   `OrbitControls`, and its `rebuild()` runs the disposal contract over an empty group. Build your own
-   domain geometry into that empty `rebuild()` seam, keeping the single `rebuild()` pipeline and the
-   single `simAPI.reset()` path. This is your first real build step (5.3). Then adapt or replace the
-   two platform leaves that still ship as stubs (`uiManager.js`, `onboarding.js`) for your own controls
-   and hints, and fill the `problems.js` / `terms.js` stubs for your own problem set and glossary.
-
-The Engineering-Graphics domain leaves (`iShape.js`, `meshAnalyzer.js`, `projectionDrawer.js`,
-`vertexLabeler.js`, `problemLibrary.js`) and the local `DESIGN.md` were already removed when the
-boilerplate was finalised — there is nothing to delete, and you consume the single root `../DESIGN.md`.
+If it's faster to start by copying `Module2/index.html` or a `Module1/` page purely as boilerplate
+for the import map / `simAPI` wiring, that's fine — but then **delete** everything
+domain-specific: the shape generators, `problems.js`, `problemLibrary.js`, `iShape.js`,
+`meshAnalyzer.js`, the Engineering Graphics content in `stepper.js`/`terms.js`/`onboarding.js`, and
+the copied `CLAUDE.md`. Never keep a `CLAUDE.md` that still points at the root
+`ARCHITECTURE.md`/`DECISIONS.md`/`RULES.md` — replace it with the filled-in template.
 
 ### 5.3 Build fresh: your own domain engine
 
-There is no shared geometry/rendering engine to inherit. The Engineering-Graphics domain leaves that
-once shipped inside `template_starter/` — `iShape.js`, `meshAnalyzer.js`, `projectionDrawer.js`,
-`vertexLabeler.js`, `problemLibrary.js` — solved orthographic projection of solids and were **removed**
-when the boilerplate was finalised; they are **not** a contract your subject inherits. Build your own
-domain generators/helpers into the sanitised `main.js` `rebuild()` seam instead (Section 5.2, step 2).
-If it helps, read those leaves in the `Module2/` master (and Module 1's drawing toolkit
-`asg`/`alp`/`acr`/`alb`) as worked examples — the disposal-contract discipline, the
-single-rebuild-pipeline discipline, and "no leaf module imports a sibling" are ideas worth
-re-implementing — but the geometry is yours to build.
+There is no shared geometry/rendering engine to inherit. Module 2's shape generators (`cube.js`,
+`cone.js`, `iShape.js`, `applyShapeTransform()`) and Module 1's drawing helper toolkit (`asg`,
+`alp`, `acr`, `alb`, …) solve Engineering Graphics' own problems — orthographic projection of
+solids, flat technical drawing — and are not a contract your subject inherits. Study them as
+worked examples if useful (the disposal-contract discipline, the single-rebuild-pipeline
+discipline, and "no leaf module imports a sibling" are good ideas worth re-implementing), but
+build your own generators/helpers for your own domain.
 
 Either way: respect the platform's shared visual rules in your new domain's viewport — Two-Cue,
 Chrome-Only Blue, Flat-Ink, and the rest (`PLATFORM-RULES.md` §2). Add any new **domain-specific
@@ -637,9 +579,8 @@ These are the mistakes that specifically bite when **standing up a new topic fro
 from RULES.md §9, both module `CLAUDE.md` files, and the actual divergences found in the two existing
 topics. (General development anti-patterns live in RULES.md §9; this list is only the setup traps.)
 
-- **Copying from a topic instead of the boilerplate/master.** Duplicate `template_starter/` for Case
-  A/C (restoring the solids from `Module2/` for a solids topic), never a `graphics_module_2_topic_*`
-  folder — the topics are already scoped-down and some carry stale shared
+- **Copying from a topic instead of the master.** Always copy `Module2/` for Case A/C, never a
+  `graphics_module_2_topic_*` folder — the topics are already scoped-down and some carry stale shared
   files (RULES.md §1.1, §1.3).
 - **Editing a "shared" file in the topic.** Fix it in `Module2/` and re-copy; a topic-local edit to
   `anim.js`/`genericSolid.js`/a generator silently forks the platform (RULES.md §1.3–§1.4).

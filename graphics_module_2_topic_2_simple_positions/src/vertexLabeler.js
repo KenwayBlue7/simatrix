@@ -70,6 +70,17 @@ const CHAIN = Object.freeze({ long: 0.16, dot: 0.04, gap: 0.05 });
  *  centre lines project a little past the outline in a real drawing. */
 const AXIS_OVERSHOOT = 0.12;
 
+/**
+ * Vertex labels CASCADE in on generate(): each starts transparent and eases to full
+ * opacity, staggered by its vertex index, so the annotation set appears one after
+ * another instead of every label popping in at once. Kept short so it reads as a
+ * flourish, not a wait. The transition is applied inline (reusing the shared
+ * --ease-standard token) and CLEARED by setOpacity() so the fold cross-fade — which
+ * drives opacity every frame — is never left lagging a frame behind the transition.
+ */
+const LABEL_FADE_MS = 240;
+const LABEL_STAGGER_MS = 35;
+
 /** Letters for base corners: A, B, C, … (wraps to A1, B1… past 26, never expected). */
 function letterFor(i) {
   return i < 26 ? String.fromCharCode(65 + i) : `${String.fromCharCode(65 + (i % 26))}${Math.floor(i / 26)}`;
@@ -363,6 +374,11 @@ export function initVertexLabeler(scene, initialResolution) {
     for (const w of worlds) radius = Math.max(radius, w.distanceTo(centroid));
     const offset = Math.max(0.06, radius * 0.12);
 
+    // Reduced motion opts out of the cascade — labels appear immediately at full opacity.
+    const reduceMotion = window.matchMedia
+      ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      : false;
+
     labels.forEach(({ text }, i) => {
       const pos = worlds[i].clone();
       const dir = pos.clone().sub(centroid);
@@ -374,11 +390,30 @@ export function initVertexLabeler(scene, initialResolution) {
       // Never intercept pointer events — drag-to-orbit must pass straight through.
       el.style.pointerEvents = 'none';
 
+      // Staggered cascade-in: start transparent, then ease to full opacity with a
+      // per-index delay (the rAF flip below triggers it). See LABEL_FADE_MS.
+      if (!reduceMotion) {
+        el.style.opacity = '0';
+        el.style.transition = `opacity ${LABEL_FADE_MS}ms var(--ease-standard)`;
+        el.style.transitionDelay = `${i * LABEL_STAGGER_MS}ms`;
+      }
+
       const obj = new CSS2DObject(el);
       obj.position.copy(pos);
       obj.center.set(0.5, 0.5);
       group.add(obj);
     });
+
+    // Flip the freshly-added labels opaque next frame so the transition actually
+    // animates (setting opacity in the same frame they're created would paint them
+    // straight to full). Reduced motion left them at their default opacity of 1.
+    if (!reduceMotion) {
+      requestAnimationFrame(() => {
+        for (const child of group.children) {
+          if (child.element?.classList.contains('vlabel')) child.element.style.opacity = '1';
+        }
+      });
+    }
   }
 
   /**
@@ -389,8 +424,14 @@ export function initVertexLabeler(scene, initialResolution) {
    */
   function setOpacity(o) {
     for (const obj of group.children) {
-      if (obj.element) obj.element.style.opacity = String(o);
-      else if (obj.material) obj.material.opacity = o; // axis / generator lines
+      if (obj.element) {
+        // Clear the cascade transition so the fold's per-frame opacity ramp is
+        // immediate (a lingering transition would make the labels lag the fade).
+        obj.element.style.transition = 'none';
+        obj.element.style.opacity = String(o);
+      } else if (obj.material) {
+        obj.material.opacity = o; // axis / generator lines
+      }
     }
     group.visible = o > 0.001;
   }

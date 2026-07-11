@@ -41,7 +41,13 @@
 //     each keeps its plane's hue but switches to a dash (so the solid/dashed
 //     cue, not hue, carries occlusion). This view-dependent convention takes
 //     precedence over the Two-Cue dash-on-VP styling. Colours are read from CSS
-//     tokens, never hard-coded. 3D TextMeshPro dimension labels are NOT ported.
+//     tokens, never hard-coded. The C#'s 3D TextMeshPro dimension labels are not
+//     ported AS SUCH, but a separate BIS SP 46:2003 Type-B DIMENSIONING layer is
+//     now emitted, SPLIT per view into hpDimensionGroup + vpDimensionGroup so the
+//     front-view dims fold with the VP (ADR-041): overall width / height + distances
+//     from HP / VP for the top + front views, drawn as continuous narrow lines with FILLED 3:1
+//     triangle arrowheads (a MeshBasicMaterial triangle soup, ADR-041) and CSS2D
+//     numeric labels (see the DIM_* constants + the dimensioning helpers at the foot).
 //
 //  5. COPLANAR SEAMS ARE DISCARDED, not dashed. A flat polygon face arrives as a
 //     fan of triangles; the shared diagonals between those triangles are not real
@@ -60,6 +66,7 @@ import * as THREE from 'three';
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
+import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
 
 // ============================================================================
 // Token access — colours come from CSS custom properties, never hard-coded.
@@ -154,6 +161,35 @@ const VERTEX_MERGE_TOLERANCE = 1e-3;
 
 /** Quantization grid = 1 / VERTEX_MERGE_TOLERANCE (see meshAnalyzer QUANT). */
 const QUANT = 1000;
+
+// ============================================================================
+// Dimensioning constants (BIS SP 46:2003 Type B)
+// ============================================================================
+
+/**
+ * The dimension layer draws the two textbook orthographic measurements — overall
+ * width / height and the distances from the reference planes (HP / VP) — for the
+ * top and front views. The extension + dimension LINES are Type B continuous NARROW
+ * lines packed into ONE LineSegments2 at 1.0px, tinted --color-ink, with CSS2D
+ * --font-mono / --text-xs numeric labels.
+ *
+ * ARROWHEADS ARE FILLED 3:1 TRIANGLES (ADR-041, overturning the earlier open chevron).
+ * SP 46:2003 exam grading wants the solid BIS wedge, not an open "<", so each terminator
+ * is a filled isosceles triangle — length LEN along the dimension line, full back width
+ * LEN/3 (half-width ±LEN/6) — the recognisable Type-B cue (ADR-018 textbook fidelity). A
+ * fill cannot live in a LineSegments2, so the arrowhead triangles accumulate in a SEPARATE
+ * arrow buffer (one per view — hpArrowPos / vpArrowPos) and become ONE MeshBasicMaterial({
+ * side: DoubleSide }) triangle soup per view (same --color-ink tone, unlit/flat) — the same filled form
+ * annotations.js (Bearing Block) and the Points Canvas2D sheet already use. The single-
+ * material disposal contract is kept by tearing the mesh's geometry + material down in the
+ * same dispose() traversal that walks the line groups.
+ */
+const DIM_LINE_PX = 1.0;         // Type B continuous narrow line weight, in CSS px
+const WORLD_TO_MM = 10;          // ADR-018 declared scale: 1 world unit = 10 mm
+const DIM_OFFSET = 0.9;          // world gap from a view to its dimension line
+const DIM_EXT_GAP = 0.06;        // world gap: measured feature → start of extension line
+const DIM_EXT_OVERSHOOT = 0.12;  // world: extension line past the dimension line
+const DIM_ARROW_LEN = 0.22;      // world triangle length; full back width = LEN/3 (half ±LEN/6) → 3:1
 
 // ============================================================================
 // Edge classification
@@ -267,11 +303,12 @@ function projectVP(p) {
 /**
  * Project a world point onto PP, the profile (side) plane — the "cast to the side
  * wall" view. Zeroes Z, keeps X and Y. The plane's standoff from the solid (its z0
- * offset, and the unfold hinge about the VP∩PP line) is owned by the CONSUMER:
- * main.js parents the returned ppGroup under a hinge group translated to z0 and
- * rotated about its local Y, so here we draw the bare side view at z = 0 in that
- * group's local frame. (The third orthographic view — there is no Unity sign to
- * re-derive; like HP/VP it just zeroes one world coordinate.)
+ * offset, and the flatten hinge about the HP∩PP line) is owned by the CONSUMER:
+ * main.js parents the returned ppGroup under a hinge group translated to (0, 0, z0)
+ * in WORLD space and rotated about its local X (folding the plane down onto the HP),
+ * so here we draw the bare side view at z = 0 in that group's local frame. (The third
+ * orthographic view — there is no Unity sign to re-derive; like HP/VP it just zeroes
+ * one world coordinate.)
  * @param {THREE.Vector3} p
  * @returns {THREE.Vector3}
  */
@@ -346,6 +383,27 @@ function buildSegments(batch, color, linewidth, dashed, resolution) {
   return segments;
 }
 
+/**
+ * Build the filled-arrowhead mesh from a flat triangle-vertex buffer (ADR-041), or
+ * `null` for an empty buffer. ONE unlit MeshBasicMaterial triangle soup, DoubleSide so
+ * the wedge stays solid from either orbit side, tinted the dimension ink. A fill cannot
+ * live in a LineSegments2, so the Type-B arrowheads ride here instead of in the line
+ * batch; dispose() tears its geometry + material down with the rest of the layer.
+ *
+ * @param {number[]}    positions Flat XYZ triangle vertices (9 floats per arrowhead).
+ * @param {THREE.Color} color     Fill colour (the dimension ink).
+ * @returns {THREE.Mesh | null}
+ */
+function buildArrowMesh(positions, color) {
+  if (positions.length === 0) return null;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  const material = new THREE.MeshBasicMaterial({ color: color.getHex(), side: THREE.DoubleSide });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.frustumCulled = false; // tiny geometry, avoids cull pop during orbit
+  return mesh;
+}
+
 // ============================================================================
 // Public API
 // ============================================================================
@@ -369,6 +427,17 @@ function buildSegments(batch, color, linewidth, dashed, resolution) {
  *   view to the FOLDED front view across the ground line — the connector lines of
  *   the flattened drawing. Positioned at the folded layout; the consumer fades them
  *   in as the fold completes (kept out of the fold pivot so they stay static).
+ * @property {THREE.Group} hpDimensionGroup BIS SP 46:2003 Type-B dimensions for the TOP
+ *   view only (depth X + distance from VP): one 1.0px --color-ink LineSegments2, a
+ *   --color-ink MeshBasicMaterial filled-3:1-triangle arrowhead soup (ADR-041), plus
+ *   CSS2D --font-mono / --text-xs labels. Built in the upright world frame; NOT added
+ *   to `group` — the consumer parents it under the HP (world space, stays flat). Suppress
+ *   the whole dimension layer with `options.drawDimensions = false`.
+ * @property {THREE.Group} vpDimensionGroup BIS SP 46:2003 Type-B dimensions for the FRONT
+ *   view only (height Y, width Z + clearance above HP): same three sub-objects as
+ *   hpDimensionGroup, built in the same upright X = 0 frame as vpGroup. Kept SEPARATE so the
+ *   consumer parents it under the VP FOLD PIVOT — then the front-view dimensions fold down
+ *   flat WITH the VP instead of standing upright after the flatten (the split's whole point).
  * @property {(width: number, height: number) => void} setResolution
  *   Push a new drawing-buffer size to every LineMaterial. Call once after
  *   creation and again on every resize, or line widths render wrong.
@@ -417,6 +486,7 @@ export function drawProjections(edgeMap, options = {}) {
     height = window.innerHeight,
     drawHidden = true,
     drawConnectors = true,
+    drawDimensions = true,
     z0 = 0,
   } = options;
 
@@ -429,6 +499,7 @@ export function drawProjections(edgeMap, options = {}) {
   const vpColor = cssColor('--color-vp-line');
   const ppColor = cssColor('--color-pp-line');
   const connectorColor = cssColor('--color-bench-grey');
+  const inkColor = cssColor('--color-ink'); // dimension linework (Type B, Flat-Ink)
 
   // Two batches per plane: visible (solid) and occluded (dashed). An edge lands
   // in each plane's visible/occluded batch independently of the other two planes.
@@ -523,6 +594,64 @@ export function drawProjections(edgeMap, options = {}) {
     }
   }
 
+  // --- Dimensioning layer (BIS SP 46:2003 Type B) ---------------------------
+  // Overall width / height + the distances from HP / VP for the top and front views.
+  // Built in the UPRIGHT world frame — the front view lies in the X = 0 plane (screen
+  // axes: Z horizontal, Y vertical) and the top view in the Y = 0 plane (Z horizontal,
+  // X the depth) — the same frame hpGroup / vpGroup draw in, so the consumer folds and
+  // parents this group alongside them. Every measurement is world-extent × WORLD_TO_MM.
+  // SPLIT per view (ADR-041 fold fix): the front-view (VP) dimensions must fold with the
+  // VP, the top-view (HP) dimensions must stay flat under the HP — so each view gets its
+  // own line batch + filled-arrowhead buffer + label list, realised as its own group below.
+  const vpDimBatch = newBatch();
+  const hpDimBatch = newBatch();
+  // Filled 3:1 arrowhead triangles (ADR-041) — flat triangle-vertex buffers, each realised as
+  // ONE MeshBasicMaterial soup below (a fill cannot live in a LineSegments2 line batch).
+  const vpArrowPos = [];
+  const hpArrowPos = [];
+  /** @type {{ pos: THREE.Vector3, text: string }[]} */
+  const vpDimLabels = [];
+  /** @type {{ pos: THREE.Vector3, text: string }[]} */
+  const hpDimLabels = [];
+  if (drawDimensions && edgeMap.size > 0) {
+    const box = new THREE.Box3();
+    for (const { edge } of edgeMap.values()) {
+      box.expandByPoint(edge.p1);
+      box.expandByPoint(edge.p2);
+    }
+    const { min, max } = box;
+    const V = (x, y, z) => new THREE.Vector3(x, y, z);
+    const EXTENT_EPS = 1e-3;
+
+    // Front view (VP, X = 0) → vpDim* (folds with the VP). Height (Y), width (Z, shared with
+    // the top view), and the clearance above the ground line (Y = 0 = HP∩VP) when the solid
+    // stands off HP. Built in the X = 0 plane, the same frame vpGroup draws in, so parenting
+    // this group under the VP fold pivot folds these dims down flat with the front view.
+    if (max.y - min.y > EXTENT_EPS) {
+      pushLinearDim(vpDimBatch, vpArrowPos, vpDimLabels, V(0, min.y, max.z), V(0, max.y, max.z),
+        V(0, 0, DIM_OFFSET), (max.y - min.y) * WORLD_TO_MM);
+    }
+    if (max.z - min.z > EXTENT_EPS) {
+      pushLinearDim(vpDimBatch, vpArrowPos, vpDimLabels, V(0, max.y, min.z), V(0, max.y, max.z),
+        V(0, DIM_OFFSET, 0), (max.z - min.z) * WORLD_TO_MM);
+    }
+    if (min.y > EXTENT_EPS) {
+      pushLinearDim(vpDimBatch, vpArrowPos, vpDimLabels, V(0, 0, min.z), V(0, min.y, min.z),
+        V(0, 0, -DIM_OFFSET), min.y * WORLD_TO_MM);
+    }
+
+    // Top view (HP, Y = 0) → hpDim* (stays flat under the HP). Depth (X) and the distance
+    // from VP (the top view's clearance from the ground line X = 0) when the solid stands off VP.
+    if (max.x - min.x > EXTENT_EPS) {
+      pushLinearDim(hpDimBatch, hpArrowPos, hpDimLabels, V(min.x, 0, min.z), V(max.x, 0, min.z),
+        V(0, 0, -DIM_OFFSET), (max.x - min.x) * WORLD_TO_MM);
+    }
+    if (min.x > EXTENT_EPS) {
+      pushLinearDim(hpDimBatch, hpArrowPos, hpDimLabels, V(0, 0, max.z), V(min.x, 0, max.z),
+        V(0, 0, DIM_OFFSET), min.x * WORLD_TO_MM);
+    }
+  }
+
   // --- Assemble the scene graph ---------------------------------------------
   const hpGroup = new THREE.Group();
   hpGroup.name = 'HP Projection';
@@ -536,6 +665,10 @@ export function drawProjections(edgeMap, options = {}) {
   flatConnectorGroup.name = 'Flat Projectors';
   const ppGroup = new THREE.Group();
   ppGroup.name = 'PP Projection';
+  const hpDimensionGroup = new THREE.Group();
+  hpDimensionGroup.name = 'HP Dimensions';
+  const vpDimensionGroup = new THREE.Group();
+  vpDimensionGroup.name = 'VP Dimensions';
 
   // Per plane: visible = solid + full weight, occluded = dashed + lighter weight,
   // both in the plane's own hue. VP visible is now SOLID (was wrongly dashed).
@@ -549,13 +682,35 @@ export function drawProjections(edgeMap, options = {}) {
   addIfPresent(ppConnectorGroup, buildSegments(ppConnectors, connectorColor, LINE_WIDTH_PX.connector, true, resolution));
   addIfPresent(flatConnectorGroup, buildSegments(flatConnectors, connectorColor, LINE_WIDTH_PX.connector, true, resolution));
 
+  // The dimension layer, per view: one SOLID Type-B narrow line in --color-ink (extension +
+  // dimension lines), the FILLED 3:1 arrowheads as one --color-ink MeshBasicMaterial triangle
+  // soup (ADR-041), plus one CSS2D --font-mono / --text-xs label per measurement. Built into
+  // TWO groups so the consumer can fold the front-view dims with the VP and leave the top-view
+  // dims flat under the HP.
+  addIfPresent(hpDimensionGroup, buildSegments(hpDimBatch, inkColor, DIM_LINE_PX, false, resolution));
+  addIfPresent(hpDimensionGroup, buildArrowMesh(hpArrowPos, inkColor));
+  for (const { pos, text } of hpDimLabels) {
+    const label = makeDimLabel(text);
+    label.position.copy(pos);
+    hpDimensionGroup.add(label);
+  }
+  addIfPresent(vpDimensionGroup, buildSegments(vpDimBatch, inkColor, DIM_LINE_PX, false, resolution));
+  addIfPresent(vpDimensionGroup, buildArrowMesh(vpArrowPos, inkColor));
+  for (const { pos, text } of vpDimLabels) {
+    const label = makeDimLabel(text);
+    label.position.copy(pos);
+    vpDimensionGroup.add(label);
+  }
+
   const group = new THREE.Group();
   group.name = 'Projections';
-  // flatConnectorGroup, ppGroup and ppConnectorGroup are NOT added here: the consumer
-  // parents them directly (ppGroup under the world-space PP hinge that folds onto the HP;
+  // flatConnectorGroup, ppGroup, ppConnectorGroup and the two dimension groups are NOT added
+  // here: the consumer parents them directly (ppGroup under the PP hinge inside the fold pivot;
   // flatConnectorGroup + ppConnectorGroup in world space, the latter gated on the side-view
-  // step) so they sit at the right place. setResolution + dispose below reach them by held
-  // reference regardless.
+  // step; hpDimensionGroup under the HP in world space, vpDimensionGroup under the VP fold pivot
+  // so the front dims fold flat — both gated on the dimensioning step so the sheet is not
+  // measured before it is drawn) so they sit at the right place. setResolution + dispose below
+  // reach them by held reference regardless.
   group.add(hpGroup, vpGroup, connectorGroup);
 
   return {
@@ -566,15 +721,18 @@ export function drawProjections(edgeMap, options = {}) {
     connectorGroup,
     ppConnectorGroup,
     flatConnectorGroup,
+    hpDimensionGroup,
+    vpDimensionGroup,
     setResolution(w, h) {
       resolution.set(w, h);
       const applyResolution = (root) => root.traverse((obj) => {
         const mat = /** @type {LineSegments2} */ (obj).material;
         if (mat instanceof LineMaterial) mat.resolution.copy(resolution);
       });
-      // Walk every held sub-group: vpGroup and ppGroup get reparented OUT of `group`
-      // into the fold pivot by the consumer, so `group.traverse` alone would miss them.
-      for (const sub of [group, ppGroup, ppConnectorGroup, flatConnectorGroup]) applyResolution(sub);
+      // Walk every held sub-group: vpGroup, ppGroup and the two dimension groups get reparented
+      // OUT of `group` into the fold pivot / view frame by the consumer, so `group.traverse`
+      // alone would miss them.
+      for (const sub of [group, ppGroup, ppConnectorGroup, flatConnectorGroup, hpDimensionGroup, vpDimensionGroup]) applyResolution(sub);
     },
     dispose() {
       // Full WebGL disposal contract (CLAUDE.md): geometry + material per object,
@@ -585,12 +743,17 @@ export function drawProjections(edgeMap, options = {}) {
       // into the fold pivot, so a `group.traverse` would miss them and leak their
       // LineMaterials. Walking the sub-groups directly disposes everything we
       // created regardless of who currently parents it.
-      for (const sub of [hpGroup, vpGroup, ppGroup, connectorGroup, ppConnectorGroup, flatConnectorGroup]) {
+      for (const sub of [hpGroup, vpGroup, ppGroup, connectorGroup, ppConnectorGroup, flatConnectorGroup, hpDimensionGroup, vpDimensionGroup]) {
         sub.traverse((obj) => {
-          const line = /** @type {LineSegments2} */ (obj);
-          line.geometry?.dispose();
-          const mat = line.material;
-          if (mat instanceof LineMaterial) mat.dispose();
+          obj.geometry?.dispose();
+          // Dispose ANY material — the LineMaterial of the projection/dimension lines OR
+          // the dimension layer's filled-arrowhead MeshBasicMaterial (ADR-041). Both leak
+          // if the teardown only special-cases LineMaterial.
+          const mat = obj.material;
+          if (mat) (Array.isArray(mat) ? mat : [mat]).forEach((m) => m?.dispose());
+          // The dimension labels are live CSS2D DOM nodes — pull them out of the document
+          // as part of the disposal traversal (RULES.md §3.5), or they accumulate.
+          if (obj.isCSS2DObject) obj.element?.remove();
         });
         sub.clear();
         sub.parent?.remove(sub); // detach from `group` OR from the fold pivot
@@ -626,4 +789,90 @@ function registerVertex(map, v) {
  */
 function addIfPresent(group, child) {
   if (child) group.add(child);
+}
+
+// ============================================================================
+// Dimensioning helpers (BIS SP 46:2003 Type B) — all linework routes into a
+// SegmentBatch so the whole layer is one LineSegments2 (single-material dispose).
+// ============================================================================
+
+/**
+ * Push ONE filled 3:1 triangle arrowhead into a flat triangle-vertex buffer (ADR-041,
+ * overturning the earlier open chevron). `along` is the unit direction the tip points
+ * along; the back edge sits {@link DIM_ARROW_LEN} behind the tip and spans ±LEN/6 along
+ * `perp`, so length : full back width = 3 : 1 (the BIS Type-B wedge). Emits the three
+ * triangle vertices as 9 flat floats (tip, +back, −back) for the MeshBasicMaterial soup
+ * built by {@link buildArrowMesh} — the same technique as annotations.js `pushArrowTriangle`.
+ * @param {number[]}       out   Flat triangle-vertex buffer to append to (3 verts / 9 floats).
+ * @param {THREE.Vector3}  tip   Terminator point (a view corner / ground line).
+ * @param {THREE.Vector3}  along Unit direction the arrow points along.
+ * @param {THREE.Vector3}  perp  Unit in-plane direction ⟂ to the dimension line.
+ */
+function pushArrowTriangle(out, tip, along, perp) {
+  const base = tip.clone().addScaledVector(along, -DIM_ARROW_LEN);
+  const hw = DIM_ARROW_LEN / 6; // half the full 3:1 back width (LEN/3)
+  const a = base.clone().addScaledVector(perp, hw);
+  const b = base.clone().addScaledVector(perp, -hw);
+  out.push(tip.x, tip.y, tip.z, a.x, a.y, a.z, b.x, b.y, b.z);
+}
+
+/**
+ * Push one linear dimension between features `A` and `B`, its dimension line stood off
+ * perpendicular by `off`. Emits the two extension lines (a {@link DIM_EXT_GAP} gap off
+ * each feature, running to a {@link DIM_EXT_OVERSHOOT} overshoot past the dimension
+ * line), the dimension line itself, and an outward-pointing FILLED 3:1 triangle at each end
+ * (routed into the separate `arrows` triangle buffer, ADR-041); the numeric label is collected
+ * (centered on the dim line, nudged onto the paper break) for the caller to realise as a
+ * CSS2DObject. A zero-length measure emits no label.
+ * @param {SegmentBatch} batch
+ * @param {number[]}     arrows  Flat triangle-vertex buffer for the filled arrowheads.
+ * @param {{ pos: THREE.Vector3, text: string }[]} labels  Collected label placements.
+ * @param {THREE.Vector3} A        First measured feature (world space).
+ * @param {THREE.Vector3} B        Second measured feature (world space).
+ * @param {THREE.Vector3} off      Perpendicular offset to the dimension line (world).
+ * @param {number}        valueMM  The true measurement in millimetres.
+ */
+function pushLinearDim(batch, arrows, labels, A, B, off, valueMM) {
+  const dir = off.clone().normalize();            // extension-line direction (unit)
+  const Ad = A.clone().add(off);                  // A projected onto the dimension line
+  const Bd = B.clone().add(off);                  // B projected onto the dimension line
+  // extension lines: gap off the feature → overshoot past the dimension line
+  addSegment(batch, A.clone().addScaledVector(dir, DIM_EXT_GAP), Ad.clone().addScaledVector(dir, DIM_EXT_OVERSHOOT));
+  addSegment(batch, B.clone().addScaledVector(dir, DIM_EXT_GAP), Bd.clone().addScaledVector(dir, DIM_EXT_OVERSHOOT));
+  // the dimension line
+  addSegment(batch, Ad, Bd);
+  // outward filled 3:1 triangle arrowheads (back-spread splays in the extension-line
+  // direction, which is in-plane and ⟂ to the dimension line)
+  const t = Bd.clone().sub(Ad).normalize();
+  pushArrowTriangle(arrows, Ad, t.clone().negate(), dir);
+  pushArrowTriangle(arrows, Bd, t, dir);
+  const value = Math.round(valueMM);
+  if (value === 0) return;
+  const mid = Ad.clone().add(Bd).multiplyScalar(0.5).addScaledVector(dir, DIM_EXT_GAP);
+  labels.push({ pos: mid, text: String(Math.abs(value)) });
+}
+
+/**
+ * Build a dimension value as a live CSS2DObject. The DOM node consumes the design
+ * tokens directly — --font-mono / --text-xs / --color-ink, on a --color-paper break so
+ * the dimension line never crosses the digits — never a hard-coded value (RULES.md §4.1).
+ * Disposed by the drawProjections dispose() traversal (element pulled from the document).
+ * @param {string} text
+ * @returns {CSS2DObject}
+ */
+function makeDimLabel(text) {
+  const el = document.createElement('div');
+  el.className = 'dim-label';
+  el.textContent = text;
+  el.style.fontFamily = 'var(--font-mono)';
+  el.style.fontSize = 'var(--text-xs)';
+  el.style.color = 'var(--color-ink)';
+  el.style.background = 'var(--color-paper)';
+  el.style.padding = '0 2px';
+  el.style.lineHeight = '1';
+  el.style.whiteSpace = 'nowrap';
+  el.style.pointerEvents = 'none';
+  const obj = new CSS2DObject(el);
+  obj.center.set(0.5, 0.5);
+  return obj;
 }

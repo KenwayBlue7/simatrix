@@ -38,6 +38,19 @@ const SLIDERS = [
   { key: 'distVP', range: 'rng-distvp', num: 'num-distvp', field: 'field-distvp', min: 1, max: 40, decimals: 0, unitWord: 'mm' },
 ];
 
+/**
+ * The standard engineering definition of each quadrant, shown in the note beneath
+ * the step-2 room picker and kept in step with the room the learner selects. Exact
+ * wording (capitalisation included) is the textbook convention the lesson teaches —
+ * ported verbatim from the Points topic so the two lessons read identically.
+ */
+const QUAD_NOTES = Object.freeze({
+  Q1: 'Above HP, In front of VP',
+  Q2: 'Above HP, Behind VP',
+  Q3: 'Below HP, Behind VP',
+  Q4: 'Below HP, In front of VP',
+});
+
 const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
 
 /**
@@ -64,6 +77,7 @@ export function initUIManager(sim) {
   const $ = (id) => document.getElementById(id);
 
   const controls = $('controls'); // the whole Point P group — revealed per step
+  const quadNote = $('quad-note'); // definition text under the step-2 room picker
 
   const fmt = (value, decimals) => Number(value).toFixed(decimals);
 
@@ -124,6 +138,12 @@ export function initUIManager(sim) {
       $(cfg.num).disabled = !pointLive;
       $(cfg.field)?.classList.toggle('field--disabled', !pointLive);
     }
+
+    // Keep the quadrant definition note in step with the selected room. It lives in
+    // the wizard's step-2 panel (not the #controls dock), so it stays current
+    // regardless of the point's on-stage state; #sim-status already narrates each
+    // change, so this is quiet visual reinforcement, not a second announcement.
+    if (quadNote && QUAD_NOTES[data.quadrant]) quadNote.textContent = QUAD_NOTES[data.quadrant];
   }
 
   sync();

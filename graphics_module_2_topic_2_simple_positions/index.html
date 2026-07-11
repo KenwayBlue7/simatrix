@@ -107,17 +107,17 @@
     :root {
       /* --- Surfaces (clinical palette: neutral gray + white working surfaces, tonal layering not shadows) --- */
       --color-paper:        #ffffff; /* pure-white base — viewport floor + raised control fills */
-      --color-panel:        #f5f5f5; /* neutral grey working surface — wizard/dock/cards, one tonal step BELOW paper */
+      --color-panel:        #f0f2f5; /* clinical cool grey working surface (LAB) — wizard/dock/cards, one tonal step BELOW paper */
       --color-solid-fill:   #e7e1d4; /* oklch(0.90 0.013 88)  — solid faces, so ink edges read */
 
       /* --- Ink (warm near-black) — deepened for high-contrast CAD legibility --- */
-      --color-ink:          #221f18; /* oklch(0.24 0.012 80)  — body text + visible edges (~16:1 on paper) */
-      --color-ink-secondary:#564e3c; /* oklch(0.44 0.016 80)  — secondary text + labels (~7:1 on panel) */
+      --color-ink:          #06070b; /* clinical near-black (LAB) — body text + visible edges (~20:1 on paper) */
+      --color-ink-secondary:#5a5d66; /* clinical cool grey (LAB) — secondary text + labels (~6.6:1 on paper) */
 
       /* --- Mid neutral --- */
       --color-bench-grey:   #938b7b; /* oklch(0.62 0.012 88) — hidden-edge linework, inactive, slider rest */
-      --color-border:       #d9d2c3; /* oklch(0.865 0.012 88) — crisp 1px structural seams (Ink Border Rule) */
-      --color-track:        #cfc8b8; /* oklch(0.83 0.013 88)  — recessed slider groove (reads below border) */
+      --color-border:       #e0e1e5; /* clinical cool grey (LAB) — crisp 1px structural seams (Ink Border Rule) */
+      --color-track:        #e0e1e5; /* clinical cool grey (LAB) — recessed slider groove, now == --color-border for slider↔scrollbar parity (ADR-040) */
 
       /* --- The one interaction accent (technical blue) — confident, AA on paper --- */
       --color-accent:        #1f66b5; /* oklch(0.52 0.14 252) — focus, primary action, selection (5.6:1 vs paper) */
@@ -346,53 +346,53 @@
        top-left cluster) */
     .vp-cluster {
       position: absolute;
-      top: 10%; /* leaves room for host overlays */
+      top: 44px; /* mirrors the 44px quick-view hit target — one button-height down (Fix 2, supersedes the old 10% host-overlay clearance) */
       left: var(--space-3);
       z-index: 4;
       display: flex;
       flex-direction: column;
       align-items: flex-start;
-      /* Gap keeps each control's centred 44px hit band the original 4px clear of its
-         neighbour: (44px hit floor − 30px chip height) + space-1 = 18px. */
-      gap: calc(44px - 30px + var(--space-1));
+      /* Tight stack (Module 1 .vp-cluster): the pill group + the projection pill sit close
+         together; their centred 44px hit bands stay clear at this gap (≈1px), so touch targets
+         don't collide while the chrome reads as one compact corner cluster. */
+      gap: var(--space-2);
       pointer-events: none;
     }
     .vp-cluster > * { pointer-events: auto; }
-    /* ---- Quick-view buttons: reuse the wizard-toggle visual language — panel bg,
-       hairline border, --radius-sm, focus ring — as compact text chips (clear of the
-       top-right wizard toggle). The active view is latched (.is-active): clicking it
-       again returns to perspective orbit. */
+    /* ---- Quick-view buttons (Top/Front/Side): a segmented pill group adopted from Module 1's
+       .qv-group — a panel-tinted rounded container holding three transparent view chips; the
+       latched view (.is-active; clicking it again returns to perspective orbit) fills solid accent. */
     .quick-views {
-      display: flex;
-      gap: var(--space-1);
+      display: inline-flex;
+      gap: 2px;
+      padding: 3px;
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
     }
     .quick-view {
       position: relative;  /* anchors the 44px hit-area ::before below */
-      min-width: 44px;     /* uniform chips + a 44px-wide target */
-      padding: 0 var(--space-2);
-      height: 30px;        /* painted chip stays compact; ::before lifts the HIT area to 44px */
+      min-height: 32px;    /* painted pill; ::before still lifts the HIT area to 44px */
+      padding: 0 var(--space-3);
       font-family: var(--font-sans);
       font-size: var(--text-xs);
-      font-weight: 400;  /* Two-Weight Rule: Atkinson ships 400/700 only; quiet chip leans on its shell, not weight */
-      letter-spacing: 0.01em;
+      font-weight: 600;    /* Module 1 pill: bolder + more legible than the old quiet 400 chip */
+      line-height: 1;
       color: var(--color-ink-secondary);
-      background: var(--color-panel);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-sm);
+      background: transparent;  /* the .quick-views pill group carries the panel shell now */
+      border: 0;
+      border-radius: 999px;
       cursor: pointer;
       transition: background var(--dur-fast) var(--ease-standard),
-                  border-color var(--dur-fast) var(--ease-standard),
                   color var(--dur-fast) var(--ease-standard),
                   transform var(--dur-fast) var(--ease-standard);
     }
     .quick-view:active { transform: scale(0.97); }
     .quick-view:focus-visible { outline: none; box-shadow: var(--ring-focus); }
-    /* Latched view: accented like a pressed control so the learner knows they are in a
-       fixed ortho view and which one. */
+    /* Latched view: solid accent fill (Module 1 pill) so the active ortho view reads at a glance. */
     .quick-view.is-active {
-      color: var(--color-accent-strong);
-      border-color: var(--color-accent);
-      background: var(--color-accent-soft);
+      background: var(--color-accent);
+      color: var(--color-paper);
     }
     /* Orbit-lock cue: a drag on a rotate-locked ortho view nudges the latched chip (main.js
        cueOrthoLock) — "disengage this view to orbit". Reduced motion keeps the ring, drops the shake. */
@@ -406,25 +406,25 @@
     .qv-lock-cue { animation: qvLockNudge 320ms var(--ease-standard); box-shadow: var(--ring-focus); }
     @media (prefers-reduced-motion: reduce) { .qv-lock-cue { animation: none; } }
 
-    /* ---- Connector-line toggle: a compact checkbox chip pinned top-left beneath the
-       quick-view cluster. Reuses the quick-view chip shell (panel bg, hairline border,
-       --radius-sm) so the two controls read as one family; the box itself mirrors the
-       .toggle checkbox styling at a smaller size. */
+    /* ---- Connector-line toggle: a pill toggle adopted from Module 1's .vp-chip — a rounded chip
+       beneath the quick-view group that fills solid accent when on. The checkbox is hidden, so the
+       chip itself is the on/off affordance; the two controls read as one pill family. (Brought to
+       parity with the Module 2 master's pill — replaces the earlier compact checkbox-box chip.) */
     .connector-toggle {
       position: relative; /* anchors its own centred 44px hit-area ::before; stacked in .vp-cluster */
       display: inline-flex;
       align-items: center;
       gap: var(--space-2);
-      height: 30px; /* painted chip stays compact; ::before lifts the HIT area to 44px */
-      padding: 0 var(--space-2);
+      min-height: 36px;
+      padding: 0 var(--space-3);
       font-family: var(--font-sans);
       font-size: var(--text-xs);
-      font-weight: 400;  /* Two-Weight Rule: 400 keeps this chip in the same quiet family as .quick-view */
-      letter-spacing: 0.01em;
+      font-weight: 600;
+      line-height: 1;
       color: var(--color-ink-secondary);
       background: var(--color-panel);
       border: 1px solid var(--color-border);
-      border-radius: var(--radius-sm);
+      border-radius: 999px;
       cursor: pointer;
       transition: background var(--dur-fast) var(--ease-standard),
                   border-color var(--dur-fast) var(--ease-standard),
@@ -432,29 +432,22 @@
                   transform var(--dur-fast) var(--ease-standard);
     }
     .connector-toggle:active { transform: scale(0.97); }
+    .connector-toggle svg { flex: none; width: 16px; height: 16px; }  /* Module 1 .vp-chip icon */
+    /* Hidden but still focusable + clickable (the wrapping label toggles it); the pill shows state. */
     .connector-toggle input {
-      flex: none;
-      width: 16px;  /* nudged up from 14px toward the 18px system toggle-box for legibility */
-      height: 16px;
-      margin: 0;
-      border: 1px solid var(--color-bench-grey);
-      border-radius: var(--radius-xs);
-      background-color: var(--color-paper);
-      background-repeat: no-repeat;
-      background-position: center;
-      cursor: pointer;
-      -webkit-appearance: none;
-      appearance: none;
-      transition: background-color var(--dur-fast) var(--ease-standard),
-                  border-color var(--dur-fast) var(--ease-standard),
-                  box-shadow var(--dur-fast) var(--ease-standard);
+      position: absolute;
+      width: 1px; height: 1px;
+      margin: 0; padding: 0; border: 0;
+      opacity: 0;
+      pointer-events: none;
     }
-    .connector-toggle input:checked {
-      background-color: var(--color-accent);
+    /* On = filled accent; reflects the checkbox state via :has() (already used elsewhere). */
+    .connector-toggle:has(input:checked) {
+      background: var(--color-accent);
+      color: var(--color-paper);
       border-color: var(--color-accent);
-      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='10' viewBox='0 0 12 10' fill='none'%3E%3Cpath d='M1 5L4.5 8.5L11 1.5' stroke='%23faf8f3' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
     }
-    .connector-toggle input:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .connector-toggle:has(input:focus-visible) { outline: none; box-shadow: var(--ring-focus); }
 
     /* ---- 44px hit-area floor (DESIGN.md). These viewport-corner controls stay visually
        compact so the chrome stays quiet, but a transparent, centred ::before guarantees a
@@ -897,27 +890,40 @@
       order: 1; /* card first (left within the wizard), rail after it */
       display: flex;
       flex-direction: column;
-      background: var(--color-paper);
+      background: var(--color-paper); /* content area reads pure white on the grey panel shell */
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
       padding: var(--space-5) var(--space-4);
+      overflow: hidden; /* the card itself no longer scrolls — .card__scroll owns scrolling; this just clips the rounded corners */
+    }
+    /* Pinned nav footer: the header + step body scroll inside .card__scroll while
+       .card__nav (Back / Next / Reset) stays fixed at the bottom of the card, always in
+       reach no matter how tall a step's controls get. The scroller moved here off
+       #step-card so the footer sits OUTSIDE the scroll region. overflow-x stays hidden to
+       keep the panelIn translate from flashing a horizontal scrollbar (Fix 3). */
+    .card__scroll {
+      flex: 1 1 auto;
+      min-height: 0;
       overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: var(--space-3); /* +12px scrollbar gutter (ADR-032) — keep the floating pill clear of the content */
     }
     /* Floating padded scrollbar pill — platform standard (DESIGN.md §5.11, ADR-032). A 10px WebKit
        channel with a ~4px thumb that floats clear of both edges via a 3px transparent border +
        background-clip:padding-box, tinted to --color-border on a transparent track. IMPORTANT:
        `scrollbar-width` stays UNSET on the base rule so Chrome 121+ keeps the pseudo-elements; it is
-       set to `thin` for Firefox only, in the @supports guard below. */
-    #step-card::-webkit-scrollbar { width: 10px; }
-    #step-card::-webkit-scrollbar-track { background: transparent; }
-    #step-card::-webkit-scrollbar-thumb {
+       set to `thin` for Firefox only, in the @supports guard below. Moved off #step-card onto the
+       .card__scroll region that now owns the scroll. */
+    .card__scroll::-webkit-scrollbar { width: 10px; }
+    .card__scroll::-webkit-scrollbar-track { background: transparent; }
+    .card__scroll::-webkit-scrollbar-thumb {
       background: var(--color-border);
       background-clip: padding-box;
       border: 3px solid transparent;
       border-radius: 999px;
     }
     @supports (-moz-appearance: none) {
-      #step-card {
+      .card__scroll {
         scrollbar-width: thin;
         scrollbar-color: var(--color-border) transparent;
       }
@@ -1508,6 +1514,7 @@
       min-height: 0;
       overflow-y: auto;
       padding: var(--space-5);
+      padding-right: var(--space-3); /* scrollbar gutter — pill floats centered in its track (ADR-032) */
     }
     /* Floating padded scrollbar pill — platform standard (DESIGN.md §5.11, ADR-032); matches #step-card. */
     .problem-library__body::-webkit-scrollbar { width: 10px; }
@@ -1585,14 +1592,16 @@
       }
       .quick-view:hover {
         background: var(--color-paper);
-        border-color: var(--color-bench-grey);
         color: var(--color-ink);
       }
+      /* Keep the latched view solid-accent even on hover (Module 1 pill). */
+      .quick-view.is-active:hover { background: var(--color-accent-strong); color: var(--color-paper); }
       .connector-toggle:hover {
         background: var(--color-paper);
         border-color: var(--color-bench-grey);
         color: var(--color-ink);
       }
+      .connector-toggle:has(input:checked):hover { background: var(--color-accent-strong); border-color: var(--color-accent-strong); color: var(--color-paper); }
       .vp-hint__dismiss:hover { background: var(--color-border); color: var(--color-ink); }
       .notice__dismiss:hover { background: var(--color-panel); border-color: var(--color-bench-grey); }
       /* Hover on a jumpable, non-current step previews the jump with the accent halo
@@ -1791,6 +1800,8 @@
       swapped-in panel on value-text updates (critique P2). Let #sim-status own it.
     -->
     <section id="step-card">
+      <!-- .card__scroll: header + step body scroll here; .card__nav stays pinned below. -->
+      <div class="card__scroll">
       <header>
         <div class="card__eyebrow-row">
           <p class="card__eyebrow">Step <span id="step-current">1</span> of <span id="step-total">6</span></p>
@@ -1970,6 +1981,15 @@
               where they meet, so the front view ends up directly across from the top view, with the side view beside it: the standard sheet layout.</span>
           </p>
           <button id="btn-flatten" class="btn btn--primary btn--block" type="button">Flatten to 2D</button>
+          <!-- BIS SP 46:2003 Type-B dimensioning reveal (ADR-041): draws overall width /
+               height + distances from HP / VP on the top + front views, with filled 3:1
+               arrowheads. TOGGLE — stepper.js swaps the label Show ↔ Hide and drives
+               simController.setDimensions on/off. -->
+          <button id="btn-dimensions" class="btn btn--primary btn--block" type="button" aria-pressed="false">Show dimensions</button>
+          <p class="done-badge" id="done-dimensions">
+            <svg class="done-badge__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Dimensions drawn
+          </p>
           <!-- Feature 1: appears once flattened. Celebrates, clears the active problem,
                resets through the single path, and opens the Problem Library (stepper.js
                wires it via simController.completeAndNext). Label adapts in free-play. -->
@@ -1977,6 +1997,7 @@
           <button id="btn-unfold" class="btn btn--block" type="button" hidden>Unfold to 3D</button>
         </section>
       </div>
+      </div><!-- /.card__scroll -->
 
       <footer class="card__nav">
         <!-- Ghost Reset, guarded by an inline two-state confirm (harden): a stray
@@ -2029,6 +2050,9 @@
            simController.setConnectors; the choice persists across rebuilds. -->
       <label class="connector-toggle" title="Show or hide the dashed connector lines">
         <input type="checkbox" id="connector-toggle" checked />
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+          <path d="M5 5v14M19 5v14" stroke-dasharray="3 3"/><path d="M5 12h14"/>
+        </svg>
         <span>Connector lines</span>
       </label>
     </div>

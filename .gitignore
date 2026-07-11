@@ -6,3 +6,7 @@ Thumbs.db
 .DS_Store
 desktop.ini
 *~
+
+# Archives and generated codebase dumps (keep out of history)
+*.zip
+graphics_module_1_topic_2_spatial_framework/graphics_module_1_topic_2_spatial_framework.txt

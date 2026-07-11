@@ -4,8 +4,8 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="light only" />
-  <title>Orthographic Projection of Solids</title>
-  <meta name="description" content="Guided step-by-step viewport for studying orthographic projection of solids onto the Horizontal and Vertical planes." />
+  <title>Simatrix Starter Template</title>
+  <meta name="description" content="A minimal dual-mode Simatrix simulation scaffold — guided stepper plus Compare workbench — ready to build a new topic on." />
 
   <!--
     Three.js is loaded as CDN ES modules ONLY, pinned to 0.160.0.
@@ -175,6 +175,7 @@
 
       /* --- Layering --- */
       --z-notice: 100;
+      --z-compare: 90; /* Compare card (ADR-012) — over the viewport chrome (z 3–4), below the overlay */
       --z-overlay: 120; /* full-viewport Practice-problems dialog (above the mobile
                            notice 100; below the context-lost chip 150 / boot fallback 200) */
     }
@@ -359,6 +360,11 @@
       pointer-events: none;
     }
     .vp-cluster > * { pointer-events: auto; }
+    /* Dormant placeholders: the quick-view + connector controls ship HIDDEN in the starter
+       template (their projection/fold features were stripped). Their explicit `display` below
+       would otherwise beat the UA `[hidden] { display:none }` rule, so honour `hidden` here. */
+    .quick-views[hidden],
+    .connector-toggle[hidden] { display: none; }
     /* ---- Quick-view buttons (Top/Front/Side): a segmented pill group adopted from Module 1's
        .qv-group — a panel-tinted rounded container holding three transparent view chips; the
        latched view (.is-active; clicking it again returns to perspective orbit) fills solid accent. */
@@ -375,7 +381,7 @@
       min-height: 32px;    /* painted pill; ::before still lifts the HIT area to 44px */
       padding: 0 var(--space-3);
       font-family: var(--font-sans);
-      font-size: var(--text-xs);
+      font-size: 0.8125rem;
       font-weight: 600;    /* Module 1 pill: bolder + more legible than the old quiet 400 chip */
       line-height: 1;
       color: var(--color-ink-secondary);
@@ -417,7 +423,7 @@
       min-height: 36px;
       padding: 0 var(--space-3);
       font-family: var(--font-sans);
-      font-size: var(--text-xs);
+      font-size: 0.8125rem;
       font-weight: 600;
       line-height: 1;
       color: var(--color-ink-secondary);
@@ -455,6 +461,7 @@
        the painted control. The real element keeps the focus ring, so focus stays crisp. */
     .quick-view::before,
     .connector-toggle::before,
+    .compare-card__btn::before,
     .vp-hint__dismiss::before {
       content: "";
       position: absolute;
@@ -465,6 +472,168 @@
       height: 100%;
       min-width: 44px;
       min-height: 44px;
+    }
+
+    /* ============================================================
+       Compare view — ported from the Points topic (ADR-012 / ADR-037).
+       DOM + CSS SCAFFOLDING ONLY. The enter/exit-workbench logic, the 2D
+       drawCompare() renderer, and the #compare-chip that opens the card all live in
+       main.js in Points and are NOT ported here (this template's main.js is a stub) —
+       wire them when you build the template's own domain. The structure below makes the
+       template natively dual-mode capable: a floating compact "drawing sheet" card that
+       expands into a true 50/50 workbench split.
+       ============================================================ */
+    /* Compact floating card — the on-demand 2D "drawing sheet". Transient overlay, so the
+       Flat-Ink rule permits its shadow. position:absolute inside #sim-viewport (positioned ancestor). */
+    .compare-card {
+      position: absolute;
+      z-index: var(--z-compare);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+    }
+    .compare-card[hidden] { display: none; }
+    /* Sits below the wizard-toggle chevron (top-right, 44px) so the card never covers it. */
+    .compare-card[data-size="compact"] {
+      top: calc(var(--space-3) + 44px + var(--space-2));
+      right: var(--space-3);
+      width: min(420px, 38vw);
+      height: min(320px, 42vh);
+    }
+    /* Expanded = the 50/50 workbench split (ADR-037). The card is re-parented to <body>
+       (by main.js, once wired) and placed as the grid's right pane by the body.compare-split
+       rules below; here it just sheds the floating-card chrome. */
+    body.compare-split #compare-card {
+      position: static;
+      inset: auto;
+      width: auto;
+      height: auto;
+      min-height: 0;
+      transform: none;
+      border: 0;
+      border-left: 1px solid var(--color-border);
+      border-radius: 0;
+      box-shadow: none;
+    }
+    .compare-card__head {
+      flex: 0 0 auto;
+      display: flex;
+      align-items: center;
+      gap: var(--space-1);
+      padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+      background: var(--color-panel);
+      border-bottom: 1px solid var(--color-border);
+    }
+    .compare-card__tab {
+      flex: 1 1 auto;
+      font-family: var(--font-sans);
+      font-size: 0.6875rem;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: var(--color-ink-secondary);
+    }
+    .compare-card__btn {
+      position: relative; /* anchors the centred 44px hit-area ::before */
+      flex: none;
+      width: 32px;
+      height: 32px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      border: 0;
+      background: none;
+      color: var(--color-ink-secondary);
+      cursor: pointer;
+      border-radius: var(--radius-xs);
+      transition: background var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .compare-card__btn svg { width: 18px; height: 18px; }
+    .compare-card__btn:active { transform: scale(0.97); }
+    .compare-card__btn:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .compare-card__stage {
+      flex: 1 1 auto;
+      position: relative;
+      min-height: 0;
+      background: var(--color-paper);
+    }
+    /* The 2D drawing canvas fills the stage; wire a drawCompare() in main.js to size its
+       backing store to the stage rect × devicePixelRatio and redraw from your data. */
+    .compare-card__stage canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ---- Compare-split workbench (ADR-037) — the true 50/50. body flips from the
+       wizard-beside-viewport flex row into a grid:
+         "view compare"   (minmax(0,1fr) row, two 1fr columns)
+         "rail  rail"      (auto row spanning both panes)
+       The wizard drops out; wire main.js to re-parent your drivers into #workbench-rail.
+       Because #sim-viewport IS the left pane, handleResize() (which measures it) sizes the
+       renderer to half-width with no JS sizing change. Desktop-only (mobile keeps the sheet). */
+    body.compare-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: minmax(0, 1fr) auto;
+      grid-template-areas:
+        "view compare"
+        "rail rail";
+    }
+    /* The seam between the 3D viewport and the rail lives on the LEFT pane's bottom edge, so
+       it spans only the 3D half; the right (2D → rail) half stays borderless so the drawing
+       card and rail read as one continuous surface. */
+    body.compare-split #sim-viewport {
+      grid-area: view;
+      min-width: 0;
+      border-bottom: 1px solid var(--color-border);
+    }
+    body.compare-split #compare-card { grid-area: compare; }
+    body.compare-split #workbench-rail { grid-area: rail; }
+    /* The wizard is collapsed BY the split; the chevron (main.js) exits it to bring it back. */
+    body.compare-split #wizard { display: none; }
+    /* In the 50/50 split the drawing head + the viewport chevron are redundant chrome. */
+    body.compare-split .compare-card__head { display: none; }
+    body.compare-split #wizard-toggle { display: none; }
+
+    /* The docked driver rail — spans both panes, hosts the re-parented controls laid out as a
+       horizontal instrument row. Persistent/docked, so no shadow (Flat-Ink) — a hairline top
+       seam only (drawn by #sim-viewport's border-bottom on the left half). */
+    #workbench-rail { display: none; }
+    body.compare-split #workbench-rail {
+      display: flex;
+      align-items: flex-end;
+      justify-content: center;
+      gap: var(--space-6);
+      padding: var(--space-4) var(--space-5);
+      background: var(--color-panel);
+      overflow-x: auto;
+    }
+    /* Each driver reflows from a vertical stack into a fixed-width column. */
+    #workbench-rail .field { flex: 0 0 auto; width: 200px; margin: 0; gap: var(--space-2); }
+    /* A per-step reveal used `hidden`; in the rail every driver is live. */
+    #workbench-rail .field[hidden] { display: block !important; }
+
+    /* Narrow viewports: the compare card becomes a full-width bottom sheet (no room to float). */
+    @media (max-width: 767px) {
+      .compare-card[data-size="compact"],
+      .compare-card[data-size="expanded"] {
+        top: auto;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        transform: none;
+        width: 100%;
+        height: 70%;
+        border-radius: var(--radius-md) var(--radius-md) 0 0;
+      }
     }
 
     /* ---- First-angle projection symbol: screen-space annotation pinned bottom-right,
@@ -1784,12 +1953,9 @@
 
     <div class="wizard-main">
     <ol id="step-rail" aria-label="Progress">
-      <li class="rail__item" data-step="1"><button type="button" class="rail__btn"><span class="rail__marker">1</span><span class="rail__label">Add &amp; rest</span></button></li>
-      <li class="rail__item" data-step="2"><button type="button" class="rail__btn"><span class="rail__marker">2</span><span class="rail__label">Position</span></button></li>
-      <li class="rail__item" data-step="3"><button type="button" class="rail__btn"><span class="rail__marker">3</span><span class="rail__label">Label</span></button></li>
-      <li class="rail__item" data-step="4"><button type="button" class="rail__btn"><span class="rail__marker">4</span><span class="rail__label">Top &amp; front</span></button></li>
-      <li class="rail__item" data-step="5"><button type="button" class="rail__btn"><span class="rail__marker">5</span><span class="rail__label">Side view</span></button></li>
-      <li class="rail__item" data-step="6"><button type="button" class="rail__btn"><span class="rail__marker">6</span><span class="rail__label">Flatten</span></button></li>
+      <li class="rail__item" data-step="1"><button type="button" class="rail__btn"><span class="rail__marker">1</span><span class="rail__label">Step one</span></button></li>
+      <li class="rail__item" data-step="2"><button type="button" class="rail__btn"><span class="rail__marker">2</span><span class="rail__label">Step two</span></button></li>
+      <li class="rail__item" data-step="3"><button type="button" class="rail__btn"><span class="rail__marker">3</span><span class="rail__label">Step three</span></button></li>
     </ol>
 
     <!--
@@ -1803,7 +1969,7 @@
       <div class="card__scroll">
       <header>
         <div class="card__eyebrow-row">
-          <p class="card__eyebrow">Step <span id="step-current">1</span> of <span id="step-total">6</span></p>
+          <p class="card__eyebrow">Step <span id="step-current">1</span> of <span id="step-total">3</span></p>
           <!-- Practice-problems entry: a quiet ghost action sharing the eyebrow baseline,
                so it is anchored in the header instead of floating above the column. Opens
                the full-viewport library. -->
@@ -1815,229 +1981,40 @@
             <span>Practice problems</span>
           </button>
         </div>
-        <h2 class="card__title" id="step-title">Add a solid</h2>
+        <h2 class="card__title" id="step-title">Step one</h2>
         <p class="card__lead" id="step-lead"></p>
       </header>
 
       <div class="card__body">
-        <!-- STEP 1 — Add & rest (add, size, then choose the resting plane) -->
+        <!-- STEP 1 — placeholder. Replace with your subject's first-step controls. -->
         <section class="step-panel" data-step="1">
           <div class="dock__group">
-            <h3 class="dock__group-title">Solid</h3>
-            <div class="field">
-              <label class="field__label" for="ctl-shape"><span class="field__name">Shape</span></label>
-              <select id="ctl-shape" class="field__select">
-                <option value="Cube">Cube</option>
-                <optgroup label="Pyramids">
-                  <option value="Pyramid">Square pyramid</option>
-                  <option value="TriangularPyramid">Triangular pyramid</option>
-                  <option value="PentagonalPyramid">Pentagonal pyramid</option>
-                  <option value="HexagonalPyramid">Hexagonal pyramid</option>
-                </optgroup>
-                <optgroup label="Prisms">
-                  <option value="TriangularPrism">Triangular prism</option>
-                  <option value="SquarePrism">Square prism</option>
-                  <option value="PentagonalPrism">Pentagonal prism</option>
-                  <option value="HexagonalPrism">Hexagonal prism</option>
-                </optgroup>
-                <optgroup label="Curved">
-                  <option value="Cylinder">Cylinder</option>
-                  <option value="Cone">Cone</option>
-                </optgroup>
-              </select>
-            </div>
-
-            <button id="btn-add" class="btn btn--primary btn--block" type="button">Add solid to scene</button>
-
-            <p class="dock__note">All sizes are in millimetres (mm).</p>
-
-            <div class="field">
-              <label class="field__label" for="rng-base"><span class="field__name">Base length</span></label>
-              <div class="field__row">
-                <input class="field__range" type="range" id="rng-base" min="5" max="70" step="1" />
-                <input class="field__num" type="text" id="num-base" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Base length, exact value in millimetres" />
-              </div>
-            </div>
-
-            <div class="field" id="field-height">
-              <label class="field__label" for="rng-height"><span class="field__name">Height</span></label>
-              <div class="field__row">
-                <input class="field__range" type="range" id="rng-height" min="5" max="70" step="1" />
-                <input class="field__num" type="text" id="num-height" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Height, exact value in millimetres" />
-              </div>
-            </div>
-          </div>
-
-          <div class="dock__group">
-            <h3 class="dock__group-title">Resting plane</h3>
-            <p class="dock__note">The base sits flat on one reference plane, and the axis stays <strong>perpendicular to it</strong>. On the
-              <button type="button" class="term" aria-describedby="def-hp">HP<span class="term__pop" role="tooltip" id="def-hp">The <strong>Horizontal Plane</strong>: the flat floor the solid rests above. Looking straight down onto it gives the top view.</span></button> the axis stands upright; on the
-              <button type="button" class="term" aria-describedby="def-vp">VP<span class="term__pop" role="tooltip" id="def-vp">The <strong>Vertical Plane</strong>: the upright wall behind the solid. Looking at it from the front gives the front view.</span></button> the solid lies down with its axis horizontal. Inclination (Step&nbsp;2) then tilts it from there.</p>
-            <div class="field">
-              <label class="field__label" for="ctl-resting"><span class="field__name">Base rests on</span></label>
-              <select id="ctl-resting" class="field__select">
-                <option value="HP">HP &mdash; axis upright</option>
-                <option value="VP">VP &mdash; axis horizontal</option>
-              </select>
-            </div>
+            <h3 class="dock__group-title">Step one</h3>
+            <p class="dock__note">Placeholder panel. Drop this step's controls (sliders, selects, toggles) in here, wire them in src/uiManager.js, and gate the step in src/stepper.js.</p>
           </div>
         </section>
 
-        <!-- STEP 2 — Position & turn (distance from each plane, base orientation, then inclination) -->
+        <!-- STEP 2 — placeholder. -->
         <section class="step-panel" data-step="2" hidden>
           <div class="dock__group">
-            <h3 class="dock__group-title">Placement</h3>
-            <p class="dock__note">How far the solid sits from each reference plane: the HP (horizontal floor) and the VP (vertical wall).</p>
-            <div class="field">
-              <label class="field__label" for="rng-disthp"><span class="field__name">Distance from HP</span></label>
-              <div class="field__row">
-                <input class="field__range" type="range" id="rng-disthp" min="0" max="50" step="1" aria-describedby="disthp-hint" />
-                <input class="field__num" type="text" id="num-disthp" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Distance from horizontal plane, exact value in millimetres" aria-describedby="disthp-hint" />
-              </div>
-            </div>
-            <p class="dock__note" id="disthp-hint" hidden>With the base on the VP, the height becomes horizontal depth. Measure the distance to the HP from the solid's lowest point, then add half the base height to reach the axis.</p>
-            <div class="field">
-              <label class="field__label" for="rng-distvp"><span class="field__name">Distance from VP</span></label>
-              <div class="field__row">
-                <input class="field__range" type="range" id="rng-distvp" min="0" max="50" step="1" />
-                <input class="field__num" type="text" id="num-distvp" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Distance from vertical plane, exact value in millimetres" />
-              </div>
-            </div>
-            <div class="field">
-              <label class="field__label" for="ctl-distvp-ref"><span class="field__name">VP distance measured to</span></label>
-              <select id="ctl-distvp-ref" class="field__select">
-                <option value="nearest">Nearest point</option>
-                <option value="axis">Axis (centre)</option>
-              </select>
-            </div>
-            <p class="dock__note">For a solid turned about its axis, its nearest corner sits in front of its centre. Switch to <strong>Axis</strong> when a problem quotes the distance to the axis rather than the nearest point.</p>
-          </div>
-
-          <div class="dock__group">
-            <h3 class="dock__group-title">Base orientation</h3>
-            <p class="dock__note">Turn the solid about its own axis — spin it freely, or snap a corner or edge toward the VP. This only rotates it in place; the axis stays perpendicular to its resting plane.</p>
-            <div class="field">
-              <label class="field__label" for="rng-roty"><span class="field__name">Turn about the axis</span></label>
-              <div class="field__row">
-                <input class="field__range" type="range" id="rng-roty" min="0" max="360" step="1" />
-                <input class="field__num" type="text" id="num-roty" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Turn about the axis, exact value in degrees" />
-                <span class="field__unit" aria-hidden="true">&deg;</span>
-              </div>
-            </div>
-            <label class="toggle" for="tgl-orient">
-              <input type="checkbox" id="tgl-orient" />
-              <span class="toggle__text" id="lbl-orient">Orient to corner</span>
-              <svg class="toggle__lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
-            </label>
-          </div>
-
-          <div class="dock__group">
-            <h3 class="dock__group-title">Inclination</h3>
-            <p class="dock__note">Tilt the solid toward a plane. Use the angle sliders for a standard-axis tilt, or
-              <button type="button" class="term" aria-describedby="def-faceincl">face inclination<span class="term__pop" role="tooltip" id="def-faceincl">Tilting the solid until one of its slanted faces lies parallel to a chosen plane. Available for pyramids and the cone only.</span></button>
-              to lay a slanted face flat against a plane. The HP and VP face options are mutually exclusive, and apply to pyramids and the cone only.</p>
-            <div class="field">
-              <label class="field__label" for="rng-anglehp"><span class="field__name">Angle &ang;HP</span></label>
-              <div class="field__row">
-                <input class="field__range" type="range" id="rng-anglehp" min="-90" max="90" step="1" value="0" />
-                <input class="field__num" type="text" id="num-anglehp" inputmode="decimal" autocomplete="off" spellcheck="false" value="0" aria-label="Inclination to horizontal plane, exact value in degrees" />
-                <span class="field__unit" aria-hidden="true">&deg;</span>
-              </div>
-            </div>
-            <div class="field">
-              <label class="field__label" for="rng-anglevp"><span class="field__name">Angle &ang;VP</span></label>
-              <div class="field__row">
-                <input class="field__range" type="range" id="rng-anglevp" min="-90" max="90" step="1" value="0" />
-                <input class="field__num" type="text" id="num-anglevp" inputmode="decimal" autocomplete="off" spellcheck="false" value="0" aria-label="Inclination to vertical plane, exact value in degrees" />
-                <span class="field__unit" aria-hidden="true">&deg;</span>
-              </div>
-            </div>
-            <label class="toggle" for="tgl-fihp">
-              <input type="checkbox" id="tgl-fihp" />
-              <span class="toggle__text">Face inclination &rarr; HP</span>
-              <svg class="toggle__lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
-            </label>
-            <label class="toggle" for="tgl-fivp">
-              <input type="checkbox" id="tgl-fivp" />
-              <span class="toggle__text">Face inclination &rarr; VP</span>
-              <svg class="toggle__lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
-            </label>
+            <h3 class="dock__group-title">Step two</h3>
+            <p class="dock__note">Placeholder panel for the second step.</p>
           </div>
         </section>
 
-        <!-- STEP 3 — Label vertices -->
+        <!-- STEP 3 — placeholder. -->
         <section class="step-panel" data-step="3" hidden>
-          <p class="hint">
-            <svg class="hint__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            <span>Each label stays pinned to its corner as you rotate the view, so you never lose track of which point is which across the projections.</span>
-          </p>
-          <button id="btn-label" class="btn btn--primary btn--block" type="button">Label vertices</button>
-          <p class="done-badge" id="done-label">
-            <svg class="done-badge__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Vertices labelled
-          </p>
-        </section>
-
-        <!-- STEP 4 — Draw top & front views (HP + VP only) -->
-        <section class="step-panel" data-step="4" hidden>
-          <p class="hint">
-            <svg class="hint__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            <span>This is
-              <button type="button" class="term" aria-describedby="def-ortho">orthographic projection<span class="term__pop" role="tooltip" id="def-ortho">Each point drops straight onto a plane along a perpendicular, with no perspective. The view keeps the solid's true lengths and angles.</span></button>:
-              the views keep the solid's true sizes, and edges the body hides are drawn dashed.</span>
-          </p>
-          <button id="btn-project" class="btn btn--primary btn--block" type="button">Draw top &amp; front views</button>
-          <p class="done-badge" id="done-project">
-            <svg class="done-badge__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Top &amp; front views drawn
-          </p>
-        </section>
-
-        <!-- STEP 5 — Add the side view (reveal the profile plane) -->
-        <section class="step-panel" data-step="5" hidden>
-          <p class="hint">
-            <svg class="hint__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            <span>The
-              <button type="button" class="term" aria-describedby="def-pp">profile plane<span class="term__pop" role="tooltip" id="def-pp">The <strong>Profile Plane</strong>: an upright wall standing at the solid's side. Looking at it from the side gives the side view — the third of the three views that fix the solid completely.</span></button>
-              (PP, violet) stands at the solid's side. We bring it in and cast the side view onto it, completing the set of three views.</span>
-          </p>
-          <button id="btn-sideview" class="btn btn--primary btn--block" type="button">Add side view</button>
-          <p class="done-badge" id="done-sideview">
-            <svg class="done-badge__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Side view added
-          </p>
-        </section>
-
-        <!-- STEP 6 — Flatten to 2D -->
-        <section class="step-panel" data-step="6" hidden>
-          <p class="hint">
-            <svg class="hint__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-            <span>The planes hinge along the
-              <button type="button" class="term" aria-describedby="def-ground">ground line<span class="term__pop" role="tooltip" id="def-ground">The line where the HP and VP meet. The planes fold open along it to bring every view onto one flat sheet.</span></button>
-              where they meet, so the front view ends up directly across from the top view, with the side view beside it: the standard sheet layout.</span>
-          </p>
-          <button id="btn-flatten" class="btn btn--primary btn--block" type="button">Flatten to 2D</button>
-          <!-- BIS SP 46:2003 Type-B dimensioning reveal (ADR-041): draws overall width /
-               height + distances from HP / VP on the top + front views, with filled 3:1
-               arrowheads. TOGGLE — stepper.js swaps the label Show ↔ Hide and drives
-               simController.setDimensions on/off. -->
-          <button id="btn-dimensions" class="btn btn--primary btn--block" type="button" aria-pressed="false">Show dimensions</button>
-          <p class="done-badge" id="done-dimensions">
-            <svg class="done-badge__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Dimensions drawn
-          </p>
-          <!-- Feature 1: appears once flattened. Celebrates, clears the active problem,
-               resets through the single path, and opens the Problem Library (stepper.js
-               wires it via simController.completeAndNext). Label adapts in free-play. -->
-          <button id="btn-complete-next" class="btn btn--primary btn--block" type="button" hidden>Complete &amp; next problem</button>
-          <button id="btn-unfold" class="btn btn--block" type="button" hidden>Unfold to 3D</button>
+          <div class="dock__group">
+            <h3 class="dock__group-title">Step three</h3>
+            <p class="dock__note">Placeholder panel for the third step.</p>
+          </div>
         </section>
       </div>
       </div><!-- /.card__scroll -->
 
       <footer class="card__nav">
         <!-- Ghost Reset, guarded by an inline two-state confirm (harden): a stray
-             click can't wipe six steps of work. Arming swaps "Reset" for the confirm
+             click can't wipe your work in progress. Arming swaps "Reset" for the confirm
              on this same control and steps Back / Next aside; only "Yes" fires
              simAPI.reset() — the single reset path (CLAUDE.md). Wiring: uiManager.js. -->
         <div id="reset-control">
@@ -2058,7 +2035,7 @@
   </aside>
 
   <!-- The 3D teaching viewport. main.js mounts the WebGL canvas + label overlay here. -->
-  <main id="sim-viewport" aria-label="Orthographic projection viewport. Drag to orbit the solid.">
+  <main id="sim-viewport" aria-label="3D simulation viewport. Drag to orbit.">
     <!-- Hide/show the guided-steps panel to enlarge the 3D view. Floats over the
          canvas so it stays reachable in both states (main.js toggles the body class). -->
     <button id="wizard-toggle" class="wizard-toggle" type="button" aria-controls="wizard" aria-expanded="true" title="Hide steps panel">
@@ -2075,7 +2052,7 @@
       <!-- Quick-view camera buttons: snap the (ortho) camera square to each reference plane.
            Clear of the top-right wizard toggle. main.js wires them via [data-quick-view];
            clicking the active one returns to perspective orbit. -->
-      <div class="quick-views" role="group" aria-label="Quick camera views">
+      <div class="quick-views" role="group" aria-label="Quick camera views" hidden>
         <button class="quick-view" type="button" data-quick-view="top" aria-pressed="false" title="Top view (look down on HP)">Top</button>
         <button class="quick-view" type="button" data-quick-view="front" aria-pressed="false" title="Front view (look at VP)">Front</button>
         <button class="quick-view" type="button" data-quick-view="side" aria-pressed="false" title="Side view (look at PP)">Side</button>
@@ -2084,7 +2061,7 @@
       <!-- Connector-line visibility: de-clutter the drawing by hiding the dashed 3D→2D
            connectors and the flattened projectors. main.js wires #connector-toggle via
            simController.setConnectors; the choice persists across rebuilds. -->
-      <label class="connector-toggle" title="Show or hide the dashed connector lines">
+      <label class="connector-toggle" title="Show or hide the dashed connector lines" hidden>
         <input type="checkbox" id="connector-toggle" checked />
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
           <path d="M5 5v14M19 5v14" stroke-dasharray="3 3"/><path d="M5 12h14"/>
@@ -2093,28 +2070,28 @@
       </label>
     </div>
 
-    <!-- First-angle projection symbol: fades in bottom-right when the drawing flattens
-         (Step 5). Pure screen-space annotation, toggled by main.js (.is-visible). -->
-    <div id="fa-symbol" class="fa-symbol" aria-hidden="true" title="First-angle projection">
-      <svg viewBox="0 0 64 34" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <!-- Truncated cone, end elevation (circles) + side elevation (trapezium) -->
-        <circle cx="14" cy="17" r="11" />
-        <circle cx="14" cy="17" r="4.5" />
-        <path d="M38 7 L60 11 L60 23 L38 27 Z" />
-        <line x1="38" y1="7" x2="38" y2="27" />
-      </svg>
-      <span class="fa-symbol__caption">First-angle</span>
-    </div>
-
-    <!-- Empty-start orientation: shown until the first solid is added (onboarding.js). -->
-    <div id="vp-empty" class="vp-overlay" aria-hidden="true">
-      <svg class="vp-overlay__icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-        <path d="M24 8 40 17 24 26 8 17Z" />
-        <path d="M40 17V31L24 40 8 31V17" />
-        <path d="M24 26V40" />
-      </svg>
-      <p class="vp-overlay__title">Your solid will appear here</p>
-      <p class="vp-overlay__hint">Pick a shape and add it from the panel.</p>
+    <!-- Compare card (ADR-012) — the on-demand 2D "drawing sheet" frame, ported from the
+         Points topic as dual-mode scaffolding. The stage owns a plain 2D <canvas> that a
+         drawCompare() routine (wire in main.js) would live-redraw. Hidden until opened; the
+         #compare-chip toggle + the enter/exit-workbench logic live in main.js (not ported —
+         this template's main.js is a stub). -->
+    <div id="compare-card" class="compare-card" data-size="compact" role="region" aria-label="Compare: the 2D drawing" hidden>
+      <div class="compare-card__head">
+        <span class="compare-card__tab">2D drawing</span>
+        <button id="compare-expand" class="compare-card__btn" type="button" aria-label="Expand compare view" title="Expand">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 3H5a2 2 0 0 0-2 2v4M15 3h4a2 2 0 0 1 2 2v4M9 21H5a2 2 0 0 1-2-2v-4M15 21h4a2 2 0 0 0 2-2v-4"/>
+          </svg>
+        </button>
+        <button id="compare-close" class="compare-card__btn" type="button" aria-label="Close compare view" title="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18"/>
+          </svg>
+        </button>
+      </div>
+      <div class="compare-card__stage">
+        <canvas id="compare-canvas" aria-label="2D drawing surface"></canvas>
+      </div>
     </div>
 
     <!-- One-time orbit hint: appears with the first solid, dismisses on first drag. -->
@@ -2151,6 +2128,13 @@
       <span class="vp-note__text"></span>
     </div>
   </main>
+
+  <!-- Docked driver rail for the Compare workbench split (ADR-037). A direct child of
+       <body> so it can be the grid's full-width bottom row under body.compare-split; stays
+       display:none until the split is on. In the Points topic main.js creates this lazily and
+       re-parents the point drivers into it — here it is a static empty target: wire main.js to
+       move your controls in on enterWorkbench(). -->
+  <div id="workbench-rail" role="group" aria-label="Controls"></div>
 
   <!-- Live region: main.js + stepper.js narrate step + mode changes for screen readers. -->
   <div id="sim-status" class="sr-only" role="status" aria-live="polite"></div>

@@ -59,6 +59,7 @@ const TOTAL = STEPS.length;
  *   setLabels: (on: boolean) => void,
  *   setProjections: (on: boolean) => void,
  *   setSideView: (on: boolean) => void,
+ *   setDimensions: (on: boolean) => void,
  *   flatten: () => void,
  *   unflatten: () => void,
  *   completeAndNext: () => void,
@@ -73,6 +74,9 @@ export function initStepper(sim) {
 
   // --- DOM ---
   const card = $('step-card');
+  // The scrollable region is now .card__scroll (the .card__nav footer is pinned outside
+  // it); fall back to #step-card for older markup that hasn't split the scroller out.
+  const cardScroll = card?.querySelector('.card__scroll') || card;
   const railItems = [...document.querySelectorAll('#step-rail .rail__item')];
   const panels = [...document.querySelectorAll('.step-panel')];
   const elCurrent = $('step-current');
@@ -88,18 +92,20 @@ export function initStepper(sim) {
   const btnProject = $('btn-project');
   const btnSideView = $('btn-sideview');
   const btnFlatten = $('btn-flatten');
+  const btnDimensions = $('btn-dimensions');
   const btnUnfold = $('btn-unfold');
   const btnCompleteNext = $('btn-complete-next');
   const doneLabel = $('done-label');
   const doneProject = $('done-project');
   const doneSideView = $('done-sideview');
+  const doneDimensions = $('done-dimensions');
   const shapeSelect = $('ctl-shape');
 
   if (elTotal) elTotal.textContent = String(TOTAL);
 
   // --- Wizard state. Layer flags mirror what the engine is currently showing. ---
   let currentStep = 1;
-  const state = { visited2: false, labels: false, projections: false, sideView: false, flattened: false };
+  const state = { visited2: false, labels: false, projections: false, sideView: false, flattened: false, dimensions: false };
 
   /** Whether step i counts as complete (drives rail checks + Next gating). */
   function isComplete(i) {
@@ -164,6 +170,15 @@ export function initStepper(sim) {
     doneSideView?.classList.toggle('is-on', state.sideView);
     if (btnFlatten) btnFlatten.hidden = state.flattened;
     if (btnUnfold) btnUnfold.hidden = !state.flattened;
+    // Dimensions (Step 6, optional): a TRUE on/off toggle — the button stays visible and
+    // swaps its label + aria-pressed between "Show dimensions" and "Hide dimensions"; the
+    // done badge lights while dimensions are on. It gates nothing (Step 6 is terminal), so
+    // it stays out of isComplete/canAdvance.
+    if (btnDimensions) {
+      btnDimensions.textContent = state.dimensions ? 'Hide dimensions' : 'Show dimensions';
+      btnDimensions.setAttribute('aria-pressed', String(state.dimensions));
+    }
+    doneDimensions?.classList.toggle('is-on', state.dimensions);
     // "Complete & next problem" (Feature 1) appears only once the drawing is flattened —
     // the payoff moment. Label adapts to whether a textbook problem is loaded (free-play
     // gets "Pick a problem", which still opens the library to choose a challenge).
@@ -201,7 +216,7 @@ export function initStepper(sim) {
 
     // Start each step at the top — a long previous step may have left the card
     // scrolled down, and the new step should read from its title.
-    if (card) card.scrollTop = 0;
+    if (cardScroll) cardScroll.scrollTop = 0;
 
     renderRail();
     renderActions();
@@ -299,6 +314,19 @@ export function initStepper(sim) {
     renderRail(); renderActions(); renderNav();
   }, listen);
 
+  // Step 6 — TOGGLE the BIS Type-B dimension layer on the top + front views (ADR-041).
+  // Flip the state, drive the engine to match, and let renderActions swap the button
+  // label (Show ↔ Hide). Gates nothing, so the rail/nav don't actually change here.
+  btnDimensions?.addEventListener('click', () => {
+    const next = !state.dimensions;
+    sim.setDimensions(next);
+    state.dimensions = next;
+    sim.announce(next
+      ? 'Dimensions drawn onto the top and front views.'
+      : 'Dimensions hidden.');
+    renderRail(); renderActions(); renderNav();
+  }, listen);
+
   // Step 6 — complete & move on (Feature 1). completeAndNext celebrates, clears any active
   // problem, resets through the single path, and opens the Problem Library. The reset
   // re-renders this chrome via reset()→goToStep(1), so no manual re-render is needed here.
@@ -338,6 +366,7 @@ export function initStepper(sim) {
     state.projections = false;
     state.sideView = false;
     state.flattened = false;
+    state.dimensions = false;
     goToStep(1, { announce: false });
   }
 

@@ -39,6 +39,16 @@ folder that runs by being served over HTTP (locally via XAMPP Apache on **port
 80 is held by Windows IIS and returns 404). The browser loads Three.js from a CDN
 the first time, then runs offline.
 
+The whole platform is now managed as a **single, unified Git monorepo** rooted at
+`C:\xampp\htdocs\Simatrix` — one repository, one working tree, one commit history for
+every module and topic below. It was **not** always this way: each topic/module folder
+used to be its own independent repository with its own inner `.git` directory and
+detached history. Those inner `.git` folders were **deleted** and everything flattened
+into this one repo so that a platform-wide change (a shared root doc plus several topic
+folders) is a single atomic commit, and so version control, tagging, and git hooks are
+centralized alongside the one root source of truth for the docs (DESIGN.md, PRODUCT.md,
+PLATFORM-RULES.md, ARCHITECTURE.md, DECISIONS.md). See **DECISIONS.md → ADR-039**.
+
 ```
 C:\xampp\htdocs\Simatrix\
 ├── Module1\                                   Engineering Drawing foundations.
@@ -245,6 +255,11 @@ the root style; none manage state.
   amber, dashed)**, and **side view (PP, violet)**, with hidden edges dashed and
   faint dotted connector lines tracing each 3D corner down to its views. Uses
   fattened lines (`LineSegments2`) so engineering line weights are real pixels.
+  It also emits the BIS Type-B **dimension layer split into `hpDimensionGroup` +
+  `vpDimensionGroup`** (ADR-041): the orchestrator MUST parent the HP top-view dims to
+  world `shapeGroup` and the VP front-view dims to `vpFoldGroup`, so the front-view
+  dimensions fold flat WITH the VP during the Step-6 cinematic fold while the top-view
+  dimensions stay put — a single dimension group could not survive the fold.
   **Imports:** Three.js + the line add-ons. **Provides:** `drawProjections()`,
   `classifyEdge()`, `EdgeType`. Reads CSS color tokens; returns a Three.js group.
 
