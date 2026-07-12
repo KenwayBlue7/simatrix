@@ -1,4 +1,4 @@
-#Simatrix
+# Simatrix
 
 ## 1. What Simatrix is
 
