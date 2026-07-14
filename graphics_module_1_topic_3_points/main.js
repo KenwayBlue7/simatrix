@@ -1018,6 +1018,12 @@ function enterWorkbench() {
     document.body.appendChild(compareCard);
   }
   document.body.classList.add('compare-split');
+  // The rail toggle (ADR-037 2026-07-14 amendment) always defaults to shown on entry —
+  // a prior collapse from an earlier split visit must not carry over. The button's own
+  // state (text/aria/title) must be forced back in sync here too — it isn't just a CSS
+  // class, and setupRailToggle's click handler isn't in the loop on this forced path.
+  document.body.classList.remove('rail-collapsed');
+  syncRailToggleState(false);
 }
 
 /** Restore the floating layout: hand the drivers back to #controls, re-nest the card
@@ -1026,6 +1032,9 @@ function exitWorkbench() {
   if (!workbenchOpen) return;
   workbenchOpen = false;
   document.body.classList.remove('compare-split');
+  document.body.classList.remove('rail-collapsed'); // no stale collapse state outside the split
+  syncRailToggleState(false); // pair the class reset with a facet sync (button is hidden here, but
+                              // keeps the invariant symmetric with enterWorkbench's forced-open sync)
 
   // Card back inside the viewport (the positioned ancestor compact anchors to).
   if (compareCard && viewport && compareCard.parentElement !== viewport) {
@@ -1151,8 +1160,8 @@ function drawCompare() {
   ctx.strokeStyle = benchGrey;
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(px, Math.min(yPrime, yTop, cy) - 10);
-  ctx.lineTo(px, Math.max(yPrime, yTop, cy) + 10);
+  ctx.moveTo(px, Math.min(yPrime, yTop, cy));
+  ctx.lineTo(px, Math.max(yPrime, yTop, cy));
   ctx.stroke();
 
   // ── Formal BIS SP 46:2003 Type-B dimensions ───────────────────────────────
@@ -1221,10 +1230,29 @@ function drawCompare() {
     ctx.fillText(text, mx, my);
   };
 
+  // distHP (p′) and distVP (p) are both VERTICAL dims stood off right of the projector.
+  // In Q2 (both above the XY line) / Q3 (both below) they share a sign and would stack on
+  // the same line at px+DIM_OFF_V. Stagger per BIS SP 46:2003 parallel dimensioning:
+  // inner (smaller) stays at DIM_OFF_V, outer (larger) steps out; if equal, split L/R.
+  let offPrime = DIM_OFF_V;
+  let offTop = DIM_OFF_V;
+  const rP = Math.round(dPrime), rT = Math.round(dTop);
+  const sameSide = (rP > 0 && rT > 0) || (rP < 0 && rT < 0);
+  if (sameSide) {                       // rP, rT already both non-zero here
+    const aP = Math.abs(rP), aT = Math.abs(rT);
+    if (aP === aT) {                    // equal magnitudes → opposite sides, no overlap
+      offPrime = -DIM_OFF_V;
+      offTop = DIM_OFF_V;
+    } else if (aP > aT) {               // distHP larger → step it outward
+      offPrime = DIM_OFF_V + 26;
+    } else {                            // distVP larger → step it outward
+      offTop = DIM_OFF_V + 26;
+    }
+  }
   // distHP — p′ height above the XY line (front view). Vertical dim, right of the projector.
-  linearDim(px, cy, px, yPrime, DIM_OFF_V, 0, dPrime);
+  linearDim(px, cy, px, yPrime, offPrime, 0, dPrime);
   // distVP — p depth below the XY line (top view). Vertical dim, right of the projector.
-  linearDim(px, cy, px, yTop, DIM_OFF_V, 0, dTop);
+  linearDim(px, cy, px, yTop, offTop, 0, dTop);
   // distRP — lateral offset from the centre datum (where PP cuts the XY line). Redraw the
   // datum tick as the dimension's origin, then dimension datum → shared projector.
   if (Math.round(lat) !== 0) {
@@ -1741,6 +1769,45 @@ function setupWizardToggle() {
 }
 
 // ============================================================================
+// Rail hide/reveal — collapse the docked #workbench-rail for a full-screen read
+// of the 50/50 split (ADR-037 2026-07-14 amendment). Independent of the wizard
+// chevron: collapsing the rail never exits the split, and enterWorkbench()
+// always resets this back to shown on entry.
+// ============================================================================
+
+/** One-source-of-truth sync for the #rail-toggle button's 4 state facets (aria-expanded,
+ *  aria-label, title, the visible .rail-toggle__text span — the explicit label mirrors
+ *  aria-label so sighted and screen-reader users read the same state). Called from the
+ *  click handler below AND from enterWorkbench(), which force-reopens the rail on every
+ *  split entry — without this second call site the button could still read "Show" /
+ *  collapsed from an earlier in-split collapse even though the rail is now visible. */
+function syncRailToggleState(collapsed) {
+  const btn = document.getElementById('rail-toggle');
+  if (!btn) return;
+  btn.setAttribute('aria-expanded', String(!collapsed));
+  btn.setAttribute('aria-label', collapsed ? 'Show controls' : 'Hide controls');
+  btn.title = collapsed ? 'Show controls' : 'Hide controls';
+  const txt = btn.querySelector('.rail-toggle__text');
+  if (txt) txt.textContent = collapsed ? 'Show' : 'Hide';
+}
+
+function setupRailToggle() {
+  const btn = document.getElementById('rail-toggle');
+  if (!btn) return;
+
+  btn.addEventListener('click', () => {
+    const collapsed = document.body.classList.toggle('rail-collapsed');
+    syncRailToggleState(collapsed);
+    announce(collapsed ? 'Controls rail hidden.' : 'Controls rail shown.');
+    // The rail's grid row (and the gap around it) drops out on collapse, so the
+    // viewport and 2D drawing card grow into the reclaimed height — a layout-changing
+    // reflow like entering/leaving the split itself, so reuse remeasureAfterReflow's
+    // double-rAF wait (it also repaints the 2D drawing at the new size).
+    remeasureAfterReflow();
+  });
+}
+
+// ============================================================================
 // Platform contract — window.simAPI (RULES.md §2.8–§2.9).
 // ============================================================================
 
@@ -1797,6 +1864,7 @@ function init() {
   try {
     setupMobileNotice();
     setupWizardToggle();
+    setupRailToggle();
     setupQuickViews(); // bind the Top/Front/Side chips (setView flies the camera)
     setupCompareCard(); // bind the ADR-012 chrome BEFORE the stepper's first
                         // applyView drives syncCompareChipVisibility

@@ -139,9 +139,18 @@ export function createLabelLayer({ width = 1, height = 1 } = {}) {
   const occlusionRay = new THREE.Raycaster();
   const occluderMeshes = [];
   const anchorWorld = new THREE.Vector3();
+  const anchorNDC = new THREE.Vector3();
   const rayDir = new THREE.Vector3();
   /** Clearance so a numeral flush against a sheet's far edge doesn't self-occlude. */
   const OCCLUSION_EPS = 0.05;
+
+  /** In-viewport chrome the quadrant numerals must never bleed over (screenshot bug: 'II'
+   *  showing through the top-left quick-view cluster's transparent gaps). These are DOM
+   *  siblings of the CSS2D overlay inside #sim-viewport — the depth buffer can't clip a
+   *  CSS2D label against them, so this is a screen-space rect test, not a raycast. Queried
+   *  lazily (not cached at module load) since index.html builds this chrome after this
+   *  module is imported. */
+  const CHROME_SELECTORS = ['.vp-cluster', '#compare-chip', '.wizard-toggle'];
 
   /** One label: a DOM node wrapped in a CSS2DObject at a world anchor. All
    *  styling (colour, weight, chip box) lives on the CSS classes. */
@@ -268,31 +277,73 @@ export function createLabelLayer({ width = 1, height = 1 } = {}) {
     },
 
     /** Per-frame occlusion for the quadrant numerals: hide any numeral the HP/VP
-     *  sheets sit in front of, from the live camera's vantage. CSS2D labels are DOM —
-     *  the depth buffer can't clip them — so this raycasts camera → numeral against
-     *  `occluderRoot`'s fill MESHES only (the Line2 grids/borders are skipped: they are
-     *  expensive to raycast and a hairline should never hide a label). Called from the
-     *  render loop (main.js) with the ACTIVE camera and the hvPlanes leaf's group;
-     *  cheap — at most 4 rays against a handful of plane quads. No-op with no numerals. */
+     *  sheets sit in front of, from the live camera's vantage, OR whose projected
+     *  screen position lands inside a piece of in-viewport chrome (screenshot bug:
+     *  the 'II' numeral bleeding through the top-left quick-view cluster's transparent
+     *  gaps — a CSS2D label is a DOM node, so neither the depth buffer NOR normal paint
+     *  order can clip it against chrome that lives in the same #sim-viewport). The mesh
+     *  test raycasts camera → numeral against `occluderRoot`'s fill MESHES only (the
+     *  Line2 grids/borders are skipped: expensive to raycast and a hairline should never
+     *  hide a label); the chrome test projects the numeral to viewport-local px and hit-tests
+     *  it against CHROME_SELECTORS' rects. Called from the render loop (main.js) with the
+     *  ACTIVE camera and the hvPlanes leaf's group; cheap — at most 4 rays/projections
+     *  against a handful of plane quads and chrome rects. No-op with no numerals. */
     updateOcclusion(camera, occluderRoot) {
-      if (!quadLabels.length || !occluderRoot || !camera) return;
+      if (!quadLabels.length || !camera) return;
       occluderMeshes.length = 0;
       // NOTE: Line2/LineSegments2 EXTEND Mesh (isMesh is true), so the fat-line grids/borders
       // must be excluded explicitly — their raycast() needs Raycaster.camera and would throw.
-      occluderRoot.traverse((o) => {
-        if (o.isMesh && o.visible && !o.isLine2 && !o.isLineSegments2) occluderMeshes.push(o);
-      });
-      if (!occluderMeshes.length) return;
+      if (occluderRoot) {
+        occluderRoot.traverse((o) => {
+          if (o.isMesh && o.visible && !o.isLine2 && !o.isLineSegments2) occluderMeshes.push(o);
+        });
+      }
+
+      // Chrome rects in viewport-local px (same origin the CSS2D overlay projects into).
+      // Queried live (not cached) — cheap at 3 selectors/frame and self-corrects across
+      // layouts (e.g. the Compare chip hides in the split; hidden/zero-rect chrome is
+      // dropped so it can never contribute a stale hit box).
+      const viewportRect = document.getElementById('sim-viewport')?.getBoundingClientRect();
+      const chromeRects = viewportRect
+        ? CHROME_SELECTORS.map((sel) => document.querySelector(sel))
+            .filter((el) => el && !el.hidden && el.offsetParent !== null)
+            .map((el) => el.getBoundingClientRect())
+            .filter((r) => r.width > 0 && r.height > 0)
+            .map((r) => ({
+              left: r.left - viewportRect.left,
+              right: r.right - viewportRect.left,
+              top: r.top - viewportRect.top,
+              bottom: r.bottom - viewportRect.top,
+            }))
+        : [];
+
       for (const obj of quadLabels) {
         obj.getWorldPosition(anchorWorld);
-        rayDir.copy(anchorWorld).sub(camera.position);
-        const dist = rayDir.length();
-        if (dist < 1e-6) continue;
-        occlusionRay.set(camera.position, rayDir.normalize());
-        occlusionRay.near = 0;
-        occlusionRay.far = dist - OCCLUSION_EPS;
-        const hidden = occlusionRay.intersectObjects(occluderMeshes, false).length > 0;
-        obj.element.style.visibility = hidden ? 'hidden' : '';
+
+        let meshHidden = false;
+        if (occluderMeshes.length) {
+          rayDir.copy(anchorWorld).sub(camera.position);
+          const dist = rayDir.length();
+          if (dist >= 1e-6) {
+            occlusionRay.set(camera.position, rayDir.normalize());
+            occlusionRay.near = 0;
+            occlusionRay.far = dist - OCCLUSION_EPS;
+            meshHidden = occlusionRay.intersectObjects(occluderMeshes, false).length > 0;
+          }
+        }
+
+        let inChrome = false;
+        if (chromeRects.length) {
+          anchorNDC.copy(anchorWorld).project(camera); // clip space, -1..1 (z: behind-camera > 1)
+          if (anchorNDC.z < 1) {
+            const sx = (anchorNDC.x * 0.5 + 0.5) * resolution.x;
+            const sy = (1 - (anchorNDC.y * 0.5 + 0.5)) * resolution.y; // NDC +Y is up, screen +Y is down
+            inChrome = chromeRects.some(
+              (r) => sx >= r.left && sx <= r.right && sy >= r.top && sy <= r.bottom);
+          }
+        }
+
+        obj.element.style.visibility = (meshHidden || inChrome) ? 'hidden' : '';
       }
     },
 

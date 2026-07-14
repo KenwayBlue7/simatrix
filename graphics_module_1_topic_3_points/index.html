@@ -297,7 +297,7 @@
        chevron flips when collapsed; the viewport reflows to full width via flex. */
     .wizard-toggle {
       position: absolute;
-      top: calc(44px + var(--space-5));
+      top: var(--space-3);
       right: var(--space-3);
       z-index: 4;
       width: 44px;  /* DESIGN.md 44px target floor (was 40px) */
@@ -497,10 +497,13 @@
       width: min(420px, 38vw);
       height: min(320px, 42vh);
     }
-    /* Expanded = the 50/50 workbench split (ADR-037). The card is re-parented to
-       <body> and placed as the grid's right pane by the body.compare-split rules far
-       below; here it just sheds the floating-card chrome (no float geometry, no
-       shadow, a single hairline seam against the 3D pane). */
+    /* Expanded = the 50/50 workbench split (ADR-037). The card is re-parented to <body> and
+       placed as the grid's right pane by the body.compare-split rules far below; here it just
+       sheds the floating-card's absolute positioning. TRIAL (suspends ADR-021's flush layout,
+       mirrors topic-4): the card KEEPS its base .compare-card border/radius/paper fill instead
+       of flattening to a flush seam, so it reads as a floating rounded card on the gray split
+       background (see body.compare-split below). box-shadow stays off (Flat-Ink rule — docked
+       surfaces don't earn the transient-overlay shadow; the gap + gray bg carry the "float"). */
     body.compare-split #compare-card {
       position: static;
       inset: auto;
@@ -508,9 +511,6 @@
       height: auto;
       min-height: 0;
       transform: none;
-      border: 0;
-      border-left: 1px solid var(--color-border);
-      border-radius: 0;
       box-shadow: none;
     }
     .compare-card__head {
@@ -585,17 +585,19 @@
       grid-template-areas:
         "view compare"
         "rail rail";
+      background: var(--color-panel); /* gray working surface behind the floating cards */
+      gap: var(--space-4);
+      padding: var(--space-4);
     }
-    /* The structural hairline between the 3D viewport and the rail lives on the LEFT pane's
-       own bottom edge, NOT on the rail's top edge — so it spans only the 3D half. The right
-       half (2D drawing → rail) is left deliberately borderless: the drawing card and the rail
-       read as one continuous workbench surface there (Task 2). Because #sim-viewport is
-       border-box, this 1px is subtracted from clientHeight and handleResize sizes the canvas
-       to the box above the seam — no overlap. */
+    /* TRIAL (suspends ADR-021's flush/seamed layout, mirrors topic-4): the 3D viewport is its
+       own rounded white card (no flush border-bottom seam into the rail) — the grid gap above
+       supplies the separation instead. */
     body.compare-split #sim-viewport {
       grid-area: view;
       min-width: 0;
-      border-bottom: 1px solid var(--color-border);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      overflow: hidden; /* clip the WebGL canvas to the rounded corners */
     }
     body.compare-split #compare-card { grid-area: compare; }
     body.compare-split #workbench-rail { grid-area: rail; }
@@ -611,21 +613,26 @@
     body.compare-split #wizard-toggle { display: none; }
 
     /* The docked driver rail — spans both panes, hosts the re-parented [data-ctrl]
-       wrappers laid out as a horizontal instrument row. Persistent/docked, so no
-       shadow (Flat-Ink) — a hairline top seam only (ADR-021 parity). */
+       wrappers laid out as a horizontal instrument row. TRIAL (suspends ADR-021's flush hairline
+       seam, mirrors topic-4): paper-white rounded card so it reads as the third floating card
+       alongside the viewport and drawing. */
     #workbench-rail { display: none; }
     body.compare-split #workbench-rail {
       display: flex;
+      position: relative; /* own stacking context, so nothing composited inside #sim-viewport
+                              (e.g. a CSS2D label) can ever paint over the rail — defensive
+                              hardening, independent of the #sim-viewport chrome-occlusion fix
+                              in labelLayer.js's updateOcclusion(). */
+      z-index: 20;
       align-items: flex-end;
       justify-content: center; /* Centre the instrument row so the drivers sit balanced
                                   across the full-width rail instead of hugging the far left
                                   (the row is narrower than both panes, so no scroll clip). */
       gap: var(--space-6);
       padding: var(--space-4) var(--space-5);
-      background: var(--color-panel);
-      /* NO top border here: a full-width rail border would draw the hairline under BOTH panes,
-         including the 2D drawing half that must stay seamless. The left (3D) half's seam is drawn
-         by #sim-viewport's border-bottom above; the right (2D) half stays borderless (Task 2). */
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
       overflow-x: auto;
     }
     /* Each driver reflows from the wizard's vertical stack into a fixed-width column
@@ -646,6 +653,74 @@
     body.compare-split #workbench-rail .quad-note { display: none; }
     /* The card's per-step reveal used `hidden`; in the rail every driver is live. */
     #workbench-rail .field[hidden] { display: block !important; }
+
+    /* ---- Rail hide/reveal toggle (ADR-037 2026-07-14 amendment; explicit-label pass same
+       day): a dedicated control, independent of the wizard chevron, for a full-screen 3D/2D
+       read of the split. Now a labelled "Hide"/"Show" pill (not icon-only): it shares
+       grid-area:rail with #workbench-rail so it floats at the RAIL'S TOP-LEFT while the split
+       is open (DOM order paints it above the rail card beneath — the rail's own centred driver
+       row leaves that corner clear), then re-anchors fixed to the screen's bottom-left once the
+       rail collapses out of the grid (so it stays reachable with the rail gone). A NEW class
+       (not .wizard-toggle) — the two toggles must stay fully independent per the amendment. */
+    .rail-toggle {
+      display: none; /* shown only in the split, see body.compare-split #rail-toggle below */
+      position: relative; /* anchors the 44px hit-area ::before (see the shared selector below) */
+      align-items: center;
+      gap: var(--space-2);
+      z-index: 95; /* above the Compare card (--z-compare 90), below the mobile notice (100) */
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0 var(--space-3);
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    /* Open: in-grid, pinned to the rail area's top-left corner. */
+    body.compare-split #rail-toggle {
+      display: inline-flex;
+      grid-area: rail;
+      align-self: start;
+      justify-self: start;
+      margin: var(--space-4);
+    }
+    /* Collapsed: the "rail" grid area no longer exists once grid-template-areas drops it
+       (see body.compare-split.rail-collapsed below), so re-anchor to the viewport directly —
+       fixed bottom-left, same var(--space-4) inset — instead of auto-placing into the
+       remaining view/compare row. */
+    body.compare-split.rail-collapsed #rail-toggle {
+      position: fixed;
+      left: 0;
+      bottom: 0;
+      margin: var(--space-4);
+    }
+    .rail-toggle:active { transform: scale(0.97); }
+    .rail-toggle:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .rail-toggle__icon {
+      width: 20px;
+      height: 20px;
+      flex: none;
+      transition: transform var(--dur-base) var(--ease-standard);
+    }
+    .rail-toggle__text {
+      font-family: var(--font-sans);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      line-height: 1;
+    }
+    /* Collapsed: drop the rail out of the grid (its row + gap reclaimed) and flip the
+       chevron to point back down toward where the rail will reappear. */
+    body.rail-collapsed #workbench-rail { display: none !important; }
+    body.rail-collapsed .rail-toggle__icon { transform: rotate(180deg); }
+    body.compare-split.rail-collapsed {
+      grid-template-rows: minmax(0, 1fr);
+      grid-template-areas: "view compare";
+    }
 
     /* ---- 44px hit-area floor (DESIGN.md). These viewport-corner controls stay visually
        compact so the chrome stays quiet, but a transparent, centred ::before guarantees a
@@ -1821,6 +1896,11 @@
         border-color: var(--color-bench-grey);
         color: var(--color-ink);
       }
+      .rail-toggle:hover {
+        background: var(--color-paper);
+        border-color: var(--color-bench-grey);
+        color: var(--color-ink);
+      }
       .quick-view:hover {
         background: var(--color-paper);
         color: var(--color-ink);
@@ -2316,6 +2396,22 @@
       <span class="vp-note__text"></span>
     </div>
   </main>
+
+  <!-- Rail hide/reveal toggle (ADR-037 2026-07-14 amendment; explicit-label pass same day): a
+       direct <body> child, NOT a child of #workbench-rail — a child would vanish along with the
+       rail on collapse and become impossible to reveal again. Only visible while
+       body.compare-split is active (see CSS above); it shares grid-area:rail so it floats at the
+       rail's top-left when open, then drops to a fixed bottom-left of the screen once the rail
+       collapses out of the grid. A visible "Hide"/"Show" span replaces the old icon-only sr-only
+       label (main.js setupRailToggle keeps aria-label in sync for screen readers). Independent
+       of #wizard-toggle: collapsing the rail never exits the split, and the split always resets
+       the rail to shown on entry. main.js setupRailToggle wires it. -->
+  <button id="rail-toggle" class="rail-toggle" type="button" aria-controls="workbench-rail" aria-expanded="true" aria-label="Hide controls" title="Hide controls">
+    <svg class="rail-toggle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+    <span class="rail-toggle__text">Hide</span>
+  </button>
 
   <!-- Inline term-definition popover — the ONE fixed tooltip src/terms.js fills
        from the pointSteps.js TERMS glossary and anchors to whichever `.term`
