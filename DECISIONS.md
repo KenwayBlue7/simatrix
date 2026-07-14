@@ -1303,6 +1303,346 @@ clone at full parity — see amendments)
 
 ---
 
+## ADR-042: The `rebuild()` disposal contract MUST deep-`traverse()` — a shallow child loop leaks nested `THREE.Group` hierarchies
+
+**Date:** 2026-07-12
+**Decision:** The single-`rebuild()` disposal contract (ADR-004) disposes GPU resources by
+**deep-traversing** every top-level child of the geometry group —
+`for (const child of shapeGroup.children) child.traverse(disposeObj)`, where `disposeObj` frees an
+object's geometry, every material, and any texture map — **not** by a shallow one-level loop over
+`shapeGroup.children`. Landed in `graphics_module_1_topic_4_understanding_orthographic_views/main.js` (the `disposeObj`
+helper + the traversal) and **backported to `template_starter/main.js`**, so every future topic cut
+from the starter (ADR-009's copy-and-simplify discipline) inherits the deep contract by default.
+**Why:** The Glass Box domain build assembles its content as **nested `THREE.Group` hierarchies** —
+the glass box, the central solid, the projectors, and the orbiting Observer are each a sub-group of
+`shapeGroup`. The starter's original shallow loop disposed only a **direct** child's *own*
+geometry/material, and a `Group` node carries neither — so for grouped content it freed **nothing**
+and would exhaust the WebGL context across rapid rebuilds (the "most likely late-stage bug" ADR-004
+guards against). Verified against the shipped Glass Box module: with the deep traverse,
+`renderer.info.memory` held **flat at 16 → 16 geometries / 0 textures** across 50 `simAPI.reset()`
+rebuilds plus 30 quick-view switches.
+**Alternatives rejected:** (a) *Keep the shallow child loop and mandate flat, un-nested geometry*
+(every mesh a direct child of `shapeGroup`) — rejected: it pushes a fragile invariant onto every
+future domain build (one nested `Group` silently leaks the whole subtree) to save a one-line
+traversal, and grouping is the natural, readable way to assemble a domain scene. (b) *Dispose the
+whole scene/renderer each rebuild* — rejected: it would tear down the persistent reference grid,
+lights, and cameras the contract deliberately keeps **out** of `shapeGroup`, and is far more work
+than freeing the per-frame subtree.
+**Consequences:** `shapeGroup` children may now be nested `Group`s freely; disposal is a shared
+`disposeObj(obj)` primitive (`geometry?.dispose()` + every material + `map`). RULES.md §3.3 is
+updated to require the deep traversal and cites this ADR; a topic that reintroduces a shallow
+one-level loop is a regression (RULES.md §8.4). The fixed grid / lights / cameras must stay outside
+`shapeGroup` so the traverse never frees them. Any EG topic derived from `template_starter` now
+carries the fix without re-discovering the leak.
+**Status:** Active (refines the ADR-004 disposal contract; does not overturn it)
+
+---
+
+## ADR-043: The Glass Box reference planes use functional hue-tinted glass, not paper-tinted, to stay visible on the white viewport
+
+**Date:** 2026-07-12
+**Decision:** In the Glass Box Visualizer (`graphics_module_1_topic_4_understanding_orthographic_views/src/glassBox.js`)
+the three reference planes are filled with **functional hue-tinted glass** — each pane tinted its
+**own** domain hue (HP floor **teal** `--color-hp-line`, VP back wall **amber** `--color-vp-line`,
+PP side wall **violet** `--color-pp-line`) at a low `FILL_OPACITY = 0.09` with a solid same-hue
+border — **not** the neutral "paper-tinted" fill the original build brief specified.
+**Why:** A paper/white fill (`--color-paper` is `#ffffff`) is **invisible** against the pure-white
+sim viewport — the panes would vanish and leave only their edges, defeating the whole "object sits
+inside a glass box" mental model. Tinting each pane its own functional hue makes the glass read as a
+real surface **and** does double duty as that plane's Two-Cue hue signal, reusing the platform's
+existing viewport colour encodings (HP teal / VP amber) rather than inventing new chrome.
+**This strictly upholds the Two-Cue Rule (§4.6):** colour is never the sole cue — each pane still
+carries its solid border, its label, and its fixed spatial position (floor / back wall / side wall),
+so the plane's identity survives even if the faint 0.09 fill is not perceived.
+**Alternatives rejected:** (a) *Paper/neutral-white fill as briefed* — rejected: invisible on the
+white viewport. (b) *A single neutral-grey tint on all three panes* — rejected: it would separate
+glass from background but throw away the free Two-Cue reinforcement and force the learner to tell
+three identically-coloured panes apart by position alone. (c) *Raise the opacity so a neutral fill
+shows* — rejected: a heavier fill occludes the solid and its projected views **inside** the box and
+drifts toward the banned glassmorphism / PBR "architectural-viz" look (PRODUCT.md anti-references).
+**Consequences:** A documented deviation from the brief, recorded at `FILL_OPACITY` in
+`glassBox.js`. The tint reads **domain** hues only, so §4.5 (Chrome-Only Blue) still holds — no blue
+enters the viewport. Token discipline holds: every fill and border colour is read from a
+`--color-*-line` token, none hard-coded (ADR-003). If a future pane ever needs a distinct non-hue
+tint, it must be declared as its own token, not inlined.
+**Status:** Superseded by ADR-044 (the fill is gone; the plane is now a grid matrix)
+
+---
+
+## ADR-044: The Glass Box reference planes are calm grid matrices, not hue-tinted glass — and the Profile Plane moves to +X to fix a first-angle handedness bug
+
+**Date:** 2026-07-13
+**Decision:** In `graphics_module_1_topic_4_understanding_orthographic_views/src/glassBox.js`, the three reference planes
+drop the hue-tinted glass fill (ADR-043) for a calm **grid matrix** (a 12×12 lattice of faint
+same-hue lines, `GRID_OPACITY = 0.30`) plus a thick same-hue border, all rendered as
+`LineSegments2` (no mesh fill at all). Separately, the **Profile Plane moves from x = −H to
+x = +H** — the object is now viewed from −X for the Side view, so its image casts onto the PP at
++X, and the PP's fold hinge flips from −π/2 to +π/2 (`PP_FOLD_ANGLE`) so it swings to the RIGHT of
+the fixed VP when unfolded. *(Fold clause superseded by ADR-049 — the PP now folds DOWN onto the
+HP, Module 2 parity; the +X placement and −X viewing direction stand.)*
+**Why:** Two independent problems. (1) The hue-tinted glass fill (ADR-043) was a workable fix for
+visibility, but a build audit found the grid-matrix look reads more like a drafting instrument
+(the "graph paper you can see through") and avoids any residual translucency artifacts stacking
+with the new bounding-box projector rays (ADR-046) once four dashed ray-batches plus three fills
+plus the fold's dissolve-opacity animation were all live in the same view. (2) The **orientation
+bug**: with PP at −X, the Left-hand Side View's fold hinge swung the PP to the LEFT of Front —
+first-angle projection puts the **Left**-hand Side View to the **right** of the Front view (the
+object is imagined rolling rightward past the observer, HP down / PP right). The −X placement had
+been carried through three earlier build phases (glass-box-domain-build memory, ADR-036, ADR-038)
+without the handedness ever being checked against BIS/first-angle convention until this pass.
+**Alternatives rejected:** (a) *Keep the hue-tinted fill, just move PP* — rejected: doesn't address
+the layering-artifact concern once bounding-box projectors (ADR-046) added a fourth translucent
+layer per pane. (b) *Keep PP at −X and mirror the 2D Compare sheet layout instead* (Side view drawn
+top-left, Front top-right) — rejected: this is the "flagged divergence" the 2026-07-12 completion
+memory recorded as unresolved; reorienting the 3D fold to match the correct first-angle convention
+is the textbook-correct fix, not papering over it in the 2D sheet.
+**Consequences:** `VIEW_DIR.side` now casts from `(−1,0,0)`; `projectToPlane('side')` and every
+PP-tagged buffer in `castProjectors()` target `x = +H`. The exploded pane offset (`half`) is no
+longer a fixed constant — it is now computed per rebuild from the domain object's live bounding box
+(see ADR-045), so `createGlassBox()`/`castProjectors()` take an options object instead of positional
+args. `--color-hp/vp/pp-line` tokens are still the only colour source (ADR-003 unaffected).
+**Status:** Active — grid matrices + PP placement stand; the PP **fold clause** superseded by ADR-049
+
+---
+
+## ADR-045: The Foundations Bearing Block becomes the Glass Box Visualizer's domain object, replacing the placeholder box solid
+
+**Date:** 2026-07-13
+**Decision:** `graphics_module_1_topic_4_understanding_orthographic_views` no longer suspends a plain `BoxGeometry`
+placeholder inside the glass box. It copies `graphics_module_1_topic_1_foundations/src/bearingBlock.js`
+verbatim (the pillow-block housing generator — base, mounting holes, boss, through-bore) into its
+own `src/`, imports `createBearingBlock()`, and scales it down (`BLOCK_SCALE = 0.42`) to float
+inside the exploded reference box.
+**Why:** A plain box solid taught nothing about *why* orthographic projection matters — every one
+of its three views is a trivial rectangle. The Bearing Block is a real, already-built, non-trivial
+part (round bore, mounting holes, a curved boss) that makes the three cast views visibly different
+from each other, which is the entire pedagogical point of the glass-box mental model. Reusing the
+Foundations generator (rather than authoring a new solid) keeps a single geometry source for the
+"same object, two lessons" pairing across Module 1 Topic 1 (hidden-line classification) and Topic 4
+(orthographic projection) — a learner who has seen the block once recognizes it here.
+**Alternatives rejected:** (a) *Author a new, simpler solid just for this topic* — rejected: extra
+generator code for no pedagogical gain the Bearing Block doesn't already provide, and it forfeits
+the cross-topic recognition. (b) *Import `bearingBlock.js` via a relative `../` path instead of
+copying it* — rejected: violates ADR-009 (no shared code library; topic clones are manual full
+copies) and would couple two independently-deployed sim payloads at runtime.
+**Consequences:** The block's generator-authored scale (~9 units) no longer matches the old fixed
+`BOX_HALF = 2.6` constant, so the exploded plane offset is now *derived*: `main.js`'s
+`buildBearingBlockSolid()` computes the scaled block's `THREE.Box3`, and `paneHalf` = its largest
+half-extent + a fixed `PANE_MARGIN`. This also feeds the Observer's orbit distance and the 2D
+Compare sheet's fixed bounds (ADR-038 unaffected — the sheet is still locked to a static value, just
+one now computed once per rebuild instead of hand-tuned). If `bearingBlock.js` changes in
+Foundations, this topic's copy must be updated by hand (ADR-009's known cost).
+**Status:** Active
+
+---
+
+## ADR-046: Projector rays cast from the object's bounding-box corners, not every mesh vertex
+
+**Date:** 2026-07-13
+**Decision:** `castProjectors()` in `glassBox.js` casts its dashed projector rays and 2D view
+outlines from the domain object's axis-aligned `THREE.Box3` — its 8 extreme corners and 12 box
+edges — rather than the object's real mesh vertices.
+**Why:** The Bearing Block (ADR-045) is a non-convex CSG-style mesh with dozens of vertices (base
+corners, two mounting-hole rims at 24 segments each, the bore rim, the boss dome). Casting a
+projector ray from every vertex to every one of the three planes would draw an unreadable spiderweb
+that obscures the very views it's meant to explain — the opposite of the lesson's goal. The
+bounding box gives exactly 8 corners and a clean rectangular "envelope" projection on each pane,
+which is legible at a glance and still visually correct: the object's true silhouette is always
+inside its bounding-box projection.
+**Alternatives rejected:** (a) *Cast from every mesh vertex* — rejected per above (spiderweb). (b)
+*Cast from the convex hull* — rejected: still tens of points for this part, and computing/maintaining
+a hull is unwarranted complexity for a teaching aid whose point is the glass-box concept, not exact
+silhouette tracing. (c) *Hand-pick a handful of "interesting" vertices per part* — rejected: not
+generic, breaks if the domain object ever changes.
+**Consequences:** The 2D Compare sheet (`drawCompare()`) also draws the bounding-box outline (it
+consumes the same `solidData.verts/edges`), so the 3D projector view and the 2D drawing are always
+the same simplified envelope — consistent, if a deliberate simplification a learner should be told
+is "the object's extent," not "the object's exact outline." `castProjectors()` now returns
+`userData.views`/`userData.rays` keyed per plane (`hp`/`vp`/`pp`) instead of one flat group, so a
+guided step (ADR-047) can show a single plane's cast in isolation.
+**Amended (2026-07-13):** the bounding-box simplification now applies **only to the dashed
+projector rays** (still 8 rays per plane, from the Box3's extreme corners — the spiderweb argument
+above stands for rays). The **2D view outlines drawn on the planes must trace the true domain
+geometry silhouette**: a rectangular envelope on the pane taught the wrong lesson — the learner saw
+"a box" where the cast view should show the Bearing Block's real profile (dome, base, hole rims),
+which is the entire point of casting a view. The silhouette comes from `THREE.EdgesGeometry` on the
+block's merged geometry at a threshold above its 15° curve-facet angle (so smooth surfaces stay
+clean and only true creases/rims survive), carried as `solidData.silhouette` alongside the
+unchanged `verts/edges` bbox corners. `drawCompare()` consumes the same silhouette so the 3D pane
+views and the 2D sheet stay the same picture (the consistency invariant above is preserved, now at
+true-silhouette fidelity). Segments that degenerate to a point in a given view (edges parallel to
+that view's sight axis) are skipped per view.
+**Status:** Active (amended 2026-07-13 — bbox for rays only; view outlines trace the true silhouette)
+
+---
+
+## ADR-047: The Glass Box view-switcher moves off the viewport into a 5-step guided sequence, driven by a single `renderStep()`
+
+**Date:** 2026-07-13
+**Decision:** The Top/Front/Side quick-view buttons move out of the 3D viewport's floating
+top-left cluster (`.vp-cluster`, now deleted along with the never-wired connector-line toggle) and
+into the Step 3 panel of a new 5-step guided wizard: **1** The Object, **2** The Reference Planes,
+**3** Lines of Sight, **4** The Glass Box, **5** The 2D Drawing. A new `renderStep(step)` in
+`main.js` is the single function that decides which domain layers (the block+Observer, the
+grid planes, each plane's view outline + dashed rays, the Observer's sight lines, the fold, the
+Compare split) are visible for a given step; `stepper.js` calls `sim.onStepChange(n)` on every
+Next/Back/rail-jump so `renderStep` fires on every transition.
+**Why:** The original quick-view chips let a learner jump straight to "Front" before the object,
+the planes, or the projection concept had been introduced — useful as a bench control, wrong as a
+first encounter. Folding the view-switcher into a guided step, and gating every other layer
+(planes, rays, sight lines, the fold) behind the SAME step sequence, turns the sim from "a bench
+with everything visible at once" into a taught progression: see the object, see the planes appear,
+learn to cast one view at a time, then see all three at once, then watch them unfold flat. This
+mirrors the Foundations topic's existing 4-step wizard pattern (ADR-029) rather than inventing a
+new interaction model.
+**Alternatives rejected:** (a) *Keep the quick-view chips in the viewport AND add the step gating
+separately* — rejected: two controls doing overlapping jobs invites them to drift out of sync (a
+chip click during Step 1 would show a view the lesson hasn't introduced yet). (b) *Gate visibility
+per-step inside `stepper.js`* — rejected: violates the leaf-module layering rule (CLAUDE.md
+"leaves don't cross-import") — `stepper.js` cannot own THREE.js scene-graph visibility; it now only
+calls one hook (`onStepChange`) back into the orchestrator, which owns the scene.
+**Consequences:** `main.js` no longer boots straight into the Compare split
+(`BOOT_INTO_COMPARE_SPLIT` flipped to `false`, overturning the Phase-4 scaffold's boot-into-split
+default) — Step 5 opens it instead, via the same `renderStep()` call. `simAPI.reset()` now also
+resets `currentStep` to 1. The Observer's sight lines and each plane's dashed rays gained a
+gating layer (`sightAllowed`/`rayAllowed` in `main.js`) that `applyFoldPose()` ANDs against its own
+fold-dissolve visibility, so the two visibility sources (which step is active vs. how far the fold
+has progressed) never fight for control of the same `.visible` flag. **Trap found + fixed in the
+same pass:** `body.compare-split #wizard { display:none }` (ADR-037) hides the entire wizard —
+rail, Back button, Reset — the instant Step 5 opens the split, so a learner who reached Step 5 had
+no way back to Step 4 short of reloading the page. Fixed with one ghost "← Back to Step 4" button
+docked in `#workbench-rail` (which stays visible in compare-split), wired to a new `stepper.back()`
+that steps to `currentStep − 1`.
+**Status:** Active
+
+---
+
+## ADR-048: QA cleanup pass on the (now-renamed) "Understanding Orthographic Views" topic — rename, camera default, dead-UI purge, Reset fix
+
+**Date:** 2026-07-13
+**Decision:** Four changes to `graphics_module_1_topic_4_understanding_orthographic_views` (folder
+and product renamed from "Glass Box Visualizer"/`..._glass_box`, ADR-024 slug + §1.12 title-parity
+compliance unaffected by the rename): (1) the default 3D perspective camera pose moves from
+top-right-front `(8.5, 6.5, 10)` to top-left-front `(-12, 8, 12)` — new **RULES.md §5.20**; (2) the
+unwired "Practice problems" entry button, its full-viewport dialog, and the active-problem header
+DOM + CSS are deleted outright — this topic never wired a `problemLibrary.js`, so the button opened
+an empty shell; (3) `src/uiManager.js` — which owned the Reset button's two-state confirm but was
+never imported by `main.js` and targeted a parameter dock (`ctl-shape`, sliders) this topic doesn't
+have — is deleted, and its Reset wiring is reimplemented directly in `main.js` as
+`setupResetControl()`, routed through the single `window.simAPI.reset()` path (§2.9); (4) Step 3
+gains explicit action copy ("Click the buttons below to move the Observer.") and a new
+`showToast()` helper fires "Lesson complete" on first reaching Step 5.
+**Why:** A QA pass written against the platform's other engine (Module 1's `initSim(cfg)`) surfaced
+that this topic — built on the Module-2 orchestrator pattern (ADR-033) — has no `cfg`, no
+`cfg.problems`, and no `STEPS` array in `main.js`; translating the QA intent onto the real
+architecture surfaced that Reset was silently dead (the confirm markup existed, but nothing live
+called it) rather than merely mis-styled. The camera default follows the "layout reads
+left-to-right" rationale: Top/Front/Side cast to the object's top/back/left faces (first-angle), so
+starting the eye on that same top-left side previews how the unfolded drawing will read.
+**Alternatives rejected:** *Add `cfg.problems`/an `initSim(cfg)` shim to satisfy the QA brief
+literally* — rejected: would duplicate Module 1's engine inside a Module-2-pattern topic, violating
+the no-cross-architecture-conflation rule (§7.6/§7.7) for no real benefit, since this topic has no
+problem-library content to gate.
+**Consequences:** The topic's served URL changes to
+`graphics_module_1_topic_4_understanding_orthographic_views/`; every cross-file path reference
+(ARCHITECTURE.md §2, root CHANGELOG.md, this file's ADR-042/043/044/045 path strings, the topic's
+own CLAUDE.md/CHANGELOG.md) was swept to match — historical ADR narrative text describing the
+former "Glass Box" build is left as-written (append-only log, §8.4). `.reset-confirm*` CSS is now
+shared solely by `main.js`'s `setupResetControl()` (its other consumer, the Practice-problems
+"load problem" confirm, was deleted in the same pass).
+**Status:** Active
+
+---
+
+## ADR-049: The Profile Plane folds DOWN onto the HP (Module 2 parity), the reference planes explode apart with CSS2D name pills, and the Observer becomes a flat CSS2D icon
+
+**Date:** 2026-07-13
+**Decision:** Four coupled geometry/aid changes to `graphics_module_1_topic_4_understanding_orthographic_views`:
+(1) **PP fold reversal** — the PP no longer swings sideways into the VP plane about the VP∩PP edge
+(`+π/2` about Y, ADR-044); it now hinges **DOWN onto the HP about the HP∩PP line** with
+`PP_FOLD_ANGLE = −π/2`, the same −90° drop as Module 2's `PP_FOLD_TARGET`. Its hinge pivot is
+**nested inside the HP hinge's inner group**, so the flattened PP rides the HP's own +90° swing into
+the VP plane — the Side view lands **beside the Top view** (bottom-right, Module 2's 4th-quadrant
+layout, Top and Side sharing the depth axis). `drawCompare()` moves the 2D Side view to match
+(beside Top, `projSide = (y right, z down)` read off the fold's landing pose).
+(2) **Exploded planes** — each pane keeps its `[−paneHalf, paneHalf]` in-plane span but sits at
+`planeOffset = paneHalf + PLANE_EXPLODE_GAP` on its normal axis, so the three grid planes share no
+vertices and a visible air gap separates their edges; the fold hinges sit at the offset lines
+(ground line `(0,−D,−D)`, HP∩PP line `(+D,−D)` along Z), which lands everything coplanar with the
+VP and carries the explode gap into the flat layout as sheet separation.
+(3) **CSS2D plane pills** — "HP"/"VP"/"PP" `CSS2DObject` pills (Module 2's `.plane-label`
+convention, already in this topic's starter CSS) attach to each pane's outer edge and ride its fold
+hinge; they fade with the Step-2 plane reveal via element opacity + their own `.visible`.
+(4) **CSS2D Observer** — the wireframe camera assembly (body box + lens frustum, ~40 fat-line
+segments) is replaced by a flat CSS2D eye-glyph icon (`.observer-icon`): a viewport AID should be
+the lightest thing that reads, and a DOM glyph costs zero geometry and always faces the camera.
+**Why:** (1) The old sideways PP fold contradicted the platform's reference implementation —
+Module 2 established (and documents at `PP_FOLD_TARGET`) that the profile plane folds down onto the
+HP, landing the side view beside the top view; two topics teaching two different unfold layouts for
+the same concept is exactly the cross-module drift RULES.md §7 exists to prevent. (2) The corner-box
+panes previously shared corner vertices, reading as one welded solid rather than three independent
+planes — the "exploded" mental model the lesson narrates was not what the scene showed. (3/4) With
+three separated planes the learner needs the names ON the planes, and the wireframe camera cost
+real geometry + disposal bookkeeping for an aid whose only job is "the eye is here."
+**Alternatives rejected:** (a) *Keep the PP fold world-sibling (Module 2's parenting) instead of
+nesting it in the HP hinge* — rejected: in Module 2 the HP is the FIXED plane so a sibling works;
+here the VP is fixed and the HP itself folds, so a world-sibling PP would land on a plane that then
+rotates away without it. Nesting composes the two hinges so "PP onto HP, HP into VP" reads as one
+continuous physical unfold. (b) *Explode the panes by growing their span instead of offsetting
+them* — rejected: shared corner vertices are the artifact being removed; a bigger welded corner box
+is still a welded corner box. (c) *An SVG texture sprite for the Observer* — rejected: a texture is
+GPU state to dispose and mip-blur at glancing angles; the CSS2D node needs neither.
+**Consequences:** `createGlassBox()`/`castProjectors()` take `offset` alongside `half`;
+`projectToPlane()` and the rays/views/sight-lines all land at `±planeOffset`. ADR-044's PP
+**placement** (+X) and viewing direction (−X) stand; only its fold clause is superseded. The r160
+CSS2DRenderer-ignores-ancestor-visibility gotcha (Module 2) now applies here: the pills and the
+Observer icon get their own `.visible` writes in `applyPlaneOpacity()`/`applyFoldPose()`, and the
+disposal traversal pulls CSS2D DOM nodes from the overlay per RULES.md §3.5 (`disposeObj` handles
+`isCSS2DObject`), since the auto-remove listener only fires for a directly-removed child, not a
+descendant of a cleared group.
+**Status:** Active (supersedes ADR-044's fold clause; ADR-044's PP placement stands)
+
+---
+
+## ADR-050: Pane view outlines are dimension-constructed 2D drawings; the dashed bounding-box projector rays are removed
+
+**Date:** 2026-07-13
+**Decision:** Three coupled QA-polish changes to `graphics_module_1_topic_4_understanding_orthographic_views`:
+(1) **Exact 2D views** — `castProjectors()` no longer projects an EdgesGeometry-extracted 3D
+silhouette per pane; it constructs each view's segments directly from the Bearing Block's dimension
+table (`BEARING_BLOCK_DIMS × BLOCK_SCALE`, computed in `main.js` and passed as a world-unit `dims`
+object — glassBox.js stays a THREE-only leaf, ADR-007 star rule). Front (VP): base rectangle + body
+sides to the dome spring line + a 32-chord dome semicircle, with NO line at the spring line (the
+dome springs tangentially — body width equals the boss diameter). Top (HP): base outer rectangle +
+the body's two longitudinal edges (its front/back edges coincide with the base rectangle). Side
+(PP): ONE seamless outer rectangle from foot bottom to dome top (base, body and dome share the full
+depth, so no interior edge exists).
+(2) **Projector-ray purge** — the dashed 8-corner bounding-box rays (`buildRays`, `rayByPlane`,
+`rayAllowed`, `userData.rays`) are deleted end-to-end; the panes display only the 2D drawing
+outlines. Step gating renames `rayAllowed` → `viewAllowed` and drives the outlines directly; the
+Step-3/Step-4 dock copy no longer mentions dashed projector lines.
+(3) **Tighter Step-2+ framing** — `FRAME_MARGIN` drops 1.18 → 1.08 so the three exploded grids fill
+the camera with a small breathable margin (`FRAME_MARGIN_TIGHT` 1.03 for Step 1 unchanged).
+**Why:** The extract-then-filter pipeline (amended ADR-046 + the Part-3 `sideFix` seam filter/apex
+injection) was a chain of patches fighting EdgesGeometry's per-view blind spots — false seams to
+subtract, culled tangents to re-inject — and visual QA still found artifacts. The block's views are
+closed-form: constructing them from the dimension table is shorter, exact by definition, and
+matches how a draughtsman authors a multiview drawing. The rays read as clutter over the now-exact
+outlines and duplicated what Step 3's sight lines already teach.
+**Alternatives rejected:** (a) *Keep EdgesGeometry and grow the per-view filter set* — rejected:
+every new geometry feature would need new filters; exactness by construction beats exactness by
+subtraction. (b) *Import `BEARING_BLOCK_DIMS` into glassBox.js* — rejected: breaks the leaf rule
+(ADR-007); main.js owns the scale and passes world numbers in.
+**Consequences:** `castProjectors({ offset, resolution, dims })` — the `verts`, `silhouette` and
+`sideFix` parameters are gone, as is `userData.rays`. `solidData.silhouette` (EdgesGeometry) still
+exists in main.js solely for the 2D Compare sheet's `drawCompare()`; the pane outlines and the
+Compare sheet no longer share one segment source (the ADR-046/049 consistency invariant is
+narrowed to the Compare sheet). `solidData.verts` still feeds the Step-3 sight lines.
+**Status:** Active (supersedes the amended ADR-046's view-outline pipeline and the Part-3 `sideFix`
+corrections; ADR-046's bounding-box treatment survives only in the sight lines' 8-corner cast)
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*

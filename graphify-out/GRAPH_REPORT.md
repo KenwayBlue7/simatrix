@@ -1,542 +1,939 @@
-# Graph Report - C:/xampp/htdocs/Simatrix  (2026-07-10)
+# Graph Report - Simatrix  (2026-07-13)
 
 ## Corpus Check
-- 35 files · ~389,323 words
+- 191 files · ~472,523 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1484 nodes · 2608 edges · 142 communities (86 shown, 56 thin omitted)
-- Extraction: 93% EXTRACTED · 7% INFERRED · 0% AMBIGUOUS · INFERRED: 178 edges (avg confidence: 0.69)
-- Token cost: 487,331 input · 0 output
+- 2452 nodes · 3834 edges · 345 communities (135 shown, 210 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 111 edges (avg confidence: 0.58)
+- Token cost: 0 input · 0 output
+
+## Graph Freshness
+- Built from commit: `a172c8e0`
+- Run `git rev-parse HEAD` and compare to check if the graph is stale.
+- Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
-- Module 1 Engine Core
-- Module 2 Sim Orchestrator
-- Simple Positions Sim
-- Foundations Sim & Annotations
-- Cross-Module Orchestrator Docs
-- Points Sim & Fold
-- Module 1 First-Angle Projection
-- Module 2 Solid Geometry Core
-- Architecture Decisions (ADRs)
-- Intro to Solids Sim
-- Simple Positions Solid Generators
-- Module 1 Lines & Traces
-- Module 1 Dimensioning
-- Spatial Framework Fold
-- Product Feature Set
-- Module 1 Lesson Docs
-- Module 1 Lines Engine
-- Intro Solid Generators
-- Simple Positions 2D Drawer
-- Module 2 2D Projection Drawer
-- Spatial Framework Changelog & UI
-- Module 1 Lines & Traces
-- Points HP/VP Planes
-- Points Point Projector
-- Spatial Framework HP/VP Planes
-- Spatial Framework Point Projector
-- Intro Solid Geometry Core
-- Module 1 Quadrant System
-- Spatial Framework Frustums
-- Foundations Line Drawer
-- Points Sim Orchestrator
-- Points Compare Workbench
-- Simple Positions Problem Library
-- Simple Positions Vertex Labeler
-- Module 2 Problem Library
-- Module 2 Vertex Labeler
-- Foundations Animation
-- Spatial Framework Animation
-- Points Animation
-- Intro to Solids Vertex Labeler
-- Simple Positions Animation
-- Module 1 Animation
-- Module 2 Animation
-- Product Design Principles
-- Foundations Bearing Block
-- Foundations Hidden-Line Analyzer
-- Spatial Framework Label Layer
-- Spatial Framework Guided Stepper
-- Points Label Layer
-- Intro to Solids Solid Anatomy
-- Simple Positions Hidden-Line Analyzer
-- Simple Positions UI Manager
-- Module 2 Hidden-Line Analyzer
-- Module 2 Design Docs
-- Points Sim Orchestrator
-- Points UI Manager
-- Module 1 Line Steps
-- Spatial Framework Framework Data
-- Points Sim Orchestrator
-- Points Point Steps
-- Module 1 Plane Steps
-- Spatial Framework Sim Orchestrator
-- Spatial Framework Sim Orchestrator
-- Spatial Framework UI Manager
-- Simple Positions Lesson Page UI
-- Spatial Framework Sim Orchestrator
-- Points Problem Set
-- Design & Decision Notes
-- Spatial Framework Sim Orchestrator
-- Points Onboarding
-- Points Problem Library
-- Intro to Solids Module Guide
-- Simple Positions Onboarding
-- Module 2 Onboarding
-- Foundations Module Guide
-- Spatial Framework Sim Orchestrator
-- Points Point Data
-- Intro to Solids Lesson Page UI
-- Module 1 Line Problems
-- Module 1 Onboarding
-- Design System Rules
-- Foundations Lesson Page UI
-- Foundations Label Layer
-- Foundations Glossary Terms
-- Spatial Framework Changelog
-- Spatial Framework Lesson Page UI
-- Points Changelog
-- Module 1 Changelog
-- Module 1 Quadrant Steps
+- First-Angle Projection Scene
+- Fold Animation Engine
+- Projection Orchestrator
+- Annotations & Arrow Meshes
+- Module Docs & ADRs
+- Scene Boot & Camera
+- Solid Geometry Generators
+- Engineering Graphics Concepts
+- Edge Overlay & Layers
+- Camera Framing & Solids
+- Solid Generators (clone)
+- Platform Design System
+- ADR Index & Compare View
+- Dimensioning & Line Types
+- Fold Camera Choreography
+- Projection Drawer
+- Projection Drawer (clone)
+- UI Manager & Sliders
+- Solid Mesh Builder
+- HP/VP Planes
+- Point Rig
+- HP/VP Planes (clone)
+- Point Rig (clone)
+- CLAUDE
+- PRODUCT
+- genericSolid
+- ARCHITECTURE
+- frustums
+- lineDrawer
+- main
+- main
+- main
+- main
+- problems
+- problems
+- DECISIONS
+- anim
+- anim
+- main
+- main
+- anim
+- labelLayer
+- vertexLabeler
+- anim
+- vertexLabeler
+- anim
+- anim
+- vertexLabeler
+- bearingBlock
+- meshAnalyzer
+- labelLayer
+- spatialSteps
+- anatomy
+- main
+- meshAnalyzer
+- meshAnalyzer
+- DECISIONS
+- CHANGELOG
+- CLAUDE
+- main
+- lineData
+- ARCHITECTURE
+- DESIGN
+- spatialData
+- uiManager
+- main
+- main
+- pointSteps
+- main
+- problems
+- DECISIONS
+- ARCHITECTURE
+- DECISIONS
+- main
+- pointProblems
+- DECISIONS
+- main
+- onboarding
+- problemLibrary
+- CLAUDE
+- onboarding
+- onboarding
+- PRODUCT
+- uiManager
+- CLAUDE
+- main
+- main
+- pointData
+- computeEffectiveAngles
+- lineProblems
+- onboarding
+- CHANGELOG
+- labelLayer
+- terms
+- quadrantSteps
+- CLAUDE.module-template
+- DECISIONS
+- DECISIONS
+- CHANGELOG
+- CHANGELOG
+- terms
+- CHANGELOG
+- problemLibrary
+- uiManager
+- 2026-06-01T14-57-13Z__index-html
+- terms
+- PRODUCT
+- CLAUDE
+- DECISIONS
+- DECISIONS
+- DECISIONS
+- CHANGELOG
+- CHANGELOG
+- CHANGELOG
+- CHANGELOG
+- CHANGELOG
+- CHANGELOG
+- CHANGELOG
+- CHANGELOG
+- CHANGELOG
+- terms.js
+- CHANGELOG
+- CHANGELOG
+- CHANGELOG
+- CLAUDE
+- CLAUDE
+- DESIGN
+- DESIGN
+- DESIGN
+- DESIGN
+- DESIGN
+- PLATFORM-RULES
+- PRODUCT
+- CLAUDE
+- init
+- DESIGN.md — Module 1 Premium Interaction Layer
+- setView
+- wireControls
+- rebuild
+- Simatrix — Rules (Enforcement Checklist)
+- Critique — Orthographic Projection Guided Stepper (`index.html`)
+- Critique — Orthographic Projection Guided Stepper (`index.html`)
+- init
+- CLAUDE.md — Simatrix · Module 1 Topic 1: Engineering Graphics Foundations (BUILT)
+- engageOrtho
+- annotations.js
+- anim.js
+- Critique — `index.html` (Lesson 1: The Two Reference Planes)
+- reset
+- Changelog — Simatrix (repository root)
+- CLAUDE.md — Simatrix Projection of Points
+- renderStep
+- CLAUDE.md — Simatrix Engineering Graphics Viewer
+- glassBox.js
+- Changelog
+- CLAUDE.md — Simatrix · Module 1 Topic 2: Spatial Framework (BUILT)
+- bearingBlock.js
+- Critique — Projection of Points simulation (`index.html` + `main.js`)
+- Critique — `lines.html` (Projection of Straight Lines)
+- CLAUDE.md — Simatrix · Module 2 Topic 1: Introduction to Solids
+- CLAUDE.md — Simatrix Engineering Graphics Viewer
+- 2026-05-29T05-17-54Z__index-html.md
+- 2026-05-29T08-30-33Z__index-html.md
+- 2026-06-03T13-12-43Z__index-html.md
+- 2026-05-29T05-17-54Z__index-html.md
+- 2026-05-29T08-30-33Z__index-html.md
+- 2026-06-03T13-12-43Z__index-html.md
+- CLAUDE.md — Simatrix · [Subject Name] · [Module/Topic Name]
+- CLAUDE.md — Simatrix: Understanding Orthographic Views
+- intro.js
+- Changelog — Understanding Orthographic Views
+- problems.js
+- foundationSteps.js
+- DESIGN.md — Module 1 Topic 1: Engineering Graphics Foundations (topic appendix)
+- onboarding.js
 - Changelog
 - Changelog
 - Changelog
-- Changelog
-- Changelog
-- Architecture Decisions ADR Note
-- Points Changelog
-- Module 2 2026-06-01T14-57-13Z__Index-Html
-- Module 2 Lesson Page UI
-- Module 2 Lesson Page UI
-- Product Spec Product Notes
-- Changelog
-- Changelog
-- Changelog
-- Changelog
-- Changelog
-- Changelog
-- Architecture Decisions ADR Note
-- Architecture Decisions ADR Note
-- Architecture Decisions ADR Note
-- Design System Design Notes
-- Design System Design Notes
-- Design System Design Notes
-- Design System Design Notes
-- Design System Design Notes
-- Design System Design Notes
-- Design System Design Notes
-- Design System Design Notes
-- Design System Design Notes
-- Foundations Changelog
-- Foundations Lesson Page UI
-- Spatial Framework Changelog
-- Spatial Framework Changelog
-- Points Lesson Page UI
-- Intro to Solids Changelog
-- Simple Positions Changelog
-- Module 2 Changelog
-- Module 2 Module Guide
-- Module 2 Module Guide
-- Module 2 Design Notes
-- Module 2 Design Notes
-- Module 2 Design Notes
-- Module 2 Design Notes
-- Module 2 Design Notes
-- Module 2 Lesson Page UI
-- Module 2 Lesson Page UI
-- Module 2 Lesson Page UI
-- Platform Rules
+- frameDefault
+- Unity to Three.js sign re-derivation gotcha
+- Changelog — Simatrix Starter Template
+- Textbook Problem Library
+- Guided Stepper (step rail + step card)
+- CLAUDE.md
+- Boot Watchdog + WebGL Fallback
+- genericSolid.js (Shared Polygon Trigonometry)
+- Sandboxed iframe Boundary
+- Master to Deploy Relationship
+- meshAnalyzer.js (Edge Welding)
+- meta.json Four-Field Metadata Contract
+- Module 1 (Foundations of Projection)
+- Module 2 (Master — Orthographic Projection of Solids)
+- No-Build Pinned-CDN ES-Module Contract
+- Orchestrator + Leaf-Modules Pattern
+- graphics_module_1_topic_3_points
+- projectionDrawer.js (Orthographic Projections + Dimensions)
+- Single rebuild() Pipeline
+- Shared engine.js + Thin Pages Pattern
+- window.simAPI Host Contract (pause/resume/reset)
+- Simatrix Teaching Platform
+- graphics_module_1_topic_2_spatial_framework
+- three-mesh-bvh (Occlusion Raycaster Acceleration)
+- graphics_module_2_topic_1_introduction (deployed copy)
+- graphics_module_2_topic_2_simple_positions (deployed copy)
+- CHANGELOG.md (Root Changelog)
+- ADR-001: No build step; pinned CDN ES modules
+- ADR-002: Host integration via window.simAPI, not postMessage
+- ADR-003: CSS design tokens are the single runtime source of truth
+- ADR-004: Every geometry change funnels through one rebuild() pipeline
+- ADR-005: Re-derive ported signs visually; explicit ZXY Euler
+- ADR-006: Fat lines + hard-edge geometry + quantized edge welding
+- ADR-007: Orchestrator + leaf modules; only genericSolid shared
+- ADR-008: Rotation priority hierarchy via mutually-exclusive UI
+- ADR-009: No shared library; topic clones are manual full copies
+- ADR-010: DESIGN.shared.md duplicated per module (superseded)
+- ADR-011: Module 1 uses shared engine.js + thin pages (superseded)
+- ADR-012: On-demand Compare View replaced persistent dual-pane
+- ADR-013: The fold camera moves (revised, then re-overturned)
+- ADR-020: 'Simple Positions' carries no topic number; folder names hide the master
+- ADR-022: Platform design system centralized into one root DESIGN.md
+- ADR-023: PRODUCT.md centralized into one root file
+- ADR-024: Topic folders named graphics_module_M_topic_K_slug
+- ADR-025: New subject picks its template by geometry (M2=3D, M1=2D)
+- ADR-029: Foundations adopts orchestrator pattern, retains meshAnalyzer
+- ADR-030: three-mesh-bvh via CDN import map accelerates occlusion
+- ADR-031: rAF-throttle on-orbit hidden-line update, never debounce
+- ADR-033: Module 1 fully adopts orchestrator pattern platform-wide
+- ADR-036: Restore front-on ortho camera swoop during the fold
+- ADR-037: Points Compare gains a standalone 50/50 workbench
+- ADR-038: 2D Compare drawing is a fixed sheet-locked scale
+- ADR-039: Repository flattening into one unified monorepo
+- ADR-040: Cool-neutral clinical palette remap
+- ADR-041: Split HP/VP dimension groups + filled BIS arrowheads
+- DECISIONS.md (ADR Log)
+- Border-Over-Shadow Rule
+- Chrome-Only Blue Rule
+- DESIGN.md (Platform Design System)
+- Flat-Ink Rule
+- Cinematic Fold-to-Flat Animation
+- Host-Integration White Exception (retired)
+- North Star: The Patient Tutor's Paper
+- Quiet Chrome Rule
+- Tabular Rule
+- CSS Design-Token System (single runtime source of truth)
+- Two-Cue Rule
+- Two-Weight Rule
+- DOCUMENTATION-SYSTEM.md — Six-File Documentation Methodology
+- Hidden-Line Occlusion Raycaster
+- Line Classification Fixes
+- ADR-029 (Foundations on Module 2 orchestrator; retains meshAnalyzer; overturns ADR-011 for this topic)
+- Camera-Dependent Hidden-Line Classification (occlusion raycaster + BVH)
+- BIS Line Types (SP 46:2003 — Type A / E-F / G / B)
+- HP/VP Plane Pair
+- Spatial Quadrant Label Layer
+- Point Projector Rig
+- Rabattement Fold (Flatten-to-2D)
+- Transition Cross-Fades
+- ADR-033 (Module 1 remaining topics adopt Module 2 orchestrator pattern)
+- Four Quadrants (HP/VP intersection)
+- Rabattement Fold (HP hinges flat onto VP about the XY line)
+- Compare Workbench
+- Fold Swoop
+- Points Quadrant Numeral Occlusion
+- Ortho Orbit Lock
+- Dual-Camera Ortho Quick-Views
+- Projection of a Point (onto HP/VP across four quadrants)
+- Base vertices
+- Central axis OP
+- Surface generators
+- Shared 3D engine (shape generators + vertexLabeler)
+- Solid anatomy (parts of solids)
+- Base orientation / Orient to corner preset
+- meshAnalyzer quantized edge welding
+- rebuild() single-path disposal contract
+- Resting plane choice (HP / VP)
+- window.simAPI platform contract
+- Simple positions pose model
+- Unity to Three.js sign re-derivation gotcha
+- Impeccable critique 2026-05-29T05:17 (score 32, 3 P1s)
+- Impeccable critique 2026-05-29T08:30 (score 37, post-fixes)
+- Impeccable critique 2026-06-01T14:57 (score 34)
+- Impeccable critique 2026-06-03T13:12 (Practice-problems button, score 28)
+- Accent blue vs HP projection blue collision (P1)
+- font-weight 600 Two-Weight Rule violation (P2)
+- Unanchored Practice-problems entry button (P1)
+- Unconfirmed one-click Reset wipe (P1)
+- Silent unfold-on-edit (visibility gap, P1)
+- Implemented tokens drift from DESIGN.md (P1)
+- Chrome-Only Blue Rule
+- HP Teal (#007f7c, solid HP projection)
+- Inline Term Definition component
+- PP Violet (#7a5ea6, profile plane projection)
+- Quiet Chrome Rule
+- Step Rail component (progress spine)
+- Technical Blue accent (#1f66b5)
+- Two-Cue Rule
+- Two-Weight Rule (Atkinson 400/700 only)
+- VP Amber (#bc5d1e, dashed VP projection)
+- Guided Stepper platform direction
+- Struggling first-year primary persona
+- WCAG 2.2 AA accessibility commitments
+- Impeccable Critique — Projection of Points Sim (2026-05-30, 35/40)
+- Impeccable Critique — lines.html Projection of Straight Lines (2026-06-02, 32/40)
+- Impeccable Critique — index.html Lesson 1 Two Reference Planes (2026-06-13, 38/40)
+- Lines Side-by-Side Compare Split
+- Lines 5-Step Problem-Solving Stepper
+- N.D. Bhatt / K.C. John Textbook Problem Sets
+- HT/VT Trace Markers
+- Cinematic Reversible Fold / Rabatment Animation
+- Module 1 CLAUDE.md — EG Foundations (seven shared-frame lessons)
+- Quadrant Sign Convention (resolvePosition sign table)
+- Module 1 DESIGN.md — Premium Interaction Layer
+- Dimensioning (three parts of a dimension; aligned vs unidirectional)
+- First-Angle Projection & the Fold (SP 46:2003 / BIS)
+- The Two Reference Planes (HP + VP meeting at the xy fold line)
+- Standard Line Types (visible / hidden / centre / dimension)
+- Projection of Points (p top view, p′ front view)
+- The Four Dihedral Quadrants
+- Impeccable Critique — Module 2 index.html (2026-05-29 v1, 32/40)
+- Impeccable Critique — Module 2 index.html post-fixes (2026-05-29 v2, 37/40)
+- Impeccable Critique — Practice Problems Entry Positioning (2026-06-03, 28/40)
+- meshAnalyzer.js Quantized Edge Welding (1e-3 canonical keys)
+- Module 2 Orchestrator + Leaf-Module Pattern (star topology)
+- Orthographic Projection of Solids (HP/VP/PP views)
+- HP Teal (Horizontal Plane / top-view encoding)
+- Inline Term Definition (dotted-underline term popover)
+- The Patient Tutor's Paper (Creative North Star)
+- PP Violet (Profile Plane / side-view encoding)
+- Quiet Chrome Rule (blue accent <=10% of chrome)
+- Two-Cue Rule (no color carries meaning alone)
+- Two-Weight Rule (Atkinson ships 400/700 only)
+- VP Amber (Vertical Plane / front-view encoding)
+- CLAUDE.module-template.md (New-Subject Starter)
+- MODULE-STARTER.md (New-Sim Playbook)
+- PLATFORM-RULES.md (Subject-Agnostic Rules)
+- template_starter (Stripped Boilerplate Scaffold)
+- Anti-References (Product Boundaries)
+- Compare View
+- Seven Core Design Principles
+- meta.json (topic metadata)
+- Guided Stepper
 
 ## God Nodes (most connected - your core abstractions)
-1. `$()` - 29 edges
-2. `asg()` - 28 edges
-3. `rebuild()` - 26 edges
-4. `alb()` - 25 edges
-5. `wire()` - 25 edges
-6. `announce()` - 20 edges
-7. `buildTraceScene()` - 19 edges
-8. `albBox()` - 19 edges
-9. `buildTLScene()` - 17 edges
-10. `alp()` - 17 edges
+1. `Simatrix — Decisions (ADR Log)` - 51 edges
+2. `$()` - 29 edges
+3. `asg()` - 28 edges
+4. `rebuild()` - 26 edges
+5. `alb()` - 25 edges
+6. `wire()` - 25 edges
+7. `Changelog` - 25 edges
+8. `Changelog` - 23 edges
+9. `buildTraceScene()` - 20 edges
+10. `announce()` - 20 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `Module 2 Topic 1 DESIGN (Guided Stepper design system)` --semantically_similar_to--> `Module 2 Topic 2 DESIGN (Guided Stepper design system)`  [INFERRED] [semantically similar]
-  graphics_module_2_topic_1_introduction/DESIGN.md → graphics_module_2_topic_2_simple_positions/DESIGN.md
-- `Orthographic Projection of Solids (HP/VP/PP views)` --semantically_similar_to--> `Projection of a Point (onto HP/VP across four quadrants)`  [INFERRED] [semantically similar]
-  Module2/CLAUDE.md → graphics_module_1_topic_3_points/CLAUDE.md
-- `Module 2 Topic 1 CLAUDE (Introduction to Solids)` --semantically_similar_to--> `Module 2 Topic 2 CLAUDE (Simple Positions / Orthographic Projection)`  [INFERRED] [semantically similar]
-  graphics_module_2_topic_1_introduction/CLAUDE.md → graphics_module_2_topic_2_simple_positions/CLAUDE.md
-- `Lines 2D Compare Sheet-Locked Scale` --semantically_similar_to--> `Points/Lines Auto-Zoom Framing`  [INFERRED] [semantically similar]
-  CHANGELOG.md → Module1/CHANGELOG.md
-- `Dual-Camera Ortho Quick-Views` --semantically_similar_to--> `Front View Projection Morph`  [INFERRED] [semantically similar]
-  graphics_module_1_topic_3_points/CHANGELOG.md → graphics_module_1_topic_1_foundations/CHANGELOG.md
+- `Projection of a Point` --semantically_similar_to--> `Orthographic Projection`  [INFERRED] [semantically similar]
+  graphics_module_1_topic_3_points/index.html → Module2/index.html
+- `Simple Positions lesson` --semantically_similar_to--> `Orthographic Projection of Solids (Module 2 master lesson)`  [INFERRED] [semantically similar]
+  graphics_module_2_topic_2_simple_positions/index.html → Module2/index.html
+- `initUIManager()` --indirect_call--> `armReset()`  [INFERRED]
+  graphics_module_1_topic_3_points/src/uiManager.js → Module1/src/engine.js
+- `initUIManager()` --indirect_call--> `armReset()`  [INFERRED]
+  graphics_module_2_topic_2_simple_positions/src/uiManager.js → Module1/src/engine.js
+- `initUIManager()` --indirect_call--> `armReset()`  [INFERRED]
+  Module2/src/uiManager.js → Module1/src/engine.js
 
 ## Import Cycles
 - None detected.
 
 ## Hyperedges (group relationships)
-- **The named colour rules (binding everywhere)** — design_quiet_chrome_rule, design_chrome_only_blue_rule, design_two_cue_rule [EXTRACTED 0.90]
-- **Module 1's migration from shared-engine to the orchestrator pattern** — decisions_adr_007_orchestrator_leaf_modules, decisions_adr_011_module1_shared_engine, decisions_adr_029_foundations_orchestrator_hidden_line, decisions_adr_033_module1_orchestrator_migration [EXTRACTED 0.85]
-- **Centralization of shared docs into the Simatrix root** — decisions_adr_010_design_shared_md, decisions_adr_022_centralized_design_md, decisions_adr_023_centralized_product_md, decisions_adr_028_new_topic_consumes_root_docs [EXTRACTED 0.90]
-- **ADR-032 Quiet Chrome Scrollbar System** — product_quiet_chrome_principle, changelog_quiet_chrome_scrollbar, module2_changelog_scrollbar, module1_changelog_scrollbar_pill [INFERRED 0.85]
-- **Compare Split Workbench System** — product_compare_view, product_lines_workbench, changelog_points_compare_workbench, module1_changelog_lines_compare_split [INFERRED 0.80]
-- **3D-to-2D Fold System** — product_fold_animation, changelog_fold_swoop, module1_changelog_fold_swoop [INFERRED 0.85]
-- **ADR-032 Quiet Chrome Scrollbar Backport** — graphics_module_1_topic_1_foundations_changelog_quiet_chrome_scrollbar, graphics_module_1_topic_2_spatial_framework_changelog_quiet_chrome_scrollbar, graphics_module_2_topic_1_introduction_changelog_quiet_chrome_scrollbar, graphics_module_2_topic_2_simple_positions_changelog_quiet_chrome_scrollbar [INFERRED 0.80]
-- **Dual-Camera Projection Morph (flatten / quick-views)** — graphics_module_1_topic_1_foundations_changelog_front_view_morph, graphics_module_1_topic_2_spatial_framework_changelog_rabattement_fold, graphics_module_1_topic_3_points_changelog_ortho_quick_views, graphics_module_1_topic_3_points_changelog_fold_swoop [INFERRED 0.75]
-- **Module-2 Guided Stepper Pattern** — graphics_module_1_topic_1_foundations_index_line_type_wizard, graphics_module_1_topic_2_spatial_framework_changelog_stepper, graphics_module_1_topic_3_points_index_points_wizard, graphics_module_2_topic_2_simple_positions_index_projection_wizard [INFERRED 0.75]
-- **Cinematic Reversible Fold / Rabatment System (First-angle, Points, Lines)** — module1_claude_fold_rabatment, module1_firstangle_first_angle_projection, module1_points_projection_of_points, module1_lines_projection_of_straight_lines [INFERRED 0.85]
-- **The Simatrix Six-File Documentation System** — architecture_map, decisions_adr_log, design_platform_design_system, module_starter_playbook, documentation_system_methodology, claude_module_template_starter [EXTRACTED 0.90]
-- **DESIGN.md Named Rules System** — module2_design_quiet_chrome_rule, module2_design_chrome_only_blue_rule, module2_design_two_cue_rule, module2_design_two_weight_rule, module2_design_tabular_rule, module2_design_flat_ink_rule, module2_design_border_over_shadow_rule, module2_design_host_integration_white_exception [EXTRACTED 0.90]
-- **Foundations BIS Line-Type Lesson (Bearing Block)** — graphics_module_1_topic_1_foundations_claude_bearing_block, graphics_module_1_topic_1_foundations_design_bis_line_types, graphics_module_1_topic_1_foundations_claude_hidden_line_classification, module2_claude_meshanalyzer_welding [EXTRACTED 0.85]
-- **Two-Cue plane colour encoding (teal HP / amber VP / violet PP)** — graphics_module_2_topic_2_simple_positions_design_two_cue_rule, graphics_module_2_topic_2_simple_positions_design_hp_teal, graphics_module_2_topic_2_simple_positions_design_vp_amber, graphics_module_2_topic_2_simple_positions_design_pp_violet [EXTRACTED 0.90]
-- **Iterative design-critique sequence on index.html** — graphics_module_2_topic_2_simple_positions_critique_2026_05_29_0517, graphics_module_2_topic_2_simple_positions_critique_2026_05_29_0830, graphics_module_2_topic_2_simple_positions_critique_2026_06_01_1457, graphics_module_2_topic_2_simple_positions_critique_2026_06_03_1312, graphics_module_2_topic_2_simple_positions_index [INFERRED 0.80]
+- **Guided Stepper pattern shared across the guided lessons** — module2_index_guided_stepper, module2_index_page, graphics_module_1_topic_1_foundations_index_page, graphics_module_1_topic_2_spatial_framework_index_page, graphics_module_1_topic_3_points_index_page, graphics_module_2_topic_2_simple_positions_index_page [INFERRED 0.85]
+- **HP, VP and PP form the orthographic reference-plane framework** — graphics_module_1_topic_2_spatial_framework_index_horizontal_plane, graphics_module_1_topic_2_spatial_framework_index_vertical_plane, graphics_module_1_topic_3_points_index_profile_plane, graphics_module_1_topic_2_spatial_framework_index_four_quadrants [INFERRED 0.85]
+- **BIS line types A / E-F / G / B form the line-type taxonomy** — graphics_module_1_topic_1_foundations_index_type_a, graphics_module_1_topic_1_foundations_index_type_ef, graphics_module_1_topic_1_foundations_index_type_g, graphics_module_1_topic_1_foundations_index_type_b, graphics_module_1_topic_1_foundations_index_bis_line_types [INFERRED 0.85]
 
-## Communities (142 total, 56 thin omitted)
+## Communities (345 total, 210 thin omitted)
 
-### Community 0 - "Module 1 Engine Core"
-Cohesion: 0.05
-Nodes (101): $(), rebuildFromEdit(), animateFold(), animateFoldSwoop(), announce(), announceState(), applyProjectionMorph(), area (+93 more)
+### Community 0 - "First-Angle Projection Scene"
+Cohesion: 0.07
+Nodes (46): animate(), applyMode(), applyProjectionMorph(), buildScene(), computeEffectiveAngles(), createEdgeOverlay(), cssColor(), cssVar() (+38 more)
 
-### Community 1 - "Module 2 Sim Orchestrator"
-Cohesion: 0.05
-Nodes (82): animate(), animateFold(), announce(), answerSheetBox(), applyFoldVisual(), applyMode(), applyProfilePlaneVisibility(), applyProjectionMorph() (+74 more)
-
-### Community 2 - "Simple Positions Sim"
-Cohesion: 0.05
-Nodes (80): animate(), animateFold(), announce(), answerSheetBox(), applyFoldVisual(), applyMode(), applyProfilePlaneVisibility(), applyProjectionMorph() (+72 more)
-
-### Community 3 - "Foundations Sim & Annotations"
+### Community 1 - "Fold Animation Engine"
 Cohesion: 0.06
-Nodes (61): ARROW, buildSegments(), CHAIN, createAnnotations(), cssColor(), ADR-0007, ADR-0018, pushArrowTriangle() (+53 more)
+Nodes (48): animate(), applyDimensionVisibility(), applyMode(), applyProjectionMorph(), buildScene(), computeEffectiveAngles(), contentBox(), createEdgeOverlay() (+40 more)
 
-### Community 4 - "Cross-Module Orchestrator Docs"
-Cohesion: 0.05
-Nodes (53): Foundations (Topic 1) CLAUDE.md — Bearing Block plan, ADR-029 (Foundations on Module 2 orchestrator; retains meshAnalyzer; overturns ADR-011 for this topic), Foundations (Topic 1) DESIGN.md appendix — BIS line-type map, Spatial Framework (Topic 2) CLAUDE.md, ADR-033 (Module 1 remaining topics adopt Module 2 orchestrator pattern), Projection of Points (Topic 3) CLAUDE.md, Module 2 Topic 1 CLAUDE (Introduction to Solids), Shared 3D engine (shape generators + vertexLabeler) (+45 more)
+### Community 2 - "Projection Orchestrator"
+Cohesion: 0.17
+Nodes (37): buildAnimScene(), draw3D(), drawStage(), firstAngleSymbol(), SYM, draw3D(), angle3(), buildAnimScene() (+29 more)
 
-### Community 5 - "Points Sim & Fold"
+### Community 3 - "Annotations & Arrow Meshes"
+Cohesion: 0.07
+Nodes (42): animate(), announce(), buildScene(), cssColor(), cssVar(), DEFAULT_CAMERA_POSITION, DEFAULT_CAMERA_TARGET, disposeObj() (+34 more)
+
+### Community 4 - "Module Docs & ADRs"
+Cohesion: 0.09
+Nodes (43): arc(), asgBold(), beginConScene(), buildTLScene(), buildTraceScene(), CALM_GRID, clamp01(), computeTraces() (+35 more)
+
+### Community 5 - "Scene Boot & Camera"
+Cohesion: 0.07
+Nodes (37): ADR-0021, CAMERA_POSE, commit(), compare, contentBoxWorld(), currentData, currentView, disposeContent() (+29 more)
+
+### Community 6 - "Solid Geometry Generators"
 Cohesion: 0.06
-Nodes (32): ADR-0012, ADR-0013, ADR-0021, animate(), applyProjectionMorph(), CAMERA_POSE, compare, currentData (+24 more)
+Nodes (38): ADR-0038, ADR-0045, ADR-0047, ADR-0050, index.html — Understanding Orthographic Views, animate(), boundHalf, buildScene() (+30 more)
 
-### Community 6 - "Module 1 First-Angle Projection"
-Cohesion: 0.12
-Nodes (29): buildAnimScene(), draw3D(), firstAngleSymbol(), SYM, conMarker(), buildAnimScene(), draw3D(), QNAME (+21 more)
-
-### Community 7 - "Module 2 Solid Geometry Core"
+### Community 7 - "Engineering Graphics Concepts"
 Cohesion: 0.10
-Nodes (30): buildConeGeometry(), createCone(), cssColor(), rootStyle, createCube(), cssColor(), rootStyle, buildCylinderGeometry() (+22 more)
+Nodes (31): createSolidMesh(), buildConeGeometry(), createCone(), cssColor(), rootStyle, createCube(), cssColor(), rootStyle (+23 more)
 
-### Community 8 - "Architecture Decisions (ADRs)"
+### Community 8 - "Edge Overlay & Layers"
 Cohesion: 0.08
-Nodes (35): ADR-001: No build step; ship pinned CDN ES modules, ADR-004: Every geometry change funnels through one rebuild() pipeline, ADR-005: Re-derive every ported sign visually (Unity LH -> Three.js RH), explicit ZXY Euler, ADR-006: Fat lines + hard-edge geometry + quantized edge welding for crisp technical linework, ADR-007: Orchestrator + leaf modules; leaves don't cross-import, only genericSolid is shared, ADR-008: Rotation priority hierarchy enforced through mutually-exclusive UI, ADR-009: No shared code library; topic clones are manual full copies simplified from Module 2 (the master), ADR-010: DESIGN.shared.md is the platform-wide visual contract, duplicated per module (interim) (+27 more)
+Nodes (33): announce(), applyFadeLevels(), buildScene(), CAMERA_POSE, commit(), cssColor(), cueOrthoLock(), currentData (+25 more)
 
-### Community 9 - "Intro to Solids Sim"
+### Community 9 - "Camera Framing & Solids"
+Cohesion: 0.06
+Nodes (34): 1. Purpose and scope of this file, 2.1 The token table (verified against code), 2.2 Module-1 construction-aid encodings (Lines sim), 2.3 The named colour rules (binding everywhere), 2. Color system, 3.1 Where the fonts are hosted, 3.2 When each font is used (hierarchy), 3.3 The named type rules (+26 more)
+
+### Community 10 - "Solid Generators (clone)"
+Cohesion: 0.12
+Nodes (34): Bearing Block (split plummer / pillow block), BIS Line Types (SP 46:2003), Dimensioning System (Aligned vs Unidirectional), Camera-Dependent Edge Classification (visible vs hidden, meshAnalyzer + BVH raycaster), Engineering Graphics Foundations lesson, Type A — Continuous Wide (visible edges), Type B — Continuous Narrow (dimensions/leaders), Type E/F — Dashed (hidden edges) (+26 more)
+
+### Community 11 - "Platform Design System"
+Cohesion: 0.12
+Nodes (27): createSolidMesh(), buildConeGeometry(), createCone(), cssColor(), rootStyle, createCube(), cssColor(), rootStyle (+19 more)
+
+### Community 12 - "ADR Index & Compare View"
+Cohesion: 0.06
+Nodes (38): active, cancelAll(), easeDissolve, easeDraw, easeFold, easeStandard, tick(), injectCardChrome() (+30 more)
+
+### Community 13 - "Dimensioning & Line Types"
 Cohesion: 0.12
 Nodes (31): animate(), announce(), buildScene(), createEdgeOverlay(), cssColor(), cssVar(), DEFAULT_CAMERA_POSITION, DEFAULT_CAMERA_TARGET (+23 more)
 
-### Community 10 - "Simple Positions Solid Generators"
-Cohesion: 0.12
-Nodes (26): buildConeGeometry(), createCone(), cssColor(), rootStyle, createCube(), cssColor(), rootStyle, buildCylinderGeometry() (+18 more)
+### Community 14 - "Fold Camera Choreography"
+Cohesion: 0.06
+Nodes (32): 3.10 Register the topic in `ARCHITECTURE.md`, 3.1 Name the folder, 3.2 Duplicate `template_starter/`, then restore the solids, 3.3 File-by-file: keep exactly as copied (the shared contracts), 3.4 File-by-file: adapt (the topic-specific content), 3.5 File-by-file: create fresh (only if your topic needs them), 3.6 Update `meta.json` (every field), 3.7 Update the new folder's `CLAUDE.md` (the pointer to root docs) (+24 more)
 
-### Community 11 - "Module 1 Lines & Traces"
-Cohesion: 0.13
-Nodes (28): beginConScene(), buildTLScene(), buildTraceScene(), CALM_GRID, clamp01(), computeTraces(), conLabel(), conLine() (+20 more)
+### Community 15 - "Projection Drawer"
+Cohesion: 0.06
+Nodes (32): 3.10 Register the topic in `ARCHITECTURE.md`, 3.1 Name the folder, 3.2 Copy the master, whole, 3.3 File-by-file: keep exactly as copied (the shared contracts), 3.4 File-by-file: adapt (the topic-specific content), 3.5 File-by-file: create fresh (only if your topic needs them), 3.6 Update `meta.json` (every field), 3.7 Update the new folder's `CLAUDE.md` (the pointer to root docs) (+24 more)
 
-### Community 12 - "Module 1 Dimensioning"
+### Community 16 - "Projection Drawer (clone)"
 Cohesion: 0.13
 Nodes (21): $(), afterRebuild(), draw3D(), FEEDBACK, mark(), wireControls(), draw3D(), FOCUS (+13 more)
 
-### Community 13 - "Spatial Framework Fold"
+### Community 17 - "UI Manager & Sliders"
+Cohesion: 0.06
+Nodes (30): A Reusable Methodology for Solo and Small-Team Software Projects, ARCHITECTURE.md — The Map, CLAUDE.module-template.md — The New-Family Starter, DECISIONS.md — The Diary, DESIGN.md — The Visual Contract, How CLAUDE.md Connects Everything, MODULE-STARTER.md — The Onboarding Playbook, PLATFORM-RULES.md — The Subject-Agnostic Foundation (+22 more)
+
+### Community 18 - "Solid Mesh Builder"
+Cohesion: 0.12
+Nodes (24): tick(), createLabelLayer(), ADR-0007, animate(), applyProjectionMorph(), buildScene(), cssColor(), exitFrontViewSmooth() (+16 more)
+
+### Community 19 - "HP/VP Planes"
+Cohesion: 0.07
+Nodes (29): 1. Overview, 2. Colors, 3. Typography, 4. Elevation, 5. Components, 6. Do's and Don'ts, Buttons, Cards / Containers (+21 more)
+
+### Community 20 - "Point Rig"
+Cohesion: 0.07
+Nodes (29): 1. Overview, 2. Colors, 3. Typography, 4. Elevation, 5. Components, 6. Do's and Don'ts, Buttons, Cards / Containers (+21 more)
+
+### Community 21 - "HP/VP Planes (clone)"
+Cohesion: 0.07
+Nodes (29): 1. Overview, 2. Colors, 3. Typography, 4. Elevation, 5. Components, 6. Do's and Don'ts, Buttons, Cards / Containers (+21 more)
+
+### Community 22 - "Point Rig (clone)"
+Cohesion: 0.07
+Nodes (26): 2D drawing conventions (after HP unfolds 90° about the X fold line), 2D sign logic per quadrant, 3D scene conventions (right-handed, Y-up — Three.js default), Architecture (non-negotiable), Cinematic camera (this OVERTURNS the old "camera never moves during the fold" rule), Cinematic reversible fold animation (fold ⇄ unfold, camera sweeps square-on), CLAUDE.md — Simatrix Engineering Graphics · Module 1, Colour convention (platform functional encodings — read from CSS tokens) (+18 more)
+
+### Community 23 - "CLAUDE"
 Cohesion: 0.08
-Nodes (17): CAMERA_POSE, currentData, currentView, fadeOutMembers, fadeState, FLAT_VIEW_DIR, FLAT_VIEW_UP, ADR-0004 (+9 more)
+Nodes (25): 2026-06-29, 2026-06-30, 2026-06-30 (Phase 2 — logic & interactivity), 2026-06-30 (Phase 3.1 — restore dashed hidden lines, keep X-ray), 2026-06-30 (Phase 3.2 — persistent X-ray, seam & hidden-line fixes), 2026-06-30 (Phase 3 — projection morph, X-ray overhaul & UI parity), 2026-07-01 (Completion-state cleanup + Back-button parity), 2026-07-01 (Content & Pedagogy Upgrade — foundations content model) (+17 more)
 
-### Community 14 - "Product Feature Set"
-Cohesion: 0.09
-Nodes (23): 3D-to-2D Orthographic Fold Swoop, Points Compare-Split Workbench, Points/Lines Fold Swoop (Module 1), Lines Side-by-Side Compare Split, Lines 5-Step Problem-Solving Stepper, N.D. Bhatt / K.C. John Textbook Problem Sets, HT/VT Trace Markers, Impeccable Critique — Practice Problems Entry Positioning (2026-06-03, 28/40) (+15 more)
+### Community 24 - "PRODUCT"
+Cohesion: 0.14
+Nodes (24): addIfPresent(), addSegment(), buildArrowMesh(), buildSegments(), classifyEdge(), cssColor(), DASH, drawProjections() (+16 more)
 
-### Community 15 - "Module 1 Lesson Docs"
-Cohesion: 0.13
-Nodes (21): ARCHITECTURE.md — Simatrix Architecture Map, Master → Deploy Relationship (Module 2 is the master), CLAUDE.module-template.md — New-Subject CLAUDE.md Starter, DOCUMENTATION-SYSTEM.md — Six-File Documentation Methodology, Impeccable Critique — Projection of Points Sim (2026-05-30, 35/40), Impeccable Critique — lines.html Projection of Straight Lines (2026-06-02, 32/40), Impeccable Critique — index.html Lesson 1 Two Reference Planes (2026-06-13, 38/40), Cinematic Reversible Fold / Rabatment Animation (+13 more)
+### Community 25 - "genericSolid"
+Cohesion: 0.14
+Nodes (24): addIfPresent(), addSegment(), buildArrowMesh(), buildSegments(), classifyEdge(), cssColor(), DASH, drawProjections() (+16 more)
 
-### Community 16 - "Module 1 Lines Engine"
-Cohesion: 0.27
-Nodes (21): drawStage(), draw3D(), angle3(), arc(), asgBold(), buildAnimScene(), draw2D(), draw3D() (+13 more)
+### Community 26 - "ARCHITECTURE"
+Cohesion: 0.08
+Nodes (23): 2026-07-02 (3D content: planes, point, cinematic fold), 2026-07-02 (Data layer + registration), 2026-07-02 (Guided stepper), 2026-07-02 (Scaffold), 2026-07-03 (CSS2D label layer — topic complete), 2026-07-03 (Dock removal + full-height step rail — Module 2 convergence), 2026-07-03 (Param-control relocation + step-name trim — UI regression fix), 2026-07-03 (Step-rail button layout — narrow-rail fix) (+15 more)
 
-### Community 17 - "Intro Solid Generators"
+### Community 27 - "frustums"
+Cohesion: 0.11
+Nodes (28): easeCamera, animateFold(), announceState(), beginOverlay(), buildCtx(), declutterChipLabels(), fill(), foldBack() (+20 more)
+
+### Community 28 - "lineDrawer"
+Cohesion: 0.15
+Nodes (28): $(), rebuildFromEdit(), announce(), closeTerm(), cueOrthoLock(), disarmReset(), editRebuild(), enterWorkbench() (+20 more)
+
+### Community 29 - "main"
+Cohesion: 0.22
+Nodes (20): answerSheetBox(), clearProjectionMorph(), contentBox(), engageOrtho(), fitOrthoZoom(), fitPerspectiveDistance(), flattenedViewBox(), frameToSolid() (+12 more)
+
+### Community 30 - "main"
+Cohesion: 0.14
+Nodes (12): init(), markBooted(), setupConnectorToggle(), setupMobileNotice(), initOnboarding(), SPOTLIGHTS, TONE_CLASSES, initTerms() (+4 more)
+
+### Community 31 - "main"
+Cohesion: 0.14
+Nodes (20): announce(), applyCompareSize(), completeAndNext(), drawCompare(), ensureWorkbenchRail(), enterWorkbench(), exitWorkbench(), handleResize() (+12 more)
+
+### Community 32 - "main"
+Cohesion: 0.11
+Nodes (18): 2026-07-06, 2026-07-06 (Phase 2 — pipeline rewire), 2026-07-07 (Phase 3 fixes — ADR compliance), 2026-07-07 (Phase 3 — UI shell, guided sequence, labels), 2026-07-07 (Phase 4 — Problem Library + textbook problem sets), 2026-07-07 (Phase 5 — final polish: line conventions, quick-views, leak cert), 2026-07-08 (Dual-camera ortho quick-views — enforce RULES.md §5.18), 2026-07-08 (Phase 6 — UI/UX polish: quadrant grid, negative PP, Compare mirrors lateral) (+10 more)
+
+### Community 33 - "problems"
 Cohesion: 0.19
 Nodes (15): createSolidMesh(), buildConeGeometry(), createCone(), cssColor(), rootStyle, createCube(), cssColor(), rootStyle (+7 more)
 
-### Community 18 - "Simple Positions 2D Drawer"
-Cohesion: 0.18
-Nodes (18): addIfPresent(), addSegment(), buildSegments(), classifyEdge(), cssColor(), DASH, drawProjections(), EdgeType (+10 more)
+### Community 34 - "problems"
+Cohesion: 0.21
+Nodes (13): animateFold(), applyDimensionVisibility(), applyFoldVisual(), applyProfilePlaneVisibility(), disposeActiveProjection(), refreshProjections(), setDimensionsVisible(), setObjectOpacity() (+5 more)
 
-### Community 19 - "Module 2 2D Projection Drawer"
-Cohesion: 0.18
-Nodes (18): addIfPresent(), addSegment(), buildSegments(), classifyEdge(), cssColor(), DASH, drawProjections(), EdgeType (+10 more)
-
-### Community 20 - "Spatial Framework Changelog & UI"
+### Community 35 - "DECISIONS"
 Cohesion: 0.12
-Nodes (18): Bearing Block Model, Front View Projection Morph, Hidden-Line Occlusion Raycaster, Line Classification Fixes, Orbitable Bearing Block Viewport, Turn 90 Viewport Chip, HP/VP Plane Pair, Spatial Quadrant Label Layer (+10 more)
+Nodes (15): How to add a rule, How to read a rule, Preamble, Section 1 — Master Codebase & Deployment Rules, Section 2 — Platform & Runtime Rules, Section 3 — 3D Scene & Architecture Rules, Section 4 — UI & Visual Rules (Cross-Module Standards), Section 5 — Camera & Animation Rules (+7 more)
 
-### Community 21 - "Module 1 Lines & Traces"
+### Community 36 - "anim"
+Cohesion: 0.16
+Nodes (17): applyObserverView(), assembleScene(), bufferResolution(), buildObserver(), clearSightLines(), cssColor(), cssVar(), disposeObj() (+9 more)
+
+### Community 37 - "anim"
+Cohesion: 0.11
+Nodes (17): Card geometry & facade, Chrome-injection contract, Cinematic fold camera, Compare View contract, Compare workbench (Lines — `cfg.workbenchControls`), CSS keyframes, DESIGN.md — Module 1 Premium Interaction Layer, Dual-camera orchestrator (Points / Lines — `cfg.orthoViews`) (+9 more)
+
+### Community 38 - "main"
 Cohesion: 0.27
 Nodes (17): $(), applyTLState(), enterTL(), enterTrace(), exitCon(), pauseTL(), playTL(), runConAnim() (+9 more)
 
-### Community 22 - "Points HP/VP Planes"
+### Community 39 - "main"
+Cohesion: 0.24
+Nodes (11): $(), syncUI(), HPVT(), QNAME, sync(), VPVT(), wireControls(), setNote() (+3 more)
+
+### Community 40 - "anim"
+Cohesion: 0.20
+Nodes (14): ADR-0043, ADR-0046, castProjectors(), circleInto(), createGlassBox(), cssColor(), DASH, gridPositions() (+6 more)
+
+### Community 41 - "labelLayer"
+Cohesion: 0.18
+Nodes (17): buildScene(), clearProjectionMorph(), clearQuickView(), cssColor(), cueOrthoLock(), driveFold(), engageOrtho(), fitOrthoZoom() (+9 more)
+
+### Community 42 - "vertexLabeler"
 Cohesion: 0.16
 Nodes (16): calmGrid(), createHvPlanes(), cssColor(), DASH, fatSegments(), FILL, GRID, ADR-0004 (+8 more)
 
-### Community 23 - "Points Point Projector"
-Cohesion: 0.17
-Nodes (14): ADR-0006, createPointRig(), cssColor(), DASH, fatSegment(), footDot(), ADR-0004, ADR-0007 (+6 more)
+### Community 43 - "anim"
+Cohesion: 0.13
+Nodes (13): handleResize(), init(), markBooted(), setupConnectorToggle(), setupMobileNotice(), initOnboarding(), SPOTLIGHTS, TONE_CLASSES (+5 more)
 
-### Community 24 - "Spatial Framework HP/VP Planes"
+### Community 44 - "vertexLabeler"
+Cohesion: 0.24
+Nodes (18): tween(), animateFoldSwoop(), clearProjectionMorph(), engageOrtho(), exitQuickView(), fitOrthoZoom(), fitOrthoZoomForView(), flatBoxFor() (+10 more)
+
+### Community 45 - "anim"
 Cohesion: 0.17
 Nodes (15): calmGrid(), createHvPlanes(), cssColor(), DASH, fatSegments(), FILL, GRID, ADR-0004 (+7 more)
 
-### Community 25 - "Spatial Framework Point Projector"
+### Community 46 - "anim"
 Cohesion: 0.17
 Nodes (14): createPointRig(), cssColor(), DASH, fatSegment(), footDot(), ADR-0004, ADR-0006, ADR-0007 (+6 more)
 
-### Community 26 - "Intro Solid Geometry Core"
+### Community 47 - "vertexLabeler"
+Cohesion: 0.17
+Nodes (14): createPointRig(), cssColor(), DASH, fatSegment(), footDot(), ADR-0004, ADR-0006, ADR-0007 (+6 more)
+
+### Community 48 - "bearingBlock"
+Cohesion: 0.18
+Nodes (18): announce(), clearStepViewButtons(), defaultShapeData(), enterCompareSplit(), exitCompareSplit(), handleResize(), init(), markBooted() (+10 more)
+
+### Community 49 - "meshAnalyzer"
 Cohesion: 0.27
 Nodes (12): buildPrismGeometry(), rootStyle, buildPyramidGeometry(), createGenericPyramid(), cssColor(), rootStyle, alignmentOffset(), apothem() (+4 more)
 
-### Community 27 - "Module 1 Quadrant System"
-Cohesion: 0.24
-Nodes (12): $(), $(), syncUI(), sync(), wireControls(), HPVT(), QNAME, sync() (+4 more)
+### Community 50 - "labelLayer"
+Cohesion: 0.13
+Nodes (14): Anti-Patterns Verdict, Critique — Orthographic Projection Guided Stepper (`index.html`), Design Health Score, Minor Observations, Overall Impression, [P1] Editing geometry while flattened unfolds the drawing with no visible explanation, [P1] Reset is a one-click, unconfirmed total wipe, [P2] `aria-live="polite"` on the entire `#step-card` over-announces for screen readers (+6 more)
 
-### Community 28 - "Spatial Framework Frustums"
+### Community 51 - "spatialSteps"
+Cohesion: 0.16
+Nodes (13): animateFold(), applyFoldVisual(), applyProfilePlaneVisibility(), setObjectOpacity(), setProjectionsVisible(), setSideViewVisible(), active, cancelAll() (+5 more)
+
+### Community 52 - "anatomy"
+Cohesion: 0.13
+Nodes (14): Anti-Patterns Verdict, Critique — Orthographic Projection Guided Stepper (`index.html`), Design Health Score, Minor Observations, Overall Impression, [P1] Editing geometry while flattened unfolds the drawing with no visible explanation, [P1] Reset is a one-click, unconfirmed total wipe, [P2] `aria-live="polite"` on the entire `#step-card` over-announces for screen readers (+6 more)
+
+### Community 53 - "main"
+Cohesion: 0.21
+Nodes (14): announce(), applyLayers(), disposeContent(), init(), markBooted(), rebuild(), reset(), restoreView() (+6 more)
+
+### Community 54 - "meshAnalyzer"
+Cohesion: 0.14
+Nodes (12): active, cancelAll(), easeCamera, easeDissolve, easeDraw, easeFold, easeStandard, tick() (+4 more)
+
+### Community 55 - "meshAnalyzer"
 Cohesion: 0.19
 Nodes (13): BODIES, createFrustums(), cssColor(), DASH, fatSegments(), ADR-0004, ADR-0006, ADR-0007 (+5 more)
 
-### Community 29 - "Foundations Line Drawer"
+### Community 56 - "DECISIONS"
+Cohesion: 0.18
+Nodes (11): handleResize(), init(), markBooted(), setupMobileNotice(), DEFAULT_VIEW, STEPS, TERMS, initStepper() (+3 more)
+
+### Community 57 - "CHANGELOG"
+Cohesion: 0.14
+Nodes (12): animate(), applyProjectionMorph(), resume(), startLoop(), active, cancelAll(), easeCamera, easeDissolve (+4 more)
+
+### Community 58 - "CLAUDE"
+Cohesion: 0.15
+Nodes (13): announce(), completeAndNext(), reset(), resetCamera(), setConnectorsVisible(), setFirstAngleSymbol(), setRefLabelOpacity(), setupWizardToggle() (+5 more)
+
+### Community 59 - "main"
+Cohesion: 0.32
+Nodes (14): answerSheetBox(), clearProjectionMorph(), engageOrtho(), fitOrthoZoom(), flattenedViewBox(), restorePerspective(), setFlatView(), setupQuickViews() (+6 more)
+
+### Community 60 - "lineData"
+Cohesion: 0.09
+Nodes (21): 1. What Simatrix Is, 2. Codebase Map, 3. Module 2 — Component Breakdown (the master), 4. Module 1 — Component Breakdown (foundations of projection), 5. Data Flow — How a User Interaction Reaches the Scene, 6. The iframe Boundary, 7. What Is Shared Across All Codebases, 8. What Is Intentionally Different Between Modules (+13 more)
+
+### Community 61 - "ARCHITECTURE"
+Cohesion: 0.15
+Nodes (12): CLAUDE.md — Simatrix · Module 1 Topic 1: Engineering Graphics Foundations (BUILT), Decision 1 — Canonical "Front Face", Decision 2 — Fully orbitable in 3D, every step (no 2D camera lock), Decision 3 — RETAIN `meshAnalyzer.js` + the dynamic projection/line-drawing machinery, Decision 4 — BIS line-type mapping for the Front Face, Non-negotiables inherited from Module 2 (apply unchanged), Open questions (geometry to verify before build) — see chat, Refactor intent (what this overturns) (+4 more)
+
+### Community 62 - "DESIGN"
+Cohesion: 0.22
+Nodes (13): tween(), clearProjectionMorph(), engageOrtho(), ensurePerspectiveActive(), frameToBlock(), frontViewOrtho(), frontViewPose(), orbitToAzimuth() (+5 more)
+
+### Community 63 - "spatialData"
+Cohesion: 0.22
+Nodes (12): ARROW, buildSegments(), CHAIN, createAnnotations(), cssColor(), ADR-0007, ADR-0018, pushArrowTriangle() (+4 more)
+
+### Community 64 - "uiManager"
 Cohesion: 0.21
 Nodes (11): bucketCovers(), createLineDrawer(), cssColor(), DASH, EdgeClass, findCoplanarPair(), ADR-0007, LINE_WIDTH_PX (+3 more)
 
-### Community 30 - "Points Sim Orchestrator"
+### Community 65 - "main"
+Cohesion: 0.15
+Nodes (12): Anti-Patterns Verdict, Critique — `index.html` (Lesson 1: The Two Reference Planes), Design Health Score, Headline finding, Minor Observations, [P2] Boot overlay diverges from the token system, [P2] `#c3d` canvas has no accessible name, [P3] `<h1>` empty until JS runs (+4 more)
+
+### Community 66 - "main"
 Cohesion: 0.22
-Nodes (13): announce(), applyCompareSize(), drawCompare(), exitWorkbench(), handleResize(), init(), isWorkbenchViewport(), markBooted() (+5 more)
+Nodes (7): active, cancelAll(), easeCamera, easeDissolve, easeDraw, easeFold, easeStandard
 
-### Community 31 - "Points Compare Workbench"
-Cohesion: 0.23
-Nodes (13): buildScene(), clearProjectionMorph(), clearQuickView(), cssColor(), cueOrthoLock(), driveFold(), engageOrtho(), orthoZoomForDist() (+5 more)
+### Community 67 - "pointSteps"
+Cohesion: 0.17
+Nodes (11): 2026-06-27, 2026-06-28, 2026-06-29, 2026-07-02, 2026-07-03, 2026-07-09, 2026-07-10, 2026-07-11 (+3 more)
 
-### Community 32 - "Simple Positions Problem Library"
+### Community 68 - "main"
+Cohesion: 0.17
+Nodes (11): 3D engineering gotchas (read before writing rotation/projection math), Architecture (non-negotiable), CLAUDE.md — Simatrix Projection of Points, Cross-cutting rules, Keeping Root Documents Current, Platform contract (required for Simatrix uploads), Project-wide documentation (read before cross-module tasks), Rotation priority hierarchy (pedagogically critical) (+3 more)
+
+### Community 69 - "problems"
 Cohesion: 0.24
-Nodes (7): ENABLED_TIERS, enabledProblems(), FIELD_LABELS, groupByTier(), PROBLEMS, TIERS, ShapeType
+Nodes (9): initProblemLibrary(), ENABLED_TIERS, enabledProblems(), FIELD_LABELS, groupByTier(), PROBLEMS, TIERS, defaultShapeData() (+1 more)
 
-### Community 33 - "Simple Positions Vertex Labeler"
+### Community 70 - "DECISIONS"
+Cohesion: 0.17
+Nodes (11): 3D engineering gotchas (read before writing rotation/projection math), Architecture (non-negotiable), CLAUDE.md — Simatrix Engineering Graphics Viewer, Cross-cutting rules, Keeping Root Documents Current, Platform contract (required for Simatrix uploads), Project-wide documentation (read before cross-module tasks), Rotation priority hierarchy (pedagogically critical) (+3 more)
+
+### Community 71 - "ARCHITECTURE"
+Cohesion: 0.15
+Nodes (12): 1. What Simatrix is, 2. Who it is for, 3. What it is not (anti-references), 4. Core design principles, 5. Features — Module 1 (audit-verified), 6. Features — Module 2 (audit-verified), 7. Accessibility commitments (with implementation status), 8. Planned but not yet implemented (+4 more)
+
+### Community 72 - "DECISIONS"
 Cohesion: 0.24
-Nodes (8): CHAIN, GENERATOR_DASH, letterFor(), numberFor(), orderRing(), planAnnotations(), sampleRing(), uniqueLocalVertices()
+Nodes (11): tween(), clearProjectionMorph(), driveFold(), engageOrtho(), fadeExtension(), fadeInLeaf(), fitOrthoZoom(), flyCamera() (+3 more)
 
-### Community 34 - "Module 2 Problem Library"
-Cohesion: 0.24
-Nodes (7): ENABLED_TIERS, enabledProblems(), FIELD_LABELS, groupByTier(), PROBLEMS, TIERS, ShapeType
-
-### Community 35 - "Module 2 Vertex Labeler"
-Cohesion: 0.24
-Nodes (8): CHAIN, GENERATOR_DASH, letterFor(), numberFor(), orderRing(), planAnnotations(), sampleRing(), uniqueLocalVertices()
-
-### Community 36 - "Foundations Animation"
+### Community 73 - "main"
 Cohesion: 0.18
-Nodes (6): active, easeCamera, easeDissolve, easeDraw, easeFold, easeStandard
+Nodes (9): CHIP_OFFSET, createLabelLayer(), ADR-0004, ADR-0007, ADR-0016, ADR-0033, PLANE_ANCHOR, QUAD_ANCHORS (+1 more)
 
-### Community 37 - "Spatial Framework Animation"
-Cohesion: 0.18
-Nodes (6): active, easeCamera, easeDissolve, easeDraw, easeFold, easeStandard
+### Community 74 - "pointProblems"
+Cohesion: 0.22
+Nodes (8): DEFAULT_VIEW, ADR-0012, STEPS, TERMS, ADR-0007, ADR-0037, initTerms(), ADR-0007
 
-### Community 38 - "Points Animation"
-Cohesion: 0.18
-Nodes (6): active, easeCamera, easeDissolve, easeDraw, easeFold, easeStandard
+### Community 75 - "DECISIONS"
+Cohesion: 0.22
+Nodes (7): active, cancelAll(), easeCamera, easeDissolve, easeDraw, easeFold, easeStandard
 
-### Community 39 - "Intro to Solids Vertex Labeler"
+### Community 76 - "main"
 Cohesion: 0.27
 Nodes (8): CHAIN, GENERATOR_DASH, letterFor(), numberFor(), orderRing(), planAnnotations(), sampleRing(), uniqueLocalVertices()
 
-### Community 40 - "Simple Positions Animation"
+### Community 77 - "onboarding"
+Cohesion: 0.27
+Nodes (8): CHAIN, GENERATOR_DASH, letterFor(), numberFor(), orderRing(), planAnnotations(), sampleRing(), uniqueLocalVertices()
+
+### Community 78 - "problemLibrary"
 Cohesion: 0.18
-Nodes (6): active, easeCamera, easeDissolve, easeDraw, easeFold, easeStandard
+Nodes (10): 2026-06-16, 2026-06-19, 2026-06-20, 2026-06-25, 2026-06-26, 2026-06-27, 2026-06-28, 2026-07-09 (+2 more)
 
-### Community 41 - "Module 1 Animation"
-Cohesion: 0.18
-Nodes (6): active, easeCamera, easeDissolve, easeDraw, easeFold, easeStandard
+### Community 79 - "CLAUDE"
+Cohesion: 0.24
+Nodes (9): initProblemLibrary(), ENABLED_TIERS, enabledProblems(), FIELD_LABELS, groupByTier(), PROBLEMS, TIERS, defaultShapeData() (+1 more)
 
-### Community 42 - "Module 2 Animation"
-Cohesion: 0.18
-Nodes (6): active, easeCamera, easeDissolve, easeDraw, easeFold, easeStandard
+### Community 80 - "onboarding"
+Cohesion: 0.27
+Nodes (8): CHAIN, GENERATOR_DASH, letterFor(), numberFor(), orderRing(), planAnnotations(), sampleRing(), uniqueLocalVertices()
 
-### Community 43 - "Product Design Principles"
-Cohesion: 0.20
-Nodes (10): Quiet Chrome Scrollbar Harmonization, Step-Card Scrollbar Pill (Module 1), Floating Minimal Scrollbars (Module 2), Domain Colours (HP/VP/PP Encoding), Two-State Reset Confirm, Accessibility Commitments (WCAG 2.2 AA), Seven Core Design Principles, Primary Persona — Struggling First-Year (+2 more)
-
-### Community 44 - "Foundations Bearing Block"
+### Community 81 - "onboarding"
 Cohesion: 0.29
-Nodes (9): ADR-0001, BEARING_BLOCK_DIMS, buildBearingBlockGeometry(), buildBodyProfile(), buildFootProfile(), createBearingBlock(), cssColor(), ADR-0007 (+1 more)
+Nodes (9): BEARING_BLOCK_DIMS, buildBearingBlockGeometry(), buildBodyProfile(), buildFootProfile(), createBearingBlock(), cssColor(), ADR-0001, ADR-0007 (+1 more)
 
-### Community 45 - "Foundations Hidden-Line Analyzer"
+### Community 82 - "PRODUCT"
 Cohesion: 0.27
 Nodes (7): addEdge(), buildEdgeMap(), compareLattice(), Edge, Face, IDENTITY_ELEMENTS, vertexToken()
 
-### Community 46 - "Spatial Framework Label Layer"
+### Community 83 - "uiManager"
+Cohesion: 0.20
+Nodes (9): Architecture — Module 2 orchestrator pattern (ADR-033, overturns ADR-011 for this topic), CLAUDE.md — Simatrix · Module 1 Topic 2: Spatial Framework (BUILT), File structure, Non-negotiables inherited from the platform (apply unchanged), Platform contract (already wired — do not add a second path), Project-wide documentation (read before cross-module tasks), SESSION DIGEST — [date] — [feature/task], Session Digest Protocol (+1 more)
+
+### Community 84 - "CLAUDE"
 Cohesion: 0.20
 Nodes (8): CHIP_OFFSET, ADR-0004, ADR-0007, ADR-0016, ADR-0033, PLANE_ANCHOR, QUAD_ANCHORS, NOTE: Line2/LineSegments2 EXTEND Mesh (isMesh is true), so the fat-line grids/bo
 
-### Community 47 - "Spatial Framework Guided Stepper"
-Cohesion: 0.24
-Nodes (6): DEFAULT_VIEW, STEPS, TERMS, initStepper(), ADR-0007, ADR-0007
+### Community 85 - "main"
+Cohesion: 0.06
+Nodes (32): 3.10 Register the topic in `ARCHITECTURE.md`, 3.1 Name the folder, 3.2 Copy the master, whole, 3.3 File-by-file: keep exactly as copied (the shared contracts), 3.4 File-by-file: adapt (the topic-specific content), 3.5 File-by-file: create fresh (only if your topic needs them), 3.6 Update `meta.json` (every field), 3.7 Update the new folder's `CLAUDE.md` (the pointer to root docs) (+24 more)
 
-### Community 48 - "Points Label Layer"
-Cohesion: 0.20
-Nodes (8): CHIP_OFFSET, ADR-0004, ADR-0007, ADR-0016, ADR-0033, PLANE_ANCHOR, QUAD_ANCHORS, NOTE: Line2/LineSegments2 EXTEND Mesh (isMesh is true), so the fat-line grids/bo
-
-### Community 49 - "Intro to Solids Solid Anatomy"
+### Community 86 - "main"
 Cohesion: 0.29
 Nodes (6): CONCEPTS, factsFor(), LAYER_TOGGLES, ROSTER, SHAPE_FACTS, ShapeType
 
-### Community 50 - "Simple Positions Hidden-Line Analyzer"
+### Community 87 - "pointData"
 Cohesion: 0.27
 Nodes (7): addEdge(), buildEdgeMap(), compareLattice(), Edge, Face, IDENTITY_ELEMENTS, vertexToken()
 
-### Community 51 - "Simple Positions UI Manager"
-Cohesion: 0.27
-Nodes (8): clamp(), initUIManager(), parseNumeric(), SLIDERS, clamp(), initUIManager(), parseNumeric(), SLIDERS
+### Community 88 - "computeEffectiveAngles"
+Cohesion: 0.20
+Nodes (9): Anti-Patterns Verdict, Critique — Projection of Points simulation (`index.html` + `main.js`), Design Health Score, Minor Observations, Overall Impression, Persona Red Flags, Priority Issues, Questions to Consider (+1 more)
 
-### Community 52 - "Module 2 Hidden-Line Analyzer"
+### Community 89 - "lineProblems"
+Cohesion: 0.20
+Nodes (9): Anti-Patterns Verdict, Critique — `lines.html` (Projection of Straight Lines), Design Health Score, Minor Observations, Overall Impression, Persona Red Flags, Priority Issues, Questions to Consider (+1 more)
+
+### Community 90 - "onboarding"
 Cohesion: 0.27
 Nodes (7): addEdge(), buildEdgeMap(), compareLattice(), Edge, Face, IDENTITY_ELEMENTS, vertexToken()
 
-### Community 53 - "Module 2 Design Docs"
-Cohesion: 0.25
-Nodes (9): First-Angle Projection Framework, Four Quadrants (HP/VP intersection), Rabattement Fold (HP hinges flat onto VP about the XY line), Projection of a Point (onto HP/VP across four quadrants), Orthographic Projection of Solids (HP/VP/PP views), HP Teal (Horizontal Plane / top-view encoding), PP Violet (Profile Plane / side-view encoding), Two-Cue Rule (no color carries meaning alone) (+1 more)
-
-### Community 54 - "Points Sim Orchestrator"
-Cohesion: 0.22
-Nodes (9): commit(), contentBoxWorld(), disposeContent(), flatSheetBox(), notifyStateChange(), rebuild(), viewportSize(), worldPosition() (+1 more)
-
-### Community 55 - "Points UI Manager"
-Cohesion: 0.28
-Nodes (8): clamp(), initUIManager(), ADR-0007, ADR-0015, ADR-0018, parseNumeric(), QUAD_NOTES, SLIDERS
-
-### Community 56 - "Module 1 Line Steps"
-Cohesion: 0.28
-Nodes (5): deg(), LineCase, resolveLine(), STEPS, TERMS
-
-### Community 57 - "Spatial Framework Framework Data"
-Cohesion: 0.25
-Nodes (4): ADR-0018, ADR-0033, QUADRANT_INFO, QuadrantType
-
-### Community 58 - "Points Sim Orchestrator"
-Cohesion: 0.25
-Nodes (7): completeAndNext(), reset(), resetCamera(), showToast(), initStepper(), ADR-0007, ADR-0037
-
-### Community 59 - "Points Point Steps"
-Cohesion: 0.29
-Nodes (5): DEFAULT_VIEW, ADR-0012, STEPS, TERMS, ADR-0007
-
-### Community 60 - "Module 1 Plane Steps"
-Cohesion: 0.36
-Nodes (4): initSim(), defaultPlaneData(), STEPS, TERMS
-
-### Community 61 - "Spatial Framework Sim Orchestrator"
-Cohesion: 0.29
-Nodes (7): createLabelLayer(), applyFadeLevels(), commit(), disposeContent(), rebuild(), viewportSize(), worldPosition()
-
-### Community 62 - "Spatial Framework Sim Orchestrator"
-Cohesion: 0.29
-Nodes (7): buildScene(), cssColor(), cueOrthoLock(), handleResize(), init(), markBooted(), setupMobileNotice()
-
-### Community 63 - "Spatial Framework UI Manager"
-Cohesion: 0.38
-Nodes (6): clamp(), initUIManager(), ADR-0007, ADR-0018, parseNumeric(), SLIDERS
-
-### Community 64 - "Simple Positions Lesson Page UI"
-Cohesion: 0.29
-Nodes (7): Points Problem Library, Active-Problem Header, Points Problem Library Overlay, Orthographic Projection Viewport, Simple Positions Problem Library, Six-Step Projection Wizard, Solid & Placement Controls
-
-### Community 65 - "Spatial Framework Sim Orchestrator"
-Cohesion: 0.40
-Nodes (6): clearProjectionMorph(), engageOrtho(), fitOrthoZoom(), restorePerspective(), swoopToAnswerSheet(), tweenCamera()
-
-### Community 66 - "Points Problem Set"
+### Community 92 - "labelLayer"
 Cohesion: 0.33
 Nodes (5): FIELD_LABELS, ADR-0015, ADR-0018, PROBLEMS, TIERS
 
-### Community 67 - "Design & Decision Notes"
+### Community 93 - "terms"
+Cohesion: 0.28
+Nodes (8): clamp(), initUIManager(), ADR-0007, ADR-0015, ADR-0018, parseNumeric(), QUAD_NOTES, SLIDERS
+
+### Community 94 - "quadrantSteps"
+Cohesion: 0.22
+Nodes (8): 3D engineering gotchas (read before writing rotation/projection math), Architecture (non-negotiable), CLAUDE.md — Simatrix · Module 2 Topic 1: Introduction to Solids, Cross-cutting rules, Platform contract (required for Simatrix uploads), Project-wide documentation (read before cross-module tasks), Rotation priority hierarchy (pedagogically critical), Visual style
+
+### Community 95 - "CLAUDE.module-template"
+Cohesion: 0.22
+Nodes (8): 3D engineering gotchas (read before writing rotation/projection math), Architecture (non-negotiable), CLAUDE.md — Simatrix Engineering Graphics Viewer, Cross-cutting rules, Platform contract (required for Simatrix uploads), Pose model — SIMPLE POSITIONS (this clone), Project-wide documentation (read before cross-module tasks), Visual style
+
+### Community 96 - "DECISIONS"
+Cohesion: 0.22
+Nodes (8): Anti-Patterns Verdict, Design Health Score, Minor Observations, Overall Impression, Persona Red Flags, Priority Issues, Questions to Consider, What's Working
+
+### Community 97 - "DECISIONS"
+Cohesion: 0.22
+Nodes (8): Anti-Patterns Verdict, Design Health Score, Minor Observations, Overall Impression, Persona Red Flags, Priority Issues, Questions to Consider, What's Working
+
+### Community 98 - "CHANGELOG"
+Cohesion: 0.22
+Nodes (8): Anti-Patterns Verdict, Design Health Score, Minor Observations, Overall Impression, Persona Red Flags, Priority Issues, Questions to Consider, What's Working
+
+### Community 99 - "CHANGELOG"
+Cohesion: 0.22
+Nodes (8): Accessibility & Inclusion, Anti-references, Brand Personality, Design Principles, Product, Product Purpose, Register, Users
+
+### Community 100 - "terms"
+Cohesion: 0.22
+Nodes (8): Anti-Patterns Verdict, Design Health Score, Minor Observations, Overall Impression, Persona Red Flags, Priority Issues, Questions to Consider, What's Working
+
+### Community 101 - "CHANGELOG"
+Cohesion: 0.22
+Nodes (8): Anti-Patterns Verdict, Design Health Score, Minor Observations, Overall Impression, Persona Red Flags, Priority Issues, Questions to Consider, What's Working
+
+### Community 102 - "problemLibrary"
+Cohesion: 0.22
+Nodes (8): Anti-Patterns Verdict, Design Health Score, Minor Observations, Overall Impression, Persona Red Flags, Priority Issues, Questions to Consider, What's Working
+
+### Community 103 - "uiManager"
+Cohesion: 0.20
+Nodes (11): $(), QNAME, sync(), wireControls(), defaultPointData(), QuadrantType, FIELD_LABELS, PROBLEMS (+3 more)
+
+### Community 104 - "2026-06-01T14-57-13Z__index-html"
+Cohesion: 0.25
+Nodes (7): Before you write any code, CLAUDE.md — Simatrix · [Subject Name] · [Module/Topic Name], Keeping your own documents current, Project-wide documentation (read before cross-module tasks), SESSION DIGEST — [date] — [feature/task], Session Digest Protocol, Subject-specific architecture rules
+
+### Community 105 - "terms"
+Cohesion: 0.32
+Nodes (7): clamp(), initUIManager(), ADR-0007, ADR-0018, parseNumeric(), QUAD_NOTES, SLIDERS
+
+### Community 106 - "PRODUCT"
+Cohesion: 0.25
+Nodes (7): Before you write any code, CLAUDE.md — Simatrix Starter Template, Keeping your own documents current, Project-wide documentation (read before cross-module tasks), SESSION DIGEST — [date] — [feature/task], Session Digest Protocol, Subject-specific architecture rules
+
+### Community 107 - "CLAUDE"
+Cohesion: 0.04
+Nodes (51): ADR-000: [Template — copy this for a new entry], ADR-001: No build step; ship pinned CDN ES modules, ADR-002: Host integration via a `window.simAPI` global, not `postMessage`, ADR-003: CSS design tokens are the single runtime source of truth for all visual values, ADR-004: Every geometry change funnels through one `rebuild()` pipeline, ADR-005: Re-derive every ported sign visually (Unity left-handed → Three.js right-handed), explicit ZXY Euler, ADR-006: Fat lines + hard-edge geometry + quantized edge welding for crisp technical linework, ADR-007: Orchestrator + leaf modules — leaves don't cross-import; only `genericSolid` (pure math) is shared (+43 more)
+
+### Community 108 - "DECISIONS"
+Cohesion: 0.20
+Nodes (14): applyFoldPose(), applyPlaneOpacity(), applyStepGating(), driveFold(), fitDistance(), flowNote(), frameRadiusForStep(), frameToStep() (+6 more)
+
+### Community 109 - "DECISIONS"
+Cohesion: 0.29
+Nodes (4): ENABLED_TIERS, FIELD_LABELS, PROBLEMS, TIERS
+
+### Community 110 - "DECISIONS"
+Cohesion: 0.36
+Nodes (4): initSim(), defaultPlaneData(), STEPS, TERMS
+
+### Community 112 - "CHANGELOG"
+Cohesion: 0.25
+Nodes (7): How to read a rule, Section 1 — Platform & Runtime Contract, Section 2 — UI & Visual Rules, Section 3 — Cross-Subject Harmony, Section 4 — Documentation Rules, Section 5 — Anti-Patterns (Quick Scan), Simatrix — Platform Rules (Subject-Agnostic Foundation)
+
+### Community 113 - "CHANGELOG"
+Cohesion: 0.33
+Nodes (7): DESIGN.md (platform design system), Platform Visual Rules (Quiet Chrome, Chrome-Only Blue, Two-Cue, Two-Weight, Tabular, Flat-Ink, Border-Over-Shadow), Connector-Line Toggle (dormant), Design Tokens (Modern Drafting Bench), Domain Viewport Colors (HP teal / VP amber / PP violet), Quick-View Camera Buttons (dormant), Byte-Identical Shared Contract Files
+
+### Community 114 - "CHANGELOG"
+Cohesion: 0.29
+Nodes (4): ENABLED_TIERS, FIELD_LABELS, PROBLEMS, TIERS
+
+### Community 115 - "CHANGELOG"
 Cohesion: 0.40
-Nodes (5): ADR-003: CSS design tokens are the single runtime source of truth for all visual values, ADR-032: The floating padded scrollbar pill is the platform scrollbar standard, tinted --color-border, Clinical / Inverted Palette and token table, Creative North Star: The Patient Tutor's Paper, Scrollbars - the floating padded pill
+Nodes (4): ADR-0007, STEPS, TERMS, ADR-0007
 
-### Community 68 - "Spatial Framework Sim Orchestrator"
+### Community 116 - "CHANGELOG"
+Cohesion: 0.33
+Nodes (4): ADR-0018, ADR-0033, QUADRANT_INFO, QuadrantType
+
+### Community 117 - "CHANGELOG"
 Cohesion: 0.40
-Nodes (5): announce(), flushFadeOut(), reset(), resetCamera(), startFadeOut()
+Nodes (4): initProblemLibrary(), ADR-0007, ADR-0015, ADR-0033
 
-### Community 70 - "Points Problem Library"
+### Community 118 - "CHANGELOG"
+Cohesion: 0.47
+Nodes (5): armReset(), clamp(), initUIManager(), parseNumeric(), SLIDERS
+
+### Community 119 - "CHANGELOG"
 Cohesion: 0.40
-Nodes (3): ADR-0007, ADR-0015, ADR-0033
+Nodes (4): 1. Subject, 2. BIS line-type → token map (the only encoding this topic adds), 3. Fat-line stack (inherited, non-negotiable), DESIGN.md — Module 1 Topic 1: Engineering Graphics Foundations (topic appendix)
 
-### Community 71 - "Intro to Solids Module Guide"
+### Community 120 - "CHANGELOG"
 Cohesion: 0.40
-Nodes (5): Apex, Base vertices, Central axis OP, Surface generators, Solid anatomy (parts of solids)
+Nodes (3): initOnboarding(), SPOTLIGHTS, TONE_CLASSES
 
-### Community 74 - "Foundations Module Guide"
+### Community 122 - "CHANGELOG"
+Cohesion: 0.40
+Nodes (3): initOnboarding(), SPOTLIGHTS, TONE_CLASSES
+
+### Community 123 - "CHANGELOG"
+Cohesion: 0.40
+Nodes (4): 2026-06-16, 2026-07-02, 2026-07-09, Changelog
+
+### Community 126 - "CLAUDE"
 Cohesion: 0.50
-Nodes (4): Bearing Block (simplified pillow/plummer-block housing model), Camera-Dependent Hidden-Line Classification (occlusion raycaster + BVH), BIS Line Types (SP 46:2003 — Type A / E-F / G / B), meshAnalyzer.js Quantized Edge Welding (1e-3 canonical keys)
+Nodes (3): 2026-07-02, 2026-07-09, Changelog
 
-### Community 75 - "Spatial Framework Sim Orchestrator"
+### Community 127 - "DESIGN"
 Cohesion: 0.50
-Nodes (4): animate(), applyProjectionMorph(), resume(), startLoop()
+Nodes (3): 2026-07-02, 2026-07-09, Changelog
 
-### Community 77 - "Intro to Solids Lesson Page UI"
-Cohesion: 0.50
-Nodes (4): Anatomy Gallery Viewport, Anatomy Panel, Anatomy Display Toggles, Shape Rail
-
-### Community 79 - "Module 1 Line Problems"
-Cohesion: 0.50
-Nodes (3): FIELD_LABELS, PROBLEMS, TIERS
-
-### Community 81 - "Design System Rules"
+### Community 128 - "DESIGN"
 Cohesion: 0.67
-Nodes (3): The Tabular Rule, The Two-Weight Rule, Typography - Atkinson Hyperlegible + IBM Plex Mono
+Nodes (4): contentBoxWorld(), fitPerspectiveDistance(), frameDefault(), reframeIfClipped()
 
-### Community 82 - "Foundations Lesson Page UI"
+### Community 130 - "DESIGN"
+Cohesion: 0.14
+Nodes (13): 2026-07-11, 2026-07-12, 2026-07-12 (completion — cinematic unfold + 2D Compare), 2026-07-13 (ADR-050 final flag — 2D Compare sheet synced to the mathematical views), 2026-07-13 (cleanup pass — rename, camera default, dead-UI purge, Reset fix), 2026-07-13 (domain geometry & fold fixes — true silhouettes, PP-onto-HP fold, exploded labelled planes, CSS2D Observer), 2026-07-13 (domain overhaul — Bearing Block, grid planes, 5-step sequence), 2026-07-13 (final QA polish — framing, projector purge & exact 2D silhouettes, ADR-050) (+5 more)
+
+### Community 131 - "DESIGN"
 Cohesion: 0.67
-Nodes (3): BIS Line-Type Stepper, Dimension Text Toggle, BIS Line-Type Wizard
+Nodes (3): Projection of Straight Lines, Horizontal & Vertical Traces (HT / VT), True Length & Angles — Rotating-Line Method (θ/φ)
 
-### Community 85 - "Spatial Framework Changelog"
+### Community 133 - "PRODUCT"
 Cohesion: 0.67
-Nodes (3): Frustum Illustration, Point Projector Rig, Point P Controls
+Nodes (3): Active-Problem Header & Self-Check, Textbook Problem Library, ENABLED_TIERS Scope Flag
 
-### Community 86 - "Spatial Framework Lesson Page UI"
+### Community 134 - "CLAUDE"
 Cohesion: 0.67
-Nodes (3): Orbital Quadrant Flights, Quadrant Picker Panel, Quadrant 2x2 Grid
+Nodes (3): Compare View Scaffolding (card + 50/50 workbench), Guided Stepper (step rail + step card), Inline Term Definitions (glossary popover)
 
-### Community 87 - "Points Changelog"
-Cohesion: 1.00
-Nodes (3): Compare 2D Drawing, Compare Workbench, Compare Card
+### Community 276 - "Resting plane choice (HP / VP)"
+Cohesion: 0.17
+Nodes (12): announce(), completeAndNext(), reset(), resetCamera(), setConnectorsVisible(), setFirstAngleSymbol(), setRefLabelOpacity(), showContextLostNotice() (+4 more)
 
-### Community 88 - "Module 1 Changelog"
-Cohesion: 0.67
-Nodes (3): Dual-Camera Orchestrator Port, Quick-View Camera Chips, Dual Perspective/Orthographic Camera
+### Community 277 - "window.simAPI platform contract"
+Cohesion: 0.25
+Nodes (10): buildBearingBlockSolid(), BEARING_BLOCK_DIMS, buildBearingBlockGeometry(), buildBodyProfile(), buildFootProfile(), createBearingBlock(), cssColor(), ADR-0001 (+2 more)
+
+### Community 278 - "Simple positions pose model"
+Cohesion: 0.25
+Nodes (7): Architecture (non-negotiable), CLAUDE.md — Simatrix: Understanding Orthographic Views, Platform contract (required for Simatrix uploads), Project-wide documentation (read before cross-module tasks), SESSION DIGEST — [date] — [feature/task], Session Digest Protocol, This topic's architecture
 
 ## Knowledge Gaps
-- **420 isolated node(s):** `FEEDBACK`, `SYM`, `FOCUS`, `QNAME`, `active` (+415 more)
+- **1118 isolated node(s):** `FEEDBACK`, `SYM`, `NOHALO`, `reduceMotion`, `DEF` (+1113 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **56 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **210 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `armReset()` connect `Module 1 Engine Core` to `Simple Positions UI Manager`, `Points UI Manager`?**
-  _High betweenness centrality (0.026) - this node is a cross-community bridge._
-- **Why does `initUIManager()` connect `Points UI Manager` to `Module 1 Engine Core`, `Module 1 Quadrant System`, `Points Sim & Fold`, `Points Sim Orchestrator`?**
-  _High betweenness centrality (0.026) - this node is a cross-community bridge._
-- **Why does `sync()` connect `Module 1 Quadrant System` to `Points Sim Orchestrator`, `Points UI Manager`?**
-  _High betweenness centrality (0.008) - this node is a cross-community bridge._
-- **Are the 10 inferred relationships involving `wire()` (e.g. with `armReset()` and `beginOverlay()`) actually correct?**
-  _`wire()` has 10 INFERRED edges - model-reasoned connections that need verification._
-- **What connects `FEEDBACK`, `SYM`, `FOCUS` to the rest of the system?**
-  _446 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `Module 1 Engine Core` be split into smaller, more focused modules?**
-  _Cohesion score 0.053296703296703295 - nodes in this community are weakly interconnected._
-- **Should `Module 2 Sim Orchestrator` be split into smaller, more focused modules?**
-  _Cohesion score 0.0533515731874145 - nodes in this community are weakly interconnected._
+- **Why does `armReset()` connect `CHANGELOG` to `anim`, `ADR Index & Compare View`, `lineDrawer`, `terms`, `main`?**
+  _High betweenness centrality (0.105) - this node is a cross-community bridge._
+- **Why does `initUIManager()` connect `main` to `First-Angle Projection Scene`, `CHANGELOG`?**
+  _High betweenness centrality (0.052) - this node is a cross-community bridge._
+- **Why does `initUIManager()` connect `terms` to `Scene Boot & Camera`, `CHANGELOG`, `main`?**
+  _High betweenness centrality (0.051) - this node is a cross-community bridge._
+- **What connects `FEEDBACK`, `SYM`, `NOHALO` to the rest of the system?**
+  _1185 weakly-connected nodes found - possible documentation gaps or missing edges._
+- **Should `First-Angle Projection Scene` be split into smaller, more focused modules?**
+  _Cohesion score 0.06588235294117648 - nodes in this community are weakly interconnected._
+- **Should `Fold Animation Engine` be split into smaller, more focused modules?**
+  _Cohesion score 0.06485671191553545 - nodes in this community are weakly interconnected._
+- **Should `Annotations & Arrow Meshes` be split into smaller, more focused modules?**
+  _Cohesion score 0.06588235294117648 - nodes in this community are weakly interconnected._

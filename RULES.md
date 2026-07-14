@@ -194,7 +194,12 @@ Every rule is formatted:
 > Reason: a single disciplined path is what prevents WebGL context exhaustion in the iframe.
 
 > **§3.3 ✅ DO** run the full disposal contract at the start of every rebuild (dispose geometry,
-> materials, textures). *(ADR-004, CLAUDE.md)*
+> materials, textures) via a **deep `.traverse()`** of every top-level child of the geometry group
+> (`for (const child of shapeGroup.children) child.traverse(disposeObj)`). **❌ NEVER** use a shallow
+> one-level loop over the group's direct children. *(ADR-004, ADR-042, CLAUDE.md)*
+> Reason: real domain geometry is assembled as nested `THREE.Group` hierarchies; a `Group` node carries
+> no geometry/material, so a shallow loop frees **nothing** for it and exhausts the WebGL context
+> (discovered leaking in the Glass Box build, ADR-042).
 
 > **§3.4 ✅ DO** verify `renderer.info.memory` (geometry + texture counts) stays flat across 50 rapid
 > regenerations. *(ADR-004, CLAUDE.md)*
@@ -464,6 +469,11 @@ Every rule is formatted:
 > Reason: the orthographic sheet is a *measured* drawing — an auto-fit shrinks 10 mm as the line grows,
 > breaking "10 mm reads as 10 mm" and making the side-by-side 3D↔2D comparison meaningless; and the old
 > magic 100 mm span let the 150 mm True-Length slider overflow the sheet.
+
+> **§5.20 ✅ DO** make default 3D perspective camera poses look from the Top-Left-Front (negative X,
+> positive Y, positive Z) so the orthographic layout reads predictably left-to-right. *(ADR-048)*
+> Reason: Top/Front/Side are cast to the object's top, back, and left respectively (first-angle);
+> starting the eye already on that left/top side previews how the unfolded drawing will read.
 
 ---
 

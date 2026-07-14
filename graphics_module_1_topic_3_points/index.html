@@ -297,7 +297,7 @@
        chevron flips when collapsed; the viewport reflows to full width via flex. */
     .wizard-toggle {
       position: absolute;
-      top: var(--space-3);
+      top: calc(44px + var(--space-5));
       right: var(--space-3);
       z-index: 4;
       width: 44px;  /* DESIGN.md 44px target floor (was 40px) */
@@ -335,7 +335,7 @@
        top-left cluster) */
     .vp-cluster {
       position: absolute;
-      top: 44px; /* mirrors the 44px quick-view hit target — one button-height down (Fix 2, supersedes the old 10% host-overlay clearance) */
+      top: calc(44px + var(--space-5)); /* mirrors the 44px quick-view hit target — one button-height down (Fix 2, supersedes the old 10% host-overlay clearance); + --space-5 clears the host a11y text-scaler header */
       left: var(--space-3);
       z-index: 4;
       display: flex;

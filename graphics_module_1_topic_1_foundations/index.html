@@ -251,7 +251,7 @@
        (This topic's .vp-cluster equivalent.) */
     .vp-controls {
       position: absolute;
-      top: 44px; /* mirrors the 44px quick-view hit target — one button-height down (Fix 2, supersedes the old 10% host-overlay clearance) */
+      top: calc(44px + var(--space-5)); /* mirrors the 44px quick-view hit target — one button-height down (Fix 2, supersedes the old 10% host-overlay clearance); + --space-5 clears the host a11y text-scaler header */
       left: var(--space-4);
       display: flex;
       gap: var(--space-2);
@@ -324,7 +324,7 @@
        ResizeObserver in main.js re-syncs the renderer). */
     .wizard-toggle {
       position: absolute;
-      top: var(--space-3);
+      top: calc(44px + var(--space-5));
       right: var(--space-3);
       z-index: 5;
       width: 44px;

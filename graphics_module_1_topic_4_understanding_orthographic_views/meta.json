@@ -1,0 +1,6 @@
+{
+  "title": "Understanding Orthographic Views",
+  "description": "Watch an object's three principal views cast onto reference planes and unfold flat, building the spatial intuition behind orthographic multiview drawing.",
+  "difficulty": "beginner",
+  "tags": ["engineering-graphics", "glass-box", "orthographic-projection", "multiview"]
+}

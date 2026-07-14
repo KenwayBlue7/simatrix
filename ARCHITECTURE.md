@@ -139,6 +139,24 @@ C:\xampp\htdocs\Simatrix\
 │                                              ADR-015). STILL hidden in index.html: only
 │                                              the connector-declutter toggle.
 │
+├── graphics_module_1_topic_4_understanding_orthographic_views\  MODULE-1 SUBJECT
+│                                              ("Understanding Orthographic Views", formerly "Glass
+│                                              Box Visualizer" — renamed 2026-07-13, ADR-048),
+│                                              built on MODULE 2's orchestrator pattern per
+│                                              ADR-033, cut from template_starter\ (Phase 4).
+│                                              3D DOMAIN BUILD COMPLETE (2026-07-12): a new leaf
+│                                              src/glassBox.js builds the first-angle corner box
+│                                              — three hue-tinted glass panes (HP floor teal /
+│                                              VP back amber / PP side violet at 0.09 opacity,
+│                                              ADR-043) — the central solid, its three
+│                                              orthographic views cast on the panes with dashed
+│                                              projector rays (castProjectors), and an orbiting
+│                                              Observer, all assembled as NESTED sub-groups of
+│                                              shapeGroup and freed by the deep-traverse disposal
+│                                              contract (ADR-042). Boots into the ADR-037 50/50
+│                                              Compare split; drawCompare() + the six-view unfold
+│                                              are still pending.
+│
 └── (src_csharp\)                              Old C# Unity prototype. NOT documented
                                                here. (Not present in the working tree
                                                at the time of writing.)

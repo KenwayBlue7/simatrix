@@ -62,8 +62,9 @@ let controls;
 /** A fixed CAD ground-reference grid, kept OUT of shapeGroup so rebuild() never disposes it. */
 let hpGrid;
 
-/** Holds all per-frame domain geometry. The disposal contract iterates this group's DIRECT
- *  children, so add everything your rebuild() creates here as a sibling — never nested. */
+/** Holds all per-frame domain geometry. rebuild()'s disposal contract DEEP-traverses this group,
+ *  so children MAY be nested Groups — every descendant geometry/material is still freed. Add
+ *  everything your rebuild() creates here; nested sub-groups are fine. */
 let shapeGroup;
 
 /** The sim viewport element. Held module-wide so handleResize can read the live drawing-buffer
@@ -183,22 +184,31 @@ function rebuild(shapeData) {
   currentShapeData = shapeData;
 
   // --- Disposal contract (verbatim from CLAUDE.md). Prevents WebGL context exhaustion across
-  //     rapid regenerations; verify renderer.info.memory stays flat across 50 rebuilds. ---
-  for (const obj of shapeGroup.children) {
-    obj.geometry?.dispose();
-    const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-    mats.forEach((m) => { m?.map?.dispose(); m?.dispose(); });
-  }
+  //     rapid regenerations. DEEP traversal: a shallow loop over shapeGroup.children frees only a
+  //     direct child's own geometry/material, so any nested sub-group (the common shape of real
+  //     domain geometry) would leak — traverse each child so every descendant's geometry +
+  //     material(s) + map are released. Verify renderer.info.memory (geometries + textures) stays
+  //     flat across 50 rebuilds. (Discovered leaking in the Glass Box build — DECISIONS.md ADR-042.) ---
+  for (const child of shapeGroup.children) child.traverse(disposeObj);
   shapeGroup.clear();
 
   // ── DOMAIN BUILD SEAM ─────────────────────────────────────────────────────────────────────
   // Generate your subject's geometry from `shapeData` and add it to `shapeGroup` here, e.g.:
   //     if (shapeData) shapeGroup.add(buildYourGeometry(shapeData));
-  // Keep everything a DIRECT child of shapeGroup so the disposal loop above reaches it, and keep
+  // Nested sub-groups are fine — the deep disposal traversal above reaches every descendant. Keep
   // this the single path — no control may mutate the scene directly (CLAUDE.md).
   // ───────────────────────────────────────────────────────────────────────────────────────────
 
   notifyStateChange(); // state change committed — re-run any subscriber (e.g. a self-check)
+}
+
+/** Dispose one object's GPU resources — geometry + every material (+ any texture map). The single
+ *  teardown primitive the deep disposal traversal in rebuild() applies to every descendant of
+ *  shapeGroup. */
+function disposeObj(obj) {
+  obj.geometry?.dispose();
+  const mat = obj.material;
+  if (mat) (Array.isArray(mat) ? mat : [mat]).forEach((m) => { m?.map?.dispose(); m?.dispose(); });
 }
 
 // ============================================================================
