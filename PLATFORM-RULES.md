@@ -123,11 +123,17 @@ terms of Engineering Graphics' own files, modules, or lessons was left out entir
 > **§2.9 ❌ NEVER** cast a shadow on rendered content, or use elevation as decoration (the Flat-Ink
 > Rule). Shadows lift transient overlays only. *(DESIGN.md)*
 
-> **§2.10 ✅ DO** convey structure with a single crisp 1px hairline (`#d9d2c3`) and tonal layering,
-> not a drop shadow (the Border-Over-Shadow Rule). *(DESIGN.md)*
+> **§2.10 ✅ DO** convey structure with a single crisp 1px hairline (`--color-border`, current
+> resolved value `#e0e1e5`) and tonal layering, not a drop shadow (the Border-Over-Shadow Rule).
+> *(DESIGN.md)*
+> Reason: cite the token, not a hex — the resolved value moved once already (ADR-040 cooled it from
+> a warm `#d9d2c3`) and will move again; a rule pinned to a hex goes stale exactly the way this one
+> did (fixed 2026-07-16).
 
-> **§2.11 ❌ NEVER** use a bare `#000` or `#fff`. White host-blend cards consume the single
-> `--color-host-white` token (the narrowly-scoped Host-Integration White Exception). *(DESIGN.md)*
+> **§2.11 ❌ NEVER** use a bare `#000` or `#fff`. Content surfaces consume `--color-paper`
+> (`#ffffff`); chrome/shell surfaces consume `--color-panel` (`#f0f2f5`) — the retired
+> `--color-host-white` token no longer exists in code; do not reintroduce it. *(DESIGN.md §4.2)*
+> *(Corrected 2026-07-16 — this rule previously pointed at the retired token name.)*
 
 > **§2.12 ✅ DO** keep every interactive target ≥ 44px with a visible accent focus halo. *(DESIGN.md)*
 
@@ -181,6 +187,18 @@ terms of Engineering Graphics' own files, modules, or lessons was left out entir
 > text label stacks *below* the step marker, not beside it. This keeps the vertical rail narrow and
 > stops long step titles ("First-Angle Setup") from pushing the button — and the whole wizard — wide.
 > Pair it with a `max-width` on `.rail__label` so titles wrap instead of stretching the rail. *(DESIGN.md §5.6)*
+
+> **§2.23 ✅ DO** pin the wizard-collapse chevron (`.wizard-toggle`) at the plain top-corner inset
+> (`top/right: var(--space-3)`) — **not** the `.vp-cluster` top-left clearance
+> (`calc(44px + var(--space-5))`). **❌ NEVER** copy the `.vp-cluster` offset onto this control; it
+> has no button above it and a compact Compare card's own top offset is derived assuming the
+> shallow inset. *(DESIGN.md §5.12; regression found + fixed 2026-07-16.)*
+
+> **§2.24 ✅ DO** treat the ADR-037 Compare-split 50/50 workbench (`body.compare-split`, the three
+> floating rounded cards on a `--color-panel` shell, the `#rail-toggle` Hide/Show control) as the
+> shared dual-mode shape for every guided-stepper sim — not a per-module style choice. **✅ DO**
+> keep the docked rail's own *internal* control layout (row vs. tuned multi-column grid) module-scoped;
+> only the card chrome is shared. *(DESIGN.md §5.13.)*
 
 ---
 

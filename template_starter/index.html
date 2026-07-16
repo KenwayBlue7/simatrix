@@ -309,7 +309,12 @@
        chevron flips when collapsed; the viewport reflows to full width via flex. */
     .wizard-toggle {
       position: absolute;
-      top: calc(44px + var(--space-5));
+      /* Standard top-corner inset (--space-3) — NOT the .vp-cluster 44px+space-5 clearance
+         (that value is for the top-LEFT stack, one quick-view button-height down plus the
+         host a11y-scaler header gap; the top-right toggle has no button above it). The
+         Compare card's compact top (calc(space-3 + 44px + space-2)) already assumes this
+         button sits at space-3, so the two stayed silently mismatched until this fix. */
+      top: var(--space-3);
       right: var(--space-3);
       z-index: 4;
       width: 44px;  /* DESIGN.md 44px target floor (was 40px) */
@@ -506,7 +511,10 @@
     }
     /* Expanded = the 50/50 workbench split (ADR-037). The card is re-parented to <body>
        (by main.js, once wired) and placed as the grid's right pane by the body.compare-split
-       rules below; here it just sheds the floating-card chrome. */
+       rules below; here it just sheds the floating-card's absolute positioning. The card KEEPS
+       its base .compare-card border/radius/paper fill so it reads as a floating rounded card on
+       the gray split background — box-shadow stays off (Flat-Ink: docked surfaces don't earn the
+       transient-overlay shadow). */
     body.compare-split #compare-card {
       position: static;
       inset: auto;
@@ -514,9 +522,6 @@
       height: auto;
       min-height: 0;
       transform: none;
-      border: 0;
-      border-left: 1px solid var(--color-border);
-      border-radius: 0;
       box-shadow: none;
     }
     .compare-card__head {
@@ -578,7 +583,10 @@
          "rail  rail"      (auto row spanning both panes)
        The wizard drops out; wire main.js to re-parent your drivers into #workbench-rail.
        Because #sim-viewport IS the left pane, handleResize() (which measures it) sizes the
-       renderer to half-width with no JS sizing change. Desktop-only (mobile keeps the sheet). */
+       renderer to half-width with no JS sizing change. Desktop-only (mobile keeps the sheet).
+       Synced to the Module 2 master's floating-card chrome 2026-07-16: the split's own
+       background is the gray --color-panel surface, with a --space-4 gap/padding so the three
+       panes read as floating rounded cards, not flush edge-to-edge regions. */
     body.compare-split {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -586,40 +594,101 @@
       grid-template-areas:
         "view compare"
         "rail rail";
+      background: var(--color-panel);
+      gap: var(--space-4);
+      padding: var(--space-4);
     }
-    /* The seam between the 3D viewport and the rail lives on the LEFT pane's bottom edge, so
-       it spans only the 3D half; the right (2D → rail) half stays borderless so the drawing
-       card and rail read as one continuous surface. */
     body.compare-split #sim-viewport {
       grid-area: view;
       min-width: 0;
-      border-bottom: 1px solid var(--color-border);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      overflow: hidden; /* clip the WebGL canvas to the rounded corners */
     }
     body.compare-split #compare-card { grid-area: compare; }
     body.compare-split #workbench-rail { grid-area: rail; }
     /* The wizard is collapsed BY the split; the chevron (main.js) exits it to bring it back. */
     body.compare-split #wizard { display: none; }
-    /* In the 50/50 split the drawing head + the viewport chevron are redundant chrome. */
+    /* In the 50/50 split the drawing head + the viewport chevron are redundant chrome — the
+       still-visible, pressed Compare chip in the 3D pane is the single way back out. */
     body.compare-split .compare-card__head { display: none; }
     body.compare-split #wizard-toggle { display: none; }
 
-    /* The docked driver rail — spans both panes, hosts the re-parented controls laid out as a
-       horizontal instrument row. Persistent/docked, so no shadow (Flat-Ink) — a hairline top
-       seam only (drawn by #sim-viewport's border-bottom on the left half). */
+    /* The docked driver rail — spans both panes, a paper-white rounded card (matching the
+       viewport and compare panes) hosting whatever drivers a module re-parents into it.
+       DESIGN.md §5.13: only this card chrome (tone/border/radius/padding) is the shared,
+       platform-level part — the internal control FLOW below is a generic row and is meant to
+       be re-tuned per module once you know your own driver count (Module 2's tuned
+       column-major grid is domain-specific, not copied here). */
     #workbench-rail { display: none; }
     body.compare-split #workbench-rail {
       display: flex;
-      align-items: flex-end;
-      justify-content: center;
-      gap: var(--space-6);
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: var(--space-6) var(--space-5);
       padding: var(--space-4) var(--space-5);
-      background: var(--color-panel);
-      overflow-x: auto;
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
     }
-    /* Each driver reflows from a vertical stack into a fixed-width column. */
-    #workbench-rail .field { flex: 0 0 auto; width: 200px; margin: 0; gap: var(--space-2); }
+    #workbench-rail .field { margin: 0; gap: var(--space-1); }
     /* A per-step reveal used `hidden`; in the rail every driver is live. */
-    #workbench-rail .field[hidden] { display: block !important; }
+    #workbench-rail .field[hidden] { display: flex !important; }
+
+    /* ---- Rail hide/reveal toggle: a dedicated control, independent of the wizard chevron,
+       for a full-screen 3D/2D read of the split. A labelled "Hide"/"Show" pill: it claims
+       grid-area:view (the 3D pane, NOT #workbench-rail's cell) so it floats at the viewport's
+       bottom-left corner, sitting above the rail's top edge in both open and collapsed states.
+       Ported from the Module 2 master 2026-07-16 as CSS+markup scaffolding — wire its click
+       handler (toggling body.rail-collapsed) when you wire the split in main.js. */
+    .rail-toggle {
+      display: none; /* shown only in the split, see body.compare-split #rail-toggle below */
+      position: relative;
+      align-items: center;
+      gap: var(--space-2);
+      z-index: 95; /* above the Compare card (--z-compare 90), below the mobile notice (100) */
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0 var(--space-3);
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    body.compare-split #rail-toggle {
+      display: inline-flex;
+      grid-area: view;
+      align-self: end;
+      justify-self: start;
+      margin: var(--space-4);
+    }
+    .rail-toggle:active { transform: scale(0.97); }
+    .rail-toggle:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .rail-toggle__icon {
+      width: 20px;
+      height: 20px;
+      flex: none;
+      transition: transform var(--dur-base) var(--ease-standard);
+    }
+    .rail-toggle__text {
+      font-family: var(--font-sans);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      line-height: 1;
+    }
+    /* Collapsed: drop the rail out of the grid (its row + gap reclaimed) and flip the
+       chevron to point back down toward where the rail will reappear. */
+    body.rail-collapsed #workbench-rail { display: none !important; }
+    body.rail-collapsed .rail-toggle__icon { transform: rotate(180deg); }
+    body.compare-split.rail-collapsed {
+      grid-template-rows: minmax(0, 1fr);
+      grid-template-areas: "view compare";
+    }
 
     /* Narrow viewports: the compare card becomes a full-width bottom sheet (no room to float). */
     @media (max-width: 767px) {
@@ -2135,6 +2204,22 @@
        re-parents the point drivers into it — here it is a static empty target: wire main.js to
        move your controls in on enterWorkbench(). -->
   <div id="workbench-rail" role="group" aria-label="Controls"></div>
+
+  <!-- Rail hide/reveal toggle (ADR-037 pattern): a direct <body> child, NOT a child of
+       #workbench-rail — a child would vanish along with the rail on collapse and become
+       impossible to reveal again. Only visible while body.compare-split is active (see CSS
+       above); it claims grid-area:view (the 3D pane) so it floats at the viewport's
+       bottom-left, above the rail, in both open and collapsed states — the rail itself never
+       reserves space for this button. A "Hide"/"Show" pill. Ported from the Module 2 master
+       2026-07-16 as CSS+markup scaffolding: wire its click handler (toggling
+       body.rail-collapsed + swapping the label/aria-expanded) in main.js when you wire the
+       split. Independent of #wizard-toggle: collapsing the rail never exits the split. -->
+  <button id="rail-toggle" class="rail-toggle" type="button" aria-controls="workbench-rail" aria-expanded="true" aria-label="Hide controls" title="Hide controls">
+    <svg class="rail-toggle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+    <span class="rail-toggle__text">Hide</span>
+  </button>
 
   <!-- Live region: main.js + stepper.js narrate step + mode changes for screen readers. -->
   <div id="sim-status" class="sr-only" role="status" aria-live="polite"></div>

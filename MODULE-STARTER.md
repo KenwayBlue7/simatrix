@@ -97,16 +97,23 @@ Decide this **before** you create a folder. The case determines your template.
 | **B** | A new **drawing-foundations lesson** in the Module 1 family | **`Module1/`** (add a thin page) | "Conics", "Development of Surfaces" |
 | **C** | A whole **new subject module** (new discipline) | **Duplicate `template_starter/`** — the stripped boilerplate (Section 5) | Mechanical, Electrical, Civil |
 
-> **`template_starter/` is the boilerplate** (minted + finalised 2026-07-11): a copy of the Module 2
-> master with the 3D-solids geometry stripped, `problems.js`/`terms.js` emptied to stubs, the guided
-> stepper reset to three placeholder steps, and the 50/50 Compare View pre-injected. New builds now
-> **duplicate it** instead of copying `Module2/` and deleting domain files by hand. It is **fully
-> sanitised**: `main.js` is rewritten to a clean empty-scene boot (it imports only the platform leaves —
+> **`template_starter/` is the boilerplate** (minted + finalised 2026-07-11; **Compare-split chrome
+> synced to the Module 2 master 2026-07-16**): a copy of the Module 2 master with the 3D-solids
+> geometry stripped, `problems.js`/`terms.js` emptied to stubs, the guided stepper reset to three
+> placeholder steps, and the **polished** ADR-037 50/50 Compare workbench pre-injected — the
+> floating rounded-card shell (viewport / compare / rail panes on a `--color-panel` surface), the
+> `.wizard-toggle` at its correct top-corner inset, and the `#rail-toggle` Hide/Show control are all
+> already wired as CSS + markup scaffolding (DESIGN.md §5.12–§5.13). New builds now **duplicate it**
+> instead of copying `Module2/` and deleting domain files by hand. It is **fully sanitised**:
+> `main.js` is rewritten to a clean empty-scene boot (it imports only the platform leaves —
 > `stepper`, `terms`, `onboarding`, `anim` — plus Three.js and `OrbitControls`, with a
 > disposal-contract-only `rebuild()`), and every Engineering-Graphics domain leaf (`iShape.js`,
 > `meshAnalyzer.js`, `projectionDrawer.js`, `vertexLabeler.js`, `problemLibrary.js`) plus the local
 > `DESIGN.md` is already removed. So each case below spells out only what you **add or wire in** — there
-> is no leftover domain code to delete.
+> is no leftover domain code to delete. **What you still wire yourself:** your own drivers into
+> `#workbench-rail` (the rail's *internal* control layout — row vs. multi-column grid — is
+> module-scoped, DESIGN.md §5.13) plus your own `drawCompare()`/click handler for `#rail-toggle` and
+> the Compare toggle button; the template ships their chrome, not their behavior.
 
 **Case A — New topic within the Module 2 family.** Same subject (Engineering Graphics, projection of
 3D solids), new sub-topic. Start from **`template_starter/`** — the stripped boilerplate that already
@@ -430,9 +437,13 @@ cp -r template_starter my_new_subject_module
 - The **3D-solids geometry stripped** (`cube`/`cone`/`cylinder`/`genericPrism`/`genericPyramid`/
   `genericSolid`/`shapeData` removed), `problems.js` + `terms.js` emptied to stubs, and `stepper.js`
   reset to three placeholder steps.
-- The **50/50 Compare View pre-injected** (`#compare-card` + `#compare-canvas`, the empty
-  `#workbench-rail`, and the `.compare-card` / `body.compare-split` / `#workbench-rail` CSS), so a
-  dual-mode "workbench" split is available the moment you wire it.
+- The **polished ADR-037 50/50 Compare workbench pre-injected** (`#compare-card` +
+  `#compare-canvas`, the empty `#workbench-rail`, the `#rail-toggle` Hide/Show control, and the
+  `.compare-card` / `body.compare-split` / `body.rail-collapsed` / `#workbench-rail` CSS — synced to
+  the Module 2 master's floating-rounded-card chrome 2026-07-16, DESIGN.md §5.13), so a dual-mode
+  "workbench" split is available the moment you wire it. The rail's *internal* control layout
+  (a plain row by default in the template) is yours to re-tune once you know your own driver count —
+  only the card chrome (tone, border, radius, padding) is the shared, platform-level part.
 
 Two things you MUST still do after duplicating (the boilerplate is sanitised, so there is no domain
 code to delete — you fill empty seams):

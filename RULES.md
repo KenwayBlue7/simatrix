@@ -248,6 +248,13 @@ Every rule is formatted:
 > **§3.18 ✅ DO** set `polygonOffset: true` on the solid material. *(ADR-006, CLAUDE.md)*
 > Reason: otherwise edge outlines z-fight with mesh faces and flicker.
 
+> **§3.18a ✅ DO** give dashed hidden-edge `LineSegments2` materials a positive `polygonOffset`
+> (`factor: 1, units: 1`) plus `renderOrder = 0` (visible siblings get `renderOrder = 1`), so a
+> visible solid line always fully occludes a coincident hidden dashed line — drafting convention's
+> line-precedence rule. *(ADR-057)*
+> Reason: fat lines render as triangle fills, so equal-depth solid/dashed pairs z-fight and jitter
+> rather than losing deterministically; `renderOrder` alone doesn't separate their depth values.
+
 > **§3.19 ✅ DO** re-run camera-dependent edge classification (visible/hidden/silhouette) on orbit
 > when projections are shown, throttled to `requestAnimationFrame` — never to `mousemove`. *(CLAUDE.md)*
 
@@ -460,15 +467,37 @@ Every rule is formatted:
 > Reason: orthographic has no foreshortening and perspective has full foreshortening, so a straight
 > camera swap makes off-plane geometry "pop" into depth in one frame — the jarring cut the morph removes.
 
-> **§5.19 ✅ DO** render the on-demand Compare **2D orthographic drawing** at a FIXED scale locked to the
-> static sheet bounds — derived from `SHEET`, not a magic constant (Lines' `sheet2D`:
-> `SHEET2D_SPAN = (SHEET/2)*10`). A real millimetre reads the same on-screen length at any True Length /
-> inclination, and a rare over-range line extends past the sheet edge rather than shrinking the drawing.
+> **§5.19 ✅ DO** render the on-demand Compare **2D orthographic drawing** at a FIXED scale that never
+> chases the live geometry — the two modules lock it to a different, but equally fixed, basis:
+> - **Module 1 / Lines:** locked to the static sheet bounds, derived from `SHEET`, not a magic constant
+>   (`sheet2D`: `SHEET2D_SPAN = (SHEET/2)*10`). *(ADR-038)*
+> - **Module 2:** locked to the solid's own **intrinsic 3D size** (`solidSpanUnits`), anchored to that
+>   layout's own nominal centre — NEVER the live drawn bbox, and never `distHP`/`distVP`/angle slider
+>   values. *(ADR-053, refines the anchor in ADR-054; supersedes ADR-052's live auto-fit)*
+>
+> Either way, a real millimetre reads the same on-screen length regardless of slider/distance/angle
+> values, and a rare over-range line extends past the sheet edge rather than shrinking the drawing.
 > **❌ NEVER** auto-fit / auto-zoom the 2D drawing to chase the geometry — the ADR-014 auto-zoom is for
-> the 3D perspective main pane ONLY. *(ADR-038; ADR-014)*
+> the 3D perspective main pane ONLY. *(ADR-038; ADR-053; ADR-014)*
 > Reason: the orthographic sheet is a *measured* drawing — an auto-fit shrinks 10 mm as the line grows,
 > breaking "10 mm reads as 10 mm" and making the side-by-side 3D↔2D comparison meaningless; and the old
 > magic 100 mm span let the 150 mm True-Length slider overflow the sheet.
+>
+> **Exception — user-driven pan/zoom are allowed.** Drag-to-pan (ADR-054) and scroll-wheel zoom
+> (ADR-055) on Module 2's Compare canvas are permitted as independent UX view-transform layers applied
+> *after* the fixed scale above — a screen-space offset (pan) and a screen-space multiplier (zoom) in
+> `project()`, composed on top of the locked `scale`/anchor, never recomputing or replacing them. The
+> "10 mm reads as 10 mm" invariant holds at the 1×/centred default; zoom is a reversible inspection
+> lens, not a rescale of the drawing, and resets to 1×/centred on a fresh Compare open, a canvas
+> double-click, and a full sim reset (`resetCompareView()`). *(ADR-054; ADR-055)*
+> Reason: a learner should be able to inspect a clipped or small drawing without the measured-mm
+> invariant becoming a trap — pan/zoom solve that as opt-in, user-controlled screen-space lenses that
+> never touch the mathematically pure base scale §5.19 otherwise protects.
+>
+> **Reference lines follow the same rule.** Module 2's XY / X1-Y1 ground-line/hinge marks on the
+> Compare sheet are placed from the **analytic fold coordinates** (`sheetY=0`, `sheetX=−z0`), never a
+> live-bbox midpoint between adjacent views — a midpoint drifts with the same `distHP`/`distVP`
+> sliders the fixed scale above already protects against. *(ADR-056)*
 
 > **§5.20 ✅ DO** make default 3D perspective camera poses look from the Top-Left-Front (negative X,
 > positive Y, positive Z) so the orthographic layout reads predictably left-to-right. *(ADR-048)*
@@ -633,6 +662,7 @@ Every rule is formatted:
 - ❌ Let leaf modules import each other (only `genericSolid.js` is shared). *(§3.6)*
 - ❌ Copy Unity signs verbatim, leave `euler.order` implicit, or chase a `src_csharp/` path. *(§3.8, §3.10, §3.11)*
 - ❌ Use `LineBasicMaterial`, skip `computeLineDistances()`, or omit `polygonOffset`. *(§3.13, §3.17, §3.18)*
+- ❌ Leave dashed hidden-edge lines without a depth-offset/`renderOrder` bias — a coincident visible line must always win. *(§3.18a)*
 - ❌ Allow all rotation modes at once, or "fix" the pentagonal preset to 18°. *(§3.21, §3.22)*
 - ❌ Re-add the `AxesHelper`, add PBR, or cast shadows on geometry. *(§3.24, §3.25)*
 - ❌ Ship a non-manifold solid (overlapping/duplicate extrusions), or keep a zero-area triangle in `meshAnalyzer.js`. *(§3.29, §3.30)*

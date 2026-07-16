@@ -244,6 +244,13 @@ let vpFoldGroup;
 let currentMesh = null;
 let currentEdgeOverlay = null;
 
+/** Characteristic 3D size of the current solid — bounding-sphere diameter of its LOCAL
+ *  geometry (world units). Rotation- and translation-invariant by construction (local
+ *  geometry never encodes distHP/distVP, only mesh.position/quaternion do), so it is the
+ *  fixed basis drawCompare() uses for its px-per-mm scale (ADR-053) — a distance or angle
+ *  slider can move a view but must never rescale the sheet. 0 while the scene is empty. */
+let solidSpanUnits = 0;
+
 /**
  * The shape parameters currently on screen, or `null` before the learner adds a
  * solid in Step 1 (the Guided Stepper boots to an EMPTY scene — grids only).
@@ -827,6 +834,7 @@ function rebuild(shapeData) {
   shapeGroup.clear();
   currentMesh = null;
   currentEdgeOverlay = null;
+  solidSpanUnits = 0;
 
   // --- Empty start / reset: no solid. Clear any labels/projections and stop. ---
   if (!shapeData) {
@@ -834,6 +842,7 @@ function rebuild(shapeData) {
     if (ppHingeGroup) ppHingeGroup.position.z = DEFAULT_PP_STANDOFF;
     refreshLabels();
     onboarding?.setSolidPresent(false); // show the empty-state overlay
+    if (compareOpen) drawCompare(); // clear the 2D sheet too — a live rebuild, never a snapshot
     notifyStateChange(); // empty/reset is a state change too (drives the self-check prompt)
     return;
   }
@@ -868,6 +877,12 @@ function rebuild(shapeData) {
   currentMesh = mesh;
   currentEdgeOverlay = edgeOverlay;
 
+  // ADR-053: the 2D Compare sheet's scale is fixed to this LOCAL-geometry size, never to the
+  // live drawn bbox — computeBoundingSphere() reads geometry attributes before mesh.position/
+  // quaternion are applied, so it is untouched by distVP, distHP, or rotation.
+  mesh.geometry.computeBoundingSphere();
+  solidSpanUnits = (mesh.geometry.boundingSphere?.radius || 0) * 2;
+
   // Seat the profile plane just clear of the solid's nearest face (−Z side), so the
   // side view casts onto the "side wall of the box" without slicing it. The PP hinge
   // axis is the HP∩PP line at this z0; projectPP draws the side view at the hinge's
@@ -892,6 +907,9 @@ function rebuild(shapeData) {
     reframeIfClipped();  // Feature 2: dolly back if a taller/turned solid now clips the view
   }
   onboarding?.setSolidPresent(true); // hide the empty-state; surface the orbit hint once
+  // The Compare card shows a LIVE drawing, never a snapshot: every rebuild — slider
+  // drags included — repaints it from the fresh projection data.
+  if (compareOpen) drawCompare();
   notifyStateChange(); // parameter/mode change committed — re-run any self-check
 }
 
@@ -1089,6 +1107,9 @@ function setLabelsVisible(on) {
 function setProjectionsVisible(on) {
   showProjectionsFlag = on;
   refreshProjections();
+  // The Compare chip's 2D gate (Step 4's top+front) and any open sheet both track this flag.
+  syncCompareChipVisibility();
+  if (compareOpen) drawCompare();
   // Sync the freshly built projection to the current fold state — at Step 4 the
   // fold is 0, so this hides the 2D projectors until the learner flattens (without
   // it the new flatConnectorGroup would render at full opacity over the 3D view).
@@ -1134,6 +1155,9 @@ function setSideViewVisible(on) {
   // (they live in world space, gated on showSideViewFlag inside applyFoldVisual). This is
   // what hides them again when the step is turned off.
   applyFoldVisual(foldProgress);
+  // The Compare sheet's side (PP, violet) line follows the same flag (drawCompare gates
+  // ppGroup on showSideViewFlag).
+  if (compareOpen) drawCompare();
 
   // Draw-on the side view by fading the PP linework in (mirrors setProjectionsVisible's
   // HP/VP draw-on). Seed at 0 so the lines grow in rather than flashing at full weight; the
@@ -1974,9 +1998,13 @@ function buildScene(container) {
 
   // PP pill. Parented under the hinge so it rides the fold and stays labelled on the
   // flattened sheet, beside the folded side view (same rationale as the VP label riding
-  // vpFoldGroup).
+  // vpFoldGroup). The hinge sits at world z = DEFAULT_PP_STANDOFF (-3, reset per-rebuild
+  // to box.min.z - PP_MARGIN), so local (4, 4, 0) resolves to world (4, 4, -3) — tight
+  // enough to sit inside the default camera frame (~±4 units) without a zoom-out, and
+  // still clear of the HP/VP pills. Local z stays 0 so the -90°-about-X fold still lands
+  // it flat on the floor beside the folded side view.
   ppPlaneLabel = makePlaneLabel('PP', 'pp');
-  ppPlaneLabel.position.set(0, 4, 0);
+  ppPlaneLabel.position.set(4, 4, 0);
   ppPlaneLabel.visible = false; // hidden with the profile plane until Step 5 (see ppPlaneLabel decl)
   ppHingeGroup.add(ppPlaneLabel);
 
@@ -1994,15 +2022,20 @@ function buildScene(container) {
   setRefLabelOpacity(0);
 
   // Name the two reference planes in the viewport (CSS2D pills, plane-hue coded).
-  // HP sits on the fixed floor grid; VP is parented to the fold pivot so it swings
-  // down with the front view and stays labelled in the flattened 2D drawing.
-  // Positions chosen so both pills stay on-screen in the default framing AND after
-  // the fold (verified against the live camera). HP sits on the floor in the +X/−Z
-  // corner, clear of the top view; VP rides the fold pivot at local (0, 4, −3) so
-  // that when the plane swings down +90° about the ground line it lands at world
-  // (−4, 0, −3) — mirror-symmetric to HP, beside the folded front view.
+  // HP sits on the fixed floor grid (never folds); VP is parented to the fold pivot so
+  // it swings down with the front view and stays labelled in the flattened 2D drawing.
+  // Coordinates are tight (a few units) so both pills sit inside the default camera
+  // frame (DEFAULT_CAMERA_POSITION/TARGET, ~±4 units) without a zoom-out, while still
+  // staying clearly separated. HP's X MUST be positive: the VP plane is fixed at world
+  // X=0 and the solid always seats with its near face at X=distVP>0 (see seatOnPlanes,
+  // "leftmost point exactly on VP"), so positive X is the first-angle side the solid
+  // actually occupies — a negative-X HP pill reads as sitting behind VP, in the wrong
+  // quadrant for a first-angle drawing. VP rides the fold pivot at local (0, 4, -3) —
+  // local x MUST stay 0, since the +90°-about-Z flatten maps local (x, y, z) →
+  // world (-y, x, z), and only x=0 keeps the pill on the floor (world y=0) once folded
+  // flat beside the front view.
   const hpLabel = makePlaneLabel('HP', 'hp');
-  hpLabel.position.set(4, 0, -3);
+  hpLabel.position.set(2.5, 0, 3);
   scene.add(hpLabel);
 
   const vpLabel = makePlaneLabel('VP', 'vp');
@@ -2065,6 +2098,12 @@ function buildScene(container) {
   overlay.style.top = '0';
   overlay.style.left = '0';
   overlay.style.pointerEvents = 'none';
+  // Own stacking context (position:absolute + explicit z-index) so the per-label
+  // zIndex values CSS2DRenderer assigns for depth-sorting stay TRAPPED inside this
+  // overlay instead of competing in #sim-viewport's root context — where a high label
+  // index would paint over the viewport chrome (.vp-cluster z4, etc.). Tier 1: above
+  // the WebGL canvas (z auto/0), below all chrome (z 2–4).
+  overlay.style.zIndex = '1';
   container.appendChild(overlay);
 
   // Pass the live drawing-buffer size so the axis chain line + curved-solid
@@ -2140,6 +2179,10 @@ function handleResize(container) {
   // header note 1). The render-loop owns nothing here; this is the only updater.
   activeProjection?.setResolution(w, h);
   labeler?.setResolution(w, h); // axis chain line + curved-solid generators
+
+  // The Compare card's stage tracks the viewport (grid/flex sizing) — repaint its
+  // drawing at the new backing-store size so the linework stays crisp.
+  if (compareOpen) drawCompare();
 }
 
 // ============================================================================
@@ -2257,6 +2300,736 @@ function cueOrthoLock() {
 }
 
 // ============================================================================
+// Compare view + 50/50 workbench (ADR-037 pattern, ported from the finished Points
+// topic reference build: graphics_module_1_topic_3_points/main.js). The on-demand 2D
+// drawing (top/front/side views on one plain 2D <canvas>, ADR-034 — never a second
+// WebGL context) plus the expanded workbench split that docks the FULL geometry
+// driver set under both panes for a "solve & verify" read, deliberately overriding
+// the wizard's one-idea-per-step disclosure while the split is open.
+// ============================================================================
+
+/** The 7 [data-ctrl] wrapper keys re-parented into #workbench-rail, ORDERED so related
+ *  drivers sit adjacent (#rail-toggle floats over the viewport pane now, not the rail, so
+ *  this array's first entry lands in column 1 with no clearance to dodge): size (Base
+ *  length + Height, already one bundled wrapper, spans both grid rows in column 1) →
+ *  disthp + distvp (the two distances) → anglehp + anglevp (the two angles) → resting +
+ *  roty (rests on / turn about the axis). Shape, Add, and the mode toggles
+ *  (orient/face-inclination) stay in the wizard — they are not continuous geometry
+ *  drivers, and the wizard itself is unreachable while the split is open (aria-label on
+ *  #workbench-rail notes this). */
+const WORKBENCH_CONTROLS = ['size', 'disthp', 'distvp', 'anglehp', 'anglevp', 'resting', 'roty'];
+/** Desktop opens the Compare card straight into the 50/50 split, matching the Points
+ *  reference; mobile has no workbench and always gets the compact bottom-sheet card. */
+const COMPARE_DEFAULT_SIZE = 'expanded';
+/** ADR-018 declared scale: 1 world unit = 10 mm. projectionDrawer.js keeps its own private
+ *  copy of this same constant (for its dimension labels); drawCompare needs it too, to turn
+ *  flattened world-space points into the same mm units the sheet's fixed scale is defined in. */
+const WORLD_TO_MM = 10;
+
+let compareCard = null;
+let compareCanvas = null;
+let compareChip = null;
+let compareOpen = false;      // the card is shown at all (compact OR expanded)
+let compareSize = 'compact';  // 'compact' | 'expanded'
+let workbenchOpen = false;
+/** Drag-to-pan offset (CSS px, ADR-054) applied on top of the fixed intrinsic-nominal frame
+ *  in drawCompare's project(). User-driven only — never touched by slider/angle changes, so
+ *  it composes with ADR-053's scale-lock instead of fighting it. Zeroed on every card (re)open
+ *  (compare.show) so a fresh open is always centred; a dblclick on the canvas also zeroes it. */
+let comparePanX = 0;
+let comparePanY = 0;
+/** Scroll-wheel zoom multiplier (ADR-055), applied in project() as a post-multiply on TOP of
+ *  the fixed intrinsic scale — never recomputes or replaces it, so ADR-053's scale-lock stays
+ *  pure. 1 = the untouched intrinsic scale (10 mm reads as 10 mm); user-driven only, same
+ *  reset contract as comparePanX/Y (compare.show, dblclick, sim reset — see resetCompareView). */
+let compareZoom = 1;
+const COMPARE_ZOOM_MIN = 0.4;
+const COMPARE_ZOOM_MAX = 5;
+let workbenchRail = null;
+/** @type {Map<string, {parent: Element, next: Node|null}>} Each driver wrapper's original
+ *  {parent, nextSibling}, captured the first time it is re-parented so exitWorkbench can
+ *  restore it to its EXACT home slot — unlike the Points reference's single `#controls`
+ *  dock, these 7 wrappers come home to TWO different Step panels (Step 1 and Step 2). */
+const driverHomes = new Map();
+
+function isWorkbenchViewport() {
+  return window.matchMedia('(min-width: 768px)').matches;
+}
+
+/** The docked rail, created once and kept for the session. */
+function ensureWorkbenchRail() {
+  if (workbenchRail) return workbenchRail;
+  workbenchRail = document.createElement('div');
+  workbenchRail.id = 'workbench-rail';
+  workbenchRail.setAttribute('role', 'group');
+  workbenchRail.setAttribute('aria-label',
+    'Geometry drivers. Shape, and the orientation/inclination mode toggles, stay in the steps panel.');
+  document.body.appendChild(workbenchRail);
+  return workbenchRail;
+}
+
+/** Collapse the wizard, split the viewport 50/50, and dock the 7 driver wrappers under
+ *  both panes. Idempotent. */
+function enterWorkbench() {
+  if (workbenchOpen) return;
+  workbenchOpen = true;
+
+  // The split is a live 3D↔2D read, so the left pane must show the 3D pictorial — return
+  // the scene to unfolded 3D (ADR-037 gives the flattened read to the 2D canvas instead).
+  // The Step-6 flatten/unfold buttons live in #wizard, which is hidden for the whole split
+  // (see CSS), so this is the only place a flattened sheet can be un-flattened here.
+  // This bypasses the btnUnfold handler, so the stepper's own flatten latch is re-synced
+  // explicitly — otherwise Step 6 still reads "Unfold to 3D" after the Compare round-trip
+  // even though the engine is back in 3D.
+  if (foldProgress > 0) {
+    simController.unflatten();
+    stepper?.setFlattened(false);
+  }
+
+  const rail = ensureWorkbenchRail();
+  for (const key of WORKBENCH_CONTROLS) {
+    const wrap = document.querySelector(`[data-ctrl="${key}"]`);
+    if (!wrap) continue;
+    if (!driverHomes.has(key)) {
+      driverHomes.set(key, { parent: wrap.parentElement, next: wrap.nextSibling });
+    }
+    rail.appendChild(wrap);
+  }
+
+  // Re-parent the drawing card out to <body> so the grid can place it as the right pane
+  // (compact anchors absolutely inside #sim-viewport, which is now the left pane).
+  if (compareCard && compareCard.parentElement !== document.body) {
+    document.body.appendChild(compareCard);
+  }
+  document.body.classList.add('compare-split');
+  // The rail toggle always defaults to shown on entry — a prior collapse from an earlier
+  // split visit must not carry over, and the button's own facets need the same reset.
+  document.body.classList.remove('rail-collapsed');
+  syncRailToggleState(false);
+}
+
+/** Restore the floating layout: hand the 7 driver wrappers back to their captured home
+ *  slots, re-nest the card in #sim-viewport, and let the stepper's existing per-step
+ *  [hidden] (never touched while docked — #wizard is unreachable during the split) own
+ *  their visibility again. Idempotent. */
+function exitWorkbench() {
+  if (!workbenchOpen) return;
+  workbenchOpen = false;
+  document.body.classList.remove('compare-split');
+  document.body.classList.remove('rail-collapsed');
+  syncRailToggleState(false);
+
+  // Card back inside the viewport (the positioned ancestor compact anchors to).
+  if (compareCard && viewport && compareCard.parentElement !== viewport) {
+    viewport.appendChild(compareCard);
+  }
+
+  for (const key of WORKBENCH_CONTROLS) {
+    const wrap = workbenchRail?.querySelector(`[data-ctrl="${key}"]`);
+    const home = driverHomes.get(key);
+    if (wrap && home?.parent) home.parent.insertBefore(wrap, home.next);
+  }
+}
+
+/** Set the compare footprint and mount/unmount the workbench to match. 'expanded'
+ *  enters the split (desktop only); anything else is the compact floating card. */
+function applyCompareSize(size) {
+  const wantSplit = size === 'expanded' && isWorkbenchViewport();
+  compareSize = wantSplit ? 'expanded' : 'compact';
+  if (compareCard) compareCard.dataset.size = compareSize;
+  if (wantSplit) enterWorkbench();
+  else exitWorkbench();
+  remeasureAfterReflow(); // TWO frames — the grid reflow isn't laid out on frame 1
+}
+
+/** Re-measure the viewport AFTER a layout-changing reflow has actually been laid out
+ *  (entering/leaving the split flips the body between a flex row and a CSS grid — a
+ *  heavy reflow not committed by the first requestAnimationFrame). */
+function remeasureAfterReflow() {
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    handleResize(viewport);
+    if (compareOpen) drawCompare();
+  }));
+}
+
+/** State-aware Compare chip: aria-pressed mirrors open/closed (the CSS fills the pill
+ *  solid accent while pressed). */
+function updateCompareChip() {
+  compareChip?.setAttribute('aria-pressed', String(compareOpen));
+}
+
+/** Hide the chip until the lesson's 2D gate passes (Step 4's top + front views), preserving
+ *  the pedagogy that the 2D drawing is meaningless before any view is projected. A closed
+ *  gate also force-closes an open card (e.g. a reset mid-Compare). */
+function syncCompareChipVisibility() {
+  if (!compareChip) return;
+  const ok = showProjectionsFlag;
+  compareChip.hidden = !ok;
+  if (!ok && compareOpen) compare.hide();
+}
+
+/** Single reset point for the Compare sheet's user-driven view state (ADR-054 pan + ADR-055
+ *  zoom) — called on fresh open, dblclick recenter, and sim reset, so the three sites can't
+ *  drift out of sync with each other. */
+function resetCompareView() {
+  comparePanX = 0;
+  comparePanY = 0;
+  compareZoom = 1;
+}
+
+const compare = {
+  show(size) {
+    if (foldTween) return; // the fold owns the camera + card
+    compareOpen = true;
+    resetCompareView(); // ADR-054/055: every fresh open starts centred and unzoomed, not wherever a past drag/zoom left it
+    if (compareCard) compareCard.hidden = false;
+    applyCompareSize(size || (isWorkbenchViewport() ? COMPARE_DEFAULT_SIZE : 'compact'));
+    updateCompareChip();
+    announce('Compare view opened — 2D drawing.');
+  },
+  hide() {
+    if (!compareOpen) return;
+    compareOpen = false;
+    const wasSplit = workbenchOpen;
+    if (wasSplit) exitWorkbench(); // tear the split down before the card vanishes
+    if (compareCard) compareCard.hidden = true;
+    updateCompareChip();
+    announce('Compare view closed.');
+    if (wasSplit) remeasureAfterReflow(); // hand the width back to the wizard, resize the renderer
+  },
+  toggle() { compareOpen ? compare.hide() : compare.show(); },
+  isOpen() { return compareOpen; },
+};
+
+/**
+ * Repaint the Compare card's 2D orthographic drawing (top/front/side views only — no
+ * projector lines, see below) from the live projection data — a live rebuild on every
+ * commit, never a snapshot. Reads the ALREADY-CLASSIFIED (visible solid / occluded
+ * dashed, per view) LineSegments2 geometry the 3D scene itself draws with
+ * (activeProjection's hp/vp/pp groups — projectionDrawer.js's classifyEdge/visibleInHP/
+ * VP/PP, untouched here), then applies the SAME analytic fold this sim's own Step-6 uses
+ * (vpFoldGroup's +90° about Z: (x,y,z)→(−y,x,z); ppHingeGroup's −90° about local X at its
+ * z0 hinge: (x,y,z)→(x,z,−y)) so the folded points land exactly where the 3D pane's own
+ * fold puts them.
+ *
+ * ADR-052 (answer-sheet projection, replaces the old same-axis toCanvas): those folded
+ * WORLD points are then run through the answer-sheet camera's OWN top-down projection —
+ * not a naive (worldX, worldZ) passthrough. swoopToAnswerSheet uses
+ * QUICK_VIEWS.top.dir = (0,1,0) (looking down −Y) with FLAT_VIEW_UP = (−1,0,0); the
+ * camera's screen-right basis vector is cross(forward, up) = cross((0,−1,0),(−1,0,0)) =
+ * (0,0,−1), i.e. screenX ∝ −worldZ, and screen-up ∝ −worldX (matching "up = −X" — see
+ * QUICK_VIEWS/FLAT_VIEW_UP comments). So sheet-space is (sheetX, sheetY) = (−worldZ,
+ * −worldX) — front view above top view, side view to the RIGHT of top view — verified
+ * pixel-for-pixel against the 3D pane's own rendered flatten (Step 6, first-angle
+ * layout). The prior mapping used (worldX, worldZ) directly (no camera projection at
+ * all), which produced a 90°-rotated, mirrored sheet (front left of top, side below).
+ *
+ * Also replicates the BIS Type-B dimension layer (ADR-041 — dimension/extension lines,
+ * filled 3:1 arrowhead triangles, numeric CSS2D labels living in activeProjection's
+ * hp/vpDimensionGroup) and the flattened sheet's Top/Front/Side View captions, so the
+ * 2D sheet is a full replica of the annotated 3D drawing, not just its outline. The
+ * dimension layer mirrors showDimensionsFlag, the same gate applyDimensionVisibility
+ * uses on the 3D pane. No corner vertex labels (A/B/C′…): those annotate the upright
+ * 3D solid and fade out on fold (labeler.setOpacity in applyFoldVisual), so the fully
+ * flattened sheet never carries them either. The point-to-point projectors
+ * (flatConnectorGroup) are intentionally NOT drawn here — they read as clutter once the
+ * sheet is a clean flattened drawing; the 3D pane's own upright/fold view is where those
+ * connectors earn their keep (showConnectorsFlag).
+ *
+ * ADR-052 (auto-fit scale, supersedes ADR-038's fixed mm span): a fixed 140mm span left
+ * small solids reading as a speck. The sheet now measures every point it is about to
+ * draw (views + visible dimension/caption geometry) and scales+centres to fill the card
+ * with a constant pixel margin — true size is still readable off the dimension numerals.
+ *
+ * Also draws the XY (HP∩VP ground line) and X1-Y1 (HP∩PP hinge) reference marks as a thin
+ * dashed `--color-ink-secondary` underlay, ending the "intentionally not created" de-clutter
+ * gap noted on the 3D pane's own positionRefLabels/setRefLabelOpacity (those still skip them;
+ * this sheet is where they now live). See the per-view bbox comment ahead of the draw calls
+ * below for the placement math.
+ */
+function drawCompare() {
+  if (!compareCanvas) return;
+  const stage = compareCanvas.parentElement;
+  const w = stage?.clientWidth || 0;
+  const h = stage?.clientHeight || 0;
+  if (!w || !h) return;
+
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  compareCanvas.width = Math.round(w * dpr);
+  compareCanvas.height = Math.round(h * dpr);
+  const ctx = compareCanvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const paper = cssVar('--color-paper');
+  const hpCol = cssVar('--color-hp-line');
+  const vpCol = cssVar('--color-vp-line');
+  const ppCol = cssVar('--color-pp-line');
+
+  ctx.fillStyle = paper;
+  ctx.fillRect(0, 0, w, h);
+
+  if (!showProjectionsFlag || !activeProjection) return; // nothing projected yet
+
+  const z0 = ppHingeGroup ? ppHingeGroup.position.z : DEFAULT_PP_STANDOFF;
+
+  // Sheet-space (world units, no scale/offset yet) flatten: the fold each group's OWN
+  // pivot applies (see header) composed with the answer-sheet camera's projection
+  // (sheetX, sheetY) = (−worldZ, −worldX) — ADR-052. Kept separate from `project()`
+  // below so the SAME functions can measure the drawing (pass 1) before any scale
+  // exists, then draw it (pass 2) once `project` is known.
+  const sheetHP = (x, _y, z) => ({ x: -z, y: -x });          // top view: HP never folds
+  const sheetVP = (_x, y, z) => ({ x: -z, y });               // front view: (x,y,z)→(−y,x,z)
+  const sheetPP = (x, y, _z) => ({ x: y - z0, y: -x });        // side view: (x,y,z)→(x,z,z0−y)
+  // Captions store their ALREADY-POST-FOLD world position (positionRefLabels), so they
+  // only need the camera projection, not a fold.
+  const sheetCaption = (px, _py, pz) => ({ x: -pz, y: -px });
+
+  /** Walk every drawable child of `group` (LineSegments2 endpoints + arrowhead Mesh
+   *  triangle verts — the isLineSegments2 check must come first: LineSegments2 also
+   *  reports isMesh=true, r160 gotcha), feeding each raw point through `sheetFn` into
+   *  `measure`. Shared by the auto-fit measure pass and could equally walk any group
+   *  this function draws, so the measured extent always matches what actually paints. */
+  const walkGroupPoints = (group, sheetFn, visit) => {
+    if (!group) return;
+    for (const child of group.children) {
+      if (child.isLineSegments2) {
+        const start = child.geometry.attributes.instanceStart;
+        const end = child.geometry.attributes.instanceEnd;
+        if (!start || !end) continue;
+        for (let i = 0; i < start.count; i++) {
+          visit(sheetFn(start.getX(i), start.getY(i), start.getZ(i)));
+          visit(sheetFn(end.getX(i), end.getY(i), end.getZ(i)));
+        }
+      } else if (child.isMesh) {
+        const pos = child.geometry?.attributes?.position;
+        if (!pos) continue;
+        for (let i = 0; i < pos.count; i++) {
+          visit(sheetFn(pos.getX(i), pos.getY(i), pos.getZ(i)));
+        }
+      }
+    }
+  };
+
+  // ---- Pass 1 (ADR-052, supersedes ADR-038's fixed mm span): measure every point the
+  // sheet is about to draw — the three views, the dimension layer when shown, and the
+  // view captions — so the sheet can auto-fit the card instead of framing a constant mm
+  // span that left small solids reading as a speck. ----
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minY = Infinity;
+  let maxY = -Infinity;
+  const measure = (p) => {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  };
+  // Per-view sheet-space bounding boxes, tracked ALONGSIDE the overall auto-fit bbox above —
+  // used below to place the XY / X1-Y1 ground-line reference marks in the actual visual gap
+  // between adjacent folded views (self-adjusting to the solid's layout) rather than only the
+  // analytic fold-hinge position, which the auto-fit crop can push off-centre.
+  const emptyBox = () => ({ minX: Infinity, maxX: -Infinity, minY: Infinity, maxY: -Infinity });
+  const hpBox = emptyBox();
+  const vpBox = emptyBox();
+  const ppBox = emptyBox();
+  const measureBox = (box, p) => {
+    measure(p);
+    if (p.x < box.minX) box.minX = p.x;
+    if (p.x > box.maxX) box.maxX = p.x;
+    if (p.y < box.minY) box.minY = p.y;
+    if (p.y > box.maxY) box.maxY = p.y;
+  };
+  walkGroupPoints(activeProjection.hpGroup, sheetHP, (p) => measureBox(hpBox, p));
+  walkGroupPoints(activeProjection.vpGroup, sheetVP, (p) => measureBox(vpBox, p));
+  if (showSideViewFlag) walkGroupPoints(activeProjection.ppGroup, sheetPP, (p) => measureBox(ppBox, p));
+  if (showDimensionsFlag) {
+    walkGroupPoints(activeProjection.hpDimensionGroup, sheetHP, measure);
+    walkGroupPoints(activeProjection.vpDimensionGroup, sheetVP, measure);
+  }
+  for (const lbl of [topViewLabel, frontViewLabel, showSideViewFlag ? sideViewLabel : null]) {
+    if (lbl?.element?.textContent) measure(sheetCaption(lbl.position.x, lbl.position.y, lbl.position.z));
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(minY)) return; // nothing drawable yet
+
+  // ---- Fixed intrinsic-size frame (ADR-053, supersedes ADR-052's live auto-fit): scale and
+  // anchor are derived ONLY from the solid's own 3D size (solidSpanUnits) and the world origin
+  // — NEVER from the minX/maxX/minY/maxY measured above, and never from the live distHP/distVP.
+  // seatOnPlanes seats the solid so distHP=0 rests exactly on the HP (world y=0) and distVP=0
+  // rests exactly on the VP (world x=0); world z is always 0 (mesh.position.z, seatOnPlanes).
+  // So the world origin IS the slider-independent reference already built into the seating —
+  // sheetHP/sheetVP/sheetPP (above) read straight off world x/y/z, so pinning sheet-space (0,0)
+  // here means a distance slider moves ONLY the view whose formula depends on that axis; it can
+  // no longer rescale or re-pan views that don't (see the per-view derivation in the header
+  // comments above sheetHP/sheetVP/sheetPP). ----
+  const marginPx = 40;
+  const E = Math.max(solidSpanUnits, 1e-3);      // characteristic size = bounding-sphere diameter
+  const GAP = E * 0.35;                          // fixed inter-view gutter, world units
+  const nomWmm = (E + (showSideViewFlag ? GAP + E : 0)) * WORLD_TO_MM;
+  const nomHmm = (E + GAP + E) * WORLD_TO_MM;     // Front view stacked above Top view
+  const scale = Math.min((w - 2 * marginPx) / nomWmm, (h - 2 * marginPx) / nomHmm); // px per mm
+
+  // ADR-054 (refines ADR-053's anchor clause; scale above is unchanged): pinning sheet-space
+  // (0,0) to the canvas centre left the drawing lopsided — Front/Top (sheetHP.x=sheetVP.x=-z)
+  // sit centred near sheetX=0, but the Side block (sheetPP.x=y-z0) sits a further E+GAP to the
+  // RIGHT of that, so the nominal layout's own centre is NOT world-origin — it's offset exactly
+  // (E+GAP)/2 to the right (0 with no side view). Anchoring there instead of at (0,0) balances
+  // the left/right margins. Derived ONLY from E/GAP/showSideViewFlag — same distance/angle
+  // -independent inputs as `scale` itself, so this is still an intrinsic-size constant, never
+  // the live bbox: a distance slider still moves only the view whose formula depends on that
+  // axis, it just does so around this balanced centre instead of around (0,0).
+  const anchorSX = showSideViewFlag ? (E + GAP) / 2 : 0;
+  const anchorSY = 0; // Front-above/Top-below is already nominally symmetric about sheetY=0
+
+  const cx = w / 2;
+  const cy = h / 2;
+
+  // World units → sheet mm (WORLD_TO_MM, ADR-018) → canvas px, anchored at the fixed
+  // intrinsic-nominal layout centre (ADR-054) — never a live bbox centre. `compareZoom`
+  // (ADR-055) post-multiplies the content term only — a pure screen-space lens over the
+  // intrinsic `scale`, which itself never changes. `comparePanX/Y` (CSS px, ADR-054) layers
+  // the user's drag-to-pan on top so extreme distance/angle values (or a zoomed-in view)
+  // that push content past the card edge stay reachable without touching scale or anchor.
+  // Canvas y grows DOWN; the sheet's "up" is screen-up, so y flips sign.
+  const project = (p) => ({
+    x: cx + (p.x - anchorSX) * WORLD_TO_MM * scale * compareZoom + comparePanX,
+    y: cy - (p.y - anchorSY) * WORLD_TO_MM * scale * compareZoom + comparePanY,
+  });
+  // ---- Pass 2: the actual draw-space flatten functions, composing sheet-space + project. ----
+  const flattenHP = (x, y, z) => project(sheetHP(x, y, z));
+  const flattenVP = (x, y, z) => project(sheetVP(x, y, z));
+  const flattenPP = (x, y, z) => project(sheetPP(x, y, z));
+  const flattenCaption = (px, py, pz) => project(sheetCaption(px, py, pz));
+
+  // ---- Orthographic ground-line reference marks (XY / X1-Y1) — a thin dashed underlay
+  // drawn BEFORE the view linework below so the actual outlines paint on top of it, matching
+  // standard BIS sheet convention (a light construction line, not part of the drawing itself).
+  // XY is the HP∩VP ground line (Front folds down to meet Top); X1-Y1 is the HP∩PP hinge
+  // (Top+Front meet the Side view). ADR-056 (supersedes the 2026-07-16 visual-gap-midpoint
+  // placement): each line is PINNED to its analytic hinge coordinate — sheetY=0 for XY,
+  // sheetX=−z0 for X1-Y1 (see the sheetHP/sheetVP/sheetPP header derivation) — never a live
+  // bbox midpoint, because the Front view's sheetY (=worldY) and the Side view's sheetX
+  // (=worldY−z0) both move under the distHP slider (seatOnPlanes), which dragged the old
+  // midpoint along with the geometry instead of leaving it as a fixed hinge. hpBox/vpBox/ppBox
+  // are read ONLY to size each line's LENGTH along its own perpendicular axis (sheetX for XY,
+  // sheetY for X1-Y1) — both of those axes are distance-slider-invariant (sheetHP.x=sheetVP.x=
+  // −worldZ; sheetHP.y=−worldX), so the length can safely track the drawing without the
+  // position drifting. Skipped entirely once nothing is drawable (guarded by the early return
+  // above).
+  const hpValid = Number.isFinite(hpBox.minX);
+  const vpValid = Number.isFinite(vpBox.minX);
+  const ppValid = showSideViewFlag && Number.isFinite(ppBox.minX);
+  const REF_OVERSHOOT = 0.3; // world units past the drawn extent, so lines clear the linework
+
+  ctx.strokeStyle = cssVar('--color-ink-secondary');
+  ctx.lineWidth = 0.75;
+  ctx.setLineDash([1]);
+
+  if (hpValid || vpValid) {
+    const xyY = 0; // analytic HP∩VP ground line (sheetY=0) — ADR-056, never the live view midpoint
+    // Length spans only the Top+Front block, on sheetX (=−worldZ) which is invariant under
+    // distHP/distVP — deliberately excludes the Side view (its sheetX tracks distHP via z0).
+    let xMin = Infinity, xMax = -Infinity;
+    if (hpValid) { xMin = Math.min(xMin, hpBox.minX); xMax = Math.max(xMax, hpBox.maxX); }
+    if (vpValid) { xMin = Math.min(xMin, vpBox.minX); xMax = Math.max(xMax, vpBox.maxX); }
+    const a = project({ x: xMin - REF_OVERSHOOT, y: xyY });
+    const b = project({ x: xMax + REF_OVERSHOOT, y: xyY });
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
+  if (ppValid) {
+    const x1X = -z0; // analytic HP∩PP hinge (sheetX=−z0) — ADR-056, never the live view midpoint
+    // Length spans the Top+Side block, on sheetY (=−worldX for Top, =−worldX for Side) which is
+    // invariant under distHP/distVP — deliberately excludes the Front view (its sheetY=worldY
+    // tracks distHP directly).
+    const yMin = Math.min(hpValid ? hpBox.minY : ppBox.minY, ppBox.minY) - REF_OVERSHOOT;
+    const yMax = Math.max(hpValid ? hpBox.maxY : ppBox.maxY, ppBox.maxY) + REF_OVERSHOOT;
+    const a = project({ x: x1X, y: yMin });
+    const b = project({ x: x1X, y: yMax });
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.stroke();
+  }
+
+  ctx.setLineDash([]);
+
+  /** Stroke every LineSegments2 child of `group` (reading its instanced instanceStart /
+   *  instanceEnd endpoint buffers directly — the same technique used to verify these fat
+   *  lines in prior sessions), flattened by `flattenFn` and coloured `color`. Solid vs
+   *  dashed follows the segments.userData.hidden tag set in projectionDrawer.js. `width`
+   *  overrides the visible/hidden default (used by the dimension layer's 1px Type-B lines). */
+  const strokeGroup = (group, flattenFn, color, width) => {
+    if (!group) return;
+    for (const child of group.children) {
+      if (!child.isLineSegments2) continue;
+      const start = child.geometry.attributes.instanceStart;
+      const end = child.geometry.attributes.instanceEnd;
+      if (!start || !end) continue;
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width ?? (child.userData.hidden ? 1 : 1.6);
+      ctx.setLineDash(child.userData.hidden ? [5, 4] : []);
+      for (let i = 0; i < start.count; i++) {
+        const a = flattenFn(start.getX(i), start.getY(i), start.getZ(i));
+        const b = flattenFn(end.getX(i), end.getY(i), end.getZ(i));
+        ctx.beginPath();
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+        ctx.stroke();
+      }
+    }
+  };
+
+  /** Fill every triangle-soup Mesh child of `group` — the ADR-041 filled-arrowhead buffer.
+   *  LineSegments2 also reports isMesh=true (r160 gotcha), so it must be explicitly excluded
+   *  even though this walks the same dimension groups as strokeGroup. Reads raw local-space
+   *  triangle vertices straight off the position attribute, 3 verts (9 floats) per triangle. */
+  const fillArrowMesh = (group, flattenFn, color) => {
+    if (!group) return;
+    ctx.fillStyle = color;
+    for (const child of group.children) {
+      if (!child.isMesh || child.isLineSegments2) continue;
+      const pos = child.geometry?.attributes?.position;
+      if (!pos) continue;
+      for (let i = 0; i + 2 < pos.count; i += 3) {
+        const p0 = flattenFn(pos.getX(i), pos.getY(i), pos.getZ(i));
+        const p1 = flattenFn(pos.getX(i + 1), pos.getY(i + 1), pos.getZ(i + 1));
+        const p2 = flattenFn(pos.getX(i + 2), pos.getY(i + 2), pos.getZ(i + 2));
+        ctx.beginPath();
+        ctx.moveTo(p0.x, p0.y);
+        ctx.lineTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.closePath();
+        ctx.fill();
+      }
+    }
+  };
+
+  /** Paint every CSS2DObject child of `group` (the dimension layer's numeric labels) as
+   *  flat Canvas2D text — the CSS2DRenderer only exists in the 3D viewport, so the 2D sheet
+   *  reads each label's live text + world position off the DOM node and re-renders it here.
+   *  A `--color-paper` break behind the digits mirrors the 3D label's own background break
+   *  (projectionDrawer.js makeDimLabel) so the numeral stays legible over a crossing line. */
+  const drawGroupText = (group, flattenFn, color, font) => {
+    if (!group) return;
+    ctx.font = font;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (const child of group.children) {
+      if (!child.isCSS2DObject) continue;
+      const text = child.element?.textContent;
+      if (!text) continue;
+      const p = flattenFn(child.position.x, child.position.y, child.position.z);
+      const half = ctx.measureText(text).width / 2 + 2;
+      ctx.fillStyle = paper;
+      ctx.fillRect(p.x - half, p.y - 6, half * 2, 12);
+      ctx.fillStyle = color;
+      ctx.fillText(text, p.x, p.y);
+    }
+  };
+
+  // No point-to-point projectors here (ADR-052): flatConnectorGroup reads as clutter on
+  // a clean flattened sheet — see the header note. Just the three views themselves.
+  strokeGroup(activeProjection.hpGroup, flattenHP, hpCol);
+  strokeGroup(activeProjection.vpGroup, flattenVP, vpCol);
+  if (showSideViewFlag) strokeGroup(activeProjection.ppGroup, flattenPP, ppCol);
+  ctx.setLineDash([]);
+
+  // Dimension layer (BIS SP 46:2003 Type B, ADR-041) — mirrors the 3D pane's own
+  // showDimensionsFlag gate (setDimensionsVisible → applyDimensionVisibility), so the 2D
+  // sheet only carries dimensions once the learner has revealed them in the 3D view.
+  if (showDimensionsFlag) {
+    const inkCol = cssVar('--color-ink');
+    const monoFont = `11px ${cssVar('--font-mono') || 'monospace'}`;
+    strokeGroup(activeProjection.hpDimensionGroup, flattenHP, inkCol, 1);
+    strokeGroup(activeProjection.vpDimensionGroup, flattenVP, inkCol, 1);
+    fillArrowMesh(activeProjection.hpDimensionGroup, flattenHP, inkCol);
+    fillArrowMesh(activeProjection.vpDimensionGroup, flattenVP, inkCol);
+    drawGroupText(activeProjection.hpDimensionGroup, flattenHP, inkCol, monoFont);
+    drawGroupText(activeProjection.vpDimensionGroup, flattenVP, inkCol, monoFont);
+    ctx.setLineDash([]);
+  }
+
+  // View-name captions (Top/Front/Side View) — the same world-space CSS2D labels the 3D
+  // pane fades in on the flattened sheet (setRefLabelOpacity/positionRefLabels); the 2D
+  // sheet is always the fully-flattened drawing regardless of 3D fold progress (matching
+  // how hpGroup/vpGroup above are always drawn flat too), so captions always draw once a
+  // projection exists. Side caption gated on showSideViewFlag, like the side view's own line.
+  //
+  // positionRefLabels' world-space margin (M=2.0 units) past each view reads generously in
+  // the 3D viewport's own roomier framing, but is tight against this sheet's auto-fit crop
+  // (ADR-052) — a CENTRED text anchor there lets the far half of the caption bite back into
+  // the nearest dimension number. So the anchor is aligned to read AWAY from the sheet centre
+  // (its near edge sits at the point, the text extends outward) along whichever axis the
+  // label is actually offset on, using the existing margin fully instead of centring on it.
+  const captionCol = cssVar('--color-ink-secondary');
+  const captionFont = `12px ${cssVar('--font-sans') || 'sans-serif'}`;
+  const drawCaption = (lbl) => {
+    const text = lbl?.element?.textContent;
+    if (!text) return;
+    const p = flattenCaption(lbl.position.x, lbl.position.y, lbl.position.z);
+    const dx = p.x - cx;
+    const dy = p.y - cy;
+    ctx.font = captionFont;
+    ctx.fillStyle = captionCol;
+    ctx.textAlign = Math.abs(dx) >= Math.abs(dy) ? (dx < 0 ? 'right' : 'left') : 'center';
+    ctx.textBaseline = Math.abs(dy) > Math.abs(dx) ? (dy < 0 ? 'bottom' : 'top') : 'middle';
+    ctx.fillText(text, p.x, p.y);
+  };
+  drawCaption(topViewLabel);
+  drawCaption(frontViewLabel);
+  if (showSideViewFlag) drawCaption(sideViewLabel);
+}
+
+/**
+ * Rail hide/reveal — collapse the docked #workbench-rail for a full-screen read of the
+ * 50/50 split. Independent of the wizard chevron: collapsing the rail never exits the
+ * split, and enterWorkbench() always resets this back to shown on entry.
+ */
+
+/** One-source-of-truth sync for the #rail-toggle button's 4 state facets (aria-expanded,
+ *  aria-label, title, the visible .rail-toggle__text span). Called from the click handler
+ *  below AND from enterWorkbench()/exitWorkbench(), which force-reset this on every split
+ *  transition — without those second call sites the button could read stale "Show"/"Hide"
+ *  text (see the Points reference's 2026-07-15 rail-toggle desync fix). */
+function syncRailToggleState(collapsed) {
+  const btn = document.getElementById('rail-toggle');
+  if (!btn) return;
+  btn.setAttribute('aria-expanded', String(!collapsed));
+  btn.setAttribute('aria-label', collapsed ? 'Show controls' : 'Hide controls');
+  btn.title = collapsed ? 'Show controls' : 'Hide controls';
+  const txt = btn.querySelector('.rail-toggle__text');
+  if (txt) txt.textContent = collapsed ? 'Show' : 'Hide';
+}
+
+function setupRailToggle() {
+  const btn = document.getElementById('rail-toggle');
+  if (!btn) return;
+
+  btn.addEventListener('click', () => {
+    const collapsed = document.body.classList.toggle('rail-collapsed');
+    syncRailToggleState(collapsed);
+    announce(collapsed ? 'Controls rail hidden.' : 'Controls rail shown.');
+    // The rail's grid row (and its gap) drops out on collapse, so the viewport and 2D
+    // drawing card grow into the reclaimed height — reuse the double-rAF reflow wait.
+    remeasureAfterReflow();
+  });
+}
+
+/** Bind + wire the Compare chrome once at boot: the chip toggles the card, the head
+ *  buttons close / resize it. The expand button flips compact ↔ expanded. */
+function setupCompareCard() {
+  compareCard = document.getElementById('compare-card');
+  compareChip = document.getElementById('compare-chip');
+  compareCanvas = document.getElementById('compare-canvas');
+
+  compareChip?.addEventListener('click', () => compare.toggle());
+  document.getElementById('compare-close')?.addEventListener('click', () => compare.hide());
+
+  const expandBtn = document.getElementById('compare-expand');
+  const syncExpandBtn = () => {
+    const expanded = compareSize === 'expanded';
+    expandBtn?.setAttribute('aria-label', expanded ? 'Shrink to floating card' : 'Expand to split view');
+    if (expandBtn) expandBtn.title = expanded ? 'Shrink' : 'Expand';
+  };
+  syncExpandBtn();
+  expandBtn?.addEventListener('click', () => {
+    applyCompareSize(compareSize === 'expanded' ? 'compact' : 'expanded');
+    syncExpandBtn();
+    announce(compareSize === 'expanded' ? 'Compare view expanded to split.' : 'Compare view shrunk to card.');
+  });
+
+  // The workbench is desktop-only. If the viewport narrows below the mobile breakpoint
+  // while the split is up, drop back to the bottom-sheet card so the layout never wedges
+  // between the grid and the mobile stack.
+  window.matchMedia('(min-width: 768px)').addEventListener('change', (e) => {
+    if (!e.matches && workbenchOpen) { applyCompareSize('compact'); syncExpandBtn(); }
+  });
+
+  setupRailToggle();
+  setupComparePan();
+}
+
+/** Drag-to-pan (ADR-054) + scroll-wheel zoom (ADR-055) on the 2D sheet — standard
+ *  pointer-capture drag, coalesced to one redraw per animation frame so a fast drag/scroll
+ *  doesn't queue up a backlog of drawCompare() calls. Pans `comparePanX/Y` and scales
+ *  `compareZoom` (both consumed by drawCompare's project()); neither touches the intrinsic
+ *  `scale`/anchor, so both compose with ADR-053's scale-lock instead of fighting it.
+ *  Double-click recenters AND un-zooms (resetCompareView) for when a drag/zoom wanders
+ *  off-frame. */
+function setupComparePan() {
+  if (!compareCanvas) return;
+  let dragging = false;
+  let lastX = 0;
+  let lastY = 0;
+  let redrawQueued = false;
+
+  const queueRedraw = () => {
+    if (redrawQueued) return;
+    redrawQueued = true;
+    requestAnimationFrame(() => {
+      redrawQueued = false;
+      if (compareOpen) drawCompare();
+    });
+  };
+
+  compareCanvas.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    compareCanvas.setPointerCapture(e.pointerId);
+    compareCanvas.style.cursor = 'grabbing';
+  });
+  compareCanvas.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    comparePanX += e.clientX - lastX;
+    comparePanY += e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    queueRedraw();
+  });
+  const endDrag = (e) => {
+    if (!dragging) return;
+    dragging = false;
+    if (compareCanvas.hasPointerCapture?.(e.pointerId)) {
+      compareCanvas.releasePointerCapture(e.pointerId);
+    }
+    compareCanvas.style.cursor = 'grab';
+  };
+  compareCanvas.addEventListener('pointerup', endDrag);
+  compareCanvas.addEventListener('pointerleave', endDrag);
+  compareCanvas.addEventListener('pointercancel', endDrag);
+  compareCanvas.addEventListener('dblclick', () => {
+    resetCompareView();
+    if (compareOpen) drawCompare();
+  });
+
+  // Scroll-wheel zoom (ADR-055), zeroed-in on the pointer: solve for the pan shift that keeps
+  // the world point under the cursor fixed on screen as compareZoom changes, using the exact
+  // same (cx,cy) centre drawCompare's project() anchors to (w/2, h/2 of the canvas's OWN
+  // rect — matches compareCanvas.parentElement's box, which is what drawCompare sizes the
+  // canvas to). preventDefault + non-passive stops the page from scrolling under the card.
+  compareCanvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = compareCanvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const midX = rect.width / 2;
+    const midY = rect.height / 2;
+    const factor = Math.exp(-e.deltaY * 0.0015);
+    const nextZoom = Math.min(COMPARE_ZOOM_MAX, Math.max(COMPARE_ZOOM_MIN, compareZoom * factor));
+    if (nextZoom === compareZoom) return; // clamped — nothing to do
+    const k = nextZoom / compareZoom;
+    comparePanX = (mx - midX) * (1 - k) + comparePanX * k;
+    comparePanY = (my - midY) * (1 - k) + comparePanY * k;
+    compareZoom = nextZoom;
+    queueRedraw();
+  }, { passive: false });
+}
+
+// ============================================================================
 // Platform API (CLAUDE.md "Platform contract")
 // ============================================================================
 
@@ -2278,6 +3051,8 @@ window.simAPI = {
     // Single reset path (CLAUDE.md): return to the EMPTY START + Step 1. Clear the
     // rotation modes, all revealed layers (labels, projections), and any fold, then
     // empty the scene and re-drive both the controls and the wizard.
+    compare.hide(); // no-op when closed; also tears the workbench split down first
+    resetCompareView(); // ADR-054/055: hide() doesn't touch pan/zoom — a Reset must return the sheet to 1×/centred for the next open
     modes.faceInclinationHP = false;
     modes.faceInclinationVP = false;
     modes.orientToCorner = false;
@@ -2462,6 +3237,8 @@ function init() {
     setupWizardToggle();
     setupQuickViews();
     setupConnectorToggle();
+    setupCompareCard(); // Compare chip/card/expand-close + the workbench rail toggle
+    syncCompareChipVisibility(); // starts hidden — no views projected yet at boot
     ui = initUIManager(simController);
     stepper = initStepper(simController);
     problemLibrary = initProblemLibrary(simController); // textbook problem library + self-check

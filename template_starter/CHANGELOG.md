@@ -11,3 +11,27 @@ this changelog starts fresh, per MODULE-STARTER §3.2.)
 - Added: Compare-view scaffolding (`#compare-card` + `#compare-canvas`, empty `#workbench-rail`,
   and the `.compare-card` / `body.compare-split` / `#workbench-rail` CSS) ported from the Points
   topic so the template is natively dual-mode capable.
+
+## 2026-07-16
+- Fixed: `.wizard-toggle` was pinned at the stale `.vp-cluster` clearance (`calc(44px +
+  var(--space-5))`, ~68px down) instead of the plain top-corner inset (`var(--space-3)`) — it
+  silently overlapped the compact Compare card's own top offset, which is derived assuming the
+  shallow inset. Backported from the Module 2 master.
+- Fixed: the Compare-split shell (`body.compare-split`, `#sim-viewport`, `#compare-card`,
+  `#workbench-rail`) was still the pre-polish flat layout — no panel-gray shell tone/gap/padding,
+  a flush borderless viewport and compare pane, and a plain flex-row rail. Backported the Module 2
+  master's floating-rounded-card treatment: panel-gray shell with `--space-4` gap/padding; the
+  viewport and rail both gain a hairline border + `--radius-md` + (viewport) `overflow:hidden`;
+  the compare card keeps its base rounded paper-card look instead of a flush `border-left`.
+  `#workbench-rail`'s internal control flow stays a generic wrapping row — deliberately *not*
+  Module 2's tuned column-major 7-driver grid, since that's specific to its own control count.
+- Fixed: `#workbench-rail .field[hidden]` used `display:block !important` (would break flex-laid
+  fields); now `display:flex !important` to match the master.
+- Added: the `.rail-toggle` Hide/Show control (CSS + `#rail-toggle` markup, a direct `<body>`
+  child) was entirely missing from the template — there was no way to hide the docked driver rail
+  for a full-screen 3D/2D read of the split. Backported as CSS+markup scaffolding only; a module
+  wires the click handler when it wires the split (`main.js` stays untouched here).
+- Changed: synced `DESIGN.md` (§5.12 wizard-toggle spec, §5.13 Compare-split workbench spec, and
+  the "Compare is Module-1-only" claim in §7/§8 — now corrected to reflect Module 2 shipping it
+  too) and `PLATFORM-RULES.md` (§2.10/§2.11 stale hex/token references, plus two new governing
+  rules) so these universals are actually governed at the root, not just fixed in this one file.

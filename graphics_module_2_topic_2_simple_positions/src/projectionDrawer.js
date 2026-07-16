@@ -373,6 +373,17 @@ function buildSegments(batch, color, linewidth, dashed, resolution) {
     // LineMaterial is unlit already, so nothing else to disable.
   });
   material.resolution.copy(resolution);
+  // Drafting line precedence: a visible continuous line MUST fully occlude a
+  // coincident hidden dashed line (e.g. the Cube's front/back faces project to
+  // the identical square). LineSegments2 renders fat lines as triangle fills, so
+  // equal-depth solid/dashed quads z-fight and the fat-line triangle jitter lets
+  // dashed fragments leak through unpredictably. Bias the DASHED material away
+  // from camera so the solid always wins the depth test regardless of draw order.
+  if (dashed) {
+    material.polygonOffset = true;
+    material.polygonOffsetFactor = 1;
+    material.polygonOffsetUnits = 1;
+  }
 
   const segments = new LineSegments2(geometry, material);
   // LineDashedMaterial / dashed LineMaterial render solid unless per-vertex line
@@ -380,6 +391,9 @@ function buildSegments(batch, color, linewidth, dashed, resolution) {
   // segment, so dashes stay phase-consistent across disjoint edges.
   if (dashed) segments.computeLineDistances();
   segments.frustumCulled = false; // tiny geometry, avoids cull pop during orbit
+  // Belt-and-suspenders paint order: solid after dashed, so even a depth-test
+  // edge case still resolves to the correct drafting precedence.
+  segments.renderOrder = dashed ? 0 : 1;
   return segments;
 }
 

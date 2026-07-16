@@ -5,6 +5,18 @@ Notable changes to this Engineering Graphics Module 1 topic (folder
 2026-07-13 as "Glass Box Visualizer"; renamed 2026-07-13, ADR-048). History before the scaffold
 below is the starter template's, carried over from the duplication.
 
+## 2026-07-14 (trial — rounded cards on gray, suspends ADR-021)
+- Changed: `body.compare-split` re-skinned as a **trial** — the 3D viewport, 2D drawing card, and
+  workbench rail now float as three separated rounded-white (`--radius-md`, 1px `--color-border`)
+  cards over a `--color-panel` gray background (`gap`/`padding: var(--space-4)`), replacing the
+  flush edge-to-edge layout with hairline seams. This temporarily suspends ADR-021 (flush workbench
+  layout) to evaluate the new aesthetic; CSS-only, no `main.js` change.
+- Verified: headless CDP on :8080, Step 5 boots straight into the split — `getComputedStyle`
+  confirms gray body bg, 10px radius + bordered white on all three panes, 16px grid gap; exactly
+  one WebGL canvas + one 2D `#compare-canvas` (single-context invariant, ADR-034, intact); 3D orbit
+  and `drawCompare()`'s multiview both still work; `Back to Step 4` exits the split cleanly; zero
+  console errors.
+
 ## 2026-07-13 (ADR-050 final flag — 2D Compare sheet synced to the mathematical views)
 - Fixed: `drawCompare()`'s 2D Compare sheet no longer traces an `EdgesGeometry` silhouette — Front/Top/Side are now constructed with native Canvas2D calls (`ctx.rect`/`ctx.arc`/`moveTo`/`lineTo`) straight from `BEARING_BLOCK_DIMS × BLOCK_SCALE`, mirroring `src/glassBox.js castProjectors()` exactly. This removes the Side view's false base/body seam and closes the Front view's dome as a true 180° arc — the two quirks the ADR-050 pane-outline rebuild fixed in 3D but left behind in the 2D sheet. The `scale`/`panX`/`panY` (`s`/`ox`/`oy`/`toX`/`toY`) mapping is unchanged.
 - Removed: the now-dead `EdgesGeometry` silhouette extraction in `buildBearingBlockSolid()` and the `SILHOUETTE_THRESHOLD_DEG` constant — nothing reads `solidData.silhouette` any more (`solidData` is now `{ group, verts }`).

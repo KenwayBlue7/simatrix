@@ -567,6 +567,16 @@ seamlessly into the rail without a seam. So the rail itself carries **no** top b
 half's structural seam is drawn instead by `#sim-viewport`'s `border-bottom`, and the right (2D)
 Compare card stays **borderless** so it reads as one continuous surface with the rail. The "hairline
 top border" therefore survives only as the 3D viewport's bottom border, not as a rail-wide rule.
+**Amended 2026-07-14 (rounded cards):** The 2026-07-10 border amendment above (no top border /
+flush seam so the rail reads as one continuous surface with the 2D pane) is **overturned** for
+the Points 50/50 split. The split now renders **three separated rounded cards** —
+`#sim-viewport`, `#compare-card`, `#workbench-rail` — each carrying its own `1px
+var(--color-border)` + `var(--radius-md)` + paper fill, floating on a `var(--color-panel)` gray
+grid backdrop (`gap` / `padding: var(--space-4)` on `body.compare-split`). The gap and the gray
+background now carry the "one surface" separation that the flush seam used to; box-shadow stays
+off (docked surfaces don't earn the transient-overlay shadow — Flat-Ink rule holds). This
+officially adopts the rounded-card layout that shipped as a same-day trial earlier
+2026-07-14 (see `points-compare-workbench` memory) — no longer a trial.
 **Status:** Active — the pattern now spans both Lines (engine `cfg`) and Points (standalone)
 
 ---
@@ -1138,6 +1148,15 @@ scene (the flat read belongs to the 2D pane, ADR-013); on exit `stepper.refresh(
 progressive disclosure of the borrowed drivers. Same ~76px rail-height cost and hidden step-narrative
 trade-off as ADR-021. New rule candidate for RULES.md: a topic-local Compare that offers an expanded
 mode MUST provide the 50/50 workbench (not a centred overlay) for cross-topic parity.
+**Amended 2026-07-14 (rounded cards + rail toggle):** Two changes. (a) The split's layout is now
+the rounded-card treatment (see ADR-021's 2026-07-14 amendment) instead of the flush-seam one
+this ADR originally shipped with. (b) **New clause:** the workbench rail is default-visible upon
+entering the split but features a dedicated hide/reveal toggle (`#rail-toggle`, `main.js
+setupRailToggle`) for a full-screen mode — collapsing it drops the rail's grid row so
+`#sim-viewport` and `#compare-card` reclaim the freed height, resized via the existing
+`remeasureAfterReflow()` double-rAF helper. The rail toggle is a separate control from the
+wizard chevron (`#wizard-toggle`, unchanged) — collapsing the rail does not exit the split, and
+exiting the split (or re-entering it) always resets the rail back to shown.
 **Status:** Active
 
 ---
@@ -1166,7 +1185,9 @@ the sheet keeps the drawing in proportion automatically.
 **Consequences:** New **RULES.md §5.19**. The 2D scale in `Module1/lines.js` is now
 `SHEET2D_SPAN = (SHEET/2)*10`, not a bare `100`. Cross-references **ADR-014** (the 3D perspective
 auto-zoom — the deliberate counterpart that this ADR carves the 2D drawing out of).
-**Status:** Active
+**Status:** Active for the Lines topic (`Module1/lines.js`), which this ADR governs. Module 2's
+Compare drawing had adopted the same fixed-scale *pattern* by convention (not this ADR — a
+different file/sim) and has since moved off it; see **ADR-052**, which does not alter Lines.
 
 ---
 
@@ -1640,6 +1661,307 @@ Compare sheet no longer share one segment source (the ADR-046/049 consistency in
 narrowed to the Compare sheet). `solidData.verts` still feeds the Step-3 sight lines.
 **Status:** Active (supersedes the amended ADR-046's view-outline pipeline and the Part-3 `sideFix`
 corrections; ADR-046's bounding-box treatment survives only in the sight lines' 8-corner cast)
+
+---
+
+## ADR-051: Module 2 gains the Compare 50/50 workbench (ADR-037 pattern); the rail deliberately overrides per-step disclosure with the full geometry driver set
+
+**Date:** 2026-07-15
+**Decision:** Port the Points topic's finished Compare workbench (ADR-037/021/034/038) to `Module2`
+(orthographic projection of solids), which previously had no Compare chrome at all — its only 2D
+representation was the in-scene flattened answer sheet from the Step-6 fold. Two Module2-specific
+adaptations, since it diverges structurally from the Points reference:
+(1) **Rail contents** — Module2 has no `[data-ctrl]` dock (Points had one `#controls` with 4 fixed
+wrappers); its sliders are distributed across per-step `.step-panel`s. The rail docks **all 7**
+`[data-ctrl]` wrapper groups covering the 8 continuous geometry drivers (`size` = base length +
+height, `resting`, `disthp`, `distvp`, `roty`, `anglehp`, `anglevp`) **at once** while the split is
+open — a deliberate override of the wizard's one-idea-per-step disclosure, enabling a "solve &
+verify" altitude (adjust any driver, watch the 2D sheet update live). Shape selection, Add, and the
+mode toggles (orient-to-corner, face-inclination HP/VP) stay in the wizard — not continuous drivers,
+and the wizard is unreachable while the split is open anyway. Each wrapper's original
+`{parent, nextSibling}` is captured on first re-parent so `exitWorkbench()` restores it to its exact
+home slot (two different Step panels, not one shared dock).
+(2) **`drawCompare()`'s data source** — rather than re-deriving edge visibility classification (view-
+dependent, camera-independent-but-per-plane, already correctly implemented in
+`projectionDrawer.js`'s `classifyEdge`/`visibleInHP`/`VP`/`PP`), it reads the ALREADY-BUILT
+`LineSegments2` objects on `activeProjection.hpGroup`/`vpGroup`/`ppGroup`/`flatConnectorGroup`
+directly (their `instanceStart`/`instanceEnd` attribute buffers), then applies the exact same
+analytic flatten the 3D scene's own Step-6 fold uses (`vpFoldGroup`'s +90° about Z, `ppHingeGroup`'s
+−90° about local X — both derived from `projectHP`/`VP`/`PP` and the `flatConnectors` construction in
+`projectionDrawer.js`), so the 2D sheet always agrees with the in-scene answer sheet with zero
+duplicated geometry logic. One additive line in `buildSegments()` tags `segments.userData.hidden =
+dashed` so the consumer can tell solid from occluded without relying on unverified `LineMaterial`
+getter behaviour.
+**Why:** Re-deriving edge classification a second time in `main.js` would duplicate
+`projectionDrawer.js`'s already-correct, already-tested convex-solid visibility logic and risk the
+two views (3D fold vs. 2D canvas) silently disagreeing after a future edit to one but not the other.
+Reading the built linework back out keeps ONE source of truth.
+**Alternatives rejected:** (a) *Mirror one representative driver per step into the rail* — rejected:
+the user explicitly wanted the full set surfaced at once for cross-checking a solved problem, not a
+curated subset. (b) *Re-run `buildEdgeMap` + reclassify in `main.js`* — rejected per the "why" above.
+(c) *Read `material.dashed` instead of tagging `userData`* — rejected: not confirmed as public/stable
+API from this codebase's own usage; a one-line additive tag is unambiguous and low-risk.
+**Consequences:** `projectionDrawer.js`'s `buildSegments()` now sets `userData.hidden` on every
+`LineSegments2` it returns (additive, does not change `ProjectionResult`'s shape). Compare gate =
+`showProjectionsFlag` (Step 4 top+front), mirroring Points' `showHP && showVP`; the side (PP, violet)
+line is added only once `showSideViewFlag` (Step 5) is on. Verified headless (Chrome via CDP, PID-
+scoped kill): 50/50 split activates, both panes measure to half width, both canvases' backing stores
+resize, the 2D sheet paints real non-blank linework (pixel-sampled) that grows when the side view is
+revealed, the `#rail-toggle` collapsed state lands at exactly `var(--space-6)` (32px) off the
+viewport corner, and all 7 drivers restore to their correct home Step panel on exit — 31/31 checks,
+zero console errors.
+**Status:** Active
+**Amended 2026-07-15 (rail layout):** The single non-wrapping flex row of fixed-172px fields
+(above) held for the initial port but did not scale once the full 8-driver set was checked against
+the rail at split width — the row ran wider than the bench and relied on `overflow-x:auto` to hide
+the excess, and the floating `#rail-toggle` pill (a grid sibling pinned to the rail's top-left) had
+no reserved clearance from the first field row. `body.compare-split #workbench-rail` now lays the 7
+`[data-ctrl]` wrappers out as a `grid-template-columns: repeat(auto-fit, minmax(200px, 1fr))`
+instrument grid (wraps into new rows as the bench narrows, no horizontal scroll), with
+`#workbench-rail .field` losing its fixed 172px width to fill its cell, and a
+`calc(44px + var(--space-4) + var(--space-3))` top padding on the rail that reserves a clear band
+under the toggle at every width (toggle is a grid sibling, unaffected by the rail's own padding).
+Verified headless (Chrome via CDP, PID-scoped kill): the 8 fields wrap into 2 grid rows at split
+width, the toggle clears all 8 field rects with a 12.6px gap, and no field overflows the rail's
+horizontal bounds.
+
+---
+
+## ADR-052: Module 2's `drawCompare()` projects through the answer-sheet camera, not a same-axis passthrough; its scale auto-fits the card
+
+**Date:** 2026-07-15
+**Decision:** `drawCompare()`'s flatten functions now compose TWO transforms per point, not one:
+(1) the analytic fold each group's own pivot applies (unchanged from ADR-051 — VP's +90° about Z:
+`(x,y,z)→(−y,x,z)`; PP's −90° about local X at its `z0` hinge: `(x,y,z)→(x,z,z0−y)`), then (2) the
+answer-sheet camera's own top-down projection: `(sheetX, sheetY) = (−worldZ, −worldX)`. (2) was
+missing entirely — ADR-051 stopped at the fold and wrote the folded world `(x, z)` straight to the
+canvas, an implicit assumption that camera-space equals world-space, which is only true for a
+camera looking down −Y with up = +Z. This sim's actual answer-sheet camera
+(`swoopToAnswerSheet`/`QUICK_VIEWS.top.dir=(0,1,0)`, `FLAT_VIEW_UP=(−1,0,0)`) looks down −Y with
+up = −X — a 90°-rolled top view — so the passthrough put the front view LEFT of the top view and the
+side view BELOW it, a 90° rotation off the 3D pane's own rendered fold (front above top, side right
+of top). The projection direction was re-derived from the camera basis
+(`screenRight = cross(forward, up) = cross((0,−1,0),(−1,0,0)) = (0,0,−1)`, i.e. `screenX ∝ −worldZ`;
+`screenUp = up = (−1,0,0)`, i.e. `screenY(up) ∝ −worldX`) and cross-checked pixel-for-pixel against
+a screenshot of the 3D pane's flattened Step-6 state. The point-to-point projectors
+(`flatConnectorGroup`) are also no longer drawn on the sheet — they read as clutter once the layout
+is correct; that connector set still serves the 3D pane's own upright/fold view
+(`showConnectorsFlag`). Separately, the sheet's scale switches from a fixed mm span to **auto-fit**:
+it measures every point it is about to draw (views + visible dimension geometry + captions) and
+scales+centres to fill the card with a constant pixel margin — true size stays readable off the
+dimension numerals. This auto-fit applies **only to Module 2's Compare sheet**; it does not touch
+or reverse **ADR-038**, which governs the Lines topic's separate 2D sheet (`Module1/lines.js`) and
+remains Active there for the reason ADR-038 states (measured-drawing fidelity matters more when the
+sheet has no numeric dimension layer to fall back on).
+**Why:** The 2D Compare card exists so a learner can check their by-hand drawing against the sim's
+answer — that only works if the sim's own two representations (3D fold, 2D sheet) agree. A silent
+90° mismatch between them defeats the feature's purpose. Auto-fit was chosen (over retuning the
+fixed mm span) because Module 2's solids vary far more in size (base/height 1–70 mm) than Lines'
+single line geometry, so any fixed span is either too tight for large solids or leaves small ones
+reading as a speck — Module 2's sheet also carries numeric dimension labels (ADR-041), so "10 mm
+reads as 10 mm" fidelity (ADR-038's rationale) is preserved through the numerals even as the drawing
+itself scales to fit.
+**Alternatives rejected:** (a) *Keep ADR-038's fixed-scale pattern, just retune `REF_SPAN_MM`
+smaller* — rejected: any single constant is wrong at one end of Module 2's slider range (the same
+problem ADR-038 itself doesn't have, since Lines has one fixed-shape geometry, not free-varying
+base/height/distance sliders). (b) *Fix only the axis swap, keep drawing `flatConnectorGroup`* —
+rejected per explicit task requirement: the projectors read as visual noise once the sheet's own
+linework is correct and legible.
+**Consequences:** `drawCompare()` (`Module2/main.js`) now runs two passes — measure (`walkGroupPoints`
+over `sheetHP`/`sheetVP`/`sheetPP`/`sheetCaption`) then draw (`flattenHP`/`VP`/`PP`/`Caption`,
+composing the same sheet functions with `project()`). `REF_SPAN_MM` and the `flatConnectorGroup`
+stroke call are removed from this function. ADR-051's claim that the flatten "always agrees with the
+in-scene answer sheet" was true for the fold math but incomplete for the camera projection — amended
+here, not reversed (the fold-reuse architecture ADR-051 established is unchanged and still correct).
+**Status:** Superseded by ADR-053 (the auto-fit *scale/anchor* basis only — the camera-projection
+flatten this ADR fixed is unchanged and still correct).
+
+---
+
+## ADR-053: `drawCompare()`'s scale locks to the solid's intrinsic 3D size, not the live drawn layout; the anchor pins to the world origin, not a live bbox centre
+
+**Date:** 2026-07-16
+**Decision:** ADR-052's auto-fit measured every point about to be drawn (all three views + dimensions
++ captions) into one combined bbox and derived `scale`/`centerX`/`centerY` from it every redraw. That
+combined bbox includes the *empty spacing* between views, so moving a solid via a distance slider
+(`mesh.position.x = distVP` / `.y = distHP`, `seatOnPlanes`) grows that bbox and the whole sheet
+rescales+re-pans to chase it — reported as: dragging "Distance from VP" visibly shrinks the Front and
+Side views too, when only the Top view should move. Fixed by decoupling scale and anchor from the
+live bbox entirely:
+- **Scale** now derives only from `solidSpanUnits` — the current solid's LOCAL-geometry
+  bounding-sphere diameter (`mesh.geometry.computeBoundingSphere()`, computed once per `rebuild()`
+  before `mesh.position`/`quaternion` are applied). Local geometry never encodes distHP/distVP (only
+  the mesh transform does), and the bounding sphere is rotation-invariant, so `scale` is now identical
+  across every distance AND angle slider — it only changes when base/height actually resize the solid
+  (ADR-052's "no speck" goal, kept).
+- **Anchor** is the fixed world origin, mapped through the SAME unchanged `sheetHP`/`sheetVP`/`sheetPP`
+  functions (`project` now maps `p.x, p.y` directly, no `centerX/centerY` subtraction). This is not an
+  arbitrary choice: `seatOnPlanes` already seats distHP = 0 exactly on the HP (world y = 0) and
+  distVP = 0 exactly on the VP (world x = 0), with world z always 0 — the origin IS the
+  slider-independent reference already built into the solid's seating. Since `sheetVP` (Front) reads
+  `(−z, y)` — no world-x term at all — pinning the anchor there makes the Front view provably
+  identical in scale and pixel position for any distVP, while it still correctly translates with
+  distHP (a real, intentional distance, not a distortion). `sheetHP` (Top) reads `(−z, −x)`, so it
+  moves with distVP as intended and is untouched by distHP.
+**Why:** A distance/angle slider must change the drawing the way the physical setup actually changes
+— moving the solid relative to one plane — not the sheet's zoom level. Tying scale/anchor to the
+solid's own fixed size and to the origin already baked into its seating achieves that with no new
+per-frame geometry pass; the existing per-view `hpBox/vpBox/ppBox` measurement (kept, unchanged) still
+positions the dashed XY / X1-Y1 reference lines in the actual visual gap.
+**Alternatives rejected:** (a) *Retune the old auto-fit's margin/weighting* — rejected, the distortion
+is structural (any live-bbox-derived scale rescales when the bbox grows), not a tuning problem. (b)
+*Re-center on the live bbox after fixing only the scale* — rejected: a live-bbox-derived anchor still
+pans the Front view whenever the Top view (or anything else) moves, reintroducing the same coupling
+one axis later.
+**Consequences:** The Side view (`sheetPP`) keeps ADR-052's existing, unchanged formula
+(`(y−z0, −x)`), which groups its vertical placement with the Top view's rather than the Front view's —
+a pre-existing sheet-layout convention from ADR-052, not something this ADR alters. So Side view's
+*position* still legitimately shifts with distVP (by the same, already-shipped formula); what this ADR
+guarantees is that Side view's *scale* never changes, and that the Front view is fully invariant
+(scale + position) to distVP specifically, per the reported bug and its CDP-verified fix (measured
+Front-view pixel bbox identical at distVP 0 vs 50). A large distVP can legitimately push the Top (and
+Side) view toward the card edge at a fixed scale — accepted, since re-panning to recenter would move
+the Front view and reintroduce the reported distortion.
+**Status:** Active
+
+---
+
+## ADR-054: `drawCompare()`'s anchor moves from the bare world origin to the intrinsic-nominal layout centre; drag-to-pan added as the sanctioned way to inspect a clipped extreme
+
+**Date:** 2026-07-16
+**Decision:** ADR-053 anchored the 2D Compare sheet's `project()` at world-space `(0,0)`. But the sheet's
+own three-view layout does not straddle that point: Front (`sheetVP.x=-z`) and Top (`sheetHP.x=-z`)
+sit centred near sheet-x 0, while the Side block (`sheetPP.x=y-z0`) sits a further `E+GAP` world units
+to the right of them (`E`=`solidSpanUnits`, the same characteristic size `scale` is already keyed to).
+Anchoring at `(0,0)` therefore left the Side block's extra width entirely on one side, reported as a
+large dead zone on the left of the card and — since scale is intentionally locked (ADR-053) — clipping
+at the top/right edges once a distance slider pushed the layout further off that unbalanced anchor.
+Fixed by computing a **fixed intrinsic-nominal anchor offset**,
+`anchorSX = showSideViewFlag ? (E + GAP) / 2 : 0`, `anchorSY = 0`, subtracted in `project()` before the
+existing `WORLD_TO_MM * scale` step. This is derived only from `E`, `GAP` (`E * 0.35`), and
+`showSideViewFlag` — the same distance/angle-independent inputs `scale` itself already uses — so it
+changes only when base/height actually resize the solid, never with a distance or angle slider; ADR-053's
+scale-lock invariant is unchanged, only its anchor clause is refined from "world origin" to "the origin's
+own nominal layout centre."
+**Drag-to-pan (same ADR):** a fixed anchor can still put part of the drawing past the card edge at large
+distance/angle values (ADR-053 accepts this as the tradeoff for a non-rescaling sheet). Added
+`comparePanX`/`comparePanY` (CSS px), applied in `project()` after the anchor, driven by standard
+`pointerdown`/`pointermove`/`pointerup`/`pointerleave`/`pointercancel` handlers on `compareCanvas`
+(`setupComparePan()`, rAF-coalesced redraw). Pan is purely user-driven — never touched by a slider or
+angle — so it composes with the scale-lock instead of reopening ADR-053's original bug. It resets to
+zero on every fresh Compare-card open (`compare.show()`) and on a double-click (recenter).
+**Why:** A learner should never lose the drawing off-card just because a distance value is large, but
+the fix must not resurrect ADR-053's live-bbox coupling. Centering the *nominal* layout (a solid-size
+constant) fixes the common case for free; panning is the escape hatch for the extreme case, kept
+strictly opt-in and user-controlled.
+**Verified (CDP, isolated per-view-colour bbox to avoid a caption text-alignment red herring — see
+below):** base=70, height=70, distHP=distVP=50. Measuring the Top view's own teal linework
+(`--color-hp-line`) bounding box across four pan states — `(0,0)`, `(100,0)`, `(0,40)`, `(100,40)` CSS
+px — gave an identical pixel count (684) and identical width/height (138×137 backing px) in all four,
+with `minX`/`minY` each shifting by exactly `pan * dpr` (dpr 1.25) on their own axis and not the other.
+Confirms translation is pixel-exact and scale is untouched by panning.
+**Caveat found during verification, not a bug:** measuring the *whole-canvas* ink bounding box (rather
+than one view's own colour) is unreliable as a scale-invariance proxy here — `drawCaption()`'s existing,
+intentional alignment rule (anchor the caption to read away from the sheet centre) flips `textAlign`/
+`textBaseline` as a caption's position relative to `(cx,cy)` changes sign under panning, changing how far
+the caption text extends and thus the whole-canvas bbox width — with no change to any view's own
+geometry or scale. Future verification of this sheet should isolate one view's line colour rather than
+trust an aggregate ink bbox.
+**Status:** Active
+
+---
+
+## ADR-055: 2D Compare scroll-zoom added as a screen-space lens over the ADR-053 intrinsic scale
+
+**Date:** 2026-07-16
+**Decision:** Module 2's Compare sheet had drag-to-pan (ADR-054) but no way to magnify a small drawing.
+Added scroll-wheel zoom on `compareCanvas`, implemented the same way pan was: a new user-driven state
+var (`compareZoom`, default 1) consumed by `project()` as a **post-multiply on the content term only**
+(`(p.x - anchorSX) * WORLD_TO_MM * scale * compareZoom`) — `scale` and `anchorSX/SY` themselves are
+untouched, so ADR-053's scale-lock invariant holds exactly as it did through ADR-054's pan addition.
+Zoom-to-pointer keeps the world point under the cursor stationary: on `wheel`, compute
+`nextZoom = clamp(compareZoom * exp(-deltaY * k), MIN, MAX)`, then solve the pan shift that cancels the
+resulting scale change at the cursor position — `k = nextZoom/compareZoom`;
+`pan' = (cursor - canvasCentre) * (1-k) + pan * k` — before committing `compareZoom = nextZoom`. Wheel
+listener is non-passive with `preventDefault()` so the page never scrolls while the cursor is over the
+sheet. Clamped to `[0.4, 5]×` (`COMPARE_ZOOM_MIN/MAX`) so the sheet can't invert or vanish.
+**Reset contract (shared with pan):** a stray zoom must not persist across sessions with the drawing.
+Factored both `comparePanX/Y` and `compareZoom` into one `resetCompareView()`, called from
+`compare.show()` (fresh open), the canvas `dblclick` handler (recenter — now also un-zooms), and
+`window.simAPI.reset()` (a full sim reset previously left pan/zoom untouched even though `compare.hide()`
+closes the card — the state would silently reappear stale on the next open).
+**Why:** Same rationale as ADR-054 — the fixed-scale invariant ("10 mm reads as 10 mm") is a real
+teaching requirement, so any inspection aid must be a reversible, purely additive screen-space layer,
+never a rescale of the underlying drawing. Zoom is pan's natural sibling: pan solves "the view I want is
+off-card," zoom solves "the view I want is too small to read."
+**Verify:** dispatch synthetic `WheelEvent`s (negative `deltaY` = zoom in, positive = zoom out) at a
+known `clientX/clientY` on `compareCanvas`; assert `compareZoom` moves in the expected direction and
+clamps at the bounds, the world point nearest the cursor stays visually stationary (zoom-to-pointer), and
+`scale` (read via the same temp `__dbg` hook used in ADR-054's verification) is bit-identical before and
+after — confirming the intrinsic base math in `drawCompare()` was never touched.
+**Status:** Active
+
+---
+
+## ADR-056: `drawCompare()`'s XY / X1-Y1 reference lines pin to analytic fold coordinates, not a live bbox midpoint
+
+**Date:** 2026-07-16
+**Decision:** The same day's XY/X1-Y1 ground-line addition (see Module2 CHANGELOG) placed each
+dashed reference line at the midpoint of the *live* gap between adjacent views —
+`xyY = (hpBox.maxY + vpBox.minY) / 2` and `x1X = (topFrontMaxX + ppBox.minX) / 2`, read from the
+Pass-1 per-view bboxes. That gap is not fixed: `seatOnPlanes()` seats the solid at
+`mesh.position.y = distHP − minY`, so the Front view's `sheetVP.y (=worldY)` — and therefore the
+Side view's `sheetPP.x (=worldY−z0)` — both move under the **Distance from HP** slider, dragging
+the "ground line" along with the geometry it's supposed to be a fixed reference against. Fixed by
+anchoring both lines to the analytic hinge coordinates the sheet-space functions already define
+(header comment above `sheetHP`/`sheetVP`/`sheetPP`): `xyY = 0` (sheetY=0, the HP∩VP line) and
+`x1X = -z0` (sheetX=−z0, the HP∩PP hinge, `z0 = ppHingeGroup.position.z`, reset to
+`DEFAULT_PP_STANDOFF` every rebuild — never touched by a slider). The live bboxes are still read,
+but only to size each line's *length* along the line's own perpendicular axis (sheetX for XY,
+sheetY for X1-Y1) — both provably slider-invariant (`sheetHP.x = sheetVP.x = −worldZ`;
+`sheetHP.y = −worldX`), so the length can track the drawing without the position drifting.
+**Why:** matches the ADR-053 "fixed-scale, slider-independent" invariant this module has held
+since ADR-053/054/055 — a distance slider must move only the geometry, never the reference frame
+it's being measured against. The midpoint approach was a leftover reflex from the retired
+ADR-052 live-auto-fit era and was never re-derived against ADR-053's world-origin-anchor model.
+**Verify:** via CDP, read the XY line's painted canvas Y (temp probe mirroring the `__dbg`
+pattern used in ADR-054/055's verification) before and after moving **Distance from HP** from 0
+to 50; assert byte-identical. Same check for X1-Y1's canvas X under **Distance from VP**.
+**Status:** Active
+
+---
+
+## ADR-057: Coincident hidden dashed lines are forced behind visible solid lines via `polygonOffset` + `renderOrder`, not left to the depth test
+
+**Date:** 2026-07-16
+**Decision:** Drafting convention requires a visible continuous line (Type A) to fully occlude a
+hidden dashed line (Type E/F) wherever the two coincide — e.g. the Cube's front and back faces
+project to the *identical* square, so the "hidden" square sits at exactly the same depth as the
+"visible" one. `buildSegments()` in `projectionDrawer.js` built every `LineMaterial` with depth
+defaults and no `renderOrder`, so which line painted last was decided by draw order plus the
+`LESS` depth test at equal depth — and because `LineSegments2` renders fat lines as instanced
+triangle *fills* (not GL `LINES`), per-fragment depth jitters across that quad, so equal-depth
+solid/dashed pairs z-fought and dashed fragments leaked through unpredictably rather than losing
+deterministically. Fixed by giving the **dashed** material a positive `polygonOffset`
+(`factor: 1, units: 1`) so it is pushed strictly farther from the camera than any coincident solid
+line — the depth test then has a real winner regardless of fat-line jitter — plus
+`segments.renderOrder = dashed ? 0 : 1` as a belt-and-suspenders paint-order backstop. `depthTest`
+is left untouched (`true`) so the 3D solid still occludes projection lines normally; only the
+solid-vs-dashed pair at equal depth is disambiguated.
+**Why:** matches the existing `polygonOffset: true` idiom already used on the solid mesh material
+(`Module2/CLAUDE.md` 3D gotchas — prevents `EdgesGeometry` z-fighting against mesh faces) rather
+than inventing a new technique; a depth bias is robust to draw order and to fat-line triangle-fill
+jitter, where `renderOrder` alone would not be (same-buffer painter's-algorithm ties still race the
+depth test if depth values aren't actually separated).
+**Verify:** via CDP, patch `THREE.Object3D.prototype.add` (imported via `await import('three')`,
+which resolves through the page's import map to the same cached module instance the app uses) to
+capture every `HP/VP/PP Projection` group as it's attached; assert each dashed `LineSegments2`
+child has `renderOrder === 0`, `material.polygonOffset === true`,
+`polygonOffsetFactor/Units === 1`, `depthTest === true`, and each visible child has
+`renderOrder === 1`, `polygonOffset === false`. Confirmed on the Cube across 6 capture points
+(HP/VP/PP, including reparenting during fold/flatten); the flattened 2D sheet shows clean solid
+square edges with zero dashed bleed-through.
+**Status:** Active
 
 ---
 

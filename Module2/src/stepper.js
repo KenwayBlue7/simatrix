@@ -98,7 +98,6 @@ export function initStepper(sim) {
   const doneLabel = $('done-label');
   const doneProject = $('done-project');
   const doneSideView = $('done-sideview');
-  const doneDimensions = $('done-dimensions');
   const shapeSelect = $('ctl-shape');
 
   if (elTotal) elTotal.textContent = String(TOTAL);
@@ -178,7 +177,6 @@ export function initStepper(sim) {
       btnDimensions.textContent = state.dimensions ? 'Hide dimensions' : 'Show dimensions';
       btnDimensions.setAttribute('aria-pressed', String(state.dimensions));
     }
-    doneDimensions?.classList.toggle('is-on', state.dimensions);
     // "Complete & next problem" (Feature 1) appears only once the drawing is flattened —
     // the payoff moment. Label adapts to whether a textbook problem is loaded (free-play
     // gets "Pick a problem", which still opens the library to choose a challenge).
@@ -317,13 +315,17 @@ export function initStepper(sim) {
   // Step 6 — TOGGLE the BIS Type-B dimension layer on the top + front views (ADR-041).
   // Flip the state, drive the engine to match, and let renderActions swap the button
   // label (Show ↔ Hide). Gates nothing, so the rail/nav don't actually change here.
+  // Confirmation goes out via flowNote (viewport toast) instead of a panel badge, so
+  // the Step 6 panel stays compact — announce() still covers screen readers.
   btnDimensions?.addEventListener('click', () => {
     const next = !state.dimensions;
     sim.setDimensions(next);
     state.dimensions = next;
-    sim.announce(next
+    const msg = next
       ? 'Dimensions drawn onto the top and front views.'
-      : 'Dimensions hidden.');
+      : 'Dimensions hidden.';
+    sim.announce(msg);
+    sim.flowNote(msg);
     renderRail(); renderActions(); renderNav();
   }, listen);
 
@@ -370,9 +372,19 @@ export function initStepper(sim) {
     goToStep(1, { announce: false });
   }
 
+  /** Re-sync the flatten latch from an external forced fold change (e.g. Compare's
+   *  workbench forcing an unflatten) that bypasses the btnFlatten/btnUnfold handlers,
+   *  so Step 6's button + rail check don't go stale against the engine's real state. */
+  function setFlattened(flat) {
+    state.flattened = flat;
+    renderRail();
+    renderActions();
+    renderNav();
+  }
+
   // Initial render — empty start, Step 1, no announcement (avoids talking over the
   // page load for screen readers).
   goToStep(1, { announce: false });
 
-  return { sync, reset, dispose: () => ac.abort() };
+  return { sync, reset, setFlattened, dispose: () => ac.abort() };
 }

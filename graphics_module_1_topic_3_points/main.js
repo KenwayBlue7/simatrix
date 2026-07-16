@@ -266,6 +266,25 @@ let compareCard = null;
 let compareChip = null;
 let compareCanvas = null;
 
+/** Drag-to-pan offset (CSS px) applied on top of the REF_SPAN-locked scale in
+ *  drawCompare's project(). User-driven only — zeroed on every card (re)open
+ *  and on dblclick recenter (Module 2 parity, ADR-054). */
+let comparePanX = 0;
+let comparePanY = 0;
+/** Scroll-wheel zoom multiplier, post-multiplied over the fixed REF_SPAN scale
+ *  in project() — never recomputes it (ADR-055 parity). 1 = untouched scale. */
+let compareZoom = 1;
+const COMPARE_ZOOM_MIN = 0.4;
+const COMPARE_ZOOM_MAX = 5;
+
+/** Single reset point for the Compare sheet's user-driven view state — fresh
+ *  open, dblclick recenter, and sim reset all route through this. */
+function resetCompareView() {
+  comparePanX = 0;
+  comparePanY = 0;
+  compareZoom = 1;
+}
+
 /** The Top/Front/Side chip elements, bound once in setupQuickViews(). Empty until
  *  then, so syncQuickViewChips() is safe to call on any earlier path. */
 let quickViewButtons = [];
@@ -925,6 +944,7 @@ const compare = {
   show(size) {
     if (foldTween) return; // the fold owns the camera + card (ADR-013)
     compareOpen = true;
+    resetCompareView(); // every fresh open starts centred and unzoomed
     if (compareCard) compareCard.hidden = false;
     // Desktop opens straight into the 50/50 workbench (COMPARE_DEFAULT_SIZE);
     // mobile has no workbench, so it opens the compact bottom-sheet. applyCompareSize
@@ -1129,24 +1149,34 @@ function drawCompare() {
 
   const cx = w / 2;
   const cy = h / 2;
-  const px = cx + lat * scale;   // the shared vertical projector's x (lateral position)
-  const yPrime = cy - dPrime * scale;
-  const yTop = cy - dTop * scale;
+
+  // Choke point (Module 2 ADR-054/055 parity): every drawn coordinate flows through
+  // this one function, so comparePanX/Y and compareZoom stay a pure screen-space
+  // lens over the REF_SPAN-locked `scale` above — scale/anchor themselves never
+  // change (ADR-053's intent, already structurally true here via the fixed REF_SPAN).
+  const project = (mmX, mmY) => ({
+    x: cx + mmX * scale * compareZoom + comparePanX,
+    y: cy - mmY * scale * compareZoom + comparePanY,
+  });
+  const O = project(0, 0);       // the XY-line / datum origin, panned+zoomed
+  const px = project(lat, 0).x;  // the shared vertical projector's x (lateral position)
+  const yPrime = project(lat, dPrime).y;
+  const yTop = project(lat, dTop).y;
 
   // XY fold line with its X / Y end letters (the vocabulary the steps teach).
   const inset = 28;
   ctx.strokeStyle = ink;
   ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.moveTo(inset, cy);
-  ctx.lineTo(w - inset, cy);
+  ctx.moveTo(inset, O.y);
+  ctx.lineTo(w - inset, O.y);
   ctx.stroke();
   ctx.fillStyle = inkSoft;
   ctx.font = `700 13px ${sans}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('X', inset - 12, cy);
-  ctx.fillText('Y', w - inset + 12, cy);
+  ctx.fillText('X', inset - 12, O.y);
+  ctx.fillText('Y', w - inset + 12, O.y);
 
   // (The centre datum tick + the lateral / height / depth values are drawn below as
   // formal BIS Type-B dimensions, after the shared projector — see the dimension block.)
@@ -1160,8 +1190,8 @@ function drawCompare() {
   ctx.strokeStyle = benchGrey;
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.moveTo(px, Math.min(yPrime, yTop, cy));
-  ctx.lineTo(px, Math.max(yPrime, yTop, cy));
+  ctx.moveTo(px, Math.min(yPrime, yTop, O.y));
+  ctx.lineTo(px, Math.max(yPrime, yTop, O.y));
   ctx.stroke();
 
   // ── Formal BIS SP 46:2003 Type-B dimensions ───────────────────────────────
@@ -1250,19 +1280,19 @@ function drawCompare() {
     }
   }
   // distHP — p′ height above the XY line (front view). Vertical dim, right of the projector.
-  linearDim(px, cy, px, yPrime, offPrime, 0, dPrime);
+  linearDim(px, O.y, px, yPrime, offPrime, 0, dPrime);
   // distVP — p depth below the XY line (top view). Vertical dim, right of the projector.
-  linearDim(px, cy, px, yTop, offTop, 0, dTop);
+  linearDim(px, O.y, px, yTop, offTop, 0, dTop);
   // distRP — lateral offset from the centre datum (where PP cuts the XY line). Redraw the
   // datum tick as the dimension's origin, then dimension datum → shared projector.
   if (Math.round(lat) !== 0) {
     ctx.strokeStyle = benchGrey;
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.moveTo(cx, cy - 7);
-    ctx.lineTo(cx, cy + 7);
+    ctx.moveTo(O.x, O.y - 7);
+    ctx.lineTo(O.x, O.y + 7);
     ctx.stroke();
-    linearDim(cx, cy, px, cy, 0, -DIM_OFF_H, lat);
+    linearDim(O.x, O.y, px, O.y, 0, -DIM_OFF_H, lat);
   }
 
   // The two views. ADR-016: a thick dot = paper halo + colour disc (the halo lifts
@@ -1317,6 +1347,84 @@ function setupCompareCard() {
   window.matchMedia('(min-width: 768px)').addEventListener('change', (e) => {
     if (!e.matches && workbenchOpen) { applyCompareSize('compact'); syncExpandBtn(); }
   });
+
+  setupComparePan();
+}
+
+/** Drag-to-pan + scroll-wheel zoom on the 2D sheet (Module 2 ADR-054/055 parity) —
+ *  standard pointer-capture drag, coalesced to one redraw per animation frame so a
+ *  fast drag/scroll doesn't queue up a backlog of drawCompare() calls. Pans
+ *  comparePanX/Y and scales compareZoom (both consumed by drawCompare's project());
+ *  neither touches the REF_SPAN-locked `scale`, so both compose with the fixed-scale
+ *  sheet instead of fighting it. Double-click recenters AND un-zooms (resetCompareView)
+ *  for when a drag/zoom wanders off-frame. */
+function setupComparePan() {
+  if (!compareCanvas) return;
+  let dragging = false;
+  let lastX = 0;
+  let lastY = 0;
+  let redrawQueued = false;
+
+  const queueRedraw = () => {
+    if (redrawQueued) return;
+    redrawQueued = true;
+    requestAnimationFrame(() => {
+      redrawQueued = false;
+      if (compareOpen) drawCompare();
+    });
+  };
+
+  compareCanvas.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    compareCanvas.setPointerCapture(e.pointerId);
+    compareCanvas.style.cursor = 'grabbing';
+  });
+  compareCanvas.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    comparePanX += e.clientX - lastX;
+    comparePanY += e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    queueRedraw();
+  });
+  const endDrag = (e) => {
+    if (!dragging) return;
+    dragging = false;
+    if (compareCanvas.hasPointerCapture?.(e.pointerId)) {
+      compareCanvas.releasePointerCapture(e.pointerId);
+    }
+    compareCanvas.style.cursor = 'grab';
+  };
+  compareCanvas.addEventListener('pointerup', endDrag);
+  compareCanvas.addEventListener('pointerleave', endDrag);
+  compareCanvas.addEventListener('pointercancel', endDrag);
+  compareCanvas.addEventListener('dblclick', () => {
+    resetCompareView();
+    if (compareOpen) drawCompare();
+  });
+
+  // Scroll-wheel zoom, zeroed-in on the pointer: solve for the pan shift that keeps
+  // the point under the cursor fixed on screen as compareZoom changes, using the
+  // same (cx,cy) centre drawCompare's project() anchors to. preventDefault +
+  // non-passive stops the page from scrolling under the card.
+  compareCanvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = compareCanvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const midX = rect.width / 2;
+    const midY = rect.height / 2;
+    const factor = Math.exp(-e.deltaY * 0.0015);
+    const nextZoom = Math.min(COMPARE_ZOOM_MAX, Math.max(COMPARE_ZOOM_MIN, compareZoom * factor));
+    if (nextZoom === compareZoom) return; // clamped — nothing to do
+    const k = nextZoom / compareZoom;
+    comparePanX = (mx - midX) * (1 - k) + comparePanX * k;
+    comparePanY = (my - midY) * (1 - k) + comparePanY * k;
+    compareZoom = nextZoom;
+    queueRedraw();
+  }, { passive: false });
 }
 
 /** Glide the camera to a named pose (position + target) through the anim.js tween
@@ -1822,6 +1930,7 @@ window.simAPI = {
   resume() { startLoop(); },
   reset() {
     compare.hide(); // no-op when closed; the reset announcement lands last
+    resetCompareView();
     currentData = defaultPointData();
     currentView = { ...DEFAULT_VIEW };
     folded = false;

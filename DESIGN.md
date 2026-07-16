@@ -477,6 +477,65 @@ SELECTOR::-webkit-scrollbar-thumb {
 `#step-card`, `.problem-library__body`); intro topic (`graphics_module_2_topic_1_introduction/`:
 `#shape-rail`, `#anatomy-panel`).
 
+### 5.12 Wizard-collapse toggle (`.wizard-toggle`, signature)
+
+*(New section — added from the `template_starter/` sync audit, 2026-07-16, grounded in
+`Module2/index.html`.)* A single 44px chevron chip pinned to the viewport's **top-right** corner,
+collapsing the whole wizard column out of the layout so the viewport can go full-width.
+
+- **Position (load-bearing):** `top: var(--space-3); right: var(--space-3)` — the standard
+  top-corner inset, **not** the `.vp-cluster` top-left clearance (`calc(44px + var(--space-5))`).
+  The two look similar but solve different problems: `.vp-cluster` sits one button-height down
+  because it stacks *below* the top-left quick-view chips; `.wizard-toggle` has no button above it
+  on the top-right, so it belongs at the plain `--space-3` inset. **Do not copy the `.vp-cluster`
+  offset onto this control** — that was a shipped regression (fixed 2026-07-16) that also silently
+  collided with the compact Compare card, whose own top (`calc(var(--space-3) + 44px +
+  var(--space-2))`) is derived *assuming* the toggle sits at the shallow `--space-3` inset.
+- **Shape:** 44px square, `--color-panel` fill, hairline border, `--radius-sm` corners, a centred
+  20px chevron icon.
+- **Press/hover/focus:** `scale(0.97)` on `:active` (§5.1's shared press language); hover deepens to
+  paper fill + bench-grey border under the standard `(hover:hover) and (pointer:fine)` gate; the
+  accent focus halo, never removed.
+- **State:** `body.wizard-collapsed` drops `#wizard` out of the flex row (`display:none`) and
+  rotates the chevron 180° to point back toward where the panel will reappear.
+
+### 5.13 Compare-split 50/50 workbench (ADR-037, signature)
+
+*(New section — added from the `template_starter/` sync audit, 2026-07-16. Corrects §7/§8's former
+"Compare is Module-1-only" claim — see below.)* The on-demand dual-mode "workbench": `body` flips
+from the wizard-beside-viewport flex row into a CSS grid —
+
+```
+"view compare"   (minmax(0,1fr) row, two 1fr columns)
+"rail  rail"      (auto row spanning both panes)
+```
+
+— gated by `body.compare-split`. This is the shared dual-mode shape for every guided-stepper sim
+that offers a 2D/3D or before/after comparison, not a per-module style choice.
+
+- **Shell tone:** the split's own background is `--color-panel` (the gray working surface, one
+  tonal step below paper), with `gap`/`padding: var(--space-4)` between the three panes — the
+  panes read as **three floating rounded cards** on that gray surface, not flush edge-to-edge
+  regions.
+- **The three panes:** the 3D viewport (`grid-area: view`), the 2D drawing/compare card
+  (`grid-area: compare`), and the docked control rail (`grid-area: rail`). Each gets a hairline
+  border + `--radius-md` corners; the viewport additionally clips its canvas with
+  `overflow: hidden`. No shadow on any of the three (Flat-Ink, §4.2 — docked surfaces don't earn
+  the transient-overlay shadow).
+- **`#workbench-rail`:** a paper-white rounded card (matching the other two panes) hosting whatever
+  drivers the module re-parents into it on entering the split. **The rail's internal control
+  layout is module-scoped** — how many drivers, and whether they flow as a simple row or a tuned
+  multi-column grid, depends on that module's own control count; only the card chrome (tone,
+  border, radius, padding) is the shared, platform-level part.
+- **`#rail-toggle` (Hide/Show):** a dedicated 44px pill, independent of `.wizard-toggle`, that
+  floats at the 3D pane's bottom-left corner (`grid-area: view; align-self:end; justify-self:start`)
+  so it never intrudes into the rail's own grid. `body.rail-collapsed` reclaims the rail's row
+  (`#workbench-rail { display:none }`) and flips the toggle's chevron 180°; the split's
+  `grid-template-rows`/`grid-template-areas` collapse to a single `view compare` row.
+- **Exit:** while split, the 2D pane's own head chrome and `.wizard-toggle` are redundant
+  (`display:none`) — the still-visible, pressed Compare chip in the 3D pane is the single way back
+  out of the split.
+
 ---
 
 ## 6. Cross-module consistency rules (must be identical everywhere)
@@ -536,6 +595,9 @@ A module adds its own domain encodings and viewport behaviour **here**, never by
 
 - **Adds PP Violet** (`--color-pp-line #7a5ea6`) as a fully-used third projection plane (side view).
 - Defines only the two z-index rungs it uses (`--z-notice`, `--z-overlay`).
+- **Ships the ADR-037 Compare-split 50/50 workbench** (§5.13) — the on-demand 2D/3D dual-mode
+  split, including the `#rail-toggle` Hide/Show control. *(Landed 2026-07-16; supersedes the
+  former "Module 1 only" note that used to live here and in §8.5 below — see §7.2's note.)*
 - Step card is addressed by **id** (`#step-card`); the pure-white content surface (`--color-paper`,
   formerly `--color-host-white` — retired, §4.2) applies to `#step-card`, `#active-problem`,
   `.problem-card`, and the `.problem-library` backdrop; the `.vp-hint`/spotlight chips sit on the
@@ -552,16 +614,19 @@ A module adds its own domain encodings and viewport behaviour **here**, never by
 - **Carries a premium interaction layer** (motion palette, engine-injected viewport chrome, onboarding,
   feedback/resilience, Problem Library). The design-system parts are in §4–§5; the deep implementation spec
   (Compare-View state machine, cinematic-fold camera, chrome-injection contract) lives in `Module1/DESIGN.md`.
-- **The Compare View / Compare card** is a **Module-1 feature still in active development and testing** — it
-  re-houses the old dual-renderer 2D drawing as an on-demand floating card. **It is not yet implemented in
-  Module 2.** The pure-white content surface (`--color-paper`, formerly `--color-host-white` — retired,
-  §4.2) in Module 1 therefore additionally covers the viewport `.compare-card`
+- **The Compare View / Compare card** re-houses the old dual-renderer 2D drawing as an on-demand
+  floating card, with the ADR-037 50/50 split (§5.13) as its expanded state. **Updated
+  2026-07-16:** this is no longer Module-1-only — Module 2 (the master) now ships the same
+  Compare-split workbench, and `template_starter/` carries it pre-injected for every new module.
+  Module 1 keeps the deeper **Compare-View state-machine spec** (the cinematic-fold camera
+  orchestration, chrome-injection contract) as its own implementation detail in
+  `Module1/DESIGN.md` — that part remains Module-1-specific; the visual shell in §5.13 is shared.
+  The pure-white content surface (`--color-paper`, formerly `--color-host-white` — retired,
+  §4.2) in Module 1 additionally covers the viewport `.compare-card`
   frame, with the Compare drawing **stage** also `--color-paper` so the 2D sheet matches the player. Step
   card is addressed by **class** (`.step-card`), and the surface applies to `.step-card`, `#active-problem`,
   `.problem-card`, the `.problem-library` backdrop, and the `.compare-card` frame; `.vp-hint`/spotlight
   chips sit on the grey `--color-panel` chrome surface.
-  *(This was the entire ~2-line drift between the two former `DESIGN.shared.md` copies — see §8. It is
-  legitimate Module-1-specific content, not accidental drift; it was relocated here.)*
 - `@font-face` is declared in `src/shell.css`, so font URLs are **`../assets/fonts/…`** (stylesheet one level
   down). UI DOM ownership: the engine + `chrome.js` own the chrome; `src/uiManager.js` is a vestigial stub.
 - **The no-transform invariant** (§4.4) is required by the Compare card's `position:fixed` placement.
@@ -587,9 +652,10 @@ A module adds its own domain encodings and viewport behaviour **here**, never by
    inline `<script>` in `index.html`. This is a **deliberate pre-CSS fallback** — the error overlay must paint
    before `shell.css`/tokens load, so it cannot use `var(--color-*)`. It is the **only** hard-coded colour
    anywhere and is exempt from ADR-003 by necessity. Module 2's `index.html` has no such literals.
-5. **The Compare drawing feature is still being developed and tested in Module 1** and has **not** been ported
-   to Module 2 (confirmed by the maintainer, 2026-06-27). The two modules will diverge on Compare-related
-   chrome until that port happens; §7 records the current Module-1-only state.
+5. **RESOLVED 2026-07-16 — the Compare drawing feature has been ported to Module 2.** The ADR-037
+   50/50 workbench (§5.13) now ships in the master and in `template_starter/`; this is no longer an
+   open gap. (Historical note: as of the 2026-06-27 audit this item read "still Module-1-only, not
+   yet ported to Module 2" — that has since happened; §7.1/§7.2 updated to match.)
 6. **Per-module `DESIGN.md` files remain on disk.** `Module1/DESIGN.md` is kept as the legitimate Module-1
    premium-interaction implementation appendix. `Module2/DESIGN.md` is now fully superseded by this root file
    and is a candidate for removal (left in place because the consolidation brief only authorized deleting the

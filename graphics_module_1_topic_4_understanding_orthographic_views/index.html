@@ -478,7 +478,11 @@
     }
     /* Expanded = the 50/50 workbench split (ADR-037). The card is re-parented to <body>
        (by main.js, once wired) and placed as the grid's right pane by the body.compare-split
-       rules below; here it just sheds the floating-card chrome. */
+       rules below; here it just sheds the floating-card's absolute positioning. TRIAL (suspends
+       ADR-021's flush layout): the card KEEPS its base .compare-card border/radius/paper fill
+       instead of flattening to a flush seam, so it reads as a floating rounded card on the gray
+       split background (see body.compare-split below). box-shadow stays off (Flat-Ink rule —
+       docked surfaces don't earn the transient-overlay shadow; the gap + gray bg carry the "float"). */
     body.compare-split #compare-card {
       position: static;
       inset: auto;
@@ -486,9 +490,6 @@
       height: auto;
       min-height: 0;
       transform: none;
-      border: 0;
-      border-left: 1px solid var(--color-border);
-      border-radius: 0;
       box-shadow: none;
     }
     .compare-card__head {
@@ -550,7 +551,12 @@
          "rail  rail"      (auto row spanning both panes)
        The wizard drops out; wire main.js to re-parent your drivers into #workbench-rail.
        Because #sim-viewport IS the left pane, handleResize() (which measures it) sizes the
-       renderer to half-width with no JS sizing change. Desktop-only (mobile keeps the sheet). */
+       renderer to half-width with no JS sizing change. Desktop-only (mobile keeps the sheet).
+
+       TRIAL DESIGN (suspends ADR-021's flush/seamed layout): the three panes float as distinct
+       rounded cards on a gray panel background instead of sitting flush with hairline seams.
+       Revert to ADR-021 by restoring the flush borders this trial deletes below if the aesthetic
+       isn't kept. */
     body.compare-split {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -558,14 +564,18 @@
       grid-template-areas:
         "view compare"
         "rail rail";
+      background: var(--color-panel); /* gray working surface behind the floating cards */
+      gap: var(--space-4);
+      padding: var(--space-4);
     }
-    /* The seam between the 3D viewport and the rail lives on the LEFT pane's bottom edge, so
-       it spans only the 3D half; the right (2D → rail) half stays borderless so the drawing
-       card and rail read as one continuous surface. */
+    /* TRIAL: the 3D viewport is now its own rounded white card (no flush border-bottom seam into
+       the rail) — the gap above supplies the separation instead. */
     body.compare-split #sim-viewport {
       grid-area: view;
       min-width: 0;
-      border-bottom: 1px solid var(--color-border);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      overflow: hidden; /* clip the WebGL canvas to the rounded corners */
     }
     body.compare-split #compare-card { grid-area: compare; }
     body.compare-split #workbench-rail { grid-area: rail; }
@@ -576,8 +586,8 @@
     body.compare-split #wizard-toggle { display: none; }
 
     /* The docked driver rail — spans both panes, hosts the re-parented controls laid out as a
-       horizontal instrument row. Persistent/docked, so no shadow (Flat-Ink) — a hairline top
-       seam only (drawn by #sim-viewport's border-bottom on the left half). */
+       horizontal instrument row. TRIAL: paper-white rounded card (was panel-grey, flush, hairline
+       top seam only) so it reads as the third floating card alongside the viewport and drawing. */
     #workbench-rail { display: none; }
     body.compare-split #workbench-rail {
       display: flex;
@@ -585,7 +595,9 @@
       justify-content: center;
       gap: var(--space-6);
       padding: var(--space-4) var(--space-5);
-      background: var(--color-panel);
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
       overflow-x: auto;
     }
     /* Each driver reflows from a vertical stack into a fixed-width column. */

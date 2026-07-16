@@ -1,6 +1,10 @@
 # Changelog — Projection of Points
 
+## 2026-07-16
+- Added: drag-to-pan and scroll-wheel zoom on the 2D Compare sheet (Module 2 ADR-054/055 parity) — `comparePanX/Y` + `compareZoom` (clamped 0.4–5×) post-multiply over the existing `REF_SPAN`-locked scale via a new `project()` choke point in `drawCompare()`, so the fixed-scale sheet math is untouched. Dblclick recenters and un-zooms. No live-position anchor was added (unlike Module 2's off-centre side-view block, the Points sheet is already `REF_SPAN`-symmetric — a live anchor there would jump the drawing across the XY line, so dead-space balancing is left to user pan by design). Verified via CDP: wheel clamps exactly at 0.4/5×, drag delta matches `comparePanX/Y` exactly, dblclick resets to 0/0/1. (`main.js`.)
+
 ## 2026-07-15
+- Fixed: the collapsed `#rail-toggle` ("Show") pill sat flush with `#sim-viewport`'s bottom-left corner, overlapping its `--radius-md` curve instead of clearing it — the 2026-07-14 note below verified its 16px offset from the *window* edge, but the card itself is already inset 16px from the window by the grid padding, so button-edge and card-edge were coincident (0px card inset). Now anchors at `left/bottom: var(--space-6)` (32px = 16px gutter + 16px inset), landing exactly 16px inside the card corner. Verified via headless-Chrome CDP: `getBoundingClientRect()` on both elements gives `btn.left - card.left === 16` and `card.bottom - btn.bottom === 16`. (`index.html`.)
 - Fixed: `exitWorkbench()` now also calls `syncRailToggleState(false)` right after clearing `rail-collapsed`, pairing every rail-collapsed mutation with a button-facet sync (defensive — the button is `display:none` outside the split) — symmetric with `enterWorkbench()`'s existing forced-open sync. Verified the underlying forced-open fix via headless CDP: isolated the exact regression (button stuck on "Show" after collapse → exit → re-enter) by re-running the same click sequence against a copy with only `enterWorkbench()`'s sync call removed, confirming that call is what prevents the desync. (`main.js`.)
 
 ## 2026-07-14
