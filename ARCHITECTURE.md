@@ -157,6 +157,54 @@ C:\xampp\htdocs\Simatrix\
 │                                              Compare split; drawCompare() + the six-view unfold
 │                                              are still pending.
 │
+├── graphics_module_3_topic_1_sections_of_solids\  MODULE-3 SUBJECT (Sections of Solids),
+│                                              built on MODULE 2's orchestrator pattern per
+│                                              ADR-033. BUILT (2026-07-17), feature-complete:
+│                                              the section-cut engine (src/sectionCut.js,
+│                                              ADR-058) is a hand-authored analytic single-plane
+│                                              triangle clipper — never CSG — that slices the
+│                                              solid inside rebuild()'s DOMAIN BUILD SEAM, welds
+│                                              the loop on meshAnalyzer.js's 1e-3 lattice, and
+│                                              caps it as the TRUE SHAPE face; cutting-plane
+│                                              state lives beside ShapeData in main.js, never
+│                                              inside it (ADR-059). The drawing layer
+│                                              (ADR-060/061) restores projectionDrawer.js
+│                                              byte-identical from Module2 and adds a new leaf
+│                                              src/sectionView.js: 45° apparent-shape hatching
+│                                              per view plus the true shape drawn as an in-scene
+│                                              world-scale sheet with a camera tween (no
+│                                              auxiliary viewport). The textbook problem library
+│                                              (ADR-062/063) enforces the KTU "true shape given"
+│                                              exclusion as a hard EXCLUDED_TYPES data-layer
+│                                              filter and checks conic-section cuts ±0.5° with a
+│                                              live 'generator'-angle target. See root
+│                                              DECISIONS.md ADR-058..063.
+│
+├── graphics_module_3_topic_2_development_of_surfaces\  MODULE-3 SUBJECT (Development of
+│                                              Surfaces), built on MODULE 2's orchestrator
+│                                              pattern per ADR-033. BUILT (2026-07-18), Phase 4
+│                                              (final): unrolls prisms, pyramids, cylinders, and
+│                                              cones into true-size flat patterns. A new pure
+│                                              leaf src/developmentEngine.js (ADR-066) draws the
+│                                              KTU Parallel-Line / Radial-Line method split on
+│                                              the Compare card's Canvas2D sheet (ADR-053 fixed
+│                                              intrinsic-frame scale, not a 3D-space sheet);
+│                                              cutting-plane state lives beside ShapeData in
+│                                              main.js the same way (ADR-067, mirroring topic-1's
+│                                              ADR-059). Topic-1's sectionCut.js clipper
+│                                              (ADR-058) is ported in verbatim for real 3D
+│                                              truncation, restricted to Angle-to-HP + Cut-height
+│                                              controls (plane always ⊥ VP — ADR-068). The
+│                                              textbook problem library enforces the KTU
+│                                              "through holes" exclusion as a hard
+│                                              EXCLUDED_TYPES filter (ADR-065/069); shortest-path
+│                                              ("string") problems draw the geodesic as a
+│                                              straight chord on the 2D pattern AND wrap it onto
+│                                              the 3D solid, revealed only on a matched
+│                                              self-check via the non-rebuild
+│                                              commitStringPath() overlay commit (ADR-070). See
+│                                              root DECISIONS.md ADR-064..070.
+│
 └── (src_csharp\)                              Old C# Unity prototype. NOT documented
                                                here. (Not present in the working tree
                                                at the time of writing.)

@@ -1965,6 +1965,412 @@ square edges with zero dashed bleed-through.
 
 ---
 
+## ADR-058: Section cutting is a hand-authored single-plane triangle clipper, not a CSG library
+
+**Date:** 2026-07-17
+**Origin:** topic-local ADR-M3T1-001 (elevated 2026-07-18).
+**Decision:** The section-cut engine is `src/sectionCut.js` — an analytic clipper that slices
+the solid's non-indexed triangles against ONE cutting plane (Sutherland–Hodgman per triangle,
+kept half-space = signed distance ≤ 0), welds the intersection segments on the same 1e-3
+quantized lattice `meshAnalyzer.js` uses, chains them into an ordered closed loop, and
+fan-triangulates that loop into a solid cap (the "True Shape" face). It runs as a fixed stage
+inside `rebuild()`'s DOMAIN BUILD SEAM — generate mesh → **slice** → analyze edges — never as a
+live mutation from a slider. No CSG/boolean library is imported.
+**Why:** The syllabus problem is exactly one plane against one convex faceted solid — not
+general booleans. A per-triangle clip is O(triangles) with no acceleration structure (the
+largest roster solid is ≈ 96 triangles, so a full re-cut per slider tick costs microseconds),
+and its intermediate product — the ordered section loop, returned in the plane's own (u,v)
+basis — IS the true-shape polygon the auxiliary view must draw. A CSG evaluator returns
+re-triangulated soup from which that boundary loop would have to be reconstructed by
+edge-matching anyway, and its irregular cap triangulation emits exactly the slivers that once
+drew phantom "spiderweb" seams (see `meshAnalyzer.js` `DEGENERATE_NORMAL_EPS`). The topic
+CLAUDE.md's non-negotiable architecture section already forbids a CSG library for the section
+cut; this ADR records the concrete design inside that rule.
+**Alternatives rejected:** (a) *`three-bvh-csg` via the import map* — technically possible with
+no build step (pin the raw `build/index.module.js` files, never jsDelivr's `/+esm` transform,
+which would smuggle in a second `three` instance; ADR-030 set the import-map precedent with
+`three-mesh-bvh`) but forbidden by the topic rule and the wrong tool size: a BVH build plus a
+half-space proxy-box subtraction per slider tick to do what one linear pass does. Revisit only
+for genuine boolean territory (compound multi-plane cuts, solids with interior voids).
+(b) *`THREE.Shape` extrude + `mergeGeometries()` per the ADR-045 precedent* — right for
+hand-authoring a fixed part (the Bearing Block), wrong for a cut that must respond to a
+continuous plane parameterization.
+**Consequences:** Easier: the cut rim welds with the clipped lateral walls because the whole
+sliced solid feeds ONE `buildEdgeMap()` call — no double-drawn section edges; the cap is a
+second geometry group so the section face carries its own `--color-section-face` token (and,
+later, hatching) without a separate mesh. Harder/known: (1) exact plane-through-face/vertex
+grazing is degenerate for any clipper, so `sectionCut.js` snaps vertices within `PLANE_EPS`
+(2e-3) onto the plane — **the snap must exceed meshAnalyzer's 1e-3 weld lattice**, or a
+near-grazed vertex emits intersection points inside the vertex's own weld cell and
+`buildEdgeMap` fuses the sliver fan into a non-manifold edge (observed live at 1e-6 on the
+default 45° centre cut of the cube, which passes exactly through two cube edges); (2) the
+convex-roster cap uses a centroid fan — a future hollow solid (multi-loop annular section)
+falls back to `THREE.ShapeUtils.triangulateShape` (three's bundled earcut, still no new
+dependency), which is written but not exercised by any current shape; (3) a cut rim whose
+dihedral is shallower than the 20° crease threshold will not draw in the simple edge overlay —
+acceptable until the camera-dependent visible/hidden classifier pass (ADR-029 lineage) lands.
+**Status:** Active.
+
+---
+
+## ADR-059: Section-plane state lives outside ShapeData, beside it in main.js
+
+**Date:** 2026-07-17
+**Origin:** topic-local ADR-M3T1-002 (elevated 2026-07-18).
+**Decision:** The cutting-plane parameters (`enabled`, `orientation`, `angleDeg`, `offset`)
+live in a topic-local `sectionState` object in `main.js`, mutated only through
+`simController.commitSection()` (which routes through `rebuild()`), and are reset by
+`simAPI.reset()`. They are NOT fields of `ShapeData`.
+**Why:** `src/shapeData.js` is part of the Module 2 geometry engine restored byte-identical
+(root RULES.md §1.3–1.4): drift is fixed in `Module2/` and re-copied, never patched in place.
+Adding section fields to `ShapeData` would fork the file permanently. Keeping the section
+state beside — merged at the `rebuild()` call site — preserves byte-identity while keeping the
+"single rebuild path" contract intact (`commitSection` is to sectionState what `commit` is to
+ShapeData).
+**Alternatives rejected:** Formally exempting `shapeData.js` from byte-identity — a standing
+exception to a platform rule for one topic's convenience; rejected while the cheap composition
+alternative works.
+**Consequences:** Easier: `Module2/src/` fixes keep flowing into this topic by plain re-copy.
+Harder/known: problem-library "load problem" plumbing (a later pass) must serialize BOTH bags
+(`ShapeData` + `SectionState`) instead of one.
+**Status:** Active.
+
+---
+
+## ADR-060: projectionDrawer.js is a byte-identical Module2 copy; all section drawing lives in a new leaf module
+
+**Date:** 2026-07-17
+**Origin:** topic-local ADR-M3T1-003 (elevated 2026-07-18).
+**Decision:** The orthographic views (top/front/side, with per-view visible/dashed
+classification and 3D→2D connectors) come from `src/projectionDrawer.js` copied
+**byte-identical** from `Module2/src/` — the same restore-don't-fork doctrine as the geometry
+engine (root RULES.md §1.3–1.4): any fix lands in Module2 first, then re-copy. Everything
+section-specific — the 45° apparent-shape hatching per view and the true-shape auxiliary
+sheet — lives in a NEW leaf module `src/sectionView.js` (imports only THREE + the fat-line
+addons). Views are consumed with `drawDimensions: false` (the dimension layer carries CSS2D
+labels and this topic mounts no CSS2DRenderer yet) and all output groups are parented INSIDE
+`shapeGroup`, so `rebuild()`'s single deep-disposal contract frees them — `sectionView.js`
+deliberately exports no `dispose()`.
+**Why:** The drawer consumes the welded edge map generically, and the sliced solid already
+feeds one `buildEdgeMap()` call, so it needs zero modification — a cut of a convex solid is
+still convex, keeping the drawer's face-normal visibility tests exact. Isolating hatching +
+true shape in a sibling leaf keeps the copy permanently patch-free (no drift), unlike the
+module_2_topic_2 clone's manual-backport exposure.
+**Alternatives rejected:** (a) forking the drawer to add hatching inside it — permanent drift
+from the master for something expressible outside it; (b) a second dispose path mirroring the
+drawer's own `dispose()` — this topic's idiom is the one shapeGroup contract, and holding two
+teardown paths is how leaks start (verified flat 20→20 geometries across 50 re-cuts).
+**Consequences:** Easier: Module2 drawer fixes flow in by plain re-copy; `fc /b` proves parity.
+Harder/known: the drawer's 8° coplanar threshold draws all 24 lateral facet edges of the
+cone/cylinder in the views (Module2-consistent behaviour, inherited as-is); the parked
+`flatConnectorGroup` (fold-phase material) must ride hidden inside shapeGroup or its batch
+leaks.
+**Status:** Active.
+
+---
+
+## ADR-061: The true shape is an in-scene world-scale sheet plus a camera tween, not an auxiliary camera viewport
+
+**Date:** 2026-07-17
+**Origin:** topic-local ADR-M3T1-004 (elevated 2026-07-18).
+**Decision:** The TRUE SHAPE auxiliary view is drawn as a flat in-scene sheet
+(`sectionView.js`): the cut loop's `points2D` are rendered VERBATIM as local (x, y) geometry
+in a group posed by the cutting plane's own world (u, v, normal) basis, offset along the
+normal past the removed half. Step 5's "Face the section" button tweens the MAIN camera to
+`centroid + normal × orbitDistance` (orbit distance preserved, `easeCamera`, reduced-motion
+jumps). There is no second render pass, no scissored inset viewport, no auxiliary
+OrthographicCamera.
+**Why:** `sectionCut.js` already returns the exact true-shape polygon in plane coordinates —
+a camera is only a way to LOOK, not a way to OBTAIN. Drawing `points2D` at world scale locks
+the true shape 1:1 to the solid intrinsically (no frustum-fitting logic exists to drift —
+the auto-zoom failure class ADR-038 fixed by sheet-locking is unrepresentable here), keeps
+the single-canvas invariant, and matches the textbook construction: an auxiliary plane held
+parallel to the cut. Verified on the 30° cone cut: conic fit of the drawn loop has max
+residual ~1e-8 and the top view's extent equals the true extent × cos 30° exactly.
+**Alternatives rejected:** a picture-in-picture ortho viewport (renderer.setScissor) — a
+per-frame second render plus frustum-sizing state that must track the section, i.e. exactly
+the drift surface being avoided, for no pedagogical gain over facing the sheet.
+**Consequences:** Easier: zero scale bookkeeping; hatch pitch is constant in world units
+(0.25 = 2.5 mm at dock scale) across views and sheet alike. Harder/known: face-on, the
+opaque paper sheet occludes the solid behind it (accepted — the sheet IS the view); the
+sheet repositions with the plane slider since it is anchored to the live cut.
+**Status:** Active.
+
+---
+
+## ADR-062: The KTU "exclude true shape given" rule is a problem-TYPE axis with a hard filter, not an authoring convention
+
+**Date:** 2026-07-17
+**Origin:** topic-local ADR-M3T1-005 (elevated 2026-07-18).
+**Decision:** Every problem in `src/problems.js` carries a `type` field, and the library
+exposes `EXCLUDED_TYPES = ['true-shape-given']` — `enabledProblems()` filters on BOTH the
+tier (`ENABLED_TIERS`, the clone switch) AND the type. All shipped problems are
+`type: 'find-true-shape'`. A problem that hands the learner the true shape to
+reverse-engineer the cut from can therefore never surface in the library UI, even if a
+future author gives it an enabled tier.
+**Why:** The 2024 KTU syllabus explicitly excludes "true shape given" problems. The
+Module2 `TIERS`/`ENABLED_TIERS` axis is scope-based (which configurations this build can
+solve), not legality-based — reusing it would conflate "not built yet" with "banned", and
+"just don't author them" leaves the constraint invisible to the next contributor (module
+CLAUDE.md flagged exactly this gap). Additionally, no problem `target` may reference a
+true-shape dimension: targets are structurally limited to `shape` + `SectionState` keys,
+which contain no true-shape quantities at all.
+**Alternatives rejected:** (a) a never-enabled tier — overloads the clone switch and
+disappears silently if a clone edits `ENABLED_TIERS`; (b) convention only — unenforceable.
+**Consequences:** Easier: the ban is greppable, testable (a banned-type fixture is filtered
+— verified in node), and survives cloning. Harder/known: none; the axis costs one field.
+**Status:** Active.
+
+---
+
+## ADR-063: Conic-section self-check — ±0.5° tolerance + a live 'generator' target, not a "parallel to generator" preset
+
+**Date:** 2026-07-17
+**Origin:** topic-local ADR-M3T1-006 (elevated 2026-07-18).
+**Decision:** `src/problemLibrary.js` checks the cutting plane with per-field tolerances:
+±0.5° on `angleDeg`, ±0.05 world units (0.5 mm) on `offset`, identity on strings/booleans.
+A parabola problem's target is the token `angleDeg: 'generator'`, resolved at compare time
+as `atan(2·height ÷ baseLength)` from the solid actually on the bench (69.44° for the
+Fig 14-28 cone — dimension-ratio-derived, so scale-invariant). There is NO "parallel to
+generator" UI preset. Two supporting policies: (1) `offset` is checked only where the
+statement maps 1:1 onto the control ("bisecting the axis" → 0); a quoted axis point that
+would require the learner to derive a plane-normal offset is left free, guarded by a
+cuts-the-solid check (`sim.section()` non-null) so a plane that misses the solid can never
+go green. (2) Problem `setup` dims are the statement's PROPORTIONS at bench scale (mm ×
+0.04): the topic has no size controls or mm readouts, every checked quantity is
+ratio-derived, and full-scale dims (a Ø 75 mm cone) overflow the fixed camera framing
+(verified live).
+**Why:** The angle slider steps in whole degrees while a generator angle is irrational —
+but the nearest integer stop is mathematically never more than 0.5° from ANY derived
+angle, so ±0.5° makes every conic target reachable by slider alone (numeric field accepts
+the exact decimal), without a preset that would pre-solve the lesson's one discovery:
+"parallel to a generator" MEANS inclination = atan(axis ÷ radius). The sibling library's
+flat 0.05 tolerance is a length in world units and would demand 0.05° — impossible on
+this dock.
+**Alternatives rejected:** (a) a "Parallel to Generator" toggle — mechanically convenient,
+pedagogically hollow (violates the problem-solving discovery arc); (b) snapping the typed
+angle to the slider step — forbids the exact answer; (c) checking derived normal-offsets —
+tests arithmetic the dock never teaches.
+**Consequences:** Easier: authoring a conic problem is one token; dims may be rescaled
+freely without touching targets. Harder/known: an offset-free ellipse problem accepts any
+cutting position (the section stays the named conic wherever the plane cuts — accepted);
+the hint chain, not the checker, carries the atan derivation.
+**Status:** Active.
+
+---
+
+## ADR-064: `iShape.js` taken verbatim from the Module 2 master (conscious ADR-027 resolution)
+
+**Date:** 2026-07-18
+**Origin:** topic-local ADR-M3T2-001 (elevated 2026-07-18).
+**Decision:** This topic's `src/iShape.js` is the master's full 4702-byte version
+(`Module2/src/iShape.js`), copied **verbatim** and kept byte-identical.
+**Why:** Root ADR-027 classifies `iShape.js` as adapt-on-copy, requiring every new topic to read
+`applyShapeTransform()` and consciously decide which poses it keeps. The freshest Case A precedent
+(topic 1, Sections of Solids, 2026-07-17) resolved "adapt" by taking the master verbatim: full pose
+freedom (restingPlane lay-down + `angleHP`/`angleVP` inclination, `ZXY` Euler order) is retained,
+and topic scoping is done through shapeData defaults in `main.js` (`defaultSolidData()` overrides
+only `shape`), never by trimming the transform. Developments of *inclined* or truncated solids are
+in scope for later phases, so pre-stripping poses would have to be undone anyway.
+**Alternatives rejected:** *Copy an older topic's smaller `iShape.js`* — silently omits the
+inclination/lay-down composition this topic may need (the exact trap ADR-027 warns about).
+**Consequences:** `iShape.js` joins the byte-identical set for THIS topic — drift is fixed in
+`Module2/` and re-copied, never patched here. md5 `a5e6c662584cf53649c8ac81af57823e` at copy time.
+**Status:** Active
+
+---
+
+## ADR-065: Through-hole problems are excluded structurally, not editorially
+
+**Date:** 2026-07-18
+**Origin:** topic-local ADR-M3T2-002 (elevated 2026-07-18).
+**Decision:** The syllabus mandate "exclude problems with through holes" is enforced on three
+layers, strongest first: (1) **engine impossibility** — the architecture bans CSG/boolean
+libraries and the restored generator family emits only closed single-shell solids, so a pierced
+solid is unrepresentable by construction; (2) **problem-library axis** — when the problem library
+lands, it must carry a dedicated problem-`type` axis (or never-enabled tier) naming the exclusion,
+because the pose-based `TIERS`/`ENABLED_TIERS` mechanism cannot express a problem-type ban
+(the same gap topic 1 flagged for its "true shape given" exclusion); (3) **on-record notice** —
+this topic's `CLAUDE.md` carries the constraint as a named syllabus block from scaffold day one.
+**Alternatives rejected:** *"Just don't author hole problems"* — authoring discipline does not
+survive sessions; the constraint must be visible in code and docs.
+**Consequences:** Any future request for pierced/hollow solids in this topic must be pushed back
+on citing the syllabus, or escalated as a syllabus change — never implemented via a CSG library.
+**Status:** Active
+
+---
+
+## ADR-066: The development is drawn in Canvas2D on the Compare sheet via a pure `developmentEngine.js` leaf
+
+**Date:** 2026-07-18
+**Origin:** topic-local ADR-M3T2-003 (elevated 2026-07-18).
+**Decision:** The 2D flat pattern renders on the Compare card's plain 2D `<canvas>` (the ADR-012 /
+ADR-037 workbench, ported from the Module 2 master), drawn by `main.js`'s `drawCompare()` which
+delegates ALL unrolling mathematics and path construction to a new pure leaf,
+**`src/developmentEngine.js`** — no DOM access, no THREE dependency, colours injected as a resolved
+palette. This supersedes the scaffold-era CLAUDE.md prose that sketched a `developmentView.js`
+3D-space sheet "per the topic-1 `sectionView.js` precedent".
+Three sub-decisions ride along:
+1. **Method split is the KTU syllabus mandate**: Parallel-Line (prisms + cylinder — stretch-out
+   `P = n·s` / `π·d`, rectangle `P × h`, generator heights are true lengths) vs Radial-Line
+   (pyramids + cone — cone sector by the arc-length identity `θ = 360°·(r/L)`, `L = √(r²+h²)`;
+   pyramids by per-face CHORD stepping `φ = 2·asin(s/(2·L_e))`, `L_e = √(h²+R_c²)`, base edges
+   straight chords). The dispatch lives only in `layoutFor()` so the split cannot drift.
+2. **Sheet scale follows the ADR-053 fixed intrinsic-frame pattern** (user-confirmed over a strict
+   ADR-038 fixed mm span): px-per-mm derives from the ANALYTIC nominal footprint each layout
+   computes out of ShapeData intrinsics (never the live drawn extents), so the pattern can never
+   bleed off the card and pan (ADR-054) / zoom (ADR-055) / future cuts never rescale the drawing.
+3. **Truncation is a data seam, not UI**: `computeCutDistances(shapeData, localPlane)` maps a
+   cutting plane already transformed into the solid's local seated frame to true-length distances
+   per generator/edge (`|apex−P|` along a straight generator IS the true length), and
+   `drawDevelopment()` accepts the result as `cutData`. The cutting-plane controls port from
+   topic-1's `commitSection` pattern (ADR-059) in a later phase with zero engine change.
+**Why:** The Compare canvas is the platform's established 2D "answer sheet" (single-canvas
+invariant ADR-034 — no second WebGL context), Canvas2D gives crisp DPR-scaled arcs/paths with real
+line-weight control (the fat-line LineSegments2 rule is a WebGL-viewport concern and does not
+apply), and a pure engine leaf keeps every formula console-testable — the headless verification
+drives `layoutFor()` oracles directly.
+**Alternatives rejected:** (a) *3D-space sheet à la topic-1 `sectionView.js`* — that pattern exists
+because topic-1's true shape lives in the 3D fold narrative; the development is a flat DRAWING and
+belongs on the drawing sheet. (b) *SVG overlay* — a second render surface duplicating the card's
+canvas contract for no gain. (c) *Unrolling the actual mesh triangles* — the analytic formulas ARE
+the lesson (KTU methods); mesh unrolling would obscure them and drag THREE into the leaf.
+**Consequences:** `main.js` gains the ported Compare/workbench block + a thin `drawCompare()`
+orchestrator; `index.html` gains the `#compare-chip` (always visible — the sim always has a solid,
+so there is no projection gate). `WORKBENCH_CONTROLS` starts EMPTY — the parameter dock docks its
+drivers there in a later phase. The engine's ShapeType dispatch uses string literals (leaves may
+import only `genericSolid.js`, ADR-007); corner indexing ↔ 3D-mesh seam alignment is deferred to
+the section-UI port, when the seam choice becomes learner-visible.
+**Status:** Active
+
+---
+
+## ADR-067: Cutting-plane state lives in `main.js` OUTSIDE ShapeData (`commitSection` port)
+
+**Date:** 2026-07-18
+**Origin:** topic-local ADR-M3T2-004 (elevated 2026-07-18).
+**Decision:** The truncation state — `{ enabled, angleDeg, cutHeight }` — is a module-level
+`sectionState` in `main.js`, mutated only via `simController.commitSection(partial)` which routes
+through the single `rebuild()` pipeline; `simController.sectionState()` returns a copy, and
+`simAPI.reset()` re-seeds `defaultSectionState()`. `src/shapeData.js` stays byte-identical to
+Module2 (RULES.md §1.3–1.4).
+**Why:** Straight port of topic-1's proven ADR-059 pattern, and the CLAUDE.md scaffold
+clause ("Development/unroll state lives OUTSIDE ShapeData") already mandated the shape of it.
+The seated-frame plane consumed by `computeCutDistances()` is derived once per rebuild inside
+the build seam (`activeCutLocalPlane`), never recomputed by the drawing layer.
+**Alternatives rejected:** *Extending ShapeData* — breaks the byte-identical contract and forks
+the master schema for a topic-local concern.
+**Consequences:** `drawCompare()` reads `activeCutLocalPlane` (null ⇒ full pattern); the dock's
+section controls write only through `commitSection`. The unroll-animation state of a later phase
+follows the same pattern beside it.
+**Status:** Active
+
+---
+
+## ADR-068: Cutting-plane controls are Angle-to-HP + Cut-height (plane always ⊥ VP); corner sampling takes the meshes' alignment phase
+
+**Date:** 2026-07-18
+**Origin:** topic-local ADR-M3T2-005 (elevated 2026-07-18).
+**Decision:** (1) The truncation UI is two sliders + a toggle: **Angle to HP** (0–90°) and
+**Cut height** (mm above the base where the plane crosses the solid's axis). The plane is ALWAYS
+perpendicular to the VP — normal `(0, cosθ, sinθ)` — and there is no orientation select (diverges
+deliberately from topic-1's orient+offset dock; user-confirmed). (2) The 3D solid is really
+truncated: topic-1's `sectionCut.js` analytic clipper is copied in (never CSG) and runs inside
+`rebuild()`'s seam; the world plane reaches mesh-local space via `mesh.matrix.invert()` (the
+ADR-005 ZXY order is baked into the quaternion — no Euler is ever decomposed) and reaches the
+engine's seated frame via the constant shift `d_seated = d_local − n_y·(h/2)` (generators centre
+geometry at ±h/2). (3) `computeCutDistances()` samples polygon corners at
+`polygonVertexAngle(N, k, PRISM | FLAT_EDGE_FRONT)` — the phase the meshes are actually built
+with — importing `genericSolid.js`, the one leaf import ADR-007 permits. This resolves
+ADR-066's deferred "corner indexing ↔ mesh seam alignment" clause.
+**Why:** The KTU truncation standard is a plane ⊥ VP inclined to HP crossing every generator —
+exactly what the development height-model can draw. A VP-inclined (vertical) cut removes whole
+generators and is NOT representable as a height truncation of the same stretch-out (the engine
+returns null there by design); an oblique two-angle plane is beyond the syllabus. Anchoring by
+axis-crossing height reads directly off the textbook problem statements ("cut by a plane
+bisecting the axis"). Without the alignment phase, cut heights are sampled at corners the mesh
+does not have — plausible-but-wrong patterns (verified: the square prism's true heights are
+0.423/1.577 at the π/4-phase corners, not the plain-2πk/N values).
+**Alternatives rejected:** *Topic-1 parity (orientation select + offset-along-normal)* — carries
+the un-drawable VP branch into a topic whose whole payoff is the 2D pattern; *raycasting the mesh
+for cut points* — hits the 24-segment approximation instead of the true cone/cylinder and drags
+THREE into the pure engine leaf.
+**Consequences:** `WORKBENCH_CONTROLS = ['shape', 'section']` (amends ADR-066's "starts
+EMPTY"); the dock docks into `#workbench-rail` during the split. `--color-section-face` token
+added to this topic's `index.html` (same value as topic-1/DESIGN.md). 'all-cut' keeps the seated
+plane so the pattern honestly collapses; 'no-cut' nulls it so the full pattern draws.
+**Status:** Active
+
+---
+
+## ADR-069: The "through holes" exclusion ships as a hard problem-`type` filter (`EXCLUDED_TYPES`) in the data layer
+
+**Date:** 2026-07-18
+**Origin:** topic-local ADR-M3T2-006 (elevated 2026-07-18).
+**Decision:** `src/problems.js` carries a dedicated problem-type axis: every problem declares a
+`type` ('shortest-path' | 'truncation' today) and `EXCLUDED_TYPES = Object.freeze(['through-hole'])`
+is filtered INSIDE `enabledProblems()` — `ENABLED_TIERS.includes(p.tier) && !EXCLUDED_TYPES.includes(p.type)`.
+A 'through-hole' problem can never reach the library UI regardless of its tier. This completes
+ADR-065 layer 2 (the pending exclusion axis), mirroring topic-1's ADR-062
+"true-shape-given" pattern exactly.
+**Why:** The KTU 2024 syllabus mandate ("Exclude problems with through holes") must be
+structural, not an authoring convention — pose-based `TIERS` cannot express a problem-KIND ban,
+and a later session adding a pierced-solid problem should hit a named filter, not a comment.
+Layer 1 (no CSG, closed single-shell generators) already makes the geometry unrepresentable;
+this makes the *problem statement* unreachable too.
+**Alternatives rejected:** *A never-enabled tier* — conflates the method-split grouping axis
+with the ban and vanishes from view when tiers are reshuffled; *authoring discipline alone* —
+explicitly ruled out by ADR-065's on-record notice.
+**Consequences:** `groupByTier()` also filters to enabled tiers (topic-1 parity). Library data
+layer: 4 problems (statements verbatim, user-supplied), tiers `parallel`/`radial` mirroring the
+KTU method split.
+**Status:** Active
+
+---
+
+## ADR-070: Shortest-path ("string") problems — straight chord on the development, 3D wrap by per-face isometry, revealed only on a matched self-check via a non-rebuild overlay commit
+
+**Date:** 2026-07-18
+**Origin:** topic-local ADR-M3T2-007 (elevated 2026-07-18).
+**Decision:** (1) The shortest route on the surface is drawn as a STRAIGHT line on the 2D
+development (the development is an isometry, so straight there = the surface geodesic).
+`computeStringPath(layout, spec)` in `src/developmentEngine.js` parameterises a problem's
+`path: { wrap, from, to }` spec seam-anchored: radial solids take the chord between boundary
+points at pattern angles γ₀ = −half and γ₁ = γ₀ + wrap·total, with interior generator/edge
+crossings from the polar chord identity ρ(γ) = R·cos(Δ/2) / cos(γ − γₘ) (guarded invalid at
+Δ ≥ 180°, and radial specs are base→base only); parallel solids take the straight segment
+(0, y_from) → (wrap·P, y_to) with crossings interpolated on the station grid. (2) The SAME
+path is wrapped onto the 3D solid (`liftStringPathTo3D` in `main.js`): flat solids lift only
+the fold-crossing points (straight per face — per-face isometry), the cone uses a 49-sample
+fine grid; points are built in the seated frame, shifted to the generators' centred frame
+(y − h/2), and pushed through `mesh.matrix` (after an explicit `updateMatrix()` — the matrix
+is still identity right after rebuild() when the cut is off, verified live as a
+half-height-low render). Corner sampling reuses the ADR-068 alignment phases
+(PRISM / FLAT_EDGE_FRONT / plain 2πk/N). Drawn as a fat `Line2` in the new `--color-dev-path`
+token (plum), parented into `shapeGroup` so ADR-042 disposal frees it. (3) The reveal is
+GATED ON THE MATCHED SELF-CHECK (user decision): `simController.commitStringPath(spec)` is a
+NON-rebuild overlay commit — it stores the spec, rebuilds the 3D string, and repaints the
+sheet, but never calls `rebuild()` — so `problemLibrary.evaluate()` (which runs inside the
+`onStateChange` seam) can clear it on unmatch and idempotently RE-assert it after every
+rebuild while matched, with zero re-entrancy.
+**Why:** Pedagogy: the whole point of these KTU classics is discovering that the shortest
+surface route is a straight line on the flat pattern — revealing it only when the learner's
+setup matches keeps the reveal as the reward and honours the never-auto-fill rule. Cost: the
+lift is ≤ 49 points computed once per commit — no per-frame work, no performance-budget
+conflict, so the "2D-only if 3D is too expensive" fallback in the plan was not needed.
+**Alternatives rejected:** *Reveal on load* — turns the answer into scenery;
+*routing the spec through rebuild()* — re-enters `notifyStateChange` from inside a subscriber;
+*raycast/geodesic-walk on the mesh* — hits the 24-segment approximation and drags THREE into
+the pure engine leaf.
+**Consequences:** `stringPathSpec` lives beside `sectionState` (outside ShapeData,
+ADR-067 mirror) and is cleared by `simAPI.reset()`; `simController` gains `hasCut()`,
+`commitStringPath()`, `isProblemActive()`, `completeAndNext()`; the terminal step gains the
+topic-1 "Complete & next problem" CTA + success toast; `--color-dev-path #8f3a86` recorded in
+DESIGN.md §7.4.
+**Status:** Active
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*

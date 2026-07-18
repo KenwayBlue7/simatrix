@@ -1,0 +1,6 @@
+{
+  "title": "Sections of Solids",
+  "description": "Cut a solid with a section plane and draw the resulting sectional view: choose the solid, position and incline the cutting plane, and project the true shape of the section. First-angle, HP/VP conventions.",
+  "difficulty": "intermediate",
+  "tags": ["engineering-graphics", "sections-of-solids", "sectional-views", "solids", "hp-vp"]
+}

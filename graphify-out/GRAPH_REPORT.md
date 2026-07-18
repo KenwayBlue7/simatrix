@@ -1,16 +1,16 @@
-# Graph Report - Simatrix  (2026-07-16)
+# Graph Report - Simatrix  (2026-07-18)
 
 ## Corpus Check
-- 192 files · ~500,249 words
+- 239 files · ~610,788 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 2535 nodes · 3980 edges · 350 communities (142 shown, 208 thin omitted)
-- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 111 edges (avg confidence: 0.58)
+- 3025 nodes · 4790 edges · 376 communities (166 shown, 210 thin omitted)
+- Extraction: 97% EXTRACTED · 3% INFERRED · 0% AMBIGUOUS · INFERRED: 125 edges (avg confidence: 0.59)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `6acf3d1f`
+- Built from commit: `42fc28a5`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -136,6 +136,7 @@
 - frameDefault
 - CHANGELOG
 - 5. Components
+- main.js
 - CHANGELOG
 - CHANGELOG
 - CHANGELOG
@@ -361,9 +362,34 @@
 - rebuild
 - buildScene
 - initUIManager
+- genericPrism.js
+- CLAUDE.md — Simatrix Engineering Graphics Viewer — Sections of Solids
+- init
+- announce
+- reset
+- reset
+- anim.js
+- problems.js
+- applyCompareSize
+- Changelog
+- main.js
+- applyShapeTransform
+- genericPrism.js
+- init
+- CLAUDE.md — Simatrix Engineering Graphics Viewer — Development of Surfaces
+- anim.js
+- meshAnalyzer.js
+- announce
+- problems.js
+- Decisions (ADR Log) — Development of Surfaces (Module 3, Topic 2)
+- Changelog — Development of Surfaces (Module 3, Topic 2)
+- announce
+- buildScene
+- uiManager.js
+- onboarding.js
 
 ## God Nodes (most connected - your core abstractions)
-1. `Simatrix — Decisions (ADR Log)` - 58 edges
+1. `Simatrix — Decisions (ADR Log)` - 71 edges
 2. `$()` - 29 edges
 3. `asg()` - 28 edges
 4. `rebuild()` - 26 edges
@@ -379,12 +405,12 @@
   graphics_module_1_topic_3_points/index.html → Module2/index.html
 - `Simple Positions lesson` --semantically_similar_to--> `Orthographic Projection of Solids (Module 2 master lesson)`  [INFERRED] [semantically similar]
   graphics_module_2_topic_2_simple_positions/index.html → Module2/index.html
+- `buildSectionViews()` --indirect_call--> `loop()`  [INFERRED]
+  graphics_module_3_topic_1_sections_of_solids/src/sectionView.js → Module1/src/engine.js
 - `initUIManager()` --indirect_call--> `armReset()`  [INFERRED]
   graphics_module_1_topic_3_points/src/uiManager.js → Module1/src/engine.js
 - `initUIManager()` --indirect_call--> `armReset()`  [INFERRED]
   graphics_module_2_topic_2_simple_positions/src/uiManager.js → Module1/src/engine.js
-- `initUIManager()` --indirect_call--> `armReset()`  [INFERRED]
-  Module2/src/uiManager.js → Module1/src/engine.js
 
 ## Import Cycles
 - None detected.
@@ -394,15 +420,15 @@
 - **HP, VP and PP form the orthographic reference-plane framework** — graphics_module_1_topic_2_spatial_framework_index_horizontal_plane, graphics_module_1_topic_2_spatial_framework_index_vertical_plane, graphics_module_1_topic_3_points_index_profile_plane, graphics_module_1_topic_2_spatial_framework_index_four_quadrants [INFERRED 0.85]
 - **BIS line types A / E-F / G / B form the line-type taxonomy** — graphics_module_1_topic_1_foundations_index_type_a, graphics_module_1_topic_1_foundations_index_type_ef, graphics_module_1_topic_1_foundations_index_type_g, graphics_module_1_topic_1_foundations_index_type_b, graphics_module_1_topic_1_foundations_index_bis_line_types [INFERRED 0.85]
 
-## Communities (350 total, 208 thin omitted)
+## Communities (376 total, 210 thin omitted)
 
 ### Community 0 - "First-Angle Projection Scene"
 Cohesion: 0.05
 Nodes (58): animate(), applyMode(), applyProjectionMorph(), buildScene(), compare, computeEffectiveAngles(), contentBox(), createEdgeOverlay() (+50 more)
 
 ### Community 1 - "Fold Animation Engine"
-Cohesion: 0.06
-Nodes (39): animate(), applyCompareSize(), applyProjectionMorph(), compare, DEFAULT_CAMERA_POSITION, DEFAULT_CAMERA_TARGET, DEFAULT_VIEW_DIR, driverHomes (+31 more)
+Cohesion: 0.05
+Nodes (58): animate(), applyMode(), applyProjectionMorph(), buildScene(), compare, computeEffectiveAngles(), createEdgeOverlay(), cssColor() (+50 more)
 
 ### Community 2 - "Projection Orchestrator"
 Cohesion: 0.16
@@ -414,11 +440,11 @@ Nodes (42): animate(), announce(), buildScene(), cssColor(), cssVar(), DEFAULT_C
 
 ### Community 4 - "Module Docs & ADRs"
 Cohesion: 0.09
-Nodes (40): arc(), beginConScene(), buildTLScene(), buildTraceScene(), CALM_GRID, clamp01(), computeTraces(), conLabel() (+32 more)
+Nodes (38): arc(), beginConScene(), buildTLScene(), buildTraceScene(), CALM_GRID, clamp01(), computeTraces(), conLabel() (+30 more)
 
 ### Community 5 - "Scene Boot & Camera"
 Cohesion: 0.06
-Nodes (37): ADR-0021, CAMERA_POSE, compare, currentData, currentView, fitOrthoZoom(), fitOrthoZoomForView(), hasDialedWork() (+29 more)
+Nodes (36): ADR-0021, CAMERA_POSE, compare, completeAndNext(), currentData, currentView, fitOrthoZoom(), fitOrthoZoomForView() (+28 more)
 
 ### Community 6 - "Solid Geometry Generators"
 Cohesion: 0.06
@@ -434,7 +460,7 @@ Nodes (33): announce(), applyFadeLevels(), buildScene(), CAMERA_POSE, commit(), 
 
 ### Community 9 - "Camera Framing & Solids"
 Cohesion: 0.05
-Nodes (36): 1. Purpose and scope of this file, 2.1 The token table (verified against code), 2.2 Module-1 construction-aid encodings (Lines sim), 2.3 The named colour rules (binding everywhere), 2. Color system, 3.1 Where the fonts are hosted, 3.2 When each font is used (hierarchy), 3.3 The named type rules (+28 more)
+Nodes (38): 1. Purpose and scope of this file, 2.1 The token table (verified against code), 2.2 Module-1 construction-aid encodings (Lines sim), 2.3 The named colour rules (binding everywhere), 2. Color system, 3.1 Where the fonts are hosted, 3.2 When each font is used (hierarchy), 3.3 The named type rules (+30 more)
 
 ### Community 10 - "Solid Generators (clone)"
 Cohesion: 0.12
@@ -445,8 +471,8 @@ Cohesion: 0.12
 Nodes (27): createSolidMesh(), buildConeGeometry(), createCone(), cssColor(), rootStyle, createCube(), cssColor(), rootStyle (+19 more)
 
 ### Community 12 - "ADR Index & Compare View"
-Cohesion: 0.07
-Nodes (29): active, cancelAll(), easeCamera, easeDissolve, easeDraw, easeFold, easeStandard, tick() (+21 more)
+Cohesion: 0.06
+Nodes (39): active, cancelAll(), easeCamera, easeDissolve, easeDraw, easeFold, easeStandard, tick() (+31 more)
 
 ### Community 13 - "Dimensioning & Line Types"
 Cohesion: 0.12
@@ -461,8 +487,8 @@ Cohesion: 0.06
 Nodes (32): 3.10 Register the topic in `ARCHITECTURE.md`, 3.1 Name the folder, 3.2 Copy the master, whole, 3.3 File-by-file: keep exactly as copied (the shared contracts), 3.4 File-by-file: adapt (the topic-specific content), 3.5 File-by-file: create fresh (only if your topic needs them), 3.6 Update `meta.json` (every field), 3.7 Update the new folder's `CLAUDE.md` (the pointer to root docs) (+24 more)
 
 ### Community 16 - "Projection Drawer (clone)"
-Cohesion: 0.13
-Nodes (21): $(), afterRebuild(), draw3D(), FEEDBACK, mark(), wireControls(), draw3D(), FOCUS (+13 more)
+Cohesion: 0.12
+Nodes (23): $(), afterRebuild(), draw3D(), FEEDBACK, mark(), wireControls(), draw3D(), FOCUS (+15 more)
 
 ### Community 17 - "UI Manager & Sliders"
 Cohesion: 0.06
@@ -505,24 +531,24 @@ Cohesion: 0.08
 Nodes (23): 2026-07-02 (3D content: planes, point, cinematic fold), 2026-07-02 (Data layer + registration), 2026-07-02 (Guided stepper), 2026-07-02 (Scaffold), 2026-07-03 (CSS2D label layer — topic complete), 2026-07-03 (Dock removal + full-height step rail — Module 2 convergence), 2026-07-03 (Param-control relocation + step-name trim — UI regression fix), 2026-07-03 (Step-rail button layout — narrow-rail fix) (+15 more)
 
 ### Community 27 - "frustums"
-Cohesion: 0.20
-Nodes (10): $(), QNAME, sync(), defaultPointData(), QuadrantType, FIELD_LABELS, PROBLEMS, TIERS (+2 more)
+Cohesion: 0.14
+Nodes (24): addIfPresent(), addSegment(), buildArrowMesh(), buildSegments(), classifyEdge(), cssColor(), DASH, drawProjections() (+16 more)
 
 ### Community 28 - "lineDrawer"
-Cohesion: 0.21
-Nodes (17): rebuildFromEdit(), wireControls(), announce(), armReset(), closeTerm(), disarmReset(), editRebuild(), flowNote() (+9 more)
+Cohesion: 0.18
+Nodes (14): armReset(), closeTerm(), disarmReset(), goBack(), goNext(), MOBILE_Q, openTerm(), renderStep() (+6 more)
 
 ### Community 29 - "main"
-Cohesion: 0.31
-Nodes (15): answerSheetBox(), clearProjectionMorph(), engageOrtho(), fitOrthoZoom(), flattenedViewBox(), restorePerspective(), setFlatView(), setupQuickViews() (+7 more)
+Cohesion: 0.26
+Nodes (17): announce(), answerSheetBox(), clearProjectionMorph(), engageOrtho(), fitOrthoZoom(), flattenedViewBox(), restorePerspective(), setConnectorsVisible() (+9 more)
 
 ### Community 30 - "main"
-Cohesion: 0.12
-Nodes (15): init(), markBooted(), setupConnectorToggle(), setupMobileNotice(), initOnboarding(), SPOTLIGHTS, TONE_CLASSES, initProblemLibrary() (+7 more)
+Cohesion: 0.15
+Nodes (12): init(), markBooted(), setupConnectorToggle(), setupMobileNotice(), initOnboarding(), SPOTLIGHTS, TONE_CLASSES, initProblemLibrary() (+4 more)
 
 ### Community 31 - "main"
-Cohesion: 0.12
-Nodes (24): announce(), applyCompareSize(), completeAndNext(), ensureWorkbenchRail(), enterWorkbench(), exitWorkbench(), handleResize(), init() (+16 more)
+Cohesion: 0.18
+Nodes (17): announce(), applyCompareSize(), ensureWorkbenchRail(), enterWorkbench(), exitWorkbench(), handleResize(), init(), isWorkbenchViewport() (+9 more)
 
 ### Community 32 - "main"
 Cohesion: 0.09
@@ -533,8 +559,8 @@ Cohesion: 0.19
 Nodes (15): createSolidMesh(), buildConeGeometry(), createCone(), cssColor(), rootStyle, createCube(), cssColor(), rootStyle (+7 more)
 
 ### Community 34 - "problems"
-Cohesion: 0.12
-Nodes (19): animateFold(), applyDimensionVisibility(), applyFoldVisual(), applyProfilePlaneVisibility(), disposeActiveProjection(), refreshProjections(), setDimensionsVisible(), setObjectOpacity() (+11 more)
+Cohesion: 0.13
+Nodes (20): animateFold(), applyDimensionVisibility(), applyFoldVisual(), applyProfilePlaneVisibility(), disposeActiveProjection(), refreshProjections(), setDimensionsVisible(), setObjectOpacity() (+12 more)
 
 ### Community 35 - "DECISIONS"
 Cohesion: 0.12
@@ -549,12 +575,12 @@ Cohesion: 0.11
 Nodes (17): Card geometry & facade, Chrome-injection contract, Cinematic fold camera, Compare View contract, Compare workbench (Lines — `cfg.workbenchControls`), CSS keyframes, DESIGN.md — Module 1 Premium Interaction Layer, Dual-camera orchestrator (Points / Lines — `cfg.orthoViews`) (+9 more)
 
 ### Community 38 - "main"
-Cohesion: 0.15
-Nodes (12): injectCardChrome(), injectChrome(), injectLibraryChrome(), attachOrtho(), boot(), build(), buildRail(), readTokens() (+4 more)
+Cohesion: 0.27
+Nodes (17): $(), applyTLState(), enterTL(), enterTrace(), exitCon(), pauseTL(), playTL(), runConAnim() (+9 more)
 
 ### Community 39 - "main"
-Cohesion: 0.14
-Nodes (26): $(), animateFold(), announceState(), buildCtx(), cueOrthoLock(), declutterChipLabels(), fill(), foldBack() (+18 more)
+Cohesion: 0.16
+Nodes (24): $(), animateFold(), announceState(), buildCtx(), cueOrthoLock(), declutterChipLabels(), foldBack(), foldForward() (+16 more)
 
 ### Community 40 - "anim"
 Cohesion: 0.20
@@ -569,12 +595,12 @@ Cohesion: 0.16
 Nodes (16): calmGrid(), createHvPlanes(), cssColor(), DASH, fatSegments(), FILL, GRID, ADR-0004 (+8 more)
 
 ### Community 43 - "anim"
-Cohesion: 0.08
-Nodes (25): announce(), completeAndNext(), init(), markBooted(), reset(), resetCamera(), resetCompareView(), setConnectorsVisible() (+17 more)
+Cohesion: 0.10
+Nodes (25): announce(), applyCompareSize(), drawCompare(), ensureWorkbenchRail(), enterWorkbench(), exitWorkbench(), handleResize(), init() (+17 more)
 
 ### Community 44 - "vertexLabeler"
-Cohesion: 0.27
-Nodes (17): $(), applyTLState(), enterTL(), enterTrace(), exitCon(), pauseTL(), playTL(), runConAnim() (+9 more)
+Cohesion: 0.40
+Nodes (3): initOnboarding(), SPOTLIGHTS, TONE_CLASSES
 
 ### Community 45 - "anim"
 Cohesion: 0.17
@@ -601,8 +627,8 @@ Cohesion: 0.13
 Nodes (14): Anti-Patterns Verdict, Critique — Orthographic Projection Guided Stepper (`index.html`), Design Health Score, Minor Observations, Overall Impression, [P1] Editing geometry while flattened unfolds the drawing with no visible explanation, [P1] Reset is a one-click, unconfirmed total wipe, [P2] `aria-live="polite"` on the entire `#step-card` over-announces for screen readers (+6 more)
 
 ### Community 51 - "spatialSteps"
-Cohesion: 0.21
-Nodes (13): applyDimensionVisibility(), applyProfilePlaneVisibility(), disposeActiveProjection(), drawCompare(), handleResize(), refreshProjections(), remeasureAfterReflow(), setDimensionsVisible() (+5 more)
+Cohesion: 0.19
+Nodes (14): animateFold(), applyDimensionVisibility(), applyFoldVisual(), applyProfilePlaneVisibility(), disposeActiveProjection(), refreshProjections(), setDimensionsVisible(), setObjectOpacity() (+6 more)
 
 ### Community 52 - "anatomy"
 Cohesion: 0.13
@@ -625,12 +651,12 @@ Cohesion: 0.18
 Nodes (11): handleResize(), init(), markBooted(), setupMobileNotice(), DEFAULT_VIEW, STEPS, TERMS, initStepper() (+3 more)
 
 ### Community 57 - "setView"
-Cohesion: 0.26
-Nodes (17): tween(), animateFoldSwoop(), clearProjectionMorph(), engageOrtho(), exitQuickView(), fitOrthoZoom(), fitOrthoZoomForView(), flatBoxFor() (+9 more)
+Cohesion: 0.24
+Nodes (18): tween(), animateFoldSwoop(), clearProjectionMorph(), engageOrtho(), exitQuickView(), fitOrthoZoom(), fitOrthoZoomForView(), flatBoxFor() (+10 more)
 
 ### Community 58 - "problemLibrary.js"
-Cohesion: 0.18
-Nodes (7): initOnboarding(), SPOTLIGHTS, TONE_CLASSES, initProblemLibrary(), ADR-0007, ADR-0015, ADR-0033
+Cohesion: 0.27
+Nodes (11): $(), rebuildFromEdit(), sync(), wireControls(), announce(), editRebuild(), flowNote(), showRestoring() (+3 more)
 
 ### Community 59 - "main"
 Cohesion: 0.24
@@ -661,12 +687,12 @@ Cohesion: 0.15
 Nodes (12): Anti-Patterns Verdict, Critique — `index.html` (Lesson 1: The Two Reference Planes), Design Health Score, Headline finding, Minor Observations, [P2] Boot overlay diverges from the token system, [P2] `#c3d` canvas has no accessible name, [P3] `<h1>` empty until JS runs (+4 more)
 
 ### Community 66 - "announce"
-Cohesion: 0.20
-Nodes (9): animateFold(), applyFoldVisual(), active, cancelAll(), easeCamera, easeDissolve, easeDraw, easeFold (+1 more)
+Cohesion: 0.27
+Nodes (7): addEdge(), buildEdgeMap(), compareLattice(), Edge, Face, IDENTITY_ELEMENTS, vertexToken()
 
 ### Community 67 - "pointSteps"
-Cohesion: 0.17
-Nodes (11): 2026-06-27, 2026-06-28, 2026-06-29, 2026-07-02, 2026-07-03, 2026-07-09, 2026-07-10, 2026-07-11 (+3 more)
+Cohesion: 0.14
+Nodes (13): 2026-06-27, 2026-06-28, 2026-06-29, 2026-07-02, 2026-07-03, 2026-07-09, 2026-07-10, 2026-07-11 (+5 more)
 
 ### Community 68 - "main"
 Cohesion: 0.17
@@ -693,8 +719,8 @@ Cohesion: 0.18
 Nodes (9): CHIP_OFFSET, createLabelLayer(), ADR-0004, ADR-0007, ADR-0016, ADR-0033, PLANE_ANCHOR, QUAD_ANCHORS (+1 more)
 
 ### Community 74 - "pointProblems"
-Cohesion: 0.22
-Nodes (8): DEFAULT_VIEW, ADR-0012, STEPS, TERMS, ADR-0007, ADR-0037, initTerms(), ADR-0007
+Cohesion: 0.20
+Nodes (9): DEFAULT_VIEW, ADR-0012, STEPS, TERMS, initStepper(), ADR-0007, ADR-0037, initTerms() (+1 more)
 
 ### Community 75 - "DECISIONS"
 Cohesion: 0.15
@@ -733,8 +759,8 @@ Cohesion: 0.20
 Nodes (9): Architecture — Module 2 orchestrator pattern (ADR-033, overturns ADR-011 for this topic), CLAUDE.md — Simatrix · Module 1 Topic 2: Spatial Framework (BUILT), File structure, Non-negotiables inherited from the platform (apply unchanged), Platform contract (already wired — do not add a second path), Project-wide documentation (read before cross-module tasks), SESSION DIGEST — [date] — [feature/task], Session Digest Protocol (+1 more)
 
 ### Community 84 - "CLAUDE"
-Cohesion: 0.20
-Nodes (8): CHIP_OFFSET, ADR-0004, ADR-0007, ADR-0016, ADR-0033, PLANE_ANCHOR, QUAD_ANCHORS, NOTE: Line2/LineSegments2 EXTEND Mesh (isMesh is true), so the fat-line grids/bo
+Cohesion: 0.18
+Nodes (9): CHIP_OFFSET, createLabelLayer(), ADR-0004, ADR-0007, ADR-0016, ADR-0033, PLANE_ANCHOR, QUAD_ANCHORS (+1 more)
 
 ### Community 85 - "main"
 Cohesion: 0.06
@@ -745,8 +771,8 @@ Cohesion: 0.29
 Nodes (6): CONCEPTS, factsFor(), LAYER_TOGGLES, ROSTER, SHAPE_FACTS, ShapeType
 
 ### Community 87 - "pointData"
-Cohesion: 0.14
-Nodes (12): animate(), applyProjectionMorph(), resume(), startLoop(), active, cancelAll(), easeCamera, easeDissolve (+4 more)
+Cohesion: 0.26
+Nodes (11): buildSectionViews(), cssColor(), fatSegments(), hatchLoops2D(), ADR-0038, ADR-0042, ADR-0060, loopArea() (+3 more)
 
 ### Community 88 - "computeEffectiveAngles"
 Cohesion: 0.20
@@ -822,7 +848,7 @@ Nodes (7): Before you write any code, CLAUDE.md — Simatrix Starter Template, K
 
 ### Community 107 - "CLAUDE"
 Cohesion: 0.03
-Nodes (58): ADR-000: [Template — copy this for a new entry], ADR-001: No build step; ship pinned CDN ES modules, ADR-002: Host integration via a `window.simAPI` global, not `postMessage`, ADR-003: CSS design tokens are the single runtime source of truth for all visual values, ADR-004: Every geometry change funnels through one `rebuild()` pipeline, ADR-005: Re-derive every ported sign visually (Unity left-handed → Three.js right-handed), explicit ZXY Euler, ADR-006: Fat lines + hard-edge geometry + quantized edge welding for crisp technical linework, ADR-007: Orchestrator + leaf modules — leaves don't cross-import; only `genericSolid` (pure math) is shared (+50 more)
+Nodes (71): ADR-000: [Template — copy this for a new entry], ADR-001: No build step; ship pinned CDN ES modules, ADR-002: Host integration via a `window.simAPI` global, not `postMessage`, ADR-003: CSS design tokens are the single runtime source of truth for all visual values, ADR-004: Every geometry change funnels through one `rebuild()` pipeline, ADR-005: Re-derive every ported sign visually (Unity left-handed → Three.js right-handed), explicit ZXY Euler, ADR-006: Fat lines + hard-edge geometry + quantized edge welding for crisp technical linework, ADR-007: Orchestrator + leaf modules — leaves don't cross-import; only `genericSolid` (pure math) is shared (+63 more)
 
 ### Community 108 - "DECISIONS"
 Cohesion: 0.20
@@ -833,8 +859,8 @@ Cohesion: 0.29
 Nodes (4): ENABLED_TIERS, FIELD_LABELS, PROBLEMS, TIERS
 
 ### Community 110 - "layout"
-Cohesion: 0.22
-Nodes (13): beginOverlay(), enterWorkbench(), exitWorkbench(), isSplit(), layout(), placeLr(), s2Px(), s3Px() (+5 more)
+Cohesion: 0.53
+Nodes (5): chainSegments(), cutGeometryWithPlane(), ADR-0058, pointKey(), signedArea2()
 
 ### Community 111 - "Simatrix"
 Cohesion: 0.29
@@ -861,20 +887,24 @@ Cohesion: 0.33
 Nodes (4): ADR-0018, ADR-0033, QUADRANT_INFO, QuadrantType
 
 ### Community 117 - "announce"
-Cohesion: 0.60
-Nodes (4): clamp(), initUIManager(), parseNumeric(), SLIDERS
+Cohesion: 0.06
+Nodes (32): 3.10 Register the topic in `ARCHITECTURE.md`, 3.1 Name the folder, 3.2 Copy the master, whole, 3.3 File-by-file: keep exactly as copied (the shared contracts), 3.4 File-by-file: adapt (the topic-specific content), 3.5 File-by-file: create fresh (only if your topic needs them), 3.6 Update `meta.json` (every field), 3.7 Update the new folder's `CLAUDE.md` (the pointer to root docs) (+24 more)
 
 ### Community 118 - "frameDefault"
-Cohesion: 0.67
-Nodes (4): contentBoxWorld(), fitPerspectiveDistance(), frameDefault(), reframeIfClipped()
+Cohesion: 0.25
+Nodes (11): addSectionPlaneVisual(), applySectionCut(), buildScene(), buildSectionPlaneWorld(), createEdgeOverlay(), createSolidMesh(), cssColor(), cssVar() (+3 more)
 
 ### Community 119 - "CHANGELOG"
 Cohesion: 0.40
 Nodes (4): 1. Subject, 2. BIS line-type → token map (the only encoding this topic adds), 3. Fat-line stack (inherited, non-negotiable), DESIGN.md — Module 1 Topic 1: Engineering Graphics Foundations (topic appendix)
 
 ### Community 120 - "5. Components"
-Cohesion: 0.13
-Nodes (22): announce(), applyCompareSize(), completeAndNext(), drawCompare(), ensureWorkbenchRail(), enterWorkbench(), exitWorkbench(), handleResize() (+14 more)
+Cohesion: 0.22
+Nodes (13): applyCompareSize(), drawCompare(), ensureWorkbenchRail(), enterWorkbench(), exitWorkbench(), handleResize(), isWorkbenchViewport(), remeasureAfterReflow() (+5 more)
+
+### Community 121 - "main.js"
+Cohesion: 0.06
+Nodes (54): ADR-0009, ADR-0061, addEdgeOverlay(), addProjectionViews(), addSectionPlaneVisual(), animate(), announce(), applySectionCut() (+46 more)
 
 ### Community 122 - "CHANGELOG"
 Cohesion: 0.40
@@ -893,8 +923,8 @@ Cohesion: 0.40
 Nodes (4): 2026-07-02, 2026-07-09, 2026-07-16, Changelog
 
 ### Community 128 - "anim.js"
-Cohesion: 0.22
-Nodes (11): commit(), contentBoxWorld(), disposeContent(), drawCompare(), flatSheetBox(), notifyStateChange(), rebuild(), viewportSize() (+3 more)
+Cohesion: 0.14
+Nodes (17): commit(), contentBoxWorld(), disposeContent(), drawCompare(), flatSheetBox(), hasDialedWork(), notifyStateChange(), rebuild() (+9 more)
 
 ### Community 130 - "DESIGN"
 Cohesion: 0.13
@@ -937,36 +967,128 @@ Cohesion: 0.36
 Nodes (4): initSim(), defaultPlaneData(), STEPS, TERMS
 
 ### Community 348 - "rebuild"
-Cohesion: 0.20
-Nodes (10): applyMode(), computeEffectiveAngles(), notifyStateChange(), orientationAngle(), positionRefLabels(), rebuild(), reframeIfClipped(), refreshLabels() (+2 more)
+Cohesion: 0.53
+Nodes (5): chainSegments(), cutGeometryWithPlane(), ADR-0058, pointKey(), signedArea2()
 
 ### Community 349 - "buildScene"
-Cohesion: 0.22
-Nodes (10): buildScene(), createEdgeOverlay(), cssColor(), cssVar(), cueOrthoLock(), makePlaneLabel(), makeViewLabel(), pause() (+2 more)
+Cohesion: 0.16
+Nodes (17): createSolidMesh(), buildConeGeometry(), createCone(), cssColor(), rootStyle, createCube(), cssColor(), rootStyle (+9 more)
 
 ### Community 350 - "initUIManager"
 Cohesion: 0.60
 Nodes (4): clamp(), initUIManager(), parseNumeric(), SLIDERS
 
+### Community 351 - "genericPrism.js"
+Cohesion: 0.24
+Nodes (14): buildPrismGeometry(), createGenericPrism(), cssColor(), rootStyle, buildPyramidGeometry(), createGenericPyramid(), cssColor(), rootStyle (+6 more)
+
+### Community 352 - "CLAUDE.md — Simatrix Engineering Graphics Viewer — Sections of Solids"
+Cohesion: 0.15
+Nodes (12): 3D engineering gotchas (read before writing rotation/projection math), Architecture (non-negotiable), CLAUDE.md — Simatrix Engineering Graphics Viewer — Sections of Solids, Cross-cutting rules, Geometry engine (restored from Module 2, byte-identical — ADR-009), Keeping Root Documents Current, Platform contract (required for Simatrix uploads), Project-wide documentation (read before cross-module tasks) (+4 more)
+
+### Community 353 - "init"
+Cohesion: 0.06
+Nodes (32): 3.10 Register the topic in `ARCHITECTURE.md`, 3.1 Name the folder, 3.2 Copy the master, whole, 3.3 File-by-file: keep exactly as copied (the shared contracts), 3.4 File-by-file: adapt (the topic-specific content), 3.5 File-by-file: create fresh (only if your topic needs them), 3.6 Update `meta.json` (every field), 3.7 Update the new folder's `CLAUDE.md` (the pointer to root docs) (+24 more)
+
+### Community 354 - "announce"
+Cohesion: 0.14
+Nodes (12): animate(), applyProjectionMorph(), resume(), startLoop(), active, cancelAll(), easeCamera, easeDissolve (+4 more)
+
+### Community 355 - "reset"
+Cohesion: 0.20
+Nodes (9): completeAndNext(), reset(), resetCamera(), setFirstAngleSymbol(), setRefLabelOpacity(), showToast(), initStepper(), ADR-0041 (+1 more)
+
+### Community 356 - "reset"
+Cohesion: 0.16
+Nodes (23): disposeObj(), drawCompare(), rebuildStringPath3D(), clamp(), computeCutDistances(), computeStringPath(), cutHeightAt(), drawDevelopment() (+15 more)
+
+### Community 357 - "anim.js"
+Cohesion: 0.20
+Nodes (8): active, cancelAll(), easeCamera, easeDissolve, easeDraw, easeFold, easeStandard, tween()
+
+### Community 358 - "problems.js"
+Cohesion: 0.21
+Nodes (11): ADR-0062, ADR-0063, ENABLED_TIERS, enabledProblems(), EXCLUDED_TYPES, FIELD_LABELS, groupByTier(), ADR-0062 (+3 more)
+
+### Community 359 - "applyCompareSize"
+Cohesion: 0.23
+Nodes (8): QNAME, defaultPointData(), QuadrantType, FIELD_LABELS, PROBLEMS, TIERS, STEPS, TERMS
+
+### Community 361 - "main.js"
+Cohesion: 0.05
+Nodes (55): ADR-0005, announce(), applyCompareSize(), compare, DEFAULT_CAMERA_POSITION, DEFAULT_CAMERA_TARGET, defaultSectionState(), defaultSolidData() (+47 more)
+
+### Community 362 - "applyShapeTransform"
+Cohesion: 0.16
+Nodes (16): buildConeGeometry(), createCone(), cssColor(), rootStyle, createCube(), cssColor(), rootStyle, buildCylinderGeometry() (+8 more)
+
+### Community 363 - "genericPrism.js"
+Cohesion: 0.22
+Nodes (15): liftStringPathTo3D(), buildPrismGeometry(), createGenericPrism(), cssColor(), rootStyle, buildPyramidGeometry(), createGenericPyramid(), cssColor() (+7 more)
+
+### Community 364 - "init"
+Cohesion: 0.28
+Nodes (8): clamp(), initUIManager(), ADR-0048, ADR-0059, ADR-0067, ADR-0068, parseNumeric(), SECTION_SLIDERS
+
+### Community 365 - "CLAUDE.md — Simatrix Engineering Graphics Viewer — Development of Surfaces"
+Cohesion: 0.17
+Nodes (11): 3D engineering gotchas (read before writing rotation/unroll math), Architecture (non-negotiable), CLAUDE.md — Simatrix Engineering Graphics Viewer — Development of Surfaces, Cross-cutting rules, Geometry engine (restored from Module 2, byte-identical — ADR-009), Keeping Root Documents Current, Platform contract (required for Simatrix uploads), Project-wide documentation (read before cross-module tasks) (+3 more)
+
+### Community 366 - "anim.js"
+Cohesion: 0.14
+Nodes (11): animate(), resume(), startLoop(), active, cancelAll(), easeCamera, easeDissolve, easeDraw (+3 more)
+
+### Community 367 - "meshAnalyzer.js"
+Cohesion: 0.27
+Nodes (7): addEdge(), buildEdgeMap(), compareLattice(), Edge, Face, IDENTITY_ELEMENTS, vertexToken()
+
+### Community 368 - "announce"
+Cohesion: 0.38
+Nodes (6): clamp(), initUIManager(), ADR-0048, ADR-0058, parseNumeric(), SECTION_SLIDERS
+
+### Community 369 - "problems.js"
+Cohesion: 0.17
+Nodes (13): initProblemLibrary(), ADR-0063, ADR-0065, ADR-0070, ENABLED_TIERS, enabledProblems(), EXCLUDED_TYPES, FIELD_LABELS (+5 more)
+
+### Community 370 - "Decisions (ADR Log) — Development of Surfaces (Module 3, Topic 2)"
+Cohesion: 0.40
+Nodes (4): initProblemLibrary(), ADR-0007, ADR-0015, ADR-0033
+
+### Community 372 - "announce"
+Cohesion: 0.20
+Nodes (9): completeAndNext(), reset(), resetCamera(), setFirstAngleSymbol(), setRefLabelOpacity(), showToast(), initStepper(), ADR-0041 (+1 more)
+
+### Community 373 - "buildScene"
+Cohesion: 0.21
+Nodes (14): beginOverlay(), enterWorkbench(), exitWorkbench(), fill(), isSplit(), layout(), placeLr(), s2Px() (+6 more)
+
+### Community 374 - "uiManager.js"
+Cohesion: 0.67
+Nodes (4): contentBoxWorld(), fitPerspectiveDistance(), frameDefault(), reframeIfClipped()
+
+### Community 375 - "onboarding.js"
+Cohesion: 0.40
+Nodes (3): initOnboarding(), SPOTLIGHTS, TONE_CLASSES
+
 ## Knowledge Gaps
-- **1166 isolated node(s):** `FEEDBACK`, `SYM`, `NOHALO`, `reduceMotion`, `DEF` (+1161 more)
+- **1382 isolated node(s):** `FEEDBACK`, `SYM`, `NOHALO`, `reduceMotion`, `DEF` (+1377 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **208 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **210 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `armReset()` connect `lineDrawer` to `initUIManager`, `main`, `ADR Index & Compare View`, `announce`, `terms`, `main`?**
-  _High betweenness centrality (0.121) - this node is a cross-community bridge._
+- **Why does `armReset()` connect `lineDrawer` to `main`, `ADR Index & Compare View`, `init`, `announce`, `main`, `problemLibrary.js`, `terms`, `initUIManager`?**
+  _High betweenness centrality (0.156) - this node is a cross-community bridge._
 - **Why does `initUIManager()` connect `main` to `First-Angle Projection Scene`, `lineDrawer`?**
-  _High betweenness centrality (0.060) - this node is a cross-community bridge._
+  _High betweenness centrality (0.065) - this node is a cross-community bridge._
 - **Why does `initUIManager()` connect `terms` to `lineDrawer`, `Scene Boot & Camera`, `main`?**
-  _High betweenness centrality (0.060) - this node is a cross-community bridge._
+  _High betweenness centrality (0.058) - this node is a cross-community bridge._
 - **What connects `FEEDBACK`, `SYM`, `NOHALO` to the rest of the system?**
-  _1233 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _1449 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `First-Angle Projection Scene` be split into smaller, more focused modules?**
   _Cohesion score 0.05017921146953405 - nodes in this community are weakly interconnected._
 - **Should `Fold Animation Engine` be split into smaller, more focused modules?**
-  _Cohesion score 0.05555555555555555 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.04522144522144522 - nodes in this community are weakly interconnected._
 - **Should `Annotations & Arrow Meshes` be split into smaller, more focused modules?**
   _Cohesion score 0.06588235294117648 - nodes in this community are weakly interconnected._

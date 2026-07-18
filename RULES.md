@@ -571,6 +571,16 @@ Every rule is formatted:
 > `setResolution` + `dispose` (CSS2D label nodes pulled from the DOM per §3.5). **❌ NEVER** auto-add it
 > to `group` or leave its CSS2D nodes undisposed. *(ADR-041, ADR-004)*
 
+> **§6.21 ✅ DO** enforce a syllabus problem-KIND exclusion as a hard data-layer filter:
+> `EXCLUDED_TYPES = Object.freeze([...])` in `problems.js`, applied inside `enabledProblems()`
+> alongside `ENABLED_TIERS` (`ENABLED_TIERS.includes(p.tier) && !EXCLUDED_TYPES.includes(p.type)`).
+> Every problem declares a `type`. *(ADR-062, ADR-069)*
+> Reason: pose-based `TIERS`/`ENABLED_TIERS` is scope-based and cannot express a banned KIND.
+
+> **§6.22 ❌ NEVER** encode a syllabus exclusion as a never-enabled tier or as authoring
+> discipline ("just don't author them") — both vanish silently when tiers are reshuffled.
+> *(ADR-062, ADR-069)*
+
 ---
 
 ## Section 7 — Cross-Module Harmony Rules
