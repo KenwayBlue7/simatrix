@@ -1189,6 +1189,21 @@ auto-zoom — the deliberate counterpart that this ADR carves the 2D drawing out
 Compare drawing had adopted the same fixed-scale *pattern* by convention (not this ADR — a
 different file/sim) and has since moved off it; see **ADR-052**, which does not alter Lines.
 
+**Amended 2026-07-19 (ADR-072):** `SHEET2D_SPAN` in the standalone Lines topics
+(`graphics_module_1_topic_5_projection_of_line_types` and
+`graphics_module_1_topic_6_projection_of_straight_lines`, both descended from `Module1/lines.js`
+via ADR-033) is **`150`**, not the literal `(SHEET/2)*10 = 300` this ADR originally specified.
+`150` frames the True-Length slider max (the Points-consistent "frame the slider max" pattern, so
+a typical 60–150 mm drawing fills the sheet instead of floating tiny inside a worst-case-sized
+one). This is a **narrower**, not larger, span than the original derivation, so the "guarantees the
+absolute worst case stays inside" property this ADR's Alternatives-rejected clause protected
+against is now traded away for a rare over-range line — accepted per §5.19's own fallback ("extends
+past the sheet edge rather than shrinking the drawing"). The rule that the span must be a *named,
+principled fixed constant* (never a data-dependent auto-fit, never a bare unexplained magic number)
+is otherwise unchanged and still governs both topics identically. **Still Active** for the legacy
+`Module1/lines.js` at the original `(SHEET/2)*10` value — this amendment applies only to the two
+standalone topics named above.
+
 ---
 
 ## ADR-039: Flatten every topic/module sub-repository into one unified `Simatrix` monorepo
@@ -2367,6 +2382,97 @@ ADR-067 mirror) and is cleared by `simAPI.reset()`; `simController` gains `hasCu
 `commitStringPath()`, `isProblemActive()`, `completeAndNext()`; the terminal step gains the
 topic-1 "Complete & next problem" CTA + success toast; `--color-dev-path #8f3a86` recorded in
 DESIGN.md §7.4.
+**Status:** Active
+
+---
+
+## ADR-071: Extreme-angle conic problems (circle/triangle/hyperbola) check a nonzero `offset`, overriding the oblique-conic "offset stays free" default
+
+**Date:** 2026-07-18
+**Decision:** Topic-1's problem library (`src/problems.js`) gains three cone problems completing
+the KTU conic set — circle (`orientation:'HP', angleDeg:0`, offset free), isosceles triangle
+(`angleDeg:90, offset:0`, orientation omitted), hyperbola (`angleDeg:90, offset:0.8`, orientation
+omitted). At `angleDeg:90` the `'HP'` and `'VP'` plane normals coincide
+(`(0,cos90,sin90) ≡ (cos90,0,sin90) ≡ (0,0,1)` in `main.js buildSectionPlaneWorld()`), so
+orientation is a genuine don't-care and is omitted from `target.section` for both. `offset` is
+CHECKED for triangle/hyperbola — the only field that tells them apart, since both dial
+`angleDeg:90` — reversing every prior conic problem's practice of leaving `offset` free.
+**Why:** Every oblique conic problem (ellipse ×2, parabola) leaves `offset` free because a quoted
+"N mm from the base/apex" needs the learner to derive a normal-offset the mm dock can't express
+1:1 (documented per-problem in `problems.js`). At `angleDeg:90` the plane's normal is horizontal,
+so `offset` IS literally the plane's horizontal distance from the cone's axis — a true 1:1
+dockable quantity, not a derived one — so checking it exactly is legitimate here even though it
+isn't for the oblique cases. Without a checked `offset`, the triangle and hyperbola targets would
+be identical (`angleDeg:90` alone) and either problem's self-check would accept the other's answer.
+**Alternatives rejected:** *Leave offset free on both, discriminate on `type`/title alone* — the
+self-check only compares `target` fields against the dialled plane, so an unchecked field can
+never fail a wrong answer; a learner could "solve" the triangle problem by dialling any hyperbola
+offset. *A synthetic "throughApex: boolean" field* — reinvents `offset:0`, which the engine
+already treats as passing through the solid's centre (and the apex sits on the axis at that
+centre), for no gain.
+**Consequences:** `problems.js`'s `PROBLEMS` array grows 4 → 7; its header docstring documents the
+checked-offset pattern for future conic authoring. `TIERS[1].blurb` updated to name all five
+curves (circle, ellipse, triangle, parabola, hyperbola) instead of the original three.
+**Status:** Active
+
+---
+
+## ADR-072: The teammate-contributed Lines problem-solver is promoted to catalog topic 6, its Problem Library activated, and its construction-aid tokens reconciled to DESIGN.md §2.2
+
+**Date:** 2026-07-19
+**Decision:** A second, previously untracked build of the "Projection of Straight Lines" topic —
+contributed alongside the conceptual `graphics_module_1_topic_5_projection_of_line_types` primer —
+is promoted from its non-conforming folder name `module_1_topic_lines` to
+**`graphics_module_1_topic_6_projection_of_straight_lines`**, the next free Module-1 catalog slot
+after topic 5. Three changes land together:
+1. **Rename**, no other structural change — `main.js`, `meta.json`'s title ("Projection of Straight
+   Lines"), and the `<title>` tag were already correct pre-rename.
+2. **Problem Library un-staled**, not newly built — the topic's own CLAUDE.md described the
+   Problem Library as "deferred, out of migration scope" (per ADR-042), but `main.js` already calls
+   `initProblemLibrary(simController, {list: LINE_PROBLEMS, tiers: LINE_TIERS, fieldLabels:
+   LINE_FIELD_LABELS})` and wires `isProblemActive`/`completeAndNext` into `window.simAPI`; the
+   overlay DOM is present in `index.html`. The 12 problems in `src/lineProblems.js` are
+   verbatim-identical to the legacy `Module1/src/lineProblems.js` set (N.D. Bhatt + K.C. John,
+   RULES.md §6.7 compliant) — no new problems were authored, the existing library was simply wired
+   up. The doc was corrected to match the shipped code rather than the code being rolled back.
+3. **Construction-aid tokens reconciled to DESIGN.md §2.2.** The topic's `index.html :root` defined
+   only three of the six catalogued Module-1 construction-aid tokens, and two of those three were
+   aliased to existing neutrals (`--construct: var(--color-ink-secondary)`, `--locus:
+   var(--color-bench-grey)`) rather than the platform's own distinct values; the three `*-ink` text
+   variants were absent entirely. Replaced with DESIGN.md §2.2's exact catalogued hex —
+   `--construct #8a8275`, `--locus #7b4fb5`, `--tl-green #1f8a4c`, `--construct-ink #5e564a`,
+   `--locus-ink #6a3fa3`, `--tl-green-ink #166b3c` — so this Traces/True-Length construction reads
+   with the same encodings as every other Module-1 consumer of these tokens (originally catalogued
+   from `Module1/src/shell.css` in the 2026-06-27 code audit, DESIGN.md §2.2).
+**Why:** Two intentionally-distinct sibling topics were found coexisting: topic 5 is a **concept
+primer** ("Types of Lines," six fixed positions, deliberately problem-free by design — see its own
+CLAUDE.md, "removed, not deferred"), and this topic is the **problem-solving build** (5-step
+build-up + traces + True-Length + the 12-problem textbook library). An initial read of the two
+folders looked like pedagogical drift (one topic "lost" the problems the other had); reading both
+topics' CLAUDE.md files corrected that — they are siblings by design, not competing versions, and
+the only real defects were this topic's non-conforming folder name, its stale "deferred" doc
+language for a library that was already wired, and its token drift from the platform catalog.
+Promoting it (rather than discarding it in favour of porting problems into topic 5, which would
+have violated topic 5's explicit charter) preserves the only copy of the Lines problem-solving
+topic and gives it a permanent, conforming home.
+**Alternatives rejected:** (a) *Port the 12-problem library into topic 5 and retire this folder* —
+rejected: topic 5's CLAUDE.md explicitly excludes a Problem Library ("NOT a problem library... the
+sibling topic owns all of that"); doing this would both violate that charter and delete the only
+Lines problem-solver, the opposite of the intent. (b) *Leave the folder under its non-conforming
+name* — rejected: every other Module-1/2/3 topic follows the `graphics_module_<N>_topic_<K>_<slug>`
+convention (or the deliberate unnumbered exception documented for "Simple Positions," RULES.md
+§1.9); an untracked, unnumbered sibling folder is a permanent source of confusion for the next
+contributor. (c) *Revert `SHEET2D_SPAN` to the literal ADR-038 formula (`300`)* — rejected: the
+code's own comment documents a deliberate, reasoned improvement (Points-parity sheet fill); see the
+ADR-038 amendment above instead of reverting a documented win.
+**Consequences:** `graphics_module_1_topic_6_projection_of_straight_lines/` is the canonical,
+committed home of the Lines problem-solver; `graphics_module_1_topic_5_projection_of_line_types`'s
+CLAUDE.md/CHANGELOG sibling references were updated to the new name. ADR-038 gained the 2026-07-19
+amendment above. topic 5 carries the **same** token drift from DESIGN.md §2.2 (identical `:root`
+block, ported when topic 5 was cut from this topic) — left unresolved here as a flagged follow-up,
+since fixing it is outside this topic's own folder and wasn't part of the approved scope for this
+change; a future pass should apply the identical `--construct`/`--locus`/`--tl-green` + `*-ink`
+fix there for platform consistency.
 **Status:** Active
 
 ---
