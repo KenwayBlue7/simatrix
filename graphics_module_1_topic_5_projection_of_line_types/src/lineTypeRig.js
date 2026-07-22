@@ -68,8 +68,8 @@ export function createLineTypeRig({ resolved, view, foldAngle = 0, width = 1, he
       color: color.getHex(),
       linewidth: widthPx,
       dashed,
-      dashSize: dashed ? 1.6 : 1,
-      gapSize: dashed ? 1.0 : 1,
+      dashSize: dashed ? 0.12 : 1,
+      gapSize: dashed ? 0.08 : 1,
       transparent: true,
     });
     mat.resolution.copy(res);

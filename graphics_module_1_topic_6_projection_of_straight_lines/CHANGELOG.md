@@ -1,5 +1,84 @@
 # Changelog — Projection of Straight Lines
 
+## 2026-07-22 — Dashed hidden-edge lines tightened to Module 2's visual standard
+
+- **Changed:** the dashed projector lines in `lineRig.js` now use the same tight dash rhythm
+  (0.12/0.08) as Module 2's Compare sheet instead of the old chunky 1.6/1.0 pattern, restoring
+  platform-wide "Simatrix Feel" visual parity between this topic and the master reference.
+
+## 2026-07-21 — Own-canvas 2D Compare sheet; ADR-037 floating-card workbench; constructions run in the split
+
+- **Changed:** the 2D Compare sheet (`compareSheet.js`) now renders on its own `WebGLRenderer` +
+  `<canvas>` (created lazily in `.compare-card__stage` on first Compare open), a genuinely separate
+  surface from the 3D viewport's canvas — replacing the original design where it was a second
+  render pass scissored onto the SAME renderer. This let the topic adopt Module 2's ADR-037
+  floating-card workbench (grey `--color-panel` shell, `var(--space-4)` gaps, rounded/bordered
+  cards, `#rail-toggle` Hide/Show) instead of the old flush/hybrid split — a shared canvas couldn't
+  show a real gutter between its own two scissored halves (ADR-076).
+- **Fixed:** the Traces and True Length & Angles construction launchers forced the Compare card
+  down to the compact floating PIP even when the 50/50 split was already open, because the split
+  used to hide the wizard that hosted their buttons. Both launchers (plus their Replay buttons) now
+  live in `[data-ctrl]` wrappers that re-parent into the workbench rail alongside the geometry
+  drivers, so a construction runs inside the expanded split like any other control.
+- **Removed:** `computeRegions()`, the `regions` struct, and the scissored-pass `pass()` viewport
+  helper — the render loop no longer scissors one canvas into two regions, so there is nothing left
+  for ADR-074's device-px→logical-px conversion to patch.
+
+## 2026-07-20 — Intrinsic True-Length scale for the 2D Compare sheet
+
+- **Changed:** `src/sheet2DLayout.js`'s `layout2D()` scale now derives from the resolved line's
+  own True Length (`M.tl`) instead of the fixed `SHEET2D_SPAN = 150` mm span (ADR-038/ADR-072) —
+  the ADR-053 intrinsic-size model applied to a line, invariant to the distance and angle sliders,
+  so a typical drawing fills the sheet at any True Length instead of floating tiny inside a
+  worst-case-sized frame (ADR-075). `traces.js` and `trueLength.js` inherit the new scale
+  automatically, since all three share the one `layout2D()` source.
+
+## 2026-07-20 — Fixed 2D-sheet label desync on HiDPI/scaled displays
+
+- **Fixed:** the Compare workbench's 2D-sheet labels (`a′`/`b′`/`a`/`b`, dimension values) were
+  offset from the WebGL drawing they annotate on any display with `devicePixelRatio != 1` (e.g.
+  Windows 125% scaling) — the render loop's scissored passes handed `renderer.setViewport`/
+  `setScissor` device-px regions, but those APIs apply `pixelRatio` internally, so the ratio was
+  applied twice and the sheet pass drew shifted/clipped while its CSS2D labels stayed correct
+  (ADR-074).
+
+## 2026-07-20 — Step-card typography normalized to Module 2 reference scale
+
+- **Changed:** `.step-body p` gained `color: var(--color-ink-secondary)` so the multi-paragraph step
+  prose reads the same grey tone as `.card__lead` instead of inheriting near-black `--color-ink`
+  (this topic's `.card__lead`/`.step-body` were already sized `var(--text-sm)`, matching Module 2 —
+  only the body-copy colour had drifted). Part of a platform-wide step-card typography pass
+  (ADR-073); see `graphics_module_1_topic_5_projection_of_line_types` for the sibling topic's larger
+  size-token fix.
+
+## 2026-07-20 — Rounded workbench panels; src/labels/ dead-code claim corrected
+
+- **Changed:** `body.compare-split` workbench (`#compare-card` + `#workbench-rail`) gained
+  `border-radius: var(--radius-md)`; the split grid gained `gap: var(--space-1)` so the rounding
+  reads clear of the flush panes. (This topic's `--color-vp-line` was already `#b25718` from the
+  2026-07-19 promotion — no token change here.)
+- **Verified:** a stabilization audit flagged `src/labels/` (`LabelFactory.js`, `LabelManager.js`,
+  `LabelPlacement.js`, `LabelStyles.js`) as unimported dead code and a deletion candidate. False —
+  `src/lineRig.js` imports `createLabelManager`/`DIMENSION_OFFSET` from it live (the h/HT/v/VT 3D
+  label system + the True-Length dimension standoff). Deletion was skipped; the directory is
+  untouched. Real architectural debt does exist here — this topic runs TWO parallel CSS2D label
+  systems side by side (`src/labels.js`'s flat `addLabel`/`disposeLabels`, used only for the TL tag,
+  alongside `src/labels/`'s Manager/Factory/Styles/Placement stack for everything else) — merging
+  them into one is banked as a follow-up task, not done in this pass.
+
+## 2026-07-20 — Purge stale PIP-era comments and dead CSS from the Compare card
+
+- **Removed:** the dead `.compare-card__stage canvas { display:block; width:100%; height:100% }`
+  CSS rule (`index.html`) — the stage has never hosted a child `<canvas>` since the ADR-012/ADR-034
+  migration to a single scissored `WebGLRenderer` pass; verified no code ever injects one
+  (`main.js` only reads `.compare-card__stage` as a scissor rect).
+- **Fixed:** a stale comment on `#compare-card` still described `main.js drawCompare()` live-redrawing
+  a plain 2D `<canvas>` from point data — that function/path was removed at the ADR-012 migration.
+  Reworded to describe the current second-render-pass design (ADR-012 / ADR-034 alternative-A).
+- Prompted by a stabilization audit of this topic's reported UX regressions (label drift,
+  orbit-drag capture, legacy PIP remnants); the audit found none of those present in current code —
+  only this cosmetic dead-code residue remained.
+
 ## 2026-07-19 — Promoted to catalog topic 6; Problem Library doc un-staled; tokens reconciled (ADR-072)
 
 - **Changed:** Renamed the folder from the non-conforming `module_1_topic_lines` to

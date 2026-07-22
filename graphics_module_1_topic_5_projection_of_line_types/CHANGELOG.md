@@ -2,6 +2,89 @@
 
 All notable changes to this topic. Format loosely follows Keep a Changelog.
 
+## [0.1.11] — 2026-07-22 — Dashed hidden-edge lines tightened to Module 2's visual standard
+
+### Changed
+- The dashed projector lines in `lineTypeRig.js` now use the same tight dash rhythm (0.12/0.08) as
+  Module 2's Compare sheet instead of the old chunky 1.6/1.0 pattern, restoring platform-wide
+  "Simatrix Feel" visual parity between this topic and the master reference.
+
+## [0.1.10] — 2026-07-21 — Own-canvas 2D Compare sheet; ADR-037 floating-card workbench; Rotation Method runs in the split
+
+### Changed
+- The 2D Compare sheet (`compareSheet.js`) now renders on its own `WebGLRenderer` + `<canvas>`
+  (created lazily in `.compare-card__stage` on first Compare open), a genuinely separate surface
+  from the 3D viewport's canvas — replacing the original design where it was a second render pass
+  scissored onto the SAME renderer. This let the topic adopt Module 2's ADR-037 floating-card
+  workbench (grey `--color-panel` shell, `var(--space-4)` gaps, rounded/bordered cards,
+  `#rail-toggle` Hide/Show) instead of the old flush/hybrid split — a shared canvas couldn't show a
+  real gutter between its own two scissored halves (ADR-076).
+
+### Fixed
+- The Rotation Method construction launcher forced the Compare card down to the compact floating
+  PIP even when the 50/50 split was already open, because the split used to hide the wizard that
+  hosted its button. The launcher (plus its Replay button) now lives in a `[data-ctrl="rotation"]`
+  wrapper that re-parents into the workbench rail alongside the geometry drivers, so it runs inside
+  the expanded split like any other control.
+
+### Removed
+- `computeRegions()`, the `regions` struct, and the scissored-pass `pass()` viewport helper — the
+  render loop no longer scissors one canvas into two regions, so there is nothing left for
+  ADR-074's device-px→logical-px conversion to patch.
+
+## [0.1.9] — 2026-07-20 — Intrinsic True-Length scale for the 2D Compare sheet
+
+### Changed
+- `src/sheet2DLayout.js`'s `layout2D()` scale now derives from the resolved line's own True Length
+  (`M.tl`) instead of the fixed `SHEET2D_SPAN = 150` mm span (ADR-038/ADR-072) — the ADR-053
+  intrinsic-size model applied to a line, invariant to the distance and angle sliders, so a typical
+  drawing fills the sheet at any True Length instead of floating tiny inside a worst-case-sized
+  frame (ADR-075). `rotationMethod.js`'s construction inherits the new scale automatically, since
+  both share the one `layout2D()` source.
+
+## [0.1.8] — 2026-07-20 — Fixed 2D-sheet label desync on HiDPI/scaled displays
+
+### Fixed
+- The Compare workbench's 2D-sheet labels (`a′`/`b′`/`a`/`b`, dimension values) were offset from
+  the WebGL drawing they annotate on any display with `devicePixelRatio != 1` (e.g. Windows 125%
+  scaling) — the render loop's scissored passes handed `renderer.setViewport`/`setScissor`
+  device-px regions, but those APIs apply `pixelRatio` internally, so the ratio was applied twice
+  and the sheet pass drew shifted/clipped while its CSS2D labels stayed correct (ADR-074).
+
+## [0.1.7] — 2026-07-20 — Step-card typography normalized to Module 2 reference scale
+
+### Changed
+- `.card__lead` shrunk `var(--text-lead)` (1.125rem) → `var(--text-sm)` (0.875rem), and `.step-body`
+  shrunk `var(--text-base)` (1rem) → `var(--text-sm)`, matching Module 2's step-panel size — this
+  topic's step copy had been visibly larger than every sibling topic (ADR-073).
+- `.step-body p` gained `color: var(--color-ink-secondary)`, so the multi-paragraph step prose reads
+  the same grey tone as the lead sentence instead of near-black.
+
+## [0.1.6] — 2026-07-20 — Platform amber promotion + rounded workbench + stale comment fix
+
+### Changed
+- `--color-vp-line` darkened `#bc5d1e → #b25718` (platform-wide AA promotion, ~4.92:1 on paper),
+  matching the sibling `graphics_module_1_topic_6` topic's local override, now promoted platform-wide.
+- `body.compare-split` workbench (`#compare-card` + `#workbench-rail`) gained
+  `border-radius: var(--radius-md)`; the split grid gained `gap: var(--space-1)` so the rounding
+  reads clear of the flush panes.
+
+### Fixed
+- A stale CSS comment (`index.html` ~L254) cited a nonexistent `src/labelLayer.js` — corrected to
+  the real `src/labels.js`.
+
+## [0.1.5] — 2026-07-20 — Fix: construction-aid token drift vs DESIGN.md §2.2
+
+### Fixed
+- **`--construct`/`--locus`/`--tl-green` had drifted from the platform catalog** (`index.html`
+  `:root`): `--construct` and `--locus` were mis-aliased to unrelated neutral tokens
+  (`--color-ink-secondary`, `--color-bench-grey`) instead of carrying their own catalogued hex, and
+  `--tl-green` carried a stale green. All three `*-ink` text variants were missing entirely. Replaced
+  with the DESIGN.md §2.2 values verbatim (matching the sibling `graphics_module_1_topic_6` topic):
+  `--construct #8a8275`, `--locus #7b4fb5`, `--tl-green #1f8a4c`, plus `--construct-ink #5e564a`,
+  `--locus-ink #6a3fa3`, `--tl-green-ink #166b3c`. The Rotation Method construction (Step 6) now
+  renders in the correct platform hues instead of the drifted/aliased ones.
+
 ## [0.1.4] — 2026-07-15 — Fix: 3D True-Length annotation on the correct projection
 
 ### Fixed
