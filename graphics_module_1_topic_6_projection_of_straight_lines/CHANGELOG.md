@@ -1,5 +1,84 @@
 # Changelog — Projection of Straight Lines
 
+## 2026-07-23 — Compare 2D panel gains drag-to-pan + scroll-wheel zoom
+
+- Added: drag-to-pan and scroll-wheel zoom (zeroed-in on the cursor, clamped 0.4–5×) on the 2D
+  Compare drawing, double-click to recenter/un-zoom — the same interaction Module 2 and the
+  Points topic ship (ADR-054/055), re-expressed against this topic's own live ortho camera
+  (ADR-076's own-`WebGLRenderer` sheet has no Canvas2D `project()` to hook into) via new
+  `compareSheet.js` `resetView()`/`panByPixels()`/`zoomAtPixel()` methods + a
+  `setupComparePan()` wiring in `main.js` (ADR-077). Same change applied to the sibling
+  `graphics_module_1_topic_5_projection_of_line_types` topic.
+
+## 2026-07-23 — Compare 2D panel's CSS border restored (over-corrected in an earlier pass)
+
+- Fixed: the split workbench's 2D drawing panel (`#compare-card`) had no visible border at all,
+  unlike its `#sim-viewport` and `#workbench-rail` siblings. An earlier same-day pass ("Rail
+  divider removed, Replay merged into launchers...") mistook the panel's real
+  `border`/`border-left: 1px solid var(--color-border)` CSS for a "leftover" duplicate of the
+  hand-drawn canvas rectangle and deleted both — but only the canvas rectangle (in
+  `compareSheet.js`) was ever the actual leftover; the CSS border was the panel's own legitimate
+  frame (same pattern Module 2 uses). Restored `border: 1px solid var(--color-border)` on the base
+  `.compare-card` rule so both the compact float and the split view keep it; the split rule no
+  longer zeroes it back out. Same correction applied to the sibling
+  `graphics_module_1_topic_5_projection_of_line_types` topic.
+
+## 2026-07-23 — Rail group spacing widened
+
+- Changed: the gap between the rail's Dimensions and Inclination clusters widened from
+  `--space-6` (32px) to `--space-6 + --space-3` (44px) for clearer visual separation; still no
+  divider line.
+
+## 2026-07-23 — Compare panel hairline border: real fix; #con-dock button font size matched to platform standard
+
+- Fixed: the 2D Compare panel's hairline border was not a CSS border at all — `compareSheet.js`
+  drew its own sheet-frame rectangle in `--color-border` on every commit, a leftover from before
+  ADR-076 gave the Compare card its own opaque rounded box. Removed the frame draw (the XY line
+  stays); the CSS-only fix logged in the entry below verified clean via `getComputedStyle` but
+  never touched this canvas-rendered line, which is why the border was still visible.
+- Changed: `#con-dock`'s "True Length & Angles" / "Show Traces" buttons now use the 0.8125rem /
+  600-weight size shared by the platform's other floating pill controls (`#rail-toggle`,
+  `.quick-view`, `.connector-toggle`, `.compare-chip`) instead of inheriting the body's larger
+  1rem base size through the generic `.btn`'s `font: inherit`.
+
+## 2026-07-23 — Rail divider removed, Replay merged into launchers, dock buttons match Hide/Show, Compare panel hairline removed
+
+- **Removed:** the vertical divider line between the rail's Dimensions and Inclination clusters
+  (`#workbench-rail .rail__group + .rail__group` no longer sets `border-left`); the groups now
+  read as distinct through spacing alone.
+- **Changed:** the separate "Replay" buttons (`#tl-replay`, `#trace-replay`) are gone. Each
+  construction launcher now does double duty — first click builds + plays the construction and
+  relabels itself ("Replay True Length & Angles" / "Replay Show Traces"); a second click while
+  active replays the same animation from the start instead of closing it (`main.js`
+  `setConLabel`/`setupConstructions`). The construction still tears down via the existing paths
+  (switching constructions, editing a parameter, changing step, folding).
+- **Changed:** the `#con-dock` launcher buttons now match the `#rail-toggle` Hide/Show pill's
+  colours exactly (panel background, secondary ink text, no hover shift).
+- **Fixed:** the 2D Compare drawing panel's hairline border, in both the compact float and the
+  default expanded split view — a leftover `border`/`border-left: 1px solid var(--color-border)`
+  on `.compare-card` / `body.compare-split #compare-card`. A prior session's attempt only touched
+  one of these two rules (or an unloaded legacy stylesheet), so the higher-specificity split rule
+  kept the seam visible; both are now removed. Same fix applied to the sibling
+  `graphics_module_1_topic_5_projection_of_line_types` topic, which duplicates this CSS verbatim.
+
+## 2026-07-23 — Construction launchers moved off the rail, docked to the 2D panel's corner
+
+- **Changed:** the "True Length & Angles" and "Show Traces (HT & VT)" launcher buttons no longer
+  sit in the workbench rail's Constructions cluster; they now float at the 2D drawing panel's
+  bottom-right corner (`#con-dock`, `main.js` `ensureConDock()`), mirroring the existing
+  `#rail-toggle` "Hide" button's floating-corner convention on the opposite pane (3D viewport,
+  bottom-left). The rail's Constructions group and title are removed — the rail now only groups
+  Dimensions and Inclination. Both launchers still re-parent from and back to `#controls` on
+  split entry/exit exactly as before, and keep working identically (same buttons, same IDs, same
+  click handlers) — only their docked home changed. Topic-local (`main.js`, `index.html`).
+
+## 2026-07-23 — Workbench control rail grouped into labelled clusters
+
+- **Changed:** the docked `#workbench-rail` (shown in the 50/50 Compare split) now groups its
+  seven controls into three titled clusters — Dimensions, Inclination, Constructions — using the
+  platform's existing `.dock__group` convention, instead of one flat undifferentiated row, to cut
+  visual congestion. Topic-local change (`main.js`, `index.html`); no control was shrunk.
+
 ## 2026-07-22 — Dashed hidden-edge lines tightened to Module 2's visual standard
 
 - **Changed:** the dashed projector lines in `lineRig.js` now use the same tight dash rhythm

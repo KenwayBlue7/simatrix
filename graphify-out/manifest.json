@@ -635,13 +635,13 @@
     "semantic_hash": "570f8814ef9fb1e7de1136f468f6144f"
   },
   "ARCHITECTURE.md": {
-    "mtime": 1784384743.413033,
-    "ast_hash": "aedb22bdcc7595916cff584e15b8bc94",
+    "mtime": 1784618324.7927902,
+    "ast_hash": "400a706cafa5a2a6cfde65551db108b9",
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1784384780.9886205,
-    "ast_hash": "5a23f977ee2858bb1cf421a4c29eae14",
+    "mtime": 1784820668.7927935,
+    "ast_hash": "f9da65410d42ae9186a3712513b54328",
     "semantic_hash": ""
   },
   "CLAUDE.module-template.md": {
@@ -650,13 +650,13 @@
     "semantic_hash": "4cfa862e55a98351834cc0930dce8b8b"
   },
   "DECISIONS.md": {
-    "mtime": 1784384119.0223906,
-    "ast_hash": "639c9f4f5e90711ada4b78f06ca311df",
+    "mtime": 1784820644.8654442,
+    "ast_hash": "5d3bf889a59e6a58ceaa355feb7b0eca",
     "semantic_hash": ""
   },
   "DESIGN.md": {
-    "mtime": 1784367263.8518999,
-    "ast_hash": "31cb19534a6d5c541fe1271b85414482",
+    "mtime": 1784550867.985094,
+    "ast_hash": "494dca8aea44783a244e52749c1a66be",
     "semantic_hash": ""
   },
   "DOCUMENTATION-SYSTEM.md": {
@@ -685,14 +685,14 @@
     "semantic_hash": "850be92a71af9870fa4c75531df4fd63"
   },
   "Module1/CHANGELOG.md": {
-    "mtime": 1783670602.8408737,
-    "ast_hash": "156971ed070596649374f455f3786fb1",
-    "semantic_hash": "156971ed070596649374f455f3786fb1"
+    "mtime": 1784536600.7566485,
+    "ast_hash": "386c62201f9977efcf052917d3d48b67",
+    "semantic_hash": ""
   },
   "Module1/CLAUDE.md": {
-    "mtime": 1782641547.6989403,
-    "ast_hash": "8e63b259d1ffc0bd45697dcd6e48cc88",
-    "semantic_hash": "8e63b259d1ffc0bd45697dcd6e48cc88"
+    "mtime": 1784536452.5235977,
+    "ast_hash": "35706d968c5deb065744f92c6bdc1b7c",
+    "semantic_hash": ""
   },
   "Module1/DESIGN.md": {
     "mtime": 1782578005.6441164,
@@ -755,8 +755,8 @@
     "semantic_hash": "bb31292f7690fe96f93b0d6514d3b186"
   },
   "Module2/CHANGELOG.md": {
-    "mtime": 1784205640.549976,
-    "ast_hash": "ee3c8cd2e6544ff9f1dd2b294f910860",
+    "mtime": 1784536595.6397004,
+    "ast_hash": "afdea2c79b8063ec5d0aaaccc01acda4",
     "semantic_hash": ""
   },
   "Module2/CLAUDE.md": {
@@ -770,13 +770,13 @@
     "semantic_hash": "ce9d015bad1f0506cb4dc32d21df0d4f"
   },
   "Module2/index.html": {
-    "mtime": 1784190613.1713312,
-    "ast_hash": "1951d640cee4e5f1083e1c35b4a53c2c",
+    "mtime": 1784536444.6771753,
+    "ast_hash": "180d14571a01f5088070e149d81da3ac",
     "semantic_hash": ""
   },
   "PLATFORM-RULES.md": {
-    "mtime": 1784207512.8726187,
-    "ast_hash": "0cf1dced6d52a2977cb7754b985d41d4",
+    "mtime": 1784618277.240781,
+    "ast_hash": "754d91bebc84e379fe55d1f849487a09",
     "semantic_hash": ""
   },
   "PRODUCT.md": {
@@ -785,8 +785,8 @@
     "semantic_hash": "bdff43a7760776cdb9ebdd781700c905"
   },
   "RULES.md": {
-    "mtime": 1784384763.2638571,
-    "ast_hash": "48be465d504dfa6b09e4f46a3a432180",
+    "mtime": 1784618262.2480729,
+    "ast_hash": "4e2eabe15d77c9c24bec37424020e873",
     "semantic_hash": ""
   },
   "graphics_module_1_topic_1_foundations/CHANGELOG.md": {
@@ -810,9 +810,9 @@
     "semantic_hash": ""
   },
   "graphics_module_1_topic_2_spatial_framework/CHANGELOG.md": {
-    "mtime": 1783670619.8624146,
-    "ast_hash": "2fead29e574a541e36cc2ef0763bb0cb",
-    "semantic_hash": "2fead29e574a541e36cc2ef0763bb0cb"
+    "mtime": 1784536587.6162653,
+    "ast_hash": "9ad8de8cc3b888ee4101c5b55fa16488",
+    "semantic_hash": ""
   },
   "graphics_module_1_topic_2_spatial_framework/CLAUDE.md": {
     "mtime": 1783187495.796608,
@@ -820,13 +820,13 @@
     "semantic_hash": "f628862557bdfc3d8f46ff12e51aba10"
   },
   "graphics_module_1_topic_2_spatial_framework/index.html": {
-    "mtime": 1784000054.351991,
-    "ast_hash": "a456cefb08a4265bfc4b1cfcc5a31321",
+    "mtime": 1784536434.9079978,
+    "ast_hash": "ce7fddbd9c80cff4525fdb2f549a940c",
     "semantic_hash": ""
   },
   "graphics_module_1_topic_3_points/CHANGELOG.md": {
-    "mtime": 1784197527.2829466,
-    "ast_hash": "1d3fc3f938c55c522d6d252ae5cf2476",
+    "mtime": 1784550955.8338082,
+    "ast_hash": "56e98230571e32249d31ff1d8ea98c37",
     "semantic_hash": ""
   },
   "graphics_module_1_topic_3_points/CLAUDE.md": {
@@ -835,14 +835,14 @@
     "semantic_hash": "2952baf9742865258e9d9a071c442bd0"
   },
   "graphics_module_1_topic_3_points/index.html": {
-    "mtime": 1784055814.6526794,
-    "ast_hash": "1206013f1dd4eb1f77a1acef76f01db3",
+    "mtime": 1784550781.7595744,
+    "ast_hash": "3c455f4e6655a66905828114f4fceb27",
     "semantic_hash": ""
   },
   "graphics_module_2_topic_1_introduction/CHANGELOG.md": {
-    "mtime": 1783613204.630683,
-    "ast_hash": "c11bfb77935f5dc5b1fca3c53ac9bb6b",
-    "semantic_hash": "c11bfb77935f5dc5b1fca3c53ac9bb6b"
+    "mtime": 1784536592.3431883,
+    "ast_hash": "9e8f82699aaa2a4b6617be57058be716",
+    "semantic_hash": ""
   },
   "graphics_module_2_topic_1_introduction/CLAUDE.md": {
     "mtime": 1782641566.5272272,
@@ -855,9 +855,9 @@
     "semantic_hash": "94277c354c6a633e6dfa2a3d9621f49b"
   },
   "graphics_module_2_topic_1_introduction/index.html": {
-    "mtime": 1783753760.3987794,
-    "ast_hash": "8efa650b8588d08cd5e695592c252f48",
-    "semantic_hash": "8efa650b8588d08cd5e695592c252f48"
+    "mtime": 1784536441.4322913,
+    "ast_hash": "d9ba72c18e75d8deaaa794e7e5e55075",
+    "semantic_hash": ""
   },
   "graphics_module_2_topic_2_simple_positions/.impeccable/critique/2026-05-29T05-17-54Z__index-html.md": {
     "mtime": 1780031874.3281555,
@@ -880,8 +880,8 @@
     "semantic_hash": "bb31292f7690fe96f93b0d6514d3b186"
   },
   "graphics_module_2_topic_2_simple_positions/CHANGELOG.md": {
-    "mtime": 1784205646.1737716,
-    "ast_hash": "f335a652f5f0bcbb20364e8305bcff97",
+    "mtime": 1784536594.1790588,
+    "ast_hash": "870d411bbe888ade659a4709ae345b47",
     "semantic_hash": ""
   },
   "graphics_module_2_topic_2_simple_positions/CLAUDE.md": {
@@ -900,8 +900,8 @@
     "semantic_hash": "6d26a10450abebb4accec8f362b7d08c"
   },
   "graphics_module_2_topic_2_simple_positions/index.html": {
-    "mtime": 1784201862.8508625,
-    "ast_hash": "2d8a3e6dddd01d8d1bbef2642bb8ce6d",
+    "mtime": 1784536442.9114983,
+    "ast_hash": "09a75186d5a32260c74611802bd51cde",
     "semantic_hash": ""
   },
   "template_starter/main.js": {
@@ -945,8 +945,8 @@
     "semantic_hash": "22978310ca0f212c604a1dc1d5bc3769"
   },
   "template_starter/CHANGELOG.md": {
-    "mtime": 1784207655.2870295,
-    "ast_hash": "6b98d93bcc438daaab6ba7dba38a5acd",
+    "mtime": 1784536603.3140578,
+    "ast_hash": "756dc8e468c50ec1ae6498cbb1fce6d2",
     "semantic_hash": ""
   },
   "template_starter/CLAUDE.md": {
@@ -960,8 +960,8 @@
     "semantic_hash": "321c8e3168d1fe3a8d53fc9ec6d976d8"
   },
   "template_starter/index.html": {
-    "mtime": 1784207634.1974366,
-    "ast_hash": "43b269efdb71e2b228f37a3296a475fc",
+    "mtime": 1784536451.5929482,
+    "ast_hash": "684c8c11a39b0ee6909193df32e78a03",
     "semantic_hash": ""
   },
   "graphics_module_1_topic_4_understanding_orthographic_views/main.js": {
@@ -1015,8 +1015,8 @@
     "semantic_hash": ""
   },
   "graphics_module_1_topic_4_understanding_orthographic_views/CHANGELOG.md": {
-    "mtime": 1784001044.8495977,
-    "ast_hash": "2c0ac3da8fdfd24b6e30082ee2f79156",
+    "mtime": 1784536590.897755,
+    "ast_hash": "1f98c448774cb913296e9c4db82505cc",
     "semantic_hash": ""
   },
   "graphics_module_1_topic_4_understanding_orthographic_views/CLAUDE.md": {
@@ -1030,8 +1030,8 @@
     "semantic_hash": ""
   },
   "graphics_module_1_topic_4_understanding_orthographic_views/index.html": {
-    "mtime": 1784000837.446129,
-    "ast_hash": "15ad0eb369512b1f50818af137cc318d",
+    "mtime": 1784536438.490655,
+    "ast_hash": "27f4fd74c7f177aa5406a10b6d1a46ff",
     "semantic_hash": ""
   },
   "README.md": {
@@ -1095,8 +1095,8 @@
     "semantic_hash": ""
   },
   "graphics_module_3_topic_1_sections_of_solids/src/problems.js": {
-    "mtime": 1784384459.224643,
-    "ast_hash": "b0057ec3c729524dc033f4326a671ebd",
+    "mtime": 1784388516.798277,
+    "ast_hash": "7a2e4c36c863aa8dea9a5ba761c86eca",
     "semantic_hash": ""
   },
   "graphics_module_3_topic_1_sections_of_solids/src/shapeData.js": {
@@ -1120,8 +1120,8 @@
     "semantic_hash": ""
   },
   "graphics_module_3_topic_1_sections_of_solids/CHANGELOG.md": {
-    "mtime": 1784384249.4639013,
-    "ast_hash": "3f2a99a94c30fff12cce6bc46d46205a",
+    "mtime": 1784536597.0993068,
+    "ast_hash": "5243ff43f7d3ac096ba1c4e16be19f0d",
     "semantic_hash": ""
   },
   "graphics_module_3_topic_1_sections_of_solids/CLAUDE.md": {
@@ -1135,8 +1135,8 @@
     "semantic_hash": ""
   },
   "graphics_module_3_topic_1_sections_of_solids/index.html": {
-    "mtime": 1784311769.7954192,
-    "ast_hash": "5732006e262a9fd3dfcecccbea558cf5",
+    "mtime": 1784536448.0945065,
+    "ast_hash": "b82ba6c6d46d9a970a0d98b346288f0d",
     "semantic_hash": ""
   },
   "graphics_module_3_topic_1_sections_of_solids/src/meshAnalyzer.js": {
@@ -1250,8 +1250,8 @@
     "semantic_hash": ""
   },
   "graphics_module_3_topic_2_development_of_surfaces/CHANGELOG.md": {
-    "mtime": 1784384263.8405554,
-    "ast_hash": "bdab26b2386c033c9bacd48f0fbf9aed",
+    "mtime": 1784536598.9293365,
+    "ast_hash": "4287682022a6c0840459ce8ffa45699b",
     "semantic_hash": ""
   },
   "graphics_module_3_topic_2_development_of_surfaces/CLAUDE.md": {
@@ -1265,8 +1265,8 @@
     "semantic_hash": ""
   },
   "graphics_module_3_topic_2_development_of_surfaces/index.html": {
-    "mtime": 1784384633.5593855,
-    "ast_hash": "3896f725c9c8b1d5f810942189f90832",
+    "mtime": 1784536448.1606665,
+    "ast_hash": "bfdd5a3c9849daa83edacf869970328a",
     "semantic_hash": ""
   },
   "graphics_module_3_topic_2_development_of_surfaces/src/developmentEngine.js": {
@@ -1282,6 +1282,286 @@
   "graphics_module_3_topic_2_development_of_surfaces/src/problemLibrary.js": {
     "mtime": 1784384569.3951883,
     "ast_hash": "c863af9e78fdb6a054c77bc00fead2a9",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/main.js": {
+    "mtime": 1784820571.155785,
+    "ast_hash": "881e765d3098a6c6fcf308eb2b2f69aa",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/meta.json": {
+    "mtime": 1784480301.8799734,
+    "ast_hash": "9ce85a1f4ea8411b87940df05b41ae92",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/src/anim.js": {
+    "mtime": 1784480302.2962804,
+    "ast_hash": "9794e5759735a99293db84e8fd6daf96",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/src/compareSheet.js": {
+    "mtime": 1784820536.4352674,
+    "ast_hash": "d9ab08a2faed6602f0044e3933ad6695",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/src/dimensions.js": {
+    "mtime": 1784480302.3084042,
+    "ast_hash": "57dc0ec79a95f4763e6ac071ac71c1c8",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/src/labelPlacement.js": {
+    "mtime": 1784480302.3121016,
+    "ast_hash": "d3470a7c8eb5c647bbbd028987b63f0b",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/src/labels.js": {
+    "mtime": 1784480302.313701,
+    "ast_hash": "ca4b1602b07a175b8a14d25afbf4f0eb",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/src/labels/LabelFactory.js": {
+    "mtime": 1784480302.3439302,
+    "ast_hash": "9cdd571f156c971f4e891462cbbef778",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/src/labels/LabelManager.js": {
+    "mtime": 1784480302.3559396,
+    "ast_hash": "4c9ace061622f1e01824126883547068",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/src/labels/LabelPlacement.js": {
+    "mtime": 1784480302.36098,
+    "ast_hash": "0362a19306dc9302398e21658c4ee18f",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/src/labels/LabelStyles.js": {
+    "mtime": 1784480302.36098,
+    "ast_hash": "43b6ba8d4db84c3d6a8e211bd01c3af0",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/src/lineTypeRig.js": {
+    "mtime": 1784703324.353964,
+    "ast_hash": "d655e2f0112f4eda00ac78441729f64a",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/src/lineTypesData.js": {
+    "mtime": 1784480302.319224,
+    "ast_hash": "2bac38a67fa0a215f49cbbf7dae25ed6",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/src/onboarding.js": {
+    "mtime": 1784480302.324231,
+    "ast_hash": "684a274f8acc8bc6c1104582cddaa1f7",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/src/rotationMethod.js": {
+    "mtime": 1784480302.3286428,
+    "ast_hash": "fb116f5da78535d65af545de6fa79a6e",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/src/sheet2DLayout.js": {
+    "mtime": 1784571802.7686462,
+    "ast_hash": "6bfe52d54c01369290a8f43a1e075e3d",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/src/stepper.js": {
+    "mtime": 1784480302.3286428,
+    "ast_hash": "c4a49ac4634e0726184cfb8f9cb4223f",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/src/terms.js": {
+    "mtime": 1784480302.3406024,
+    "ast_hash": "1923fa628a857803c90080ac0269d347",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/src/uiManager.js": {
+    "mtime": 1784480302.3439302,
+    "ast_hash": "2b49e33e4ead0a5dc1993725e02ec501",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/.claude/settings.local.json": {
+    "mtime": 1784480269.7158687,
+    "ast_hash": "bb572d66d63788fd6d4a57240c74d408",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/main.js": {
+    "mtime": 1784820619.8413875,
+    "ast_hash": "e2c7383b204fb75eb891eea5dc4b85df",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/meta.json": {
+    "mtime": 1784480269.7147336,
+    "ast_hash": "d11ab4691783d2700412730960e59507",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/anim.js": {
+    "mtime": 1784480269.7457142,
+    "ast_hash": "9794e5759735a99293db84e8fd6daf96",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/compareSheet.js": {
+    "mtime": 1784820595.1928973,
+    "ast_hash": "5ccd28ee6f82a6d06b99d134f7413467",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/dimensions.js": {
+    "mtime": 1784480269.7457142,
+    "ast_hash": "57dc0ec79a95f4763e6ac071ac71c1c8",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/labelPlacement.js": {
+    "mtime": 1784480269.7457142,
+    "ast_hash": "d3470a7c8eb5c647bbbd028987b63f0b",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/labels.js": {
+    "mtime": 1784480269.7619836,
+    "ast_hash": "ca4b1602b07a175b8a14d25afbf4f0eb",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/labels/LabelFactory.js": {
+    "mtime": 1784480269.8087327,
+    "ast_hash": "9cdd571f156c971f4e891462cbbef778",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/labels/LabelManager.js": {
+    "mtime": 1784480269.824385,
+    "ast_hash": "4c9ace061622f1e01824126883547068",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/labels/LabelPlacement.js": {
+    "mtime": 1784480269.824385,
+    "ast_hash": "0362a19306dc9302398e21658c4ee18f",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/labels/LabelStyles.js": {
+    "mtime": 1784480269.824385,
+    "ast_hash": "43b6ba8d4db84c3d6a8e211bd01c3af0",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/lineData.js": {
+    "mtime": 1784480269.7647183,
+    "ast_hash": "8842a9e6eb45ea79267adf0b9990ef0c",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/lineProblems.js": {
+    "mtime": 1784480269.7647183,
+    "ast_hash": "cc1aecc3a3b0d83fcd8e51a53d2fc942",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/lineRig.js": {
+    "mtime": 1784703324.1181655,
+    "ast_hash": "6e8c4feed39c8a1f2acba07378aa5711",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/lineSteps.js": {
+    "mtime": 1784480269.7793489,
+    "ast_hash": "3eb4110148cd026c81b92b3c8801923c",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/onboarding.js": {
+    "mtime": 1784480269.7793489,
+    "ast_hash": "bad626fc383d361d5ad71cfd68872f0b",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/problemLibrary.js": {
+    "mtime": 1784480269.7793489,
+    "ast_hash": "7b43954f56eb0a041908cb9811f0dfd0",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/sheet2DLayout.js": {
+    "mtime": 1784571816.1010728,
+    "ast_hash": "6bfe52d54c01369290a8f43a1e075e3d",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/stepper.js": {
+    "mtime": 1784480269.7930982,
+    "ast_hash": "ab6e048d0f21d4de0bd3c24d46880482",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/terms.js": {
+    "mtime": 1784480269.7930982,
+    "ast_hash": "616a6e0d2a926bacee05f489ed5d5487",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/traces.js": {
+    "mtime": 1784480269.7930982,
+    "ast_hash": "d9e347492ca64f2a729aa8197c93cad5",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/trueLength.js": {
+    "mtime": 1784480269.7930982,
+    "ast_hash": "10d5fe019d1e830bca4a2e8c1ac13945",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/src/uiManager.js": {
+    "mtime": 1784480269.8087327,
+    "ast_hash": "416dbfd86bd79692ef5f20fa417823e9",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/CHANGELOG.md": {
+    "mtime": 1784820659.235031,
+    "ast_hash": "16ca83576acfcde39b1e52baf3d70887",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/CLAUDE.md": {
+    "mtime": 1784618433.5720448,
+    "ast_hash": "e5b7a3a08fbbf724873a2298b520da70",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_5_projection_of_line_types/index.html": {
+    "mtime": 1784817270.0590994,
+    "ast_hash": "7281a8e885586a104c9f3d1fe9a66842",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/CHANGELOG.md": {
+    "mtime": 1784820664.2734256,
+    "ast_hash": "36f416080a67f37fe6dc328294cd2032",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/CLAUDE.md": {
+    "mtime": 1784797203.1408894,
+    "ast_hash": "3278cead708a48bd4a681ef1253cd769",
+    "semantic_hash": ""
+  },
+  "graphics_module_1_topic_6_projection_of_straight_lines/index.html": {
+    "mtime": 1784817259.645187,
+    "ast_hash": "afb939bde1a83a5204a98d4db2f2abbb",
+    "semantic_hash": ""
+  },
+  ".claudian/claudian-settings.json": {
+    "mtime": 1784658707.310719,
+    "ast_hash": "fed3e0112008d778bafdf6601c2b4241",
+    "semantic_hash": ""
+  },
+  ".obsidian/app.json": {
+    "mtime": 1784660475.492913,
+    "ast_hash": "99914b932bd37a50b983c5e7c90ae93b",
+    "semantic_hash": ""
+  },
+  ".obsidian/appearance.json": {
+    "mtime": 1784660475.492913,
+    "ast_hash": "99914b932bd37a50b983c5e7c90ae93b",
+    "semantic_hash": ""
+  },
+  ".obsidian/community-plugins.json": {
+    "mtime": 1784658736.7413926,
+    "ast_hash": "d751713988987e9331980363e24189ce",
+    "semantic_hash": ""
+  },
+  ".obsidian/core-plugins.json": {
+    "mtime": 1784660475.0669107,
+    "ast_hash": "7c877bea49eaeabb100563bd157b9051",
+    "semantic_hash": ""
+  },
+  ".obsidian/graph.json": {
+    "mtime": 1784658310.033,
+    "ast_hash": "93e161022a5519dc5197a20436213904",
+    "semantic_hash": ""
+  },
+  ".obsidian/workspace.json": {
+    "mtime": 1784660503.7878993,
+    "ast_hash": "0e07004d5806a5154f8139649c7b439f",
     "semantic_hash": ""
   }
 }

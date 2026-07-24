@@ -3,6 +3,23 @@
 All notable changes at the Simatrix project root (spanning Module1, Module2, and the
 topic deploy copies). Per-module changelogs live inside each module folder.
 
+## 2026-07-23
+- Added: Topics 5 & 6's 2D Compare drawing gained drag-to-pan + scroll-wheel zoom (cursor-anchored, clamped 0.4–5×, double-click reset) — Module 2/Points' ADR-054/055 interaction, re-expressed against the topics' own ADR-076 ortho camera instead of a Canvas2D `project()` lens, since that lens doesn't exist there (ADR-077).
+
+## 2026-07-21
+- Changed: Topics 5 & 6's 2D Compare sheet moved off its shared-canvas scissor pass onto its own `WebGLRenderer`/canvas, so the two topics could finally adopt Module 2's ADR-037 floating-card workbench (grey shell, real gutters between the three cards, `#rail-toggle` Hide/Show) — a single scissored canvas couldn't show a gutter between its own two halves (ADR-076).
+- Fixed: Topics 5 & 6's construction launchers (Traces, True Length & Angles, Rotation Method) forced the Compare card down to the small floating PIP instead of the 50/50 split; they now re-parent into the workbench rail like any other driver and run inside the expanded split.
+- Removed: the two topics' `computeRegions()`/`pass()` scissor-region machinery (ADR-074's pixelRatio conversion fix along with it) — superseded, no longer applicable now that each renderer owns its own full canvas.
+
+## 2026-07-20
+- Changed: Topics 5 & 6's 2D Compare sheet scale moved from a fixed 150 mm span (ADR-038/ADR-072) to the Module 2 intrinsic-size model — it now derives from the line's own True Length, so a typical drawing fills the sheet instead of floating tiny in a worst-case-sized frame (ADR-075).
+- Fixed: 2D-sheet labels desynced from the WebGL drawing in the Compare workbench on HiDPI/scaled displays in Topics 5 and 6 (devicePixelRatio was applied twice in the scissored passes). (ADR-074; RULES.md §3.33)
+- Changed: platform-wide `--color-vp-line` promoted `#bc5d1e → #b25718` (Topic 6's local AA-driven override, ~4.92:1 on paper) across all 11 definition sites — Module 1 topics 2–5, Module 2 + its two topics, Module 3 topics 1–2, `Module1/src/shell.css`, `template_starter/` — plus `DESIGN.md` (front-matter, §2.1 table, §6.1) and `Module1/CLAUDE.md`; consumers reading `var(--color-vp-line)` needed no touch.
+- Changed: Module 1 Topics 5 & 6 `body.compare-split` workbench (`#compare-card` + `#workbench-rail`) gained `border-radius: var(--radius-md)` and the split grid gained `gap: var(--space-1)` so the rounding reads clear of the flush panes.
+- Fixed: Topic 5's stale CSS comment citing a nonexistent `src/labelLayer.js` corrected to the real `src/labels.js`.
+- Verified: a stabilization audit's claim that Topic 6's `src/labels/` directory was unimported dead code was wrong — `lineRig.js` imports `createLabelManager`/`DIMENSION_OFFSET` from it live; deletion was skipped, the directory is untouched, and a real consolidation with the flat `src/labels.js` (two parallel CSS2D label systems in one topic) is banked as a follow-up task.
+- Changed: step-card `.card__lead`/`.step-body` typography normalized to Module 2's `--text-sm` / `--color-ink-secondary` scale platform-wide — Topic 5 had drifted to a visibly larger `1.125rem`/`1rem` size, and Topics 3, 5, 6 rendered their step-body prose near-black instead of grey (ADR-073); `DESIGN.md` §3.2 amended to match, retiring the now-unused `--text-lead` role.
+
 ## 2026-07-19
 - Added: `graphics_module_1_topic_6_projection_of_straight_lines/` — promoted the teammate-contributed Lines problem-solver from its untracked, non-conforming `module_1_topic_lines/` folder to the next free Module-1 catalog slot; it and the sibling `graphics_module_1_topic_5_projection_of_line_types` concept primer are distinct-by-design topics (six-position primer vs. 5-step problem-solving build), not competing versions, so neither was ported into the other (ADR-072).
 - Fixed: `graphics_module_1_topic_6_projection_of_straight_lines/CLAUDE.md` described its Problem Library as deferred though `main.js` already wires `initProblemLibrary(...)` into `window.simAPI` — corrected the stale doc to match the shipped, active 12-problem library (verbatim N.D. Bhatt / K.C. John set, RULES.md §6.7).

@@ -139,14 +139,18 @@
         Consumed by the projection layer (meshAnalyzer / projectionDrawer).
       */
       --color-hp-line: #007f7c; /* oklch(0.53 0.11 192) — HP projection: teal, SOLID (held off blue so it never reads as the chrome accent; 4.57:1 on paper) */
-      --color-vp-line: #bc5d1e; /* oklch(0.58 0.12 55) — VP projection: amber, DASHED (teal↔amber is the CVD-safe pair; 4.19:1 on paper) */
+      --color-vp-line: #b25718; /* oklch(~0.55 0.12 52) — VP projection: amber, DASHED (teal↔amber is the CVD-safe pair; darkened one step from #bc5d1e so VP label text clears AA: 4.92:1 on paper) */
       --color-pp-line: #7a5ea6; /* oklch(0.55 0.10 305) — PP projection: violet, the third (profile) plane; held off the chrome blue (h305 vs 252) and clear of teal/amber; ~4.5:1 on paper */
 
-      /* --- Lines construction-aid tokens (topic-specific viewport encodings for the Traces /
-             True-Length constructions; reuse existing neutrals, plus one true-length green). --- */
-      --construct: var(--color-ink-secondary); /* construction / extension lines */
-      --locus:     var(--color-bench-grey);    /* locus (rotation-path) arcs */
-      --tl-green:   #2f8f4e;                    /* the recovered True Length highlight */
+      /* --- Lines construction-aid tokens (Module-1 platform catalog, DESIGN.md §2.2 — sourced
+             from Module1/src/shell.css's original values so this construction reads identically
+             to every other Module-1 consumer of these tokens; ADR-072). --- */
+      --construct:      #8a8275; /* neutral drafting-aid grey — construction / projector lines */
+      --locus:          #7b4fb5; /* violet — rotation-locus arcs (held off the chrome blue) */
+      --tl-green:       #1f8a4c; /* green — the recovered True Length highlight */
+      --construct-ink:  #5e564a; /* darker construct grey — small inline text */
+      --locus-ink:      #6a3fa3; /* darker locus violet — small inline text */
+      --tl-green-ink:   #166b3c; /* darker true-length green — small inline text */
 
       /* --- Spacing scale (4px base) --- */
       --space-1: 4px;
@@ -247,7 +251,7 @@
       user-select: none;
     }
 
-    /* CSS2D viewport labels (src/labelLayer.js) — live DOM nodes (CSS2DObject) the
+    /* CSS2D viewport labels (src/labels.js) — live DOM nodes (CSS2DObject) the
        renderer re-projects every frame, so they stay vector-sharp at any zoom
        (RULES.md §3.27). Colours ride the same tokens as the geometry they name;
        chips take the boxed "engineering software" look (Module 1's .lbl--chip:
@@ -475,14 +479,13 @@
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      /* TRANSPARENT (ADR-042): the single WebGL canvas sits BEHIND this card, and the 2D
-         orthographic sheet is a SECOND scissored render pass painted into the card-stage rect
-         on that canvas. An opaque card background would cover the WebGL sheet (leaving only the
-         CSS2D labels visible) — so the card frame is transparent and the sheet's own paper
-         background (its scene.background) fills the stage. Points' card stays paper because its
-         Canvas2D drawing is a CHILD of the stage; Lines' sheet is BEHIND the card, so it must
-         show through. The head bar keeps its own panel background. */
-      background: transparent;
+      /* PAPER (own-canvas architecture, ADR-076 — supersedes the original transparent-card
+         compromise; see DECISIONS.md): the 2D orthographic sheet now renders on its OWN
+         WebGLRenderer/canvas, a CHILD of the stage — matching the Points/Module 2 card
+         exactly. The canvas paints its own paper background (compareSheet's
+         scene.background), and this card frame is opaque paper too so there's no flash of
+         transparency before first paint. */
+      background: var(--color-paper);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
       box-shadow: var(--shadow-md);
@@ -497,8 +500,11 @@
     }
     /* Expanded = the 50/50 workbench split (ADR-037). The card is re-parented to
        <body> and placed as the grid's right pane by the body.compare-split rules far
-       below; here it just sheds the floating-card chrome (no float geometry, no
-       shadow, a single hairline seam against the 3D pane). */
+       below; here it just sheds the floating-card's absolute positioning. The card
+       KEEPS its base .compare-card border/radius/paper fill so it reads as a floating
+       rounded card on the grey split shell, matching #sim-viewport and #workbench-rail
+       (mirrors Module 2's own split rule) — only the shadow is dropped (Flat-Ink rule —
+       docked surfaces don't earn the transient-overlay shadow). */
     body.compare-split #compare-card {
       position: static;
       inset: auto;
@@ -506,9 +512,6 @@
       height: auto;
       min-height: 0;
       transform: none;
-      border: 0;
-      border-left: 1px solid var(--color-border);
-      border-radius: 0;
       box-shadow: none;
     }
     .compare-card__head {
@@ -554,32 +557,46 @@
       flex: 1 1 auto;
       position: relative;
       min-height: 0;
-      /* TRANSPARENT: the Lines 2D drawing is a SECOND WebGL render pass on the ONE
-         canvas (which sits behind this card), scissored to this stage's rect — not a
-         Canvas2D child. So the stage must not paint over the WebGL; the 2nd pass paints
-         its own paper background inside the scissor. (ADR-034 alternative-A, Lines.) */
-      background: transparent;
+      /* The 2D drawing's OWN <canvas> + WebGLRenderer live here as a real DOM child
+         (own-canvas architecture, see DECISIONS.md) — the canvas paints its own paper
+         background; this fill is just the pre-first-paint fallback. */
+      background: var(--color-paper);
     }
-    /* The 2D drawing canvas fills the stage; main.js drawCompare() sizes its
-       backing store to the stage rect × devicePixelRatio and redraws from data. */
+    /* The 2D drawing canvas fills the stage; main.js's own WebGLRenderer (ensureSheetRenderer /
+       resizeSheetRenderer) sizes its backing store to the stage rect × devicePixelRatio. */
     .compare-card__stage canvas {
       display: block;
       width: 100%;
       height: 100%;
     }
+    /* The sheet's dedicated CSS2D label overlay (main.js) — a DOM sibling of the sheet
+       canvas, sized/positioned to fill the stage 1:1 (no offset math needed: the labels
+       and the canvas they annotate now share the same box). */
+    .compare-card__stage .sheet-label-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+    }
 
     /* ============================================================
-       Compare-split workbench (ADR-037) — the true 50/50.
-       body flips from the wizard-beside-viewport flex row into a grid:
-         ┌───────────────┬───────────────┐
-         │  3D viewport  │  2D drawing    │   ← minmax(0,1fr) row, two 1fr columns
-         ├───────────────┴───────────────┤
-         │      #workbench-rail           │   ← auto row spanning both panes
+       Compare-split workbench (ADR-037, ported from Module 2; the own-canvas rendering
+       that makes it possible is ADR-076, which supersedes the topic's original
+       single-canvas scissor design — see DECISIONS.md). body flips from the
+       wizard-beside-viewport flex row into a grid of THREE FLOATING ROUNDED CARDS on
+       a grey shell (DESIGN.md §5.13):
+         ┌───────────────┐ ┌───────────────┐
+         │  3D viewport  │ │  2D drawing    │   ← minmax(0,1fr) row, two 1fr columns
+         └───────────────┘ └───────────────┘
+         ┌────────────────────────────────┐
+         │       #workbench-rail           │   ← auto row spanning both panes
          └────────────────────────────────┘
-       The wizard drops out; the point drivers re-parent into the rail (main.js
-       enterWorkbench). Because #sim-viewport IS the left pane, handleResize()
-       (which measures it) sizes the renderer to half-width with no JS sizing
-       change. Desktop-only — the mobile @media block keeps the bottom-sheet card. */
+       gap/padding: var(--space-4) between/around all three cards, on a --color-panel
+       shell. The wizard drops out; the point drivers + the Rotation Method launcher
+       re-parent into the rail (main.js enterWorkbench). The 3D viewport and the 2D
+       drawing are now two INDEPENDENT canvases (own-canvas architecture) — no more
+       scissored sub-regions of one shared canvas. Desktop-only — the mobile @media
+       block keeps the bottom-sheet card. */
     body.compare-split {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -587,61 +604,165 @@
       grid-template-areas:
         "view compare"
         "rail rail";
+      background: var(--color-panel);
+      gap: var(--space-4);
+      padding: var(--space-4);
     }
-    /* The structural hairline between the 3D viewport and the rail lives on the LEFT pane's
-       own bottom edge, NOT on the rail's top edge — so it spans only the 3D half. The right
-       half (2D drawing → rail) is left deliberately borderless: the drawing card and the rail
-       read as one continuous workbench surface there (Task 2). Because #sim-viewport is
-       border-box, this 1px is subtracted from clientHeight and handleResize sizes the canvas
-       to the box above the seam — no overlap. */
     body.compare-split #sim-viewport {
       grid-area: view;
       min-width: 0;
-      border-bottom: 1px solid var(--color-border);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      overflow: hidden; /* clip the WebGL canvas to the rounded corners */
     }
     body.compare-split #compare-card { grid-area: compare; }
     body.compare-split #workbench-rail { grid-area: rail; }
-    /* Lines 2D vehicle = a SECOND WebGL render pass on the ONE canvas (not a Canvas2D /
-       2nd context, ADR-034 alt-A). So in the split the single canvas must cover BOTH top
-       panes: #sim-viewport spans both top columns and #compare-card overlays the right
-       pane as a transparent-stage chrome frame. main.js scissors the 3D pass to the left
-       region and the 2D ortho pass to the card-stage rect. */
-    body.compare-split #sim-viewport { grid-column: 1 / 3; }
-    body.compare-split #compare-card { z-index: 4; }
-    /* The wizard is collapsed BY the split; the chevron (main.js) exits the split
-       to bring it back, mirroring ADR-021. */
+    /* The wizard is collapsed BY the split; the rail-toggle (below) or the still-visible
+       Compare chip exits it. */
     body.compare-split #wizard { display: none; }
     /* In the 50/50 split the 2D-drawing head (tab + expand/close) and the viewport
        chevron are redundant chrome — the still-visible, pressed Compare chip in the
        left 3D pane toggles the split closed, so it is the single exit. Hide both so
-       the drawing gets the full card height and the split reads clean (mirrors the
-       Lines workbench: shell.css `body.compare-workbench .compare-card__head`). */
+       the drawing gets the full card height and the split reads clean. */
     body.compare-split .compare-card__head { display: none; }
     body.compare-split #wizard-toggle { display: none; }
 
+    /* ---- Rail hide/reveal toggle (ADR-037 amendment, ported verbatim from Module 2):
+       a dedicated control, independent of the wizard chevron, for a full-screen 3D/2D
+       read of the split. A direct <body> child (NOT a child of #workbench-rail — a
+       child would vanish along with the rail on collapse and become impossible to
+       reveal again); claims grid-area:view so it floats at the viewport's bottom-left,
+       above the rail, in both the open and collapsed states. */
+    .rail-toggle {
+      display: none; /* shown only in the split, see body.compare-split #rail-toggle below */
+      position: relative; /* anchors the 44px hit-area ::before (shared selector below) */
+      align-items: center;
+      gap: var(--space-2);
+      z-index: 95; /* above the Compare card (--z-compare 90), below the mobile notice (100) */
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0 var(--space-3);
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    body.compare-split #rail-toggle {
+      display: inline-flex;
+      grid-area: view;
+      align-self: end;
+      justify-self: start;
+      margin: var(--space-4);
+    }
+    .rail-toggle:active { transform: scale(0.97); }
+    .rail-toggle:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .rail-toggle__icon {
+      width: 20px;
+      height: 20px;
+      flex: none;
+      transition: transform var(--dur-base) var(--ease-standard);
+    }
+    .rail-toggle__text {
+      font-family: var(--font-sans);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      line-height: 1;
+    }
+    /* Collapsed: drop the rail out of the grid (its row + gap reclaimed) and flip the
+       chevron to point back down toward where the rail will reappear. */
+    body.rail-collapsed #workbench-rail { display: none !important; }
+    body.rail-collapsed .rail-toggle__icon { transform: rotate(180deg); }
+    body.compare-split.rail-collapsed {
+      grid-template-rows: minmax(0, 1fr);
+      grid-template-areas: "view compare";
+    }
+
+    /* The construction-launcher dock: floats at the 2D drawing panel's bottom-right corner
+       (mirrors #rail-toggle's floating-corner convention on the opposite pane), ported from
+       topic_6's #con-dock. This topic has one launcher (Rotation Method), not a pair. */
+    .con-dock {
+      display: none; /* shown only in the split, see body.compare-split #con-dock below */
+      z-index: 95; /* above the Compare card (--z-compare 90), below the mobile notice (100) */
+      gap: var(--space-3);
+    }
+    body.compare-split #con-dock {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      grid-area: compare;
+      align-self: end;
+      justify-self: end;
+      margin: var(--space-4);
+    }
+    /* The launcher keeps the fixed-width column it used inside the rail — a single button,
+       not a slider. Its own label swaps to "Replay Rotation Method" once triggered (main.js
+       setConLabel); there is no separate Replay button. */
+    #con-dock .ctrl { flex: 0 0 auto; width: 180px; margin: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+    /* Per-step disclosure (`hidden`) still targets this wrapper by [data-ctrl] regardless of
+       DOM parent (stepper.js) — override it here the same way the rail does, so a stray
+       reset/step-load re-render can never re-hide the launcher while it's docked. */
+    #con-dock .ctrl[hidden] { display: flex !important; }
+    /* Match the #rail-toggle Hide/Show pill's chrome (panel bg, secondary ink, and its
+       0.8125rem/600 label size — .rail-toggle__text / .quick-view / .connector-toggle /
+       .compare-chip's shared floating-pill size, not the generic .btn's inherited body
+       --text-base) so the two floating-corner docks read as one visual family. */
+    #con-dock .btn {
+      background: var(--color-panel);
+      color: var(--color-ink-secondary);
+      font-size: 0.8125rem;
+      font-weight: 600;
+    }
+
     /* The docked driver rail — spans both panes, hosts the re-parented [data-ctrl]
-       wrappers laid out as a horizontal instrument row. Persistent/docked, so no
-       shadow (Flat-Ink) — a hairline top seam only (ADR-021 parity). */
+       wrappers laid out as a horizontal instrument row. A paper-white rounded card
+       matching the other two panes (DESIGN.md §5.13) on the grey shell; no shadow
+       (Flat-Ink — docked surfaces don't earn the transient-overlay shadow). Topic-local
+       clustering (this file's own rules — not a shared-file change, ported from topic_6):
+       the three drivers are grouped into two titled .dock__group clusters (main.js
+       WORKBENCH_GROUPS) — Dimensions / Inclination — instead of one flat row. The Rotation
+       Method launcher no longer lives here — it docks at the 2D panel's corner instead, see
+       .con-dock above. */
     #workbench-rail { display: none; }
     body.compare-split #workbench-rail {
       display: flex;
+      flex-wrap: wrap; /* whole CLUSTERS reflow as units on a tight viewport — never a mid-cluster split */
       align-items: flex-end;
-      justify-content: center; /* Centre the instrument row so the drivers sit balanced
-                                  across the full-width rail instead of hugging the far left
-                                  (the row is narrower than both panes, so no scroll clip). */
-      gap: var(--space-6);
+      justify-content: center; /* Centre the clusters so they sit balanced across the full-width rail. */
+      gap: var(--space-3) 0; /* row-gap only when clusters wrap; column rhythm now comes from each
+                                 cluster's own divider (.rail__group + .rail__group), so this stays 0 */
       padding: var(--space-4) var(--space-5);
-      background: var(--color-panel);
-      /* NO top border here: a full-width rail border would draw the hairline under BOTH panes,
-         including the 2D drawing half that must stay seamless. The left (3D) half's seam is drawn
-         by #sim-viewport's border-bottom above; the right (2D) half stays borderless (Task 2). */
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
       overflow-x: auto;
+    }
+    /* Each cluster: title-over-body (.dock__group's own column direction), sized to its content. */
+    #workbench-rail .rail__group { flex: 0 0 auto; }
+    /* A cluster's controls run horizontally beneath its eyebrow title. */
+    #workbench-rail .rail__group-body {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-end;
+      gap: var(--space-5);
+    }
+    /* Clusters are separated by breathing room alone (Flat-Ink — no divider line, no
+       boxed card) so the grouping reads at a glance without an extra seam. */
+    #workbench-rail .rail__group + .rail__group {
+      padding-left: var(--space-6);
     }
     /* Each driver reflows from the wizard's vertical stack into a fixed-width column
        so the row reads as an instrument bench. */
     #workbench-rail .field { flex: 0 0 auto; width: 200px; margin: 0; gap: var(--space-2); }
-    /* The card's per-step reveal used `hidden`; in the rail every driver is live. */
-    #workbench-rail .field[hidden] { display: block !important; }
+    /* The card's per-step reveal used `hidden` to show only the current step's control(s)
+       (stepper.js keeps doing this even once a wrapper is re-parented here, since it
+       queries by [data-ctrl] regardless of DOM parent); in the rail every driver is live at
+       once (the rail overrides per-step disclosure with the full set). */
+    #workbench-rail .field[hidden] { display: flex !important; }
 
     /* ---- 44px hit-area floor (DESIGN.md). These viewport-corner controls stay visually
        compact so the chrome stays quiet, but a transparent, centred ::before guarantees a
@@ -1120,17 +1241,17 @@
     .card__lead {
       margin: 0 0 var(--space-5);
       max-width: 60ch;
-      font-size: var(--text-lead); /* DESIGN.md §3.2 Lead — the one-sentence explanation */
-      line-height: 1.35;
+      font-size: var(--text-sm); /* DESIGN.md §3.2 Lead — Module 2 reference scale (ADR) */
+      line-height: 1.55;
       color: var(--color-ink-secondary);
     }
     .card__body { flex: 1 1 auto; }
     /* Step instruction paragraphs — rendered from lineTypesData.js by stepper.js. */
     .step-body {
-      font-size: var(--text-base); /* DESIGN.md §3.2 Body — "never below caption size" */
-      line-height: 1.6;
+      font-size: var(--text-sm); /* DESIGN.md §3.2 Body — Module 2 reference scale (ADR) */
+      line-height: 1.55;
     }
-    .step-body p { margin: 0 0 var(--space-3); max-width: 60ch; }
+    .step-body p { margin: 0 0 var(--space-3); max-width: 60ch; color: var(--color-ink-secondary); }
     .step-body b { font-weight: 700; }
 
     /* The per-step controls block — ONE static set of [data-ctrl] wrappers
@@ -1558,6 +1679,9 @@
       .btn--primary:hover { background: var(--color-accent-strong); border-color: var(--color-accent-strong); }
       .btn--primary:disabled:hover { background: var(--color-accent); border-color: var(--color-accent); }
       .btn--ghost:hover { background: var(--color-panel); border-color: var(--color-border); }
+      /* #rail-toggle (the Hide/Show pill this dock is matched to) has no hover shift at all —
+         mirror that here instead of inheriting .btn:hover's border-color change. */
+      #con-dock .btn:hover { background: var(--color-panel); border-color: var(--color-border); }
       .term:hover { color: var(--color-accent); }
     }
 
@@ -1769,10 +1893,11 @@
 
           <!-- Step 6 — Rotation Method construction (rotating-line method). A launcher toggle that
                builds the animated construction on the Compare sheet: it swings each foreshortened
-               view flat to recover the True Length and the true angles θ and φ. -->
+               view flat to recover the True Length and the true angles θ and φ. Its own label
+               swaps to "Replay Rotation Method" once triggered (main.js setConLabel) — there is
+               no separate Replay button. -->
           <div class="ctrl" data-ctrl="rotation" hidden>
-            <button id="btn-rotation" class="btn btn--block btn--icon" type="button" aria-pressed="false"><span class="btn__icon" aria-hidden="true">∡</span>Rotation Method — True Length</button>
-            <button id="rotation-replay" class="btn btn--ghost btn--block btn--icon" type="button" hidden><span class="btn__icon" aria-hidden="true">↺</span>Replay</button>
+            <button id="btn-rotation" class="btn btn--block btn--icon" type="button" aria-pressed="false"><span class="btn__icon" aria-hidden="true">∡</span><span class="btn__label">Rotation Method — True Length</span></button>
           </div>
 
           <!-- Every step — Generate Orthographic Projections (the reversible fold). A single
@@ -1865,12 +1990,11 @@
     </div>
 
     <!-- Compare card (ADR-012): the on-demand floating "drawing sheet" frame hosting the
-         finished 2D orthographic drawing. Ported from Module1/src/chrome.js #compare-card;
-         one deliberate adaptation for this single-WebGL-canvas build: instead of floating a
-         second WebGL canvas over the stage (the legacy #c2d + the no-transform invariant),
-         the stage OWNS a plain 2D <canvas> that main.js drawCompare() live-redraws from the
-         point data on every commit — a live rebuilt drawing, never a snapshot (ADR-012).
-         compact / expanded via data-size; main.js wires the head buttons. -->
+         finished 2D orthographic drawing. Own-canvas architecture (ADR-076 — supersedes the
+         topic's original scissor design; see DECISIONS.md): the stage hosts a dedicated
+         <canvas> + its own WebGLRenderer (main.js), a genuinely separate surface from the
+         3D viewport's canvas — a live rebuilt drawing, never a snapshot (ADR-012). compact
+         / expanded via data-size; main.js wires the head buttons. -->
     <div id="compare-card" class="compare-card" data-size="compact" role="region" aria-label="Compare: the finished 2D drawing" hidden>
       <div class="compare-card__head">
         <span class="compare-card__tab">2D drawing</span>
@@ -1886,9 +2010,9 @@
         </button>
       </div>
       <div class="compare-card__stage">
-        <!-- Phase 4A: the 2D orthographic drawing is a later-phase leaf (compareSheet.js,
-             a Three.js ortho sheet drawn in a 2nd render pass on the ONE WebGLRenderer —
-             not a second canvas/context). The legacy Points 2D <canvas> was removed here. -->
+        <!-- The 2D orthographic sheet's <canvas> + WebGLRenderer, and its dedicated
+             .sheet-label-overlay (CSS2DRenderer), are created and appended here by
+             main.js on first Compare open (ensureSheetRenderer). -->
       </div>
     </div>
 
@@ -1940,6 +2064,21 @@
       <span class="vp-note__text"></span>
     </div>
   </main>
+
+  <!-- Rail hide/reveal toggle (ADR-037 amendment, ported verbatim from Module 2): a direct
+       <body> child, NOT a child of #workbench-rail — a child would vanish along with the rail
+       on collapse and become impossible to reveal again. Only visible while body.compare-split
+       is active (see CSS above); it claims grid-area:view (the 3D pane) so it floats at the
+       viewport's bottom-left, above the rail, in both the open and collapsed states. A
+       "Hide"/"Show" pill (main.js setupRailToggle keeps aria-label in sync for screen readers).
+       Independent of #wizard-toggle: collapsing the rail never exits the split, and the split
+       always resets the rail to shown on entry. -->
+  <button id="rail-toggle" class="rail-toggle" type="button" aria-controls="workbench-rail" aria-expanded="true" aria-label="Hide controls" title="Hide controls">
+    <svg class="rail-toggle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+    <span class="rail-toggle__text">Hide</span>
+  </button>
 
   <!-- Inline term-definition popover — the ONE fixed tooltip src/terms.js fills
        from the lineTypesData.js TERMS glossary and anchors to whichever `.term`

@@ -41,12 +41,13 @@ the Rotation Method construction — carried over from the Lines topic).
 
 ## Architecture — Module 2 orchestrator pattern (ADR-033)
 
-- **`main.js` is the orchestrator** (ADR-007): it owns the scene, the perspective + orthographic
+- **`main.js` is the orchestrator** (ADR-007): it owns the scene, the 3D WebGLRenderer (the 2D
+  Compare sheet owns a second, own-canvas renderer — ADR-076), the perspective + orthographic
   cameras + their `OrbitControls` (the dual-camera §5.18 stack — quick-views + the ADR-036 fold
   swoop), the single `rebuild()` pipeline (full WebGL disposal contract, ADR-004), the render loop,
-  the two scissored render passes + the two CSS2D overlays, the Compare state machine + the ADR-021
-  workbench split, the Rotation Method construction system, the **per-step camera framing**
-  (`frameStep`), and `window.simAPI`. No leaf imports a sibling leaf (RULES.md §3.6).
+  the two CSS2D overlays, the Compare state machine + the ADR-021/ADR-037 workbench split, the
+  Rotation Method construction system, the **per-step camera framing** (`frameStep`), and
+  `window.simAPI`. No leaf imports a sibling leaf (RULES.md §3.6).
 - **Data-driven line types.** Each of the six positions is a **configuration object** in
   `lineTypesData.js` (`STEPS`), NOT a bespoke render path. A step's `set` LOCKS the `case` + the
   angles it does not teach; `controls` lists the meaningful controls; `cam` is the vantage the
@@ -62,20 +63,27 @@ the Rotation Method construction — carried over from the Lines topic).
   vantage on entry — an orbit-preserving reframe, not a held-angle lock (§5.8). Any user drag
   cancels it; orbit behaviour stays identical to every other Module-1 topic. The fold still flies
   the ADR-036 orthographic swoop unchanged.
-- **Compare / workbench** (ADR-012 / ADR-021): the 3D scene is always the main pane; the finished
-  2D orthographic drawing appears on demand (rendered in a 2nd scissored pass on the SAME
-  WebGLRenderer — one GL context). Available on every step.
+- **Compare / workbench** (ADR-012 / ADR-021 / ADR-037): the 3D scene is always the main pane; the
+  finished 2D orthographic drawing appears on demand, rendered on its OWN `WebGLRenderer`/canvas
+  (ADR-076 — a genuinely separate surface from the 3D viewport, not a scissored pass on a shared
+  one). Available on every step. The expanded split docks three floating rounded cards (3D
+  viewport, 2D drawing, rail) on a `--color-panel` shell (DESIGN.md §5.13) with an independent
+  `#rail-toggle` Hide/Show control; `WORKBENCH_CONTROLS` re-parents the drivers (`tl`/`theta`/`phi`)
+  **and** the Rotation Method launcher (`rotation`) into the rail, so the construction runs inside
+  the split like any other control.
 - **Rotation Method (Step 6):** the rotating-line construction (`rotationMethod.js`, ported from the
-  Lines topic's `trueLength.js`) animates on the Compare sheet — swings each foreshortened view
-  flat to recover the True Length and the true angles θ, φ. Torn down on any edit / step change.
+  Lines topic's `trueLength.js`, unchanged by the renderer split) animates on the Compare sheet —
+  swings each foreshortened view flat to recover the True Length and the true angles θ, φ. Torn
+  down on any edit / step change.
 
 ## File structure (as built)
 
 ```
 graphics_module_1_topic_5_projection_of_line_types/
 ├── index.html        ← thin shell (importmap + boot watchdog + canvas + wizard chrome + Compare card)
-├── main.js           ← ORCHESTRATOR (scene, ONE renderer, dual cameras, rebuild()/disposal, two
-│                        render passes, Compare/workbench, fold swoop, frameStep, Rotation Method, simAPI)
+├── main.js           ← ORCHESTRATOR (scene, the 3D renderer + the 2D Compare sheet's own
+│                        renderer (ADR-076), dual cameras, rebuild()/disposal, Compare/workbench
+│                        (ADR-037), fold swoop, frameStep, Rotation Method, simAPI)
 ├── meta.json         ← platform metadata (title = "Projection of Straight Lines — Types of Lines")
 ├── CLAUDE.md · CHANGELOG.md
 ├── assets/fonts/     ← bundled woff2 (byte-identical to the platform set)
@@ -84,7 +92,7 @@ graphics_module_1_topic_5_projection_of_line_types/
     │  # pure data
     ├── lineTypesData.js   ← LineCase · resolveLine() · defaultTypeData() · STEPS (6 types) · TERMS
     │  # shared STATELESS utilities (the §3.6 pure-math exception)
-    ├── sheet2DLayout.js   ← fixed-scale sheet-space layout math
+    ├── sheet2DLayout.js   ← intrinsic-scale (True-Length) sheet-space layout math (ADR-075)
     ├── dimensions.js      ← BIS SP 46:2003 Type-B dimension builder
     ├── labels.js · labelPlacement.js · labels/  ← the CSS2D label system + placement policy
     │  # 3D content + 2D sheet

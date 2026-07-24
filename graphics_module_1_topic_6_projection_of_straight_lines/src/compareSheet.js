@@ -1,18 +1,20 @@
-// compareSheet.js — the 2D orthographic drawing leaf (the 2nd render pass, Phase 4C+).
+// compareSheet.js — the 2D orthographic drawing leaf.
 //
 // The Lines 2D Compare drawing renders with the fat-line (Line2) stack in a DEDICATED
-// orthographic scene drawn in a SECOND scissored render pass on the SAME WebGLRenderer as
-// the 3D scene (one GL context — ADR-034 alternative-A for Lines). FIXED scale locked to the
-// static sheet bounds (ADR-038 / §5.19) via the shared sheet2DLayout.js math.
+// orthographic scene + camera. It draws on its OWN WebGLRenderer/canvas, a genuinely
+// separate surface from the 3D scene (own-canvas architecture — supersedes the original
+// ADR-034-alternative-A single-canvas scissor design; see DECISIONS.md). This leaf itself
+// stays renderer-agnostic: `render(renderer)` just calls `renderer.render(scene, camera)`,
+// so main.js can pass whichever renderer owns the sheet's canvas.
 //
-// Phase 4E: the scene now also hosts a CONSTRUCTION OVERLAY — a group the orchestrator mounts
-// the Traces / True-Length construction geometry into, so it renders in the SAME pass, camera,
-// and scissor as the base sheet, pixel-aligned to the same views. Construction aids are THIN
-// THREE.Line + circle meshes (not fat lines), so they need no resolution sync; they participate
-// in the disposal contract via clearConstruction().
+// The scene also hosts a CONSTRUCTION OVERLAY — a group the orchestrator mounts the Traces /
+// True-Length construction geometry into, so it renders in the SAME scene + camera, pixel-
+// aligned to the same views. Construction aids are THIN THREE.Line + circle meshes (not fat
+// lines), so they need no resolution sync; they participate in the disposal contract via
+// clearConstruction().
 //
 // Layering (ADR-007 / §3.6): leaf module. It imports only sheet2DLayout.js (the pure-math shared
-// exception), never a sibling behaviour leaf. main.js owns the renderer + the scissor pass.
+// exception), never a sibling behaviour leaf. main.js owns the sheet's renderer + canvas.
 
 import * as THREE from 'three';
 import { Line2 } from 'three/addons/lines/Line2.js';
@@ -26,6 +28,13 @@ import { PLACEMENT } from './labelPlacement.js';
 const MARGIN = 0.6;          // frame margin the ortho camera keeps around the sheet
 const LW = { view: 2.0, projector: 1.4, frame: 1.4 };
 
+// Compare pan/zoom (ADR-077): re-expresses Module 2/Points' ADR-054/055 drag-pan + scroll-zoom
+// against THIS leaf's live ortho camera (camera.position for pan, camera.zoom for zoom) instead
+// of a Canvas2D project() lens — see ADR-077 for why the transform target differs. Same feel:
+// clamp and wheel-sensitivity constants match Points' setupComparePan() exactly.
+const COMPARE_ZOOM_MIN = 0.4;
+const COMPARE_ZOOM_MAX = 5;
+
 // All sheet label standoffs come from the ONE shared placement policy (labelPlacement.js) — no offset
 // is invented here. Sheet chips use the §5.9 off-the-linework strategy specialised for axis-aligned
 // views: a lateral spread (a left, b right) + a perpendicular lift off the view line (front view up,
@@ -35,7 +44,8 @@ const P2 = PLACEMENT.sheet2D;
 const token = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
 const cssColor = (name) => new THREE.Color(token(name));
 
-/** @returns {{ scene, camera, setData, setResolution, render, mountConstruction, clearConstruction, dispose }} */
+/** @returns {{ scene, camera, setData, setResolution, render, mountConstruction, clearConstruction,
+ *   resetView, panByPixels, zoomAtPixel, dispose }} */
 export function createCompareSheet({ px = 1, py = 1 } = {}) {
   const scene = new THREE.Scene();
   scene.background = cssColor('--color-paper');
@@ -63,7 +73,6 @@ export function createCompareSheet({ px = 1, py = 1 } = {}) {
     hp: cssColor('--color-hp-line'),
     vp: cssColor('--color-vp-line'),
     ink: cssColor('--color-ink'),
-    border: cssColor('--color-border'),
     bench: cssColor('--color-bench-grey'),
   };
 
@@ -141,11 +150,13 @@ export function createCompareSheet({ px = 1, py = 1 } = {}) {
     setData(resolved, view) {
       clearGroup();
       dimGroup = new THREE.Group(); group.add(dimGroup); // fresh toggleable dimension layer
-      // Sheet frame + the XY (ground) line — always drawn so the sheet reads as a sheet.
-      fatLine(group, [
-        -HW - 0.3, -HH - 0.3, 0, HW + 0.3, -HH - 0.3, 0,
-        HW + 0.3, HH + 0.3, 0, -HW - 0.3, HH + 0.3, 0, -HW - 0.3, -HH - 0.3, 0,
-      ], COL.border, LW.frame);
+      // The XY (ground) line only. Pre-ADR-076, this leaf also fat-lined a full sheet-border
+      // rectangle here ("always drawn so the sheet reads as a sheet") because the old transparent
+      // Compare card had no boundary of its own — the drawn rectangle WAS the only visible edge of
+      // the "sheet". ADR-076 gave the card its own opaque-paper, rounded, own-canvas box, so that
+      // rectangle became a redundant second edge sitting a few px inside the card's real boundary —
+      // rendered pixels, invisible to getComputedStyle, which is why the CSS border removal (Task 1)
+      // didn't make the line disappear. Removed rather than kept, to match the card's own frame.
       seg(group, [-HW - 0.3, 0], [HW + 0.3, 0], COL.ink, LW.frame);
       // The XY letters — the sole always-on sheet labels (Points' clean sheet: X/Y only, no
       // plane names or view titles cluttering the drawing). The view is read from a′b′-above /
@@ -224,6 +235,45 @@ export function createCompareSheet({ px = 1, py = 1 } = {}) {
     },
 
     render(renderer) { renderer.render(scene, camera); },
+
+    /** Recenter + un-zoom (ADR-055 reset contract). Called on every fresh Compare open and on
+     *  a double-click. Camera keeps identity rotation (set once via the initial lookAt above) —
+     *  panning/zooming only ever touch position.xy + zoom, never re-orient the camera. */
+    resetView() {
+      camera.position.set(0, 0, 5);
+      camera.zoom = 1;
+      camera.updateProjectionMatrix();
+    },
+
+    /** Drag-to-pan (ADR-054 parity), re-expressed as a camera move: converts a CSS-px pointer
+     *  delta to world units using the camera's own current visible span (right-left)/zoom over
+     *  the stage's CSS size, then shifts camera.position so the drawing tracks the cursor 1:1.
+     *  No re-lookAt — position is the only thing that changes, so the fat-line geometry stays
+     *  pixel-crisp (LineMaterial.resolution is a separate, unaffected concern). */
+    panByPixels(dxPx, dyPx, cssW, cssH) {
+      const worldPerPxX = (camera.right - camera.left) / camera.zoom / Math.max(1, cssW);
+      const worldPerPxY = (camera.top - camera.bottom) / camera.zoom / Math.max(1, cssH);
+      camera.position.x -= dxPx * worldPerPxX;
+      camera.position.y += dyPx * worldPerPxY;
+    },
+
+    /** Scroll-wheel zoom, zeroed-in on the pointer (ADR-055 parity): same
+     *  `exp(-deltaY*0.0015)` factor and `[COMPARE_ZOOM_MIN, COMPARE_ZOOM_MAX]` clamp, solved
+     *  against the ortho camera instead of a screen-space pan/scale pair — shifts
+     *  camera.position by the amount that keeps the world point under (mx,my) stationary as
+     *  camera.zoom changes, mirroring ADR-055's `pan' = (cursor-centre)*(1-k) + pan*k`. */
+    zoomAtPixel(mx, my, deltaY, cssW, cssH) {
+      const factor = Math.exp(-deltaY * 0.0015);
+      const nextZoom = Math.min(COMPARE_ZOOM_MAX, Math.max(COMPARE_ZOOM_MIN, camera.zoom * factor));
+      if (nextZoom === camera.zoom) return; // clamped — nothing to do
+      const worldPerPxX = (camera.right - camera.left) / camera.zoom / Math.max(1, cssW);
+      const worldPerPxY = (camera.top - camera.bottom) / camera.zoom / Math.max(1, cssH);
+      const k = nextZoom / camera.zoom;
+      camera.position.x += (mx - cssW / 2) * worldPerPxX * (1 - 1 / k);
+      camera.position.y += (cssH / 2 - my) * worldPerPxY * (1 - 1 / k);
+      camera.zoom = nextZoom;
+      camera.updateProjectionMatrix();
+    },
 
     dispose() {
       clearGroup();

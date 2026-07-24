@@ -85,22 +85,41 @@ other web developers and is **out of scope** here.
   generate projection → traces, all pinned to the general `LineCase.INCL_BOTH` resolver; controls
   are dedicated per step (TL on step 1, distances on step 2, θ/φ on step 3). Do NOT revert to the
   six fixed-orientation "case" steps (§6.13). Do NOT rename "line AB"/"end A" (§6.15).
-- **Compare / workbench** (ADR-012 / ADR-021): the expanded Compare docks a true 50/50 split (3D
-  left, the 2D orthographic drawing right) and re-parents the geometry-driver controls
-  (`tl`/`disthp`/`distvp`/`theta`/`phi`) into a docked `#workbench-rail`; re-parent the existing
-  `[data-ctrl]` nodes, never mirror inputs (§5.17).
-- **2D Compare vehicle — Three.js ortho sheet (not Canvas2D).** Unlike the sibling Points topic
-  (ADR-034, Canvas2D), the Lines 2D drawing + its animated **Traces** and **True-Length**
-  constructions are rendered with the **fat-line (`Line2`) stack in a dedicated ortho scene drawn
-  in a SECOND render pass (scissor) on the SAME `WebGLRenderer`** — one GL context, no second
-  WebGLRenderer (ADR-034's context-exhaustion concern preserved), while the rich fat-line
-  construction code ports across near-verbatim. The 2D sheet renders at a **FIXED scale locked to
-  the sheet bounds**, never auto-zooming (ADR-038 / §5.19). `SHEET2D_SPAN = 150` (framed to the
-  True-Length slider max — the Points-consistent "frame the slider max" pattern, so a typical
-  drawing fills the sheet), **not** the literal `(SHEET/2)*10 = 300` ADR-038 first specified; the
-  topic-promotion ADR in `../DECISIONS.md` formally amends ADR-038's constant to this value (still
-  fixed-scale — 10 mm reads the same length at any TL / inclination — see `sheet2DLayout.js`'s own
-  comment for the full worst-case-vs-fill-ratio rationale).
+- **Compare / workbench** (ADR-012 / ADR-021 / ADR-037): the expanded Compare docks a true 50/50
+  split — three floating rounded cards (3D viewport, 2D orthographic drawing, docked rail) on a
+  `--color-panel` shell (DESIGN.md §5.13), with an independent `#rail-toggle` Hide/Show control
+  (`setupRailToggle`) floating at the 3D viewport's bottom-left corner. `WORKBENCH_CONTROLS`
+  re-parents the geometry-driver controls (`tl`/`disthp`/`distvp`/`theta`/`phi`) into the docked
+  `#workbench-rail` (two titled clusters, Dimensions / Inclination); re-parent the existing
+  `[data-ctrl]` nodes, never mirror inputs (§5.17). The construction launchers (`truelength`,
+  `traces`) dock separately, in `#con-dock` — a direct `<body>` child that floats at the 2D
+  drawing panel's bottom-right corner, mirroring `#rail-toggle`'s floating-corner convention on
+  the opposite pane (`ensureConDock()`/`CON_DOCK_CONTROLS`, topic-local). A construction now runs
+  inside the expanded split like any other control — it no longer force-demotes to the compact
+  card.
+- **2D Compare vehicle — Three.js ortho sheet, own renderer (ADR-076).** Unlike the sibling Points
+  topic (ADR-034, Canvas2D), the Lines 2D drawing + its animated **Traces** and **True-Length**
+  constructions are rendered with the **fat-line (`Line2`) stack in a dedicated ortho scene**
+  (`compareSheet.js`, unchanged) — but that scene now draws on its **OWN `WebGLRenderer`**, bound to
+  its own `<canvas>` created lazily inside the Compare card's stage on first Compare open
+  (`ensureSheetRenderer()`), a genuinely separate surface from the 3D viewport's canvas. This
+  replaces the topic's original design (a SECOND render pass scissored onto the SAME
+  `WebGLRenderer` as the 3D scene — one GL context, informally cited in this file's older revisions
+  and in code comments as "ADR-042," which was always this topic's own local label, never a
+  proper root-DECISIONS.md entry; the real root citation for that design was ADR-034's
+  "alternative-A" pattern, most recently patched by ADR-074's pixelRatio fix). ADR-076 retired that
+  design because a single canvas scissored into two regions cannot show a real grey gutter between
+  them, which the ADR-037 floating-card workbench (ported into this topic alongside the renderer
+  split) needs. A second WebGL context per topic is an accepted, deliberate tradeoff — see ADR-076's
+  Consequences. The rich fat-line construction code needed **zero changes**: `compareSheet.js`'s
+  `render(renderer)` already took the renderer as an argument, so it was renderer-agnostic before
+  this change too. The 2D sheet renders at an **intrinsic scale locked
+  to the line's own True Length** (ADR-075 / §5.19, superseding ADR-038's fixed `SHEET2D_SPAN` span
+  for this topic): `sheet2DLayout.js::layout2D()` derives its px-per-mm factor from the resolved
+  line's `M.tl` each call — the Module 2 ADR-053 intrinsic-size model applied to a line, invariant
+  to the distance-from-HP/VP and θ/φ sliders (they translate/reorient, never change TL), so a
+  typical drawing fills the sheet at any True Length instead of floating tiny inside a
+  worst-case-sized frame (see `sheet2DLayout.js`'s own comment for the full rationale).
 - **No solid machinery.** Lines draws points/lines, not solids: no shape generators, no
   `meshAnalyzer.js`, no `projectionDrawer.js`, no hidden-line classification.
 
@@ -110,10 +129,11 @@ other web developers and is **out of scope** here.
 graphics_module_1_topic_6_projection_of_straight_lines/
 ├── index.html            ← thin shell (importmap + boot watchdog + canvas + wizard chrome +
 │                            Compare card + workbench-rail CSS + construction-aid tokens)
-├── main.js               ← ORCHESTRATOR (topic root, not src/): scene, ONE WebGLRenderer, the
+├── main.js               ← ORCHESTRATOR (topic root, not src/): scene, the 3D WebGLRenderer (the
+│                            2D Compare sheet owns a second, own-canvas renderer — ADR-076), the
 │                            dual perspective+ortho cameras, single rebuild()/disposal, the two
-│                            scissored render passes + the two CSS2D overlays, Compare/workbench,
-│                            the ADR-036 fold swoop, the construction system, window.simAPI
+│                            CSS2D overlays, Compare/workbench (ADR-037), the ADR-036 fold swoop,
+│                            the construction system, window.simAPI
 ├── meta.json             ← platform metadata (title = "Projection of Straight Lines")
 ├── CLAUDE.md             ← THIS file
 ├── CHANGELOG.md          ← this topic's change log
@@ -126,7 +146,8 @@ graphics_module_1_topic_6_projection_of_straight_lines/
     ├── lineProblems.js   ← PROBLEMS / TIERS / FIELD_LABELS for the ACTIVE Problem Library (12
     │                        verbatim N.D. Bhatt / K.C. John textbook problems, RULES.md §6.7)
     │  # shared STATELESS utilities (the genericSolid-style §3.6 exception, imported by several leaves)
-    ├── sheet2DLayout.js  ← pure sheet-space layout math + trace (HT/VT) geometry
+    ├── sheet2DLayout.js  ← pure sheet-space layout math (intrinsic TL scale, ADR-075) + trace
+    │                        (HT/VT) geometry
     ├── dimensions.js     ← the BIS SP 46:2003 Type-B dimension builder (filled 3:1 arrows)
     ├── labels.js         ← the CSS2D label factory (makeLabel / addLabel / disposeLabels)
     │  # 3D content + 2D sheet

@@ -2,7 +2,8 @@
 //
 // Standalone orchestrator on Module 2's orchestrator + leaf-module pattern (ADR-007,
 // ADR-033 — overturns ADR-011 for this topic). It owns — and is the ONLY owner of —
-// the scene, the single WebGLRenderer, the camera + OrbitControls, the CSS2D overlay,
+// the scene, the 3D WebGLRenderer (the 2D Compare sheet owns a second, own-canvas
+// renderer — see DECISIONS.md), the camera + OrbitControls, the CSS2D overlay,
 // the single rebuild() pipeline, the full WebGL disposal contract (ADR-004), the render
 // loop, and the window.simAPI platform contract (RULES.md §2.8). No engine.js import.
 //
@@ -85,7 +86,6 @@ const SHEET_HALF = 12; // reference sheet is 24 world units (240 mm); half-exten
 // ============================================================================
 
 let renderer, scene, camera, controls, viewport, labelRenderer, contentGroup;
-let sheetLabelRenderer; // 2nd CSS2D overlay: the ortho-sheet labels (its own scene + ortho camera)
 let rafId = null;
 let running = false;
 let lastFrameTime = 0;
@@ -129,16 +129,35 @@ let stepper = null;
 let ui = null;
 let onboarding = null;
 
-// --- Compare View (ADR-012) + workbench split (ADR-021) + the 2nd-pass ortho sheet ---
+// --- Compare View (ADR-012) + workbench split (ADR-037) + the 2D sheet's OWN renderer
+//     (own-canvas architecture, ADR-076 — supersedes the topics' original single-canvas
+//     scissor design; see DECISIONS.md) ---
 let compareOpen = false;
 let compareSize = 'compact';                 // 'compact' | 'expanded'
 let workbenchOpen = false;
 let workbenchRail = null;
+let conDock = null;                          // floating construction-launcher dock (2D panel's bottom-right corner)
 let compareCard = null;
 let compareChip = null;
-let compareSheet = null;                     // the dedicated ortho-sheet leaf (2nd render pass)
+let compareSheet = null;                     // the dedicated ortho-sheet leaf (its own scene + camera)
+let sheetRenderer = null;                    // the sheet's OWN WebGLRenderer, lazily created on first Compare open
+let sheetLabelRenderer = null;               // the sheet's OWN CSS2D overlay — a DOM sibling of its canvas
+let compareStage = null;                     // .compare-card__stage — the sheet canvas's parent element
+let sheetResizeObserver = null;              // keeps the sheet canvas sized to its stage across every layout change
+let comparePanWired = false;                 // setupComparePan() guard — wire the stage listeners once
 const COMPARE_DEFAULT_SIZE = 'expanded';     // desktop opens straight into the 50/50 split (ADR-021)
-const WORKBENCH_CONTROLS = ['tl', 'disthp', 'distvp', 'theta', 'phi'];
+const WORKBENCH_CONTROLS = ['tl', 'disthp', 'distvp', 'theta', 'phi', 'truelength', 'traces'];
+// Rail clustering (topic-local visual grouping, not a platform convention): breaks the flat
+// 5-wide instrument row into two titled .dock__group clusters so the rail scans instead of
+// reading as one undifferentiated wall. Mirrors the lesson's own step structure (ADR-017) —
+// dimensions (Steps 1-2) / inclination (Step 3).
+const WORKBENCH_GROUPS = [
+  { id: 'dimensions',  title: 'Dimensions',  keys: ['tl', 'disthp', 'distvp'] },
+  { id: 'inclination', title: 'Inclination', keys: ['theta', 'phi'] },
+];
+// The construction launchers dock separately, at the 2D drawing panel's bottom-right corner
+// (#con-dock), not inside a rail cluster — see ensureConDock()/enterWorkbench() below.
+const CON_DOCK_CONTROLS = ['truelength', 'traces'];
 
 // --- Constructions (Phase 4E): the Traces (HT/VT) + True-Length overlays on the ortho sheet ---
 let conMode = null;   // null | 'trace' | 'tl'
@@ -151,11 +170,8 @@ let problemLibrary = null;
  *  step / reset change passes through). The self-check subscribes here via onStateChange. */
 const stateChangeSubs = new Set();
 
-/** Scissor regions in DEVICE px (GL origin bottom-left), recomputed on layout change.
- *  `main` = the 3D pass region (full canvas, or the left pane in the split); `sheet` =
- *  the 2D ortho pass region (the Compare card stage rect), or null when Compare is closed. */
-let regions = { main: { x: 0, y: 0, w: 1, h: 1 }, sheet: null };
-const _v2 = new THREE.Vector2();
+const _v2 = new THREE.Vector2();  // scratch for device-px size queries — the 3D renderer
+const _sv2 = new THREE.Vector2(); // scratch for device-px size queries — the sheet renderer
 
 const statusRegion = document.getElementById('sim-status');
 
@@ -225,7 +241,8 @@ function markBooted() {
 }
 
 // ============================================================================
-// Scene bootstrap — ONE WebGLRenderer, one WebGL context.
+// Scene bootstrap — the 3D WebGLRenderer + its WebGL context. (The 2D Compare sheet's
+// OWN renderer/context is created lazily on first Compare open — see ensureSheetRenderer.)
 // ============================================================================
 
 function buildScene(container) {
@@ -242,10 +259,7 @@ function buildScene(container) {
   renderer.setSize(w, h, false);
   pinCanvasSize(w, h);
   renderer.shadowMap.enabled = false; // no cast shadows (RULES.md §3.24)
-  // We drive clears per scissored pass (3D region + 2D-sheet region on the ONE canvas),
-  // so autoClear is off and the clear colour is the paper background.
-  renderer.autoClear = false;
-  renderer.setClearColor(cssColor('--color-paper'), 1);
+  renderer.setClearColor(cssColor('--color-paper'), 1); // autoClear stays default (true) — one scene per renderer now
   container.appendChild(renderer.domElement);
 
   // Flat CAD light: ambient fill + one low directional, no shadows (RULES.md §3.24).
@@ -262,7 +276,7 @@ function buildScene(container) {
 
   // The dual-camera ortho stack (ADR-036 / §5.18). A second OrthographicCamera shares the
   // canvas via its own OrbitControls; the frustum is seeded at the viewport aspect (kept in
-  // sync by computeRegions) and per-move zoom does the framing. Its controls stay disabled
+  // sync by syncMainSizing) and per-move zoom does the framing. Its controls stay disabled
   // until the fold swoop engages it (only one camera consumes pointer events at a time), and
   // orbit is locked on it (the folded sheet is a square-on 2D read — rotating it would shear
   // the flat layout). It starts on the perspective pose so frame 0 of the first morph doesn't jump.
@@ -297,8 +311,9 @@ function buildScene(container) {
   contentGroup = new THREE.Group();
   scene.add(contentGroup);
 
-  // CSS2D overlay (RULES.md §3.27) — empty in Phase 4B (the label layer is a later
-  // phase), but wired so the pipeline + disposal contract are the final shape.
+  // CSS2D overlay (RULES.md §3.27) for the 3D scene's labels. The 2D ortho sheet gets its
+  // OWN CSS2D overlay (sheetLabelRenderer), created lazily inside the Compare card's stage —
+  // see ensureSheetRenderer().
   labelRenderer = new CSS2DRenderer();
   labelRenderer.setSize(w, h);
   const overlay = labelRenderer.domElement;
@@ -307,19 +322,6 @@ function buildScene(container) {
   overlay.style.left = '0';
   overlay.style.pointerEvents = 'none';
   container.appendChild(overlay);
-
-  // A SECOND CSS2D overlay for the 2D ortho sheet's labels — projected with compareSheet's ortho
-  // camera and sized/positioned to the sheet's pass rect (the legacy per-stack CSS2D pattern). DOM
-  // only, so it holds no WebGL context. Hidden until Compare opens.
-  sheetLabelRenderer = new CSS2DRenderer();
-  sheetLabelRenderer.setSize(w, h);
-  const soverlay = sheetLabelRenderer.domElement;
-  soverlay.style.position = 'absolute';
-  soverlay.style.top = '0';
-  soverlay.style.left = '0';
-  soverlay.style.pointerEvents = 'none';
-  soverlay.style.display = 'none';
-  container.appendChild(soverlay);
 }
 
 // ============================================================================
@@ -340,9 +342,10 @@ function rebuild() {
   disposeContent();
   const resolved = resolveLine(currentData);
 
-  // Fat-line resolution is the 3D pass's DEVICE-px region (full canvas, or the left pane
-  // in the split), so line weights read correctly in whichever viewport the 3D renders in.
-  lineRig = createLineRig({ resolved, view: currentView, foldAngle, width: regions.main.w, height: regions.main.h });
+  // Fat-line resolution is the 3D renderer's own DEVICE-px canvas size — its own full
+  // canvas now (own-canvas architecture: no more shared scissored sub-region).
+  const size3d = renderer.getDrawingBufferSize(_v2);
+  lineRig = createLineRig({ resolved, view: currentView, foldAngle, width: size3d.x, height: size3d.y });
   contentGroup.add(lineRig.group);
 
   // The Compare sheet is a LIVE drawing rebuilt on every commit, never a snapshot (ADR-012
@@ -384,7 +387,7 @@ function orthoZoomForDist(dist) {
 /** Ortho zoom to fit a world box (screenW × screenH in the view's screen axes) with
  *  FIT_PADDING margin — the larger dimension just fits. */
 function fitOrthoZoom(screenW, screenH) {
-  const aspect = orthoCamera.right / orthoCamera.top; // == viewport aspect (kept so by computeRegions)
+  const aspect = orthoCamera.right / orthoCamera.top; // == viewport aspect (kept so by syncMainSizing)
   const halfW = Math.max((screenW / 2) * FIT_PADDING, 1e-3);
   const halfH = Math.max((screenH / 2) * FIT_PADDING, 1e-3);
   return Math.min((ORTHO_FRUSTUM * aspect) / halfW, ORTHO_FRUSTUM / halfH);
@@ -747,15 +750,17 @@ function completeAndNext() {
 }
 
 // ============================================================================
-// COMPARE VIEW (ADR-012) + WORKBENCH SPLIT (ADR-021) + the 2nd-pass ortho sheet.
+// COMPARE VIEW (ADR-012) + WORKBENCH SPLIT (ADR-037, the Module 2 floating-card pattern) +
+// the 2D sheet's OWN renderer.
 //
 // The main pane is ALWAYS the live 3D scene; the finished 2D orthographic drawing appears
-// on demand. Unlike the sibling Points topic (Canvas2D, ADR-034), the Lines 2D drawing is
-// rendered by compareSheet.js in a SECOND scissored render pass on the SAME WebGLRenderer
-// — one GL context. The single canvas spans the whole viewport; the 3D pass renders to
-// `regions.main` and the 2D pass to `regions.sheet` (the Compare-card stage rect). In the
-// expanded split the wizard collapses and the driver [data-ctrl] wrappers RE-PARENT into a
-// docked rail (ADR-021 — re-parent, never mirror).
+// on demand. The 2D drawing (compareSheet.js) now renders on its OWN WebGLRenderer/canvas
+// — a genuinely separate surface, matching the Points/Module 2 card exactly (own-canvas
+// architecture, ADR-076 — supersedes the topics' original single-canvas scissor design;
+// see DECISIONS.md). In the expanded split the wizard collapses and the driver +
+// construction-launcher [data-ctrl] wrappers RE-PARENT into a docked rail (re-parent,
+// never mirror), which can be hidden/shown independently via the #rail-toggle pill
+// (ADR-037 amendment).
 // ============================================================================
 
 /** The workbench is a desktop affordance (ADR-021 parity); < 768px keeps the compact card. */
@@ -777,6 +782,8 @@ const compare = {
     if (foldTween) return; // the fold owns the camera + card
     compareOpen = true;
     if (compareCard) compareCard.hidden = false;
+    ensureSheetRenderer(); // lazy: only pay for the 2nd WebGL context once Compare is actually used
+    compareSheet?.resetView(); // every fresh open starts centred and unzoomed (ADR-055 reset contract)
     applyCompareSize(size || (isWorkbenchViewport() ? COMPARE_DEFAULT_SIZE : 'compact'));
     if (compareSheet) compareSheet.setData(resolveLine(currentData), currentView);
     updateCompareChip();
@@ -790,7 +797,7 @@ const compare = {
     if (compareCard) compareCard.hidden = true;
     updateCompareChip();
     announce('Compare view closed.');
-    if (wasSplit) remeasureAfterReflow(); else computeRegions();
+    if (wasSplit) remeasureAfterReflow();
   },
   toggle() { compareOpen ? compare.hide() : compare.show(); },
   isOpen() { return compareOpen; },
@@ -812,8 +819,43 @@ function ensureWorkbenchRail() {
   workbenchRail.id = 'workbench-rail';
   workbenchRail.setAttribute('role', 'group');
   workbenchRail.setAttribute('aria-label', 'Line parameters');
+  // Build the two titled clusters once (WORKBENCH_GROUPS); enterWorkbench() re-parents the
+  // existing [data-ctrl] wrappers into each cluster's body on every split entry. The platform's
+  // own .dock__group / .dock__group-title convention (DESIGN.md — see topics 2/4/5, Module 2,
+  // Sections of Solids), reused here rather than invented fresh.
+  for (const grp of WORKBENCH_GROUPS) {
+    const wrap = document.createElement('div');
+    wrap.className = 'dock__group rail__group';
+    wrap.dataset.group = grp.id;
+    wrap.setAttribute('role', 'group');
+    const titleId = `rail-group-${grp.id}-title`;
+    wrap.setAttribute('aria-labelledby', titleId);
+    const title = document.createElement('h3');
+    title.className = 'dock__group-title';
+    title.id = titleId;
+    title.textContent = grp.title;
+    const body = document.createElement('div');
+    body.className = 'rail__group-body';
+    wrap.append(title, body);
+    workbenchRail.appendChild(wrap);
+  }
   document.body.appendChild(workbenchRail);
   return workbenchRail;
+}
+
+/** The construction-launcher dock: a direct <body> child, built once, that floats at the 2D
+ *  drawing panel's bottom-right corner during the split (mirrors #rail-toggle's floating-corner
+ *  convention on the opposite pane — see index.html .con-dock). enterWorkbench()/exitWorkbench()
+ *  re-parent the existing truelength/traces [data-ctrl] wrappers into and out of it. */
+function ensureConDock() {
+  if (conDock) return conDock;
+  conDock = document.createElement('div');
+  conDock.id = 'con-dock';
+  conDock.className = 'con-dock';
+  conDock.setAttribute('role', 'group');
+  conDock.setAttribute('aria-label', 'Constructions');
+  document.body.appendChild(conDock);
+  return conDock;
 }
 
 /** Collapse the wizard, span the canvas across both panes, and dock the drivers under
@@ -824,31 +866,76 @@ function enterWorkbench() {
   workbenchOpen = true;
   if (simController.isFolded()) simController.unfold(); // the split shows unfolded 3D (ADR-013)
   const rail = ensureWorkbenchRail();
+  const dock = ensureConDock();
   const controls = document.getElementById('controls');
-  for (const key of WORKBENCH_CONTROLS) {
+  for (const grp of WORKBENCH_GROUPS) {
+    const body = rail.querySelector(`[data-group="${grp.id}"] .rail__group-body`);
+    for (const key of grp.keys) {
+      const wrap = controls?.querySelector(`[data-ctrl="${key}"]`);
+      if (wrap && body) { wrap.hidden = false; body.appendChild(wrap); } // all five drivers live at once, clustered
+    }
+  }
+  // The construction launchers dock separately, floating at the 2D panel's bottom-right
+  // corner (#con-dock) rather than joining a rail cluster.
+  for (const key of CON_DOCK_CONTROLS) {
     const wrap = controls?.querySelector(`[data-ctrl="${key}"]`);
-    if (wrap) { wrap.hidden = false; rail.appendChild(wrap); } // all five live at once
+    if (wrap) { wrap.hidden = false; dock.appendChild(wrap); }
   }
   if (compareCard && compareCard.parentElement !== document.body) document.body.appendChild(compareCard);
   document.body.classList.add('compare-split');
+  // The rail toggle always defaults to shown on entry — a prior collapse from an earlier
+  // split visit must not carry over, and the button's own facets need the same reset.
+  document.body.classList.remove('rail-collapsed');
+  syncRailToggleState(false);
 }
 
-/** Restore the floating layout: hand the drivers back to #controls (before the fold anchor),
- *  re-nest the card in #sim-viewport, and let the stepper re-own per-step disclosure. */
+/** Restore the floating layout: hand the drivers + construction launchers back to #controls
+ *  (before the fold anchor), re-nest the card in #sim-viewport, and let the stepper re-own
+ *  per-step disclosure. */
 function exitWorkbench() {
   if (!workbenchOpen) return;
   workbenchOpen = false;
   document.body.classList.remove('compare-split');
+  document.body.classList.remove('rail-collapsed');
+  syncRailToggleState(false);
   if (compareCard && viewport && compareCard.parentElement !== viewport) viewport.appendChild(compareCard);
   const controls = document.getElementById('controls');
   const anchor = controls?.querySelector('[data-ctrl="fold"]');
-  if (workbenchRail && controls) {
+  if (controls) {
     for (const key of WORKBENCH_CONTROLS) {
-      const wrap = workbenchRail.querySelector(`[data-ctrl="${key}"]`);
+      const wrap = workbenchRail?.querySelector(`[data-ctrl="${key}"]`) || conDock?.querySelector(`[data-ctrl="${key}"]`);
       if (wrap) controls.insertBefore(wrap, anchor);
     }
   }
   stepper?.refresh?.(); // per-step disclosure re-owns the drivers
+}
+
+/** One-source-of-truth sync for the #rail-toggle button's 4 state facets (aria-expanded,
+ *  aria-label, title, the visible .rail-toggle__text span). Called from the click handler
+ *  below AND from enterWorkbench()/exitWorkbench(), which force-reset this on every split
+ *  transition — without those second call sites the button could read stale "Show"/"Hide"
+ *  text. Ported verbatim from Module 2. */
+function syncRailToggleState(collapsed) {
+  const btn = document.getElementById('rail-toggle');
+  if (!btn) return;
+  btn.setAttribute('aria-expanded', String(!collapsed));
+  btn.setAttribute('aria-label', collapsed ? 'Show controls' : 'Hide controls');
+  btn.title = collapsed ? 'Show controls' : 'Hide controls';
+  const txt = btn.querySelector('.rail-toggle__text');
+  if (txt) txt.textContent = collapsed ? 'Show' : 'Hide';
+}
+
+function setupRailToggle() {
+  const btn = document.getElementById('rail-toggle');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    const collapsed = document.body.classList.toggle('rail-collapsed');
+    syncRailToggleState(collapsed);
+    announce(collapsed ? 'Controls rail hidden.' : 'Controls rail shown.');
+    // The rail's grid row (and its gap) drops out on collapse, so the viewport and 2D
+    // drawing card grow into the reclaimed height — reuse the double-rAF reflow wait.
+    remeasureAfterReflow();
+  });
 }
 
 function setupCompareCard() {
@@ -874,44 +961,16 @@ function setupCompareCard() {
   });
 }
 
-/** Recompute the scissor regions (device px, GL origin bottom-left) from the live layout,
- *  and sync the dependent state: the 3D camera aspect + the two passes' LineMaterial
- *  resolution (the 3D pass to `main`, the 2D sheet to its rect). */
-function computeRegions() {
+/** Sync the 3D renderer's dependent state (camera aspect, ortho frustum, fat-line
+ *  resolution) to its OWN full canvas size — own-canvas architecture: the 3D renderer
+ *  no longer shares a canvas with the 2D sheet, so there is no region math here. */
+function syncMainSizing() {
   const size = renderer.getDrawingBufferSize(_v2);
-  const CW = size.x, CH = size.y;
-  const ratio = renderer.getPixelRatio();
-  let main = { x: 0, y: 0, w: CW, h: CH };
-  let sheet = null;
-  let cssSheet = null;
-  if (compareOpen && compareCard && !compareCard.hidden) {
-    const stage = compareCard.querySelector('.compare-card__stage');
-    if (stage) {
-      const cRect = renderer.domElement.getBoundingClientRect();
-      const vpRect = viewport.getBoundingClientRect();
-      const sRect = stage.getBoundingClientRect();
-      const sx = Math.round((sRect.left - cRect.left) * ratio);
-      const sw = Math.round(sRect.width * ratio);
-      const sh = Math.round(sRect.height * ratio);
-      const sTop = Math.round((sRect.top - cRect.top) * ratio);
-      const sy = CH - (sTop + sh); // flip to GL origin (bottom-left)
-      if (sw > 1 && sh > 1) {
-        sheet = { x: sx, y: sy, w: sw, h: sh };
-        // CSS-px rect (relative to #sim-viewport) for the sheet's CSS2D overlay.
-        cssSheet = { left: sRect.left - vpRect.left, top: sRect.top - vpRect.top, width: sRect.width, height: sRect.height };
-        if (workbenchOpen) main = { x: 0, y: 0, w: Math.max(1, sx), h: CH }; // 3D fills left of the sheet
-      }
-    }
-  }
-  // CSS-px rect for the 3D CSS2D overlay (the 3D pass region: full canvas, or the split's left pane).
-  const cssMain = { left: 0, top: 0, width: main.w / ratio, height: main.h / ratio };
-  regions = { main, sheet, cssMain, cssSheet };
-  const aspect = main.w / Math.max(1, main.h);
+  const aspect = size.x / Math.max(1, size.y);
   camera.aspect = aspect;
   camera.updateProjectionMatrix();
-  // Keep the ortho frustum at the 3D pass region's aspect (right/top ratio == aspect, which
-  // fitOrthoZoom relies on); per-move zoom does the framing. Don't rebuild its matrix mid-morph
-  // — applyProjectionMorph owns it until the blend clears (§5.18).
+  // Don't rebuild the ortho matrix mid-morph — applyProjectionMorph owns it until the
+  // blend clears (§5.18).
   if (orthoCamera) {
     orthoCamera.left = -ORTHO_FRUSTUM * aspect;
     orthoCamera.right = ORTHO_FRUSTUM * aspect;
@@ -919,8 +978,103 @@ function computeRegions() {
     orthoCamera.bottom = -ORTHO_FRUSTUM;
     if (projMorphK === null) orthoCamera.updateProjectionMatrix();
   }
-  lineRig?.setResolution(main.w, main.h);
-  if (sheet && compareSheet) compareSheet.setResolution(sheet.w, sheet.h);
+  lineRig?.setResolution(size.x, size.y);
+}
+
+/** Create the 2D sheet's OWN <canvas> + WebGLRenderer + CSS2D label overlay inside the
+ *  Compare card's stage, lazily on first Compare open (own-canvas architecture, ADR-076
+ *  — supersedes the topics' original shared-canvas scissor design; see DECISIONS.md). A
+ *  ResizeObserver
+ *  on the stage keeps the sheet's renderer + fat-line resolution + ortho-camera aspect in
+ *  sync across every layout change (split enter/exit, rail toggle, compact↔expanded,
+ *  window resize) — no manual resize call sites needed elsewhere. Idempotent. */
+function ensureSheetRenderer() {
+  if (sheetRenderer) return sheetRenderer;
+  const stage = compareCard?.querySelector('.compare-card__stage');
+  if (!stage) return null;
+  compareStage = stage;
+
+  const canvas = document.createElement('canvas');
+  stage.appendChild(canvas);
+  sheetRenderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  sheetRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+  sheetLabelRenderer = new CSS2DRenderer();
+  sheetLabelRenderer.domElement.classList.add('sheet-label-overlay');
+  stage.appendChild(sheetLabelRenderer.domElement);
+
+  sheetResizeObserver = new ResizeObserver(() => resizeSheetRenderer());
+  sheetResizeObserver.observe(stage);
+  resizeSheetRenderer();
+  setupComparePan();
+  return sheetRenderer;
+}
+
+/** Drag-to-pan + scroll-wheel zoom on the 2D Compare sheet (ADR-077 — re-expresses Module
+ *  2/Points' ADR-054/055 interaction against this sheet's live ortho camera instead of a
+ *  Canvas2D project() lens; see compareSheet.js resetView/panByPixels/zoomAtPixel). Bound to
+ *  `compareStage` — the canvas's PARENT — rather than the canvas itself, because the sheet's
+ *  CSS2D label overlay (`sheetLabelRenderer.domElement`) is a DOM sibling layered on top of the
+ *  canvas (see ensureSheetRenderer): listening on the canvas alone would miss drags/wheel that
+ *  land on a label. The rAF render loop repaints the sheet every frame while Compare is open, so
+ *  no manual redraw/coalescing is needed here (unlike Points' Canvas2D queueRedraw()) — mutating
+ *  the camera is enough. */
+function setupComparePan() {
+  if (comparePanWired || !compareStage) return;
+  comparePanWired = true;
+  const stage = compareStage;
+  let dragging = false;
+  let lastX = 0;
+  let lastY = 0;
+
+  stage.style.touchAction = 'none'; // let pointer events own drag/pinch instead of the browser
+  stage.style.cursor = 'grab';
+  stage.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    stage.setPointerCapture(e.pointerId);
+    stage.style.cursor = 'grabbing';
+  });
+  stage.addEventListener('pointermove', (e) => {
+    if (!dragging || !compareSheet) return;
+    const rect = stage.getBoundingClientRect();
+    compareSheet.panByPixels(e.clientX - lastX, e.clientY - lastY, rect.width, rect.height);
+    lastX = e.clientX;
+    lastY = e.clientY;
+  });
+  const endDrag = (e) => {
+    if (!dragging) return;
+    dragging = false;
+    if (stage.hasPointerCapture?.(e.pointerId)) stage.releasePointerCapture(e.pointerId);
+    stage.style.cursor = 'grab';
+  };
+  stage.addEventListener('pointerup', endDrag);
+  stage.addEventListener('pointerleave', endDrag);
+  stage.addEventListener('pointercancel', endDrag);
+  stage.addEventListener('dblclick', () => compareSheet?.resetView());
+
+  // Non-passive + preventDefault so the page never scrolls while the cursor is over the sheet.
+  stage.addEventListener('wheel', (e) => {
+    if (!compareSheet) return;
+    e.preventDefault();
+    const rect = stage.getBoundingClientRect();
+    compareSheet.zoomAtPixel(e.clientX - rect.left, e.clientY - rect.top, e.deltaY, rect.width, rect.height);
+  }, { passive: false });
+}
+
+/** Resize the sheet's canvas + CSS2D overlay to its stage, and keep compareSheet's
+ *  fat-line resolution + ortho-camera aspect in sync (device px, matching the 3D
+ *  renderer's own convention). */
+function resizeSheetRenderer() {
+  if (!sheetRenderer || !compareStage) return;
+  const w = compareStage.clientWidth || 1;
+  const h = compareStage.clientHeight || 1;
+  sheetRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  sheetRenderer.setSize(w, h, false);
+  sheetLabelRenderer?.setSize(w, h);
+  const size = sheetRenderer.getDrawingBufferSize(_sv2);
+  compareSheet?.setResolution(size.x, size.y);
 }
 
 /** Entering/leaving the split flips the body between a flex row and a CSS grid; that reflow
@@ -944,13 +1098,29 @@ function setConBtn(id, on) {
   b.classList.toggle('on', on);
   b.setAttribute('aria-pressed', String(on));
 }
-function showReplay(id, on) { const b = document.getElementById(id); if (b) b.hidden = !on; }
 
-/** A construction needs the sheet visible; force the compact floating card so the wizard (and its
- *  launcher button) stay on screen — the split collapses the wizard. */
+/** Each launcher's own label swaps to its "Replay …" text once triggered, and back to its
+ *  base text on teardown — there is no separate Replay button (ported from the old
+ *  tl-replay/trace-replay pair). Labels live in the .btn__label span so the icon span is
+ *  untouched. */
+const CON_LABELS = {
+  'btn-tl': { base: 'True Length & Angles', replay: 'Replay True Length & Angles' },
+  'btn-traces': { base: 'Show Traces (HT & VT)', replay: 'Replay Show Traces' },
+};
+function setConLabel(id, on) {
+  const b = document.getElementById(id);
+  const label = b?.querySelector('.btn__label');
+  const text = CON_LABELS[id];
+  if (label && text) label.textContent = on ? text.replay : text.base;
+}
+
+/** A construction needs the sheet visible. The launcher lives inside a
+ *  [data-ctrl="truelength"/"traces"] wrapper, which is now part of WORKBENCH_CONTROLS —
+ *  it re-parents into #con-dock (the 2D panel's bottom-right corner) on split entry, so the
+ *  expanded 50/50 split stays fully usable during a construction (no more forced demotion to
+ *  the compact card). */
 function ensureCompareForCon() {
-  if (!compareOpen) compare.show('compact');
-  else if (workbenchOpen) applyCompareSize('compact');
+  if (!compareOpen) compare.show();
 }
 
 /** Play the construction animation once (reduced motion snaps to the finished construction). */
@@ -976,31 +1146,32 @@ function teardownCon() {
   compareSheet?.clearConstruction();
   conLeaf = null;
   setConBtn('btn-traces', false); setConBtn('btn-tl', false);
-  showReplay('trace-replay', false); showReplay('tl-replay', false);
+  setConLabel('btn-traces', false); setConLabel('btn-tl', false);
   conMode = null;
 }
 
-function enterCon(mode, build, btnId, replayId) {
+function enterCon(mode, build, btnId) {
   teardownCon();
   ensureCompareForCon();
   conMode = mode;
   rebuild();                       // repaint the clean base sheet (Compare is now open)
   conLeaf = build(resolveLine(currentData));
   compareSheet.mountConstruction(conLeaf.group);
-  setConBtn(btnId, true); showReplay(replayId, true);
+  setConBtn(btnId, true); setConLabel(btnId, true);
   runCon(conLeaf.duration);
 }
-const enterTrace = () => enterCon('trace', (r) => createTraces({ resolved: r }), 'btn-traces', 'trace-replay');
-const enterTL = () => enterCon('tl', (r) => createTrueLength({ resolved: r }), 'btn-tl', 'tl-replay');
+const enterTrace = () => enterCon('trace', (r) => createTraces({ resolved: r }), 'btn-traces');
+const enterTL = () => enterCon('tl', (r) => createTrueLength({ resolved: r }), 'btn-tl');
 
-/** Close the construction and return the sheet to its plain state. */
-function exitCon() { teardownCon(); rebuild(); }
-
+/** Each launcher does double duty: first click builds + plays the construction; a click
+ *  while it's already active replays the same animation from t=0 (the old separate
+ *  Replay button's behaviour, now folded into the launcher itself — a repeat click no
+ *  longer closes the construction). It still tears down via the other existing
+ *  teardownCon() paths (switching to the other construction, a parameter edit, a step
+ *  change, the fold) — there is no longer a click-to-close affordance on the button. */
 function setupConstructions() {
-  document.getElementById('btn-traces')?.addEventListener('click', () => (conMode === 'trace' ? exitCon() : enterTrace()));
-  document.getElementById('btn-tl')?.addEventListener('click', () => (conMode === 'tl' ? exitCon() : enterTL()));
-  document.getElementById('trace-replay')?.addEventListener('click', () => { if (conMode === 'trace') runCon(conLeaf?.duration ?? 0); });
-  document.getElementById('tl-replay')?.addEventListener('click', () => { if (conMode === 'tl') runCon(conLeaf?.duration ?? 0); });
+  document.getElementById('btn-traces')?.addEventListener('click', () => (conMode === 'trace' ? runCon(conLeaf?.duration ?? 0) : enterTrace()));
+  document.getElementById('btn-tl')?.addEventListener('click', () => (conMode === 'tl' ? runCon(conLeaf?.duration ?? 0) : enterTL()));
 }
 
 // ============================================================================
@@ -1060,54 +1231,24 @@ function loop(now) {
   // pure-ortho matrix, so the blended matrix is the last word before render. Null = no morph.
   if (projMorphK !== null) applyProjectionMorph();
 
-  const size = renderer.getDrawingBufferSize(_v2);
-
-  // One full clear to paper (covers any sub-pixel gap between the tiled regions), then the
-  // two scissored passes on the ONE canvas: the 3D scene into `regions.main`, the 2D ortho
-  // sheet into `regions.sheet` (autoClear is off — see buildScene).
-  renderer.setScissorTest(false);
-  renderer.setViewport(0, 0, size.x, size.y);
-  renderer.setScissor(0, 0, size.x, size.y);
-  renderer.clear();
-
-  renderer.setScissorTest(true);
-  const { main, sheet } = regions;
-  renderer.setViewport(main.x, main.y, main.w, main.h);
-  renderer.setScissor(main.x, main.y, main.w, main.h);
+  // Own-canvas architecture (ADR-076): the 3D renderer draws its own full
+  // canvas, no scissoring, no region math — autoClear (default true) handles the paper
+  // clear on every render() call.
   renderer.render(scene, activeCamera); // perspective, or the ortho camera during the fold swoop
 
-  if (sheet && compareOpen && compareSheet) {
-    renderer.setViewport(sheet.x, sheet.y, sheet.w, sheet.h);
-    renderer.setScissor(sheet.x, sheet.y, sheet.w, sheet.h);
-    renderer.clear(true, true, true); // wipe the 3D under the sheet rect (compact overlaps it)
-    compareSheet.render(renderer);
-  }
-  renderer.setScissorTest(false);
-
-  // CSS2D overlays — each sized/positioned to its pass rect so labels track the scissored viewport.
-  // The compact Compare card FLOATS over the full-viewport 3D pass (unlike the split, whose cssMain is
-  // clipped to the left half), so the 3D-scene labels would otherwise bleed through the card over the
-  // 2D sheet — a tangle of doubled A/B/θ/φ during a construction. While the compact card is up the
-  // sheet is the focus and carries its own labels, so the 3D overlay is hidden (Issue 3 clutter).
-  const cm = regions.cssMain;
-  if (cm) {
-    labelRenderer.domElement.style.left = `${cm.left}px`;
-    labelRenderer.domElement.style.top = `${cm.top}px`;
-    labelRenderer.setSize(cm.width, cm.height);
-  }
+  // The compact Compare card FLOATS over the 3D viewport; its 2D sheet now lives on a
+  // separate canvas, but the 3D scene's CSS2D labels are still DOM elements that could
+  // visually bleed over the compact card's screen-space rect, so the same "hide the 3D
+  // labels while compact" rule still applies. In the split the two panes don't overlap.
   const hideMainLabels = compareOpen && compareSize === 'compact';
   labelRenderer.domElement.style.display = hideMainLabels ? 'none' : '';
   if (!hideMainLabels) labelRenderer.render(scene, activeCamera); // 3D scene labels
 
-  if (compareOpen && regions.cssSheet && compareSheet) {
-    const cs = regions.cssSheet;
-    sheetLabelRenderer.domElement.style.display = '';
-    sheetLabelRenderer.domElement.style.left = `${cs.left}px`;
-    sheetLabelRenderer.domElement.style.top = `${cs.top}px`;
-    sheetLabelRenderer.setSize(cs.width, cs.height);
-    sheetLabelRenderer.render(compareSheet.scene, compareSheet.camera); // 2D sheet labels
-  } else {
-    sheetLabelRenderer.domElement.style.display = 'none';
+  // The 2D sheet renders on its OWN renderer into its OWN canvas — only while Compare is
+  // open (a closed card costs nothing beyond the idle GL context).
+  if (compareOpen && compareSheet && sheetRenderer) {
+    compareSheet.render(sheetRenderer);
+    sheetLabelRenderer?.render(compareSheet.scene, compareSheet.camera); // 2D sheet labels
   }
 }
 
@@ -1130,10 +1271,11 @@ function handleResize(container) {
   renderer.setSize(w, h, false);
   pinCanvasSize(w, h);
   labelRenderer.setSize(w, h);
-  // computeRegions owns the derived state: camera aspect + BOTH passes' LineMaterial
-  // resolution (the 3D pass region + the 2D sheet rect), so both stay correct on every
-  // resize / split transition (ADR-006 §3.16, RULES.md §5.19).
-  computeRegions();
+  // syncMainSizing owns the derived state: camera aspect + fat-line resolution, both from
+  // the 3D renderer's own full canvas (own-canvas architecture, ADR-006 §3.16, RULES.md
+  // §5.19). The 2D sheet's own canvas is resized independently by its own ResizeObserver
+  // on the Compare card's stage (resizeSheetRenderer) — no call needed here.
+  syncMainSizing();
 }
 
 // ============================================================================
@@ -1185,10 +1327,12 @@ function init() {
   }
 
   try {
-    // The 2D ortho-sheet leaf (its own scene + ortho camera; drawn in the 2nd render pass).
+    // The 2D ortho-sheet leaf (its own scene + ortho camera). Its OWN renderer/canvas is
+    // created lazily on first Compare open (ensureSheetRenderer) — no 2nd GL context is
+    // paid for unless Compare is actually used.
     compareSheet = createCompareSheet();
 
-    computeRegions(); // regions.main = full canvas (no Compare yet) → feeds lineRig resolution
+    syncMainSizing(); // the 3D renderer's own full canvas → feeds lineRig resolution
     rebuild();
 
     // Onboarding first, so the wizard's step-1 spotlight/orbit-hint calls land.
@@ -1210,6 +1354,7 @@ function init() {
     setupMobileNotice();
     setupWizardToggle();
     setupCompareCard();
+    setupRailToggle();
     setupConstructions();
     setupQuickViews();
     syncCompareChipVisibility();

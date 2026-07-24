@@ -538,7 +538,7 @@
       "source_location": "L465",
       "_origin": "ast",
       "id": "module1_lines_rebuildfromedit",
-      "community": 28,
+      "community": 58,
       "norm_label": "rebuildfromedit()"
     },
     {
@@ -748,7 +748,7 @@
       "source_location": "L832",
       "_origin": "ast",
       "id": "module1_lines_arc",
-      "community": 2,
+      "community": 4,
       "norm_label": "arc()"
     },
     {
@@ -858,7 +858,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "module1_main",
-      "community": 276,
+      "community": 359,
       "norm_label": "main.js"
     },
     {
@@ -868,7 +868,7 @@
       "source_location": "L21",
       "_origin": "ast",
       "id": "c_xampp_htdocs_simatrix_module1_main",
-      "community": 276,
+      "community": 58,
       "norm_label": "$()"
     },
     {
@@ -878,7 +878,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "module1_main_resolve",
-      "community": 276,
+      "community": 2,
       "norm_label": "resolve()"
     },
     {
@@ -918,7 +918,7 @@
       "source_location": "L173",
       "_origin": "ast",
       "id": "module1_main_sync",
-      "community": 276,
+      "community": 58,
       "norm_label": "sync()"
     },
     {
@@ -928,7 +928,7 @@
       "source_location": "L181",
       "_origin": "ast",
       "id": "module1_main_wirecontrols",
-      "community": 276,
+      "community": 58,
       "norm_label": "wirecontrols()"
     },
     {
@@ -938,7 +938,7 @@
       "source_location": "L205",
       "_origin": "ast",
       "id": "module1_main_qname",
-      "community": 276,
+      "community": 359,
       "norm_label": "qname"
     },
     {
@@ -948,7 +948,7 @@
       "source_location": "L206",
       "_origin": "ast",
       "id": "module1_main_describe",
-      "community": 276,
+      "community": 359,
       "norm_label": "describe()"
     },
     {
@@ -1158,7 +1158,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "module1_src_chrome",
-      "community": 58,
+      "community": 12,
       "norm_label": "chrome.js"
     },
     {
@@ -1168,7 +1168,7 @@
       "source_location": "L146",
       "_origin": "ast",
       "id": "module1_src_chrome_injectchrome",
-      "community": 58,
+      "community": 12,
       "norm_label": "injectchrome()"
     },
     {
@@ -1178,7 +1178,7 @@
       "source_location": "L177",
       "_origin": "ast",
       "id": "module1_src_chrome_injectcardchrome",
-      "community": 58,
+      "community": 12,
       "norm_label": "injectcardchrome()"
     },
     {
@@ -1188,7 +1188,7 @@
       "source_location": "L247",
       "_origin": "ast",
       "id": "module1_src_chrome_injectlibrarychrome",
-      "community": 58,
+      "community": 12,
       "norm_label": "injectlibrarychrome()"
     },
     {
@@ -1238,7 +1238,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "module1_src_engine_tow",
-      "community": 4,
+      "community": 2,
       "norm_label": "tow()"
     },
     {
@@ -1458,7 +1458,7 @@
       "source_location": "L213",
       "_origin": "ast",
       "id": "module1_src_engine_readtokens",
-      "community": 58,
+      "community": 12,
       "norm_label": "readtokens()"
     },
     {
@@ -1468,7 +1468,7 @@
       "source_location": "L226",
       "_origin": "ast",
       "id": "module1_src_engine_build",
-      "community": 58,
+      "community": 12,
       "norm_label": "build()"
     },
     {
@@ -1478,7 +1478,7 @@
       "source_location": "L257",
       "_origin": "ast",
       "id": "module1_src_engine_attachortho",
-      "community": 58,
+      "community": 12,
       "norm_label": "attachortho()"
     },
     {
@@ -1488,7 +1488,7 @@
       "source_location": "L280",
       "_origin": "ast",
       "id": "module1_src_engine_issplit",
-      "community": 28,
+      "community": 373,
       "norm_label": "issplit()"
     },
     {
@@ -1528,7 +1528,7 @@
       "source_location": "L307",
       "_origin": "ast",
       "id": "module1_src_engine_placelr",
-      "community": 28,
+      "community": 373,
       "norm_label": "placelr()"
     },
     {
@@ -1538,7 +1538,7 @@
       "source_location": "L317",
       "_origin": "ast",
       "id": "module1_src_engine_layout",
-      "community": 28,
+      "community": 373,
       "norm_label": "layout()"
     },
     {
@@ -1568,7 +1568,7 @@
       "source_location": "L432",
       "_origin": "ast",
       "id": "module1_src_engine_editrebuild",
-      "community": 28,
+      "community": 58,
       "norm_label": "editrebuild()"
     },
     {
@@ -1598,7 +1598,7 @@
       "source_location": "L471",
       "_origin": "ast",
       "id": "module1_src_engine_startdrawon",
-      "community": 39,
+      "community": 57,
       "norm_label": "startdrawon()"
     },
     {
@@ -1808,7 +1808,7 @@
       "source_location": "L807",
       "_origin": "ast",
       "id": "module1_src_engine_fatline",
-      "community": 2,
+      "community": 16,
       "norm_label": "fatline()"
     },
     {
@@ -1818,7 +1818,7 @@
       "source_location": "L823",
       "_origin": "ast",
       "id": "module1_src_engine_addsweep",
-      "community": 2,
+      "community": 4,
       "norm_label": "addsweep()"
     },
     {
@@ -1938,7 +1938,7 @@
       "source_location": "L999",
       "_origin": "ast",
       "id": "module1_src_engine_refillcompare",
-      "community": 373,
+      "community": 39,
       "norm_label": "refillcompare()"
     },
     {
@@ -1988,7 +1988,7 @@
       "source_location": "L1077",
       "_origin": "ast",
       "id": "module1_src_engine_syncwizardtogglecollapsed",
-      "community": 28,
+      "community": 373,
       "norm_label": "syncwizardtogglecollapsed()"
     },
     {
@@ -1998,7 +1998,7 @@
       "source_location": "L1082",
       "_origin": "ast",
       "id": "module1_src_engine_enterworkbench",
-      "community": 28,
+      "community": 373,
       "norm_label": "enterworkbench()"
     },
     {
@@ -2008,7 +2008,7 @@
       "source_location": "L1095",
       "_origin": "ast",
       "id": "module1_src_engine_exitworkbench",
-      "community": 28,
+      "community": 373,
       "norm_label": "exitworkbench()"
     },
     {
@@ -2018,7 +2018,7 @@
       "source_location": "L1114",
       "_origin": "ast",
       "id": "module1_src_engine_syncworkbench",
-      "community": 28,
+      "community": 373,
       "norm_label": "syncworkbench()"
     },
     {
@@ -2238,7 +2238,7 @@
       "source_location": "L1438",
       "_origin": "ast",
       "id": "module1_src_engine_announce",
-      "community": 28,
+      "community": 58,
       "norm_label": "announce()"
     },
     {
@@ -2248,7 +2248,7 @@
       "source_location": "L1449",
       "_origin": "ast",
       "id": "module1_src_engine_flownote",
-      "community": 28,
+      "community": 58,
       "norm_label": "flownote()"
     },
     {
@@ -2258,7 +2258,7 @@
       "source_location": "L1469",
       "_origin": "ast",
       "id": "module1_src_engine_showtoast",
-      "community": 28,
+      "community": 58,
       "norm_label": "showtoast()"
     },
     {
@@ -2278,7 +2278,7 @@
       "source_location": "L1505",
       "_origin": "ast",
       "id": "module1_src_engine_armreset",
-      "community": 93,
+      "community": 28,
       "norm_label": "armreset()"
     },
     {
@@ -2328,7 +2328,7 @@
       "source_location": "L1566",
       "_origin": "ast",
       "id": "module1_src_engine_buildrail",
-      "community": 58,
+      "community": 12,
       "norm_label": "buildrail()"
     },
     {
@@ -2388,7 +2388,7 @@
       "source_location": "L1678",
       "_origin": "ast",
       "id": "module1_src_engine_setupwizardtoggle",
-      "community": 28,
+      "community": 373,
       "norm_label": "setupwizardtoggle()"
     },
     {
@@ -2398,7 +2398,7 @@
       "source_location": "L1697",
       "_origin": "ast",
       "id": "module1_src_engine_setupcomparecard",
-      "community": 28,
+      "community": 373,
       "norm_label": "setupcomparecard()"
     },
     {
@@ -2448,7 +2448,7 @@
       "source_location": "L1827",
       "_origin": "ast",
       "id": "module1_src_engine_simfacade",
-      "community": 28,
+      "community": 58,
       "norm_label": "simfacade()"
     },
     {
@@ -2458,7 +2458,7 @@
       "source_location": "L1843",
       "_origin": "ast",
       "id": "module1_src_engine_boot",
-      "community": 58,
+      "community": 12,
       "norm_label": "boot()"
     },
     {
@@ -2468,7 +2468,7 @@
       "source_location": "L1876",
       "_origin": "ast",
       "id": "module1_src_engine_initsim",
-      "community": 16,
+      "community": 347,
       "norm_label": "initsim()"
     },
     {
@@ -2678,7 +2678,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "module1_src_onboarding",
-      "community": 58,
+      "community": 12,
       "norm_label": "onboarding.js"
     },
     {
@@ -2688,7 +2688,7 @@
       "source_location": "L32",
       "_origin": "ast",
       "id": "module1_src_onboarding_spotlightkey",
-      "community": 58,
+      "community": 12,
       "norm_label": "spotlightkey()"
     },
     {
@@ -2698,7 +2698,7 @@
       "source_location": "L39",
       "_origin": "ast",
       "id": "module1_src_onboarding_tone_classes",
-      "community": 58,
+      "community": 12,
       "norm_label": "tone_classes"
     },
     {
@@ -2708,7 +2708,7 @@
       "source_location": "L50",
       "_origin": "ast",
       "id": "module1_src_onboarding_initonboarding",
-      "community": 58,
+      "community": 12,
       "norm_label": "initonboarding()"
     },
     {
@@ -2868,7 +2868,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "module1_src_pointdata",
-      "community": 276,
+      "community": 359,
       "norm_label": "pointdata.js"
     },
     {
@@ -2878,7 +2878,7 @@
       "source_location": "L23",
       "_origin": "ast",
       "id": "module1_src_pointdata_quadranttype",
-      "community": 276,
+      "community": 359,
       "norm_label": "quadranttype"
     },
     {
@@ -2888,7 +2888,7 @@
       "source_location": "L35",
       "_origin": "ast",
       "id": "module1_src_pointdata_defaultpointdata",
-      "community": 276,
+      "community": 359,
       "norm_label": "defaultpointdata()"
     },
     {
@@ -2898,7 +2898,7 @@
       "source_location": "L55",
       "_origin": "ast",
       "id": "module1_src_pointdata_resolveposition",
-      "community": 276,
+      "community": 2,
       "norm_label": "resolveposition()"
     },
     {
@@ -2908,7 +2908,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "module1_src_pointproblems",
-      "community": 276,
+      "community": 359,
       "norm_label": "pointproblems.js"
     },
     {
@@ -2918,7 +2918,7 @@
       "source_location": "L19",
       "_origin": "ast",
       "id": "module1_src_pointproblems_tiers",
-      "community": 276,
+      "community": 359,
       "norm_label": "tiers"
     },
     {
@@ -2928,7 +2928,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "module1_src_pointproblems_field_labels",
-      "community": 276,
+      "community": 359,
       "norm_label": "field_labels"
     },
     {
@@ -2938,7 +2938,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "module1_src_pointproblems_problems",
-      "community": 276,
+      "community": 359,
       "norm_label": "problems"
     },
     {
@@ -2998,7 +2998,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "module1_src_steps",
-      "community": 276,
+      "community": 359,
       "norm_label": "steps.js"
     },
     {
@@ -3008,7 +3008,7 @@
       "source_location": "L22",
       "_origin": "ast",
       "id": "module1_src_steps_terms",
-      "community": 276,
+      "community": 359,
       "norm_label": "terms"
     },
     {
@@ -3018,7 +3018,7 @@
       "source_location": "L70",
       "_origin": "ast",
       "id": "module1_src_steps_steps",
-      "community": 276,
+      "community": 359,
       "norm_label": "steps"
     },
     {
@@ -8108,7 +8108,7 @@
       "source_location": "L282",
       "_origin": "ast",
       "id": "graphics_module_1_topic_3_points_main_resetcompareview",
-      "community": 31,
+      "community": 128,
       "norm_label": "resetcompareview()"
     },
     {
@@ -8188,7 +8188,7 @@
       "source_location": "L363",
       "_origin": "ast",
       "id": "graphics_module_1_topic_3_points_main_showtoast",
-      "community": 31,
+      "community": 5,
       "norm_label": "showtoast()"
     },
     {
@@ -8268,7 +8268,7 @@
       "source_location": "L793",
       "_origin": "ast",
       "id": "graphics_module_1_topic_3_points_main_completeandnext",
-      "community": 31,
+      "community": 5,
       "norm_label": "completeandnext()"
     },
     {
@@ -8388,7 +8388,7 @@
       "source_location": "L1105",
       "_origin": "ast",
       "id": "graphics_module_1_topic_3_points_main_drawcompare",
-      "community": 31,
+      "community": 128,
       "norm_label": "drawcompare()"
     },
     {
@@ -8408,7 +8408,7 @@
       "source_location": "L1361",
       "_origin": "ast",
       "id": "graphics_module_1_topic_3_points_main_setupcomparepan",
-      "community": 31,
+      "community": 128,
       "norm_label": "setupcomparepan()"
     },
     {
@@ -8428,7 +8428,7 @@
       "source_location": "L1500",
       "_origin": "ast",
       "id": "graphics_module_1_topic_3_points_main_resetcamera",
-      "community": 41,
+      "community": 128,
       "norm_label": "resetcamera()"
     },
     {
@@ -8558,7 +8558,7 @@
       "source_location": "L1714",
       "_origin": "ast",
       "id": "graphics_module_1_topic_3_points_main_setupquickviews",
-      "community": 41,
+      "community": 31,
       "norm_label": "setupquickviews()"
     },
     {
@@ -8598,7 +8598,7 @@
       "source_location": "L1771",
       "_origin": "ast",
       "id": "graphics_module_1_topic_3_points_main_pincanvassize",
-      "community": 41,
+      "community": 31,
       "norm_label": "pincanvassize()"
     },
     {
@@ -8688,7 +8688,7 @@
       "source_location": "L1931",
       "_origin": "ast",
       "id": "graphics_module_1_topic_3_points_main_reset",
-      "community": 31,
+      "community": 128,
       "norm_label": "reset()"
     },
     {
@@ -9598,7 +9598,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "graphics_module_1_topic_3_points_src_problemlibrary",
-      "community": 44,
+      "community": 370,
       "norm_label": "problemlibrary.js"
     },
     {
@@ -9608,7 +9608,7 @@
       "source_location": "L48",
       "_origin": "ast",
       "id": "graphics_module_1_topic_3_points_src_problemlibrary_initproblemlibrary",
-      "community": 44,
+      "community": 370,
       "norm_label": "initproblemlibrary()"
     },
     {
@@ -9618,7 +9618,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "graphics_module_1_topic_3_points_src_problemlibrary_js_docref_adr_0007",
-      "community": 44,
+      "community": 370,
       "norm_label": "adr-0007"
     },
     {
@@ -9628,7 +9628,7 @@
       "source_location": "L5",
       "_origin": "ast",
       "id": "graphics_module_1_topic_3_points_src_problemlibrary_js_docref_adr_0033",
-      "community": 44,
+      "community": 370,
       "norm_label": "adr-0033"
     },
     {
@@ -9638,7 +9638,7 @@
       "source_location": "L11",
       "_origin": "ast",
       "id": "graphics_module_1_topic_3_points_src_problemlibrary_js_docref_adr_0015",
-      "community": 44,
+      "community": 370,
       "norm_label": "adr-0015"
     },
     {
@@ -14508,7 +14508,7 @@
       "source_location": "L306",
       "_origin": "ast",
       "id": "graphics_module_3_topic_1_sections_of_solids_main_markbooted",
-      "community": 368,
+      "community": 121,
       "norm_label": "markbooted()"
     },
     {
@@ -14588,7 +14588,7 @@
       "source_location": "L583",
       "_origin": "ast",
       "id": "graphics_module_3_topic_1_sections_of_solids_main_addprojectionviews",
-      "community": 87,
+      "community": 121,
       "norm_label": "addprojectionviews()"
     },
     {
@@ -14658,7 +14658,7 @@
       "source_location": "L783",
       "_origin": "ast",
       "id": "graphics_module_3_topic_1_sections_of_solids_main_handleresize",
-      "community": 368,
+      "community": 121,
       "norm_label": "handleresize()"
     },
     {
@@ -14668,7 +14668,7 @@
       "source_location": "L800",
       "_origin": "ast",
       "id": "graphics_module_3_topic_1_sections_of_solids_main_setupmobilenotice",
-      "community": 368,
+      "community": 121,
       "norm_label": "setupmobilenotice()"
     },
     {
@@ -14678,7 +14678,7 @@
       "source_location": "L820",
       "_origin": "ast",
       "id": "graphics_module_3_topic_1_sections_of_solids_main_setupwizardtoggle",
-      "community": 368,
+      "community": 121,
       "norm_label": "setupwizardtoggle()"
     },
     {
@@ -14738,7 +14738,7 @@
       "source_location": "L975",
       "_origin": "ast",
       "id": "graphics_module_3_topic_1_sections_of_solids_main_init",
-      "community": 368,
+      "community": 121,
       "norm_label": "init()"
     },
     {
@@ -14750,6 +14750,26 @@
       "id": "docref_adr_0009",
       "community": 121,
       "norm_label": "adr-0009"
+    },
+    {
+      "label": "ADR-0058",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/main.js",
+      "source_location": "L11",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_1_sections_of_solids_main_js_docref_adr_0058",
+      "community": 121,
+      "norm_label": "adr-0058"
+    },
+    {
+      "label": "ADR-0060",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/main.js",
+      "source_location": "L17",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_1_sections_of_solids_main_js_docref_adr_0060",
+      "community": 121,
+      "norm_label": "adr-0060"
     },
     {
       "label": "ADR-0042",
@@ -14780,6 +14800,16 @@
       "id": "graphics_module_3_topic_1_sections_of_solids_main_js_docref_adr_0044",
       "community": 121,
       "norm_label": "adr-0044"
+    },
+    {
+      "label": "ADR-0061",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/main.js",
+      "source_location": "L910",
+      "_origin": "ast",
+      "id": "docref_adr_0061",
+      "community": 121,
+      "norm_label": "adr-0061"
     },
     {
       "label": "anim.js",
@@ -15368,7 +15398,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "graphics_module_3_topic_1_sections_of_solids_src_onboarding",
-      "community": 368,
+      "community": 121,
       "norm_label": "onboarding.js"
     },
     {
@@ -15378,7 +15408,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "graphics_module_3_topic_1_sections_of_solids_src_onboarding_spotlightkey",
-      "community": 368,
+      "community": 121,
       "norm_label": "spotlightkey()"
     },
     {
@@ -15388,7 +15418,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "graphics_module_3_topic_1_sections_of_solids_src_onboarding_spotlights",
-      "community": 368,
+      "community": 121,
       "norm_label": "spotlights"
     },
     {
@@ -15398,7 +15428,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "graphics_module_3_topic_1_sections_of_solids_src_onboarding_tone_classes",
-      "community": 368,
+      "community": 121,
       "norm_label": "tone_classes"
     },
     {
@@ -15408,7 +15438,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "graphics_module_3_topic_1_sections_of_solids_src_onboarding_initonboarding",
-      "community": 368,
+      "community": 121,
       "norm_label": "initonboarding()"
     },
     {
@@ -15428,8 +15458,28 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "graphics_module_3_topic_1_sections_of_solids_src_problemlibrary_initproblemlibrary",
-      "community": 358,
+      "community": 121,
       "norm_label": "initproblemlibrary()"
+    },
+    {
+      "label": "ADR-0062",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/src/problemLibrary.js",
+      "source_location": "L8",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_1_sections_of_solids_src_problemlibrary_js_docref_adr_0062",
+      "community": 358,
+      "norm_label": "adr-0062"
+    },
+    {
+      "label": "ADR-0063",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/src/problemLibrary.js",
+      "source_location": "L15",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_1_sections_of_solids_src_problemlibrary_js_docref_adr_0063",
+      "community": 358,
+      "norm_label": "adr-0063"
     },
     {
       "label": "problems.js",
@@ -15510,6 +15560,26 @@
       "id": "graphics_module_3_topic_1_sections_of_solids_src_problems_groupbytier",
       "community": 358,
       "norm_label": "groupbytier()"
+    },
+    {
+      "label": "ADR-0062",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/src/problems.js",
+      "source_location": "L12",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_1_sections_of_solids_src_problems_js_docref_adr_0062",
+      "community": 358,
+      "norm_label": "adr-0062"
+    },
+    {
+      "label": "ADR-0063",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/src/problems.js",
+      "source_location": "L91",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_1_sections_of_solids_src_problems_js_docref_adr_0063",
+      "community": 358,
+      "norm_label": "adr-0063"
     },
     {
       "label": "projectionDrawer.js",
@@ -15812,6 +15882,16 @@
       "norm_label": "signedarea2()"
     },
     {
+      "label": "ADR-0058",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/src/sectionCut.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_1_sections_of_solids_src_sectioncut_js_docref_adr_0058",
+      "community": 348,
+      "norm_label": "adr-0058"
+    },
+    {
       "label": "sectionView.js",
       "file_type": "code",
       "source_file": "graphics_module_3_topic_1_sections_of_solids/src/sectionView.js",
@@ -15902,6 +15982,16 @@
       "norm_label": "buildsectionviews()"
     },
     {
+      "label": "ADR-0060",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/src/sectionView.js",
+      "source_location": "L2",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_1_sections_of_solids_src_sectionview_js_docref_adr_0060",
+      "community": 87,
+      "norm_label": "adr-0060"
+    },
+    {
       "label": "ADR-0038",
       "file_type": "concept",
       "source_file": "graphics_module_3_topic_1_sections_of_solids/src/sectionView.js",
@@ -15928,7 +16018,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "graphics_module_3_topic_1_sections_of_solids_src_shapedata",
-      "community": 358,
+      "community": 121,
       "norm_label": "shapedata.js"
     },
     {
@@ -15938,7 +16028,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "graphics_module_3_topic_1_sections_of_solids_src_shapedata_shapetype",
-      "community": 358,
+      "community": 121,
       "norm_label": "shapetype"
     },
     {
@@ -15948,7 +16038,7 @@
       "source_location": "L45",
       "_origin": "ast",
       "id": "graphics_module_3_topic_1_sections_of_solids_src_shapedata_defaultshapedata",
-      "community": 358,
+      "community": 121,
       "norm_label": "defaultshapedata()"
     },
     {
@@ -15988,7 +16078,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "graphics_module_3_topic_1_sections_of_solids_src_terms",
-      "community": 368,
+      "community": 121,
       "norm_label": "terms.js"
     },
     {
@@ -15998,7 +16088,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "graphics_module_3_topic_1_sections_of_solids_src_terms_terms",
-      "community": 368,
+      "community": 121,
       "norm_label": "terms"
     },
     {
@@ -16008,7 +16098,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "graphics_module_3_topic_1_sections_of_solids_src_terms_initterms",
-      "community": 368,
+      "community": 121,
       "norm_label": "initterms()"
     },
     {
@@ -16070,6 +16160,16 @@
       "id": "graphics_module_3_topic_1_sections_of_solids_src_uimanager_js_docref_adr_0048",
       "community": 368,
       "norm_label": "adr-0048"
+    },
+    {
+      "label": "ADR-0058",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/src/uiManager.js",
+      "source_location": "L18",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_1_sections_of_solids_src_uimanager_js_docref_adr_0058",
+      "community": 368,
+      "norm_label": "adr-0058"
     },
     {
       "label": "main.js",
@@ -16188,7 +16288,7 @@
       "source_location": "L191",
       "_origin": "ast",
       "id": "graphics_module_3_topic_2_development_of_surfaces_main_liftstringpathto3d",
-      "community": 118,
+      "community": 363,
       "norm_label": "liftstringpathto3d()"
     },
     {
@@ -16198,7 +16298,7 @@
       "source_location": "L249",
       "_origin": "ast",
       "id": "graphics_module_3_topic_2_development_of_surfaces_main_rebuildstringpath3d",
-      "community": 118,
+      "community": 356,
       "norm_label": "rebuildstringpath3d()"
     },
     {
@@ -16278,7 +16378,7 @@
       "source_location": "L392",
       "_origin": "ast",
       "id": "graphics_module_3_topic_2_development_of_surfaces_main_markbooted",
-      "community": 364,
+      "community": 361,
       "norm_label": "markbooted()"
     },
     {
@@ -16298,7 +16398,7 @@
       "source_location": "L451",
       "_origin": "ast",
       "id": "graphics_module_3_topic_2_development_of_surfaces_main_disposeobj",
-      "community": 118,
+      "community": 356,
       "norm_label": "disposeobj()"
     },
     {
@@ -16408,7 +16508,7 @@
       "source_location": "L743",
       "_origin": "ast",
       "id": "graphics_module_3_topic_2_development_of_surfaces_main_setupmobilenotice",
-      "community": 364,
+      "community": 361,
       "norm_label": "setupmobilenotice()"
     },
     {
@@ -16628,8 +16728,48 @@
       "source_location": "L1254",
       "_origin": "ast",
       "id": "graphics_module_3_topic_2_development_of_surfaces_main_init",
-      "community": 364,
+      "community": 361,
       "norm_label": "init()"
+    },
+    {
+      "label": "ADR-0067",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/main.js",
+      "source_location": "L113",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_2_development_of_surfaces_main_js_docref_adr_0067",
+      "community": 361,
+      "norm_label": "adr-0067"
+    },
+    {
+      "label": "ADR-0059",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/main.js",
+      "source_location": "L114",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_2_development_of_surfaces_main_js_docref_adr_0059",
+      "community": 361,
+      "norm_label": "adr-0059"
+    },
+    {
+      "label": "ADR-0068",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/main.js",
+      "source_location": "L116",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_2_development_of_surfaces_main_js_docref_adr_0068",
+      "community": 361,
+      "norm_label": "adr-0068"
+    },
+    {
+      "label": "ADR-0070",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/main.js",
+      "source_location": "L148",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_2_development_of_surfaces_main_js_docref_adr_0070",
+      "community": 361,
+      "norm_label": "adr-0070"
     },
     {
       "label": "ADR-0042",
@@ -16640,6 +16780,16 @@
       "id": "graphics_module_3_topic_2_development_of_surfaces_main_js_docref_adr_0042",
       "community": 361,
       "norm_label": "adr-0042"
+    },
+    {
+      "label": "ADR-0058",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/main.js",
+      "source_location": "L500",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_2_development_of_surfaces_main_js_docref_adr_0058",
+      "community": 361,
+      "norm_label": "adr-0058"
     },
     {
       "label": "ADR-0005",
@@ -16670,6 +16820,16 @@
       "id": "graphics_module_3_topic_2_development_of_surfaces_main_js_docref_adr_0037",
       "community": 361,
       "norm_label": "adr-0037"
+    },
+    {
+      "label": "ADR-0066",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/main.js",
+      "source_location": "L783",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_2_development_of_surfaces_main_js_docref_adr_0066",
+      "community": 361,
+      "norm_label": "adr-0066"
     },
     {
       "label": "ADR-0054",
@@ -17132,6 +17292,16 @@
       "norm_label": "drawradialdevelopment()"
     },
     {
+      "label": "ADR-0066",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/developmentEngine.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_2_development_of_surfaces_src_developmentengine_js_docref_adr_0066",
+      "community": 356,
+      "norm_label": "adr-0066"
+    },
+    {
       "label": "ADR-0053",
       "file_type": "concept",
       "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/developmentEngine.js",
@@ -17150,6 +17320,16 @@
       "id": "graphics_module_3_topic_2_development_of_surfaces_src_developmentengine_js_docref_adr_0007",
       "community": 356,
       "norm_label": "adr-0007"
+    },
+    {
+      "label": "ADR-0070",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/developmentEngine.js",
+      "source_location": "L301",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_2_development_of_surfaces_src_developmentengine_js_docref_adr_0070",
+      "community": 356,
+      "norm_label": "adr-0070"
     },
     {
       "label": "genericPrism.js",
@@ -17488,7 +17668,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "graphics_module_3_topic_2_development_of_surfaces_src_onboarding",
-      "community": 364,
+      "community": 375,
       "norm_label": "onboarding.js"
     },
     {
@@ -17498,7 +17678,7 @@
       "source_location": "L30",
       "_origin": "ast",
       "id": "graphics_module_3_topic_2_development_of_surfaces_src_onboarding_spotlightkey",
-      "community": 364,
+      "community": 375,
       "norm_label": "spotlightkey()"
     },
     {
@@ -17508,7 +17688,7 @@
       "source_location": "L38",
       "_origin": "ast",
       "id": "graphics_module_3_topic_2_development_of_surfaces_src_onboarding_spotlights",
-      "community": 364,
+      "community": 375,
       "norm_label": "spotlights"
     },
     {
@@ -17518,7 +17698,7 @@
       "source_location": "L49",
       "_origin": "ast",
       "id": "graphics_module_3_topic_2_development_of_surfaces_src_onboarding_tone_classes",
-      "community": 364,
+      "community": 375,
       "norm_label": "tone_classes"
     },
     {
@@ -17528,7 +17708,7 @@
       "source_location": "L56",
       "_origin": "ast",
       "id": "graphics_module_3_topic_2_development_of_surfaces_src_onboarding_initonboarding",
-      "community": 364,
+      "community": 375,
       "norm_label": "initonboarding()"
     },
     {
@@ -17550,6 +17730,36 @@
       "id": "graphics_module_3_topic_2_development_of_surfaces_src_problemlibrary_initproblemlibrary",
       "community": 369,
       "norm_label": "initproblemlibrary()"
+    },
+    {
+      "label": "ADR-0065",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/problemLibrary.js",
+      "source_location": "L10",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_2_development_of_surfaces_src_problemlibrary_js_docref_adr_0065",
+      "community": 369,
+      "norm_label": "adr-0065"
+    },
+    {
+      "label": "ADR-0063",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/problemLibrary.js",
+      "source_location": "L17",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_2_development_of_surfaces_src_problemlibrary_js_docref_adr_0063",
+      "community": 369,
+      "norm_label": "adr-0063"
+    },
+    {
+      "label": "ADR-0070",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/problemLibrary.js",
+      "source_location": "L24",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_2_development_of_surfaces_src_problemlibrary_js_docref_adr_0070",
+      "community": 369,
+      "norm_label": "adr-0070"
     },
     {
       "label": "problems.js",
@@ -17632,6 +17842,26 @@
       "norm_label": "groupbytier()"
     },
     {
+      "label": "ADR-0065",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/problems.js",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_2_development_of_surfaces_src_problems_js_docref_adr_0065",
+      "community": 369,
+      "norm_label": "adr-0065"
+    },
+    {
+      "label": "ADR-0070",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/problems.js",
+      "source_location": "L21",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_2_development_of_surfaces_src_problems_js_docref_adr_0070",
+      "community": 369,
+      "norm_label": "adr-0070"
+    },
+    {
       "label": "sectionCut.js",
       "file_type": "code",
       "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/sectionCut.js",
@@ -17682,13 +17912,23 @@
       "norm_label": "signedarea2()"
     },
     {
+      "label": "ADR-0058",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/sectionCut.js",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_2_development_of_surfaces_src_sectioncut_js_docref_adr_0058",
+      "community": 110,
+      "norm_label": "adr-0058"
+    },
+    {
       "label": "shapeData.js",
       "file_type": "code",
       "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/shapeData.js",
       "source_location": "L1",
       "_origin": "ast",
       "id": "graphics_module_3_topic_2_development_of_surfaces_src_shapedata",
-      "community": 369,
+      "community": 361,
       "norm_label": "shapedata.js"
     },
     {
@@ -17698,7 +17938,7 @@
       "source_location": "L25",
       "_origin": "ast",
       "id": "graphics_module_3_topic_2_development_of_surfaces_src_shapedata_shapetype",
-      "community": 369,
+      "community": 361,
       "norm_label": "shapetype"
     },
     {
@@ -17748,7 +17988,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "graphics_module_3_topic_2_development_of_surfaces_src_terms",
-      "community": 364,
+      "community": 361,
       "norm_label": "terms.js"
     },
     {
@@ -17758,7 +17998,7 @@
       "source_location": "L26",
       "_origin": "ast",
       "id": "graphics_module_3_topic_2_development_of_surfaces_src_terms_terms",
-      "community": 364,
+      "community": 361,
       "norm_label": "terms"
     },
     {
@@ -17768,7 +18008,7 @@
       "source_location": "L28",
       "_origin": "ast",
       "id": "graphics_module_3_topic_2_development_of_surfaces_src_terms_initterms",
-      "community": 364,
+      "community": 361,
       "norm_label": "initterms()"
     },
     {
@@ -17830,6 +18070,36 @@
       "id": "graphics_module_3_topic_2_development_of_surfaces_src_uimanager_js_docref_adr_0048",
       "community": 364,
       "norm_label": "adr-0048"
+    },
+    {
+      "label": "ADR-0068",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/uiManager.js",
+      "source_location": "L13",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_2_development_of_surfaces_src_uimanager_js_docref_adr_0068",
+      "community": 364,
+      "norm_label": "adr-0068"
+    },
+    {
+      "label": "ADR-0067",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/uiManager.js",
+      "source_location": "L20",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_2_development_of_surfaces_src_uimanager_js_docref_adr_0067",
+      "community": 364,
+      "norm_label": "adr-0067"
+    },
+    {
+      "label": "ADR-0059",
+      "file_type": "concept",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/uiManager.js",
+      "source_location": "L20",
+      "_origin": "ast",
+      "id": "graphics_module_3_topic_2_development_of_surfaces_src_uimanager_js_docref_adr_0059",
+      "community": 364,
+      "norm_label": "adr-0059"
     },
     {
       "label": "main.js",
@@ -18418,7 +18688,7 @@
       "source_location": "L1",
       "_origin": "ast",
       "id": "template_starter_src_uimanager",
-      "community": 93,
+      "community": 28,
       "norm_label": "uimanager.js"
     },
     {
@@ -18428,7 +18698,7 @@
       "source_location": "L44",
       "_origin": "ast",
       "id": "template_starter_src_uimanager_sliders",
-      "community": 93,
+      "community": 28,
       "norm_label": "sliders"
     },
     {
@@ -18438,7 +18708,7 @@
       "source_location": "L54",
       "_origin": "ast",
       "id": "template_starter_src_uimanager_clamp",
-      "community": 93,
+      "community": 28,
       "norm_label": "clamp()"
     },
     {
@@ -18448,7 +18718,7 @@
       "source_location": "L64",
       "_origin": "ast",
       "id": "template_starter_src_uimanager_parsenumeric",
-      "community": 93,
+      "community": 28,
       "norm_label": "parsenumeric()"
     },
     {
@@ -18458,7 +18728,7 @@
       "source_location": "L73",
       "_origin": "ast",
       "id": "template_starter_src_uimanager_inituimanager",
-      "community": 93,
+      "community": 28,
       "norm_label": "inituimanager()"
     },
     {
@@ -18505,7 +18775,7 @@
       "label": "3. Module 2 \u2014 Component Breakdown (the master)",
       "file_type": "document",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L202",
+      "source_location": "L250",
       "_origin": "ast",
       "id": "architecture_3_module_2_component_breakdown_the_master",
       "community": 60,
@@ -18515,7 +18785,7 @@
       "label": "Data layer",
       "file_type": "document",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L211",
+      "source_location": "L259",
       "_origin": "ast",
       "id": "architecture_data_layer",
       "community": 60,
@@ -18525,7 +18795,7 @@
       "label": "Geometry / shape generators",
       "file_type": "document",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L227",
+      "source_location": "L275",
       "_origin": "ast",
       "id": "architecture_geometry_shape_generators",
       "community": 60,
@@ -18535,7 +18805,7 @@
       "label": "Analysis & rendering",
       "file_type": "document",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L263",
+      "source_location": "L311",
       "_origin": "ast",
       "id": "architecture_analysis_rendering",
       "community": 60,
@@ -18545,7 +18815,7 @@
       "label": "UI controllers (the \"leaf\" panel modules)",
       "file_type": "document",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L291",
+      "source_location": "L339",
       "_origin": "ast",
       "id": "architecture_ui_controllers_the_leaf_panel_modules",
       "community": 60,
@@ -18555,7 +18825,7 @@
       "label": "Motion utility",
       "file_type": "document",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L323",
+      "source_location": "L371",
       "_origin": "ast",
       "id": "architecture_motion_utility",
       "community": 60,
@@ -18565,7 +18835,7 @@
       "label": "Orchestrator & shell",
       "file_type": "document",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L332",
+      "source_location": "L380",
       "_origin": "ast",
       "id": "architecture_orchestrator_shell",
       "community": 60,
@@ -18575,7 +18845,7 @@
       "label": "4. Module 1 \u2014 Component Breakdown (foundations of projection)",
       "file_type": "document",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L354",
+      "source_location": "L402",
       "_origin": "ast",
       "id": "architecture_4_module_1_component_breakdown_foundations_of_projection",
       "community": 60,
@@ -18585,7 +18855,7 @@
       "label": "The shared frame (unique to Module 1 \u2014 no Module 2 equivalent)",
       "file_type": "document",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L363",
+      "source_location": "L411",
       "_origin": "ast",
       "id": "architecture_the_shared_frame_unique_to_module_1_no_module_2_equivalent",
       "community": 60,
@@ -18595,7 +18865,7 @@
       "label": "Leaf modules (analogous to Module 2's)",
       "file_type": "document",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L384",
+      "source_location": "L432",
       "_origin": "ast",
       "id": "architecture_leaf_modules_analogous_to_module_2_s",
       "community": 60,
@@ -18605,7 +18875,7 @@
       "label": "Pure data files (unique to Module 1 \u2014 its subject matter)",
       "file_type": "document",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L401",
+      "source_location": "L449",
       "_origin": "ast",
       "id": "architecture_pure_data_files_unique_to_module_1_its_subject_matter",
       "community": 60,
@@ -18615,7 +18885,7 @@
       "label": "Vestigial",
       "file_type": "document",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L418",
+      "source_location": "L466",
       "_origin": "ast",
       "id": "architecture_vestigial",
       "community": 60,
@@ -18625,7 +18895,7 @@
       "label": "Pages & wiring",
       "file_type": "document",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L424",
+      "source_location": "L472",
       "_origin": "ast",
       "id": "architecture_pages_wiring",
       "community": 60,
@@ -18635,7 +18905,7 @@
       "label": "5. Data Flow \u2014 How a User Interaction Reaches the Scene",
       "file_type": "document",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L445",
+      "source_location": "L493",
       "_origin": "ast",
       "id": "architecture_5_data_flow_how_a_user_interaction_reaches_the_scene",
       "community": 60,
@@ -18645,7 +18915,7 @@
       "label": "6. The iframe Boundary",
       "file_type": "document",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L491",
+      "source_location": "L539",
       "_origin": "ast",
       "id": "architecture_6_the_iframe_boundary",
       "community": 60,
@@ -18655,7 +18925,7 @@
       "label": "7. What Is Shared Across All Codebases",
       "file_type": "document",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L525",
+      "source_location": "L573",
       "_origin": "ast",
       "id": "architecture_7_what_is_shared_across_all_codebases",
       "community": 60,
@@ -18665,7 +18935,7 @@
       "label": "8. What Is Intentionally Different Between Modules",
       "file_type": "document",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L571",
+      "source_location": "L619",
       "_origin": "ast",
       "id": "architecture_8_what_is_intentionally_different_between_modules",
       "community": 60,
@@ -18675,7 +18945,7 @@
       "label": "9. Known Structural Issues",
       "file_type": "document",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L626",
+      "source_location": "L674",
       "_origin": "ast",
       "id": "architecture_9_known_structural_issues",
       "community": 60,
@@ -18715,7 +18985,7 @@
       "label": "2026-07-17",
       "file_type": "document",
       "source_file": "CHANGELOG.md",
-      "source_location": "L13",
+      "source_location": "L14",
       "_origin": "ast",
       "id": "changelog_2026_07_17",
       "community": 67,
@@ -18725,7 +18995,7 @@
       "label": "2026-07-13",
       "file_type": "document",
       "source_file": "CHANGELOG.md",
-      "source_location": "L19",
+      "source_location": "L20",
       "_origin": "ast",
       "id": "changelog_2026_07_13",
       "community": 67,
@@ -18735,7 +19005,7 @@
       "label": "2026-07-12",
       "file_type": "document",
       "source_file": "CHANGELOG.md",
-      "source_location": "L37",
+      "source_location": "L38",
       "_origin": "ast",
       "id": "changelog_2026_07_12",
       "community": 67,
@@ -18745,7 +19015,7 @@
       "label": "2026-07-11",
       "file_type": "document",
       "source_file": "CHANGELOG.md",
-      "source_location": "L43",
+      "source_location": "L44",
       "_origin": "ast",
       "id": "changelog_2026_07_11",
       "community": 67,
@@ -18755,7 +19025,7 @@
       "label": "2026-07-10",
       "file_type": "document",
       "source_file": "CHANGELOG.md",
-      "source_location": "L75",
+      "source_location": "L76",
       "_origin": "ast",
       "id": "changelog_2026_07_10",
       "community": 67,
@@ -18765,7 +19035,7 @@
       "label": "2026-07-09",
       "file_type": "document",
       "source_file": "CHANGELOG.md",
-      "source_location": "L87",
+      "source_location": "L88",
       "_origin": "ast",
       "id": "changelog_2026_07_09",
       "community": 67,
@@ -18775,7 +19045,7 @@
       "label": "2026-07-03",
       "file_type": "document",
       "source_file": "CHANGELOG.md",
-      "source_location": "L108",
+      "source_location": "L109",
       "_origin": "ast",
       "id": "changelog_2026_07_03",
       "community": 67,
@@ -18785,7 +19055,7 @@
       "label": "2026-07-02",
       "file_type": "document",
       "source_file": "CHANGELOG.md",
-      "source_location": "L113",
+      "source_location": "L114",
       "_origin": "ast",
       "id": "changelog_2026_07_02",
       "community": 67,
@@ -18795,7 +19065,7 @@
       "label": "2026-06-29",
       "file_type": "document",
       "source_file": "CHANGELOG.md",
-      "source_location": "L133",
+      "source_location": "L134",
       "_origin": "ast",
       "id": "changelog_2026_06_29",
       "community": 67,
@@ -18805,7 +19075,7 @@
       "label": "2026-06-28",
       "file_type": "document",
       "source_file": "CHANGELOG.md",
-      "source_location": "L141",
+      "source_location": "L142",
       "_origin": "ast",
       "id": "changelog_2026_06_28",
       "community": 67,
@@ -18815,7 +19085,7 @@
       "label": "2026-06-27",
       "file_type": "document",
       "source_file": "CHANGELOG.md",
-      "source_location": "L156",
+      "source_location": "L157",
       "_origin": "ast",
       "id": "changelog_2026_06_27",
       "community": 67,
@@ -19520,6 +19790,136 @@
       "id": "decisions_adr_057_coincident_hidden_dashed_lines_are_forced_behind_visible_solid_lines_via_polygonoffset_renderorder_not_left_to_the_depth_test",
       "community": 107,
       "norm_label": "adr-057: coincident hidden dashed lines are forced behind visible solid lines via `polygonoffset` + `renderorder`, not left to the depth test"
+    },
+    {
+      "label": "ADR-058: Section cutting is a hand-authored single-plane triangle clipper, not a CSG library",
+      "file_type": "document",
+      "source_file": "DECISIONS.md",
+      "source_location": "L1968",
+      "_origin": "ast",
+      "id": "decisions_adr_058_section_cutting_is_a_hand_authored_single_plane_triangle_clipper_not_a_csg_library",
+      "community": 107,
+      "norm_label": "adr-058: section cutting is a hand-authored single-plane triangle clipper, not a csg library"
+    },
+    {
+      "label": "ADR-059: Section-plane state lives outside ShapeData, beside it in main.js",
+      "file_type": "document",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2016",
+      "_origin": "ast",
+      "id": "decisions_adr_059_section_plane_state_lives_outside_shapedata_beside_it_in_main_js",
+      "community": 107,
+      "norm_label": "adr-059: section-plane state lives outside shapedata, beside it in main.js"
+    },
+    {
+      "label": "ADR-060: projectionDrawer.js is a byte-identical Module2 copy; all section drawing lives in a new leaf module",
+      "file_type": "document",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2040",
+      "_origin": "ast",
+      "id": "decisions_adr_060_projectiondrawer_js_is_a_byte_identical_module2_copy_all_section_drawing_lives_in_a_new_leaf_module",
+      "community": 107,
+      "norm_label": "adr-060: projectiondrawer.js is a byte-identical module2 copy; all section drawing lives in a new leaf module"
+    },
+    {
+      "label": "ADR-061: The true shape is an in-scene world-scale sheet plus a camera tween, not an auxiliary camera viewport",
+      "file_type": "document",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2072",
+      "_origin": "ast",
+      "id": "decisions_adr_061_the_true_shape_is_an_in_scene_world_scale_sheet_plus_a_camera_tween_not_an_auxiliary_camera_viewport",
+      "community": 107,
+      "norm_label": "adr-061: the true shape is an in-scene world-scale sheet plus a camera tween, not an auxiliary camera viewport"
+    },
+    {
+      "label": "ADR-062: The KTU \"exclude true shape given\" rule is a problem-TYPE axis with a hard filter, not an authoring convention",
+      "file_type": "document",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2101",
+      "_origin": "ast",
+      "id": "decisions_adr_062_the_ktu_exclude_true_shape_given_rule_is_a_problem_type_axis_with_a_hard_filter_not_an_authoring_convention",
+      "community": 107,
+      "norm_label": "adr-062: the ktu \"exclude true shape given\" rule is a problem-type axis with a hard filter, not an authoring convention"
+    },
+    {
+      "label": "ADR-063: Conic-section self-check \u2014 \u00b10.5\u00b0 tolerance + a live 'generator' target, not a \"parallel to generator\" preset",
+      "file_type": "document",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2126",
+      "_origin": "ast",
+      "id": "decisions_adr_063_conic_section_self_check_0_5_tolerance_a_live_generator_target_not_a_parallel_to_generator_preset",
+      "community": 107,
+      "norm_label": "adr-063: conic-section self-check \u2014 \u00b10.5\u00b0 tolerance + a live 'generator' target, not a \"parallel to generator\" preset"
+    },
+    {
+      "label": "ADR-064: `iShape.js` taken verbatim from the Module 2 master (conscious ADR-027 resolution)",
+      "file_type": "document",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2162",
+      "_origin": "ast",
+      "id": "decisions_adr_064_ishape_js_taken_verbatim_from_the_module_2_master_conscious_adr_027_resolution",
+      "community": 107,
+      "norm_label": "adr-064: `ishape.js` taken verbatim from the module 2 master (conscious adr-027 resolution)"
+    },
+    {
+      "label": "ADR-065: Through-hole problems are excluded structurally, not editorially",
+      "file_type": "document",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2183",
+      "_origin": "ast",
+      "id": "decisions_adr_065_through_hole_problems_are_excluded_structurally_not_editorially",
+      "community": 107,
+      "norm_label": "adr-065: through-hole problems are excluded structurally, not editorially"
+    },
+    {
+      "label": "ADR-066: The development is drawn in Canvas2D on the Compare sheet via a pure `developmentEngine.js` leaf",
+      "file_type": "document",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2203",
+      "_origin": "ast",
+      "id": "decisions_adr_066_the_development_is_drawn_in_canvas2d_on_the_compare_sheet_via_a_pure_developmentengine_js_leaf",
+      "community": 107,
+      "norm_label": "adr-066: the development is drawn in canvas2d on the compare sheet via a pure `developmentengine.js` leaf"
+    },
+    {
+      "label": "ADR-067: Cutting-plane state lives in `main.js` OUTSIDE ShapeData (`commitSection` port)",
+      "file_type": "document",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2248",
+      "_origin": "ast",
+      "id": "decisions_adr_067_cutting_plane_state_lives_in_main_js_outside_shapedata_commitsection_port",
+      "community": 107,
+      "norm_label": "adr-067: cutting-plane state lives in `main.js` outside shapedata (`commitsection` port)"
+    },
+    {
+      "label": "ADR-068: Cutting-plane controls are Angle-to-HP + Cut-height (plane always \u22a5 VP); corner sampling takes the meshes' alignment phase",
+      "file_type": "document",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2270",
+      "_origin": "ast",
+      "id": "decisions_adr_068_cutting_plane_controls_are_angle_to_hp_cut_height_plane_always_vp_corner_sampling_takes_the_meshes_alignment_phase",
+      "community": 107,
+      "norm_label": "adr-068: cutting-plane controls are angle-to-hp + cut-height (plane always \u22a5 vp); corner sampling takes the meshes' alignment phase"
+    },
+    {
+      "label": "ADR-069: The \"through holes\" exclusion ships as a hard problem-`type` filter (`EXCLUDED_TYPES`) in the data layer",
+      "file_type": "document",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2306",
+      "_origin": "ast",
+      "id": "decisions_adr_069_the_through_holes_exclusion_ships_as_a_hard_problem_type_filter_excluded_types_in_the_data_layer",
+      "community": 107,
+      "norm_label": "adr-069: the \"through holes\" exclusion ships as a hard problem-`type` filter (`excluded_types`) in the data layer"
+    },
+    {
+      "label": "ADR-070: Shortest-path (\"string\") problems \u2014 straight chord on the development, 3D wrap by per-face isometry, revealed only on a matched self-check via a non-rebuild overlay commit",
+      "file_type": "document",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2331",
+      "_origin": "ast",
+      "id": "decisions_adr_070_shortest_path_string_problems_straight_chord_on_the_development_3d_wrap_by_per_face_isometry_revealed_only_on_a_matched_self_check_via_a_non_rebuild_overlay_commit",
+      "community": 107,
+      "norm_label": "adr-070: shortest-path (\"string\") problems \u2014 straight chord on the development, 3d wrap by per-face isometry, revealed only on a matched self-check via a non-rebuild overlay commit"
     },
     {
       "label": "DESIGN.md",
@@ -22765,7 +23165,7 @@
       "label": "Section 7 \u2014 Cross-Module Harmony Rules",
       "file_type": "document",
       "source_file": "RULES.md",
-      "source_location": "L576",
+      "source_location": "L586",
       "_origin": "ast",
       "id": "rules_section_7_cross_module_harmony_rules",
       "community": 35,
@@ -22775,7 +23175,7 @@
       "label": "Section 8 \u2014 Documentation Rules",
       "file_type": "document",
       "source_file": "RULES.md",
-      "source_location": "L623",
+      "source_location": "L633",
       "_origin": "ast",
       "id": "rules_section_8_documentation_rules",
       "community": 35,
@@ -22785,7 +23185,7 @@
       "label": "Section 9 \u2014 Anti-Patterns (Never Do These)",
       "file_type": "document",
       "source_file": "RULES.md",
-      "source_location": "L646",
+      "source_location": "L656",
       "_origin": "ast",
       "id": "rules_section_9_anti_patterns_never_do_these",
       "community": 35,
@@ -25952,14 +26352,14 @@
       "norm_label": "3d engineering gotchas (read before writing rotation/projection math)"
     },
     {
-      "label": "Section-cut engine (`src/sectionCut.js` \u2014 ADR-M3T1-001)",
+      "label": "Section-cut engine (`src/sectionCut.js` \u2014 ADR-058)",
       "file_type": "document",
       "source_file": "graphics_module_3_topic_1_sections_of_solids/CLAUDE.md",
       "source_location": "L94",
       "_origin": "ast",
-      "id": "graphics_module_3_topic_1_sections_of_solids_claude_section_cut_engine_src_sectioncut_js_adr_m3t1_001",
+      "id": "graphics_module_3_topic_1_sections_of_solids_claude_section_cut_engine_src_sectioncut_js_adr_058",
       "community": 352,
-      "norm_label": "section-cut engine (`src/sectioncut.js` \u2014 adr-m3t1-001)"
+      "norm_label": "section-cut engine (`src/sectioncut.js` \u2014 adr-058)"
     },
     {
       "label": "Visual style",
@@ -26010,86 +26410,6 @@
       "id": "graphics_module_3_topic_1_sections_of_solids_claude_keeping_root_documents_current",
       "community": 352,
       "norm_label": "keeping root documents current"
-    },
-    {
-      "label": "DECISIONS.md",
-      "file_type": "document",
-      "source_file": "graphics_module_3_topic_1_sections_of_solids/DECISIONS.md",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "graphics_module_3_topic_1_sections_of_solids_decisions",
-      "community": 359,
-      "norm_label": "decisions.md"
-    },
-    {
-      "label": "DECISIONS.md \u2014 Sections of Solids (topic-local ADR log)",
-      "file_type": "document",
-      "source_file": "graphics_module_3_topic_1_sections_of_solids/DECISIONS.md",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "graphics_module_3_topic_1_sections_of_solids_decisions_decisions_md_sections_of_solids_topic_local_adr_log",
-      "community": 359,
-      "norm_label": "decisions.md \u2014 sections of solids (topic-local adr log)"
-    },
-    {
-      "label": "ADR-M3T1-001: Section cutting is a hand-authored single-plane triangle clipper, not a CSG library",
-      "file_type": "document",
-      "source_file": "graphics_module_3_topic_1_sections_of_solids/DECISIONS.md",
-      "source_location": "L10",
-      "_origin": "ast",
-      "id": "graphics_module_3_topic_1_sections_of_solids_decisions_adr_m3t1_001_section_cutting_is_a_hand_authored_single_plane_triangle_clipper_not_a_csg_library",
-      "community": 359,
-      "norm_label": "adr-m3t1-001: section cutting is a hand-authored single-plane triangle clipper, not a csg library"
-    },
-    {
-      "label": "ADR-M3T1-002: Section-plane state lives outside ShapeData, beside it in main.js",
-      "file_type": "document",
-      "source_file": "graphics_module_3_topic_1_sections_of_solids/DECISIONS.md",
-      "source_location": "L57",
-      "_origin": "ast",
-      "id": "graphics_module_3_topic_1_sections_of_solids_decisions_adr_m3t1_002_section_plane_state_lives_outside_shapedata_beside_it_in_main_js",
-      "community": 359,
-      "norm_label": "adr-m3t1-002: section-plane state lives outside shapedata, beside it in main.js"
-    },
-    {
-      "label": "ADR-M3T1-003: projectionDrawer.js is a byte-identical Module2 copy; all section drawing lives in a new leaf module",
-      "file_type": "document",
-      "source_file": "graphics_module_3_topic_1_sections_of_solids/DECISIONS.md",
-      "source_location": "L80",
-      "_origin": "ast",
-      "id": "graphics_module_3_topic_1_sections_of_solids_decisions_adr_m3t1_003_projectiondrawer_js_is_a_byte_identical_module2_copy_all_section_drawing_lives_in_a_new_leaf_module",
-      "community": 359,
-      "norm_label": "adr-m3t1-003: projectiondrawer.js is a byte-identical module2 copy; all section drawing lives in a new leaf module"
-    },
-    {
-      "label": "ADR-M3T1-004: The true shape is an in-scene world-scale sheet plus a camera tween, not an auxiliary camera viewport",
-      "file_type": "document",
-      "source_file": "graphics_module_3_topic_1_sections_of_solids/DECISIONS.md",
-      "source_location": "L111",
-      "_origin": "ast",
-      "id": "graphics_module_3_topic_1_sections_of_solids_decisions_adr_m3t1_004_the_true_shape_is_an_in_scene_world_scale_sheet_plus_a_camera_tween_not_an_auxiliary_camera_viewport",
-      "community": 359,
-      "norm_label": "adr-m3t1-004: the true shape is an in-scene world-scale sheet plus a camera tween, not an auxiliary camera viewport"
-    },
-    {
-      "label": "ADR-M3T1-005: The KTU \"exclude true shape given\" rule is a problem-TYPE axis with a hard filter, not an authoring convention",
-      "file_type": "document",
-      "source_file": "graphics_module_3_topic_1_sections_of_solids/DECISIONS.md",
-      "source_location": "L139",
-      "_origin": "ast",
-      "id": "graphics_module_3_topic_1_sections_of_solids_decisions_adr_m3t1_005_the_ktu_exclude_true_shape_given_rule_is_a_problem_type_axis_with_a_hard_filter_not_an_authoring_convention",
-      "community": 359,
-      "norm_label": "adr-m3t1-005: the ktu \"exclude true shape given\" rule is a problem-type axis with a hard filter, not an authoring convention"
-    },
-    {
-      "label": "ADR-M3T1-006: Conic-section self-check \u2014 \u00b10.5\u00b0 tolerance + a live 'generator' target, not a \"parallel to generator\" preset",
-      "file_type": "document",
-      "source_file": "graphics_module_3_topic_1_sections_of_solids/DECISIONS.md",
-      "source_location": "L163",
-      "_origin": "ast",
-      "id": "graphics_module_3_topic_1_sections_of_solids_decisions_adr_m3t1_006_conic_section_self_check_0_5_tolerance_a_live_generator_target_not_a_parallel_to_generator_preset",
-      "community": 359,
-      "norm_label": "adr-m3t1-006: conic-section self-check \u2014 \u00b10.5\u00b0 tolerance + a live 'generator' target, not a \"parallel to generator\" preset"
     },
     {
       "label": "README.md",
@@ -26570,96 +26890,6 @@
       "id": "graphics_module_3_topic_2_development_of_surfaces_claude_keeping_root_documents_current",
       "community": 365,
       "norm_label": "keeping root documents current"
-    },
-    {
-      "label": "DECISIONS.md",
-      "file_type": "document",
-      "source_file": "graphics_module_3_topic_2_development_of_surfaces/DECISIONS.md",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "graphics_module_3_topic_2_development_of_surfaces_decisions",
-      "community": 370,
-      "norm_label": "decisions.md"
-    },
-    {
-      "label": "Decisions (ADR Log) \u2014 Development of Surfaces (Module 3, Topic 2)",
-      "file_type": "document",
-      "source_file": "graphics_module_3_topic_2_development_of_surfaces/DECISIONS.md",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "graphics_module_3_topic_2_development_of_surfaces_decisions_decisions_adr_log_development_of_surfaces_module_3_topic_2",
-      "community": 370,
-      "norm_label": "decisions (adr log) \u2014 development of surfaces (module 3, topic 2)"
-    },
-    {
-      "label": "ADR-M3T2-001: `iShape.js` taken verbatim from the Module 2 master (conscious ADR-027 resolution)",
-      "file_type": "document",
-      "source_file": "graphics_module_3_topic_2_development_of_surfaces/DECISIONS.md",
-      "source_location": "L7",
-      "_origin": "ast",
-      "id": "graphics_module_3_topic_2_development_of_surfaces_decisions_adr_m3t2_001_ishape_js_taken_verbatim_from_the_module_2_master_conscious_adr_027_resolution",
-      "community": 370,
-      "norm_label": "adr-m3t2-001: `ishape.js` taken verbatim from the module 2 master (conscious adr-027 resolution)"
-    },
-    {
-      "label": "ADR-M3T2-002: Through-hole problems are excluded structurally, not editorially",
-      "file_type": "document",
-      "source_file": "graphics_module_3_topic_2_development_of_surfaces/DECISIONS.md",
-      "source_location": "L27",
-      "_origin": "ast",
-      "id": "graphics_module_3_topic_2_development_of_surfaces_decisions_adr_m3t2_002_through_hole_problems_are_excluded_structurally_not_editorially",
-      "community": 370,
-      "norm_label": "adr-m3t2-002: through-hole problems are excluded structurally, not editorially"
-    },
-    {
-      "label": "ADR-M3T2-003: The development is drawn in Canvas2D on the Compare sheet via a pure `developmentEngine.js` leaf",
-      "file_type": "document",
-      "source_file": "graphics_module_3_topic_2_development_of_surfaces/DECISIONS.md",
-      "source_location": "L46",
-      "_origin": "ast",
-      "id": "graphics_module_3_topic_2_development_of_surfaces_decisions_adr_m3t2_003_the_development_is_drawn_in_canvas2d_on_the_compare_sheet_via_a_pure_developmentengine_js_leaf",
-      "community": 370,
-      "norm_label": "adr-m3t2-003: the development is drawn in canvas2d on the compare sheet via a pure `developmentengine.js` leaf"
-    },
-    {
-      "label": "ADR-M3T2-004: Cutting-plane state lives in `main.js` OUTSIDE ShapeData (`commitSection` port)",
-      "file_type": "document",
-      "source_file": "graphics_module_3_topic_2_development_of_surfaces/DECISIONS.md",
-      "source_location": "L90",
-      "_origin": "ast",
-      "id": "graphics_module_3_topic_2_development_of_surfaces_decisions_adr_m3t2_004_cutting_plane_state_lives_in_main_js_outside_shapedata_commitsection_port",
-      "community": 370,
-      "norm_label": "adr-m3t2-004: cutting-plane state lives in `main.js` outside shapedata (`commitsection` port)"
-    },
-    {
-      "label": "ADR-M3T2-005: Cutting-plane controls are Angle-to-HP + Cut-height (plane always \u22a5 VP); corner sampling takes the meshes' alignment phase",
-      "file_type": "document",
-      "source_file": "graphics_module_3_topic_2_development_of_surfaces/DECISIONS.md",
-      "source_location": "L111",
-      "_origin": "ast",
-      "id": "graphics_module_3_topic_2_development_of_surfaces_decisions_adr_m3t2_005_cutting_plane_controls_are_angle_to_hp_cut_height_plane_always_vp_corner_sampling_takes_the_meshes_alignment_phase",
-      "community": 370,
-      "norm_label": "adr-m3t2-005: cutting-plane controls are angle-to-hp + cut-height (plane always \u22a5 vp); corner sampling takes the meshes' alignment phase"
-    },
-    {
-      "label": "ADR-M3T2-006: The \"through holes\" exclusion ships as a hard problem-`type` filter (`EXCLUDED_TYPES`) in the data layer",
-      "file_type": "document",
-      "source_file": "graphics_module_3_topic_2_development_of_surfaces/DECISIONS.md",
-      "source_location": "L146",
-      "_origin": "ast",
-      "id": "graphics_module_3_topic_2_development_of_surfaces_decisions_adr_m3t2_006_the_through_holes_exclusion_ships_as_a_hard_problem_type_filter_excluded_types_in_the_data_layer",
-      "community": 370,
-      "norm_label": "adr-m3t2-006: the \"through holes\" exclusion ships as a hard problem-`type` filter (`excluded_types`) in the data layer"
-    },
-    {
-      "label": "ADR-M3T2-007: Shortest-path (\"string\") problems \u2014 straight chord on the development, 3D wrap by per-face isometry, revealed only on a matched self-check via a non-rebuild overlay commit",
-      "file_type": "document",
-      "source_file": "graphics_module_3_topic_2_development_of_surfaces/DECISIONS.md",
-      "source_location": "L170",
-      "_origin": "ast",
-      "id": "graphics_module_3_topic_2_development_of_surfaces_decisions_adr_m3t2_007_shortest_path_string_problems_straight_chord_on_the_development_3d_wrap_by_per_face_isometry_revealed_only_on_a_matched_self_check_via_a_non_rebuild_overlay_commit",
-      "community": 370,
-      "norm_label": "adr-m3t2-007: shortest-path (\"string\") problems \u2014 straight chord on the development, 3d wrap by per-face isometry, revealed only on a matched self-check via a non-rebuild overlay commit"
     },
     {
       "label": "README.md",
@@ -63503,6 +63733,16 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/main.js",
+      "source_location": "L910",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_1_sections_of_solids_main",
+      "target": "docref_adr_0061",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "graphics_module_3_topic_1_sections_of_solids/main.js",
@@ -63732,6 +63972,26 @@
       "weight": 1.0,
       "source": "graphics_module_3_topic_1_sections_of_solids_main",
       "target": "graphics_module_3_topic_1_sections_of_solids_main_js_docref_adr_0044",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/main.js",
+      "source_location": "L11",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_1_sections_of_solids_main",
+      "target": "graphics_module_3_topic_1_sections_of_solids_main_js_docref_adr_0058",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/main.js",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_1_sections_of_solids_main",
+      "target": "graphics_module_3_topic_1_sections_of_solids_main_js_docref_adr_0060",
       "confidence_score": 1.0
     },
     {
@@ -65918,6 +66178,26 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/src/problemLibrary.js",
+      "source_location": "L8",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_1_sections_of_solids_src_problemlibrary",
+      "target": "graphics_module_3_topic_1_sections_of_solids_src_problemlibrary_js_docref_adr_0062",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/src/problemLibrary.js",
+      "source_location": "L15",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_1_sections_of_solids_src_problemlibrary",
+      "target": "graphics_module_3_topic_1_sections_of_solids_src_problemlibrary_js_docref_adr_0063",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
@@ -66020,6 +66300,26 @@
       "weight": 1.0,
       "source": "graphics_module_3_topic_1_sections_of_solids_src_problems",
       "target": "graphics_module_3_topic_1_sections_of_solids_src_problems_groupbytier",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/src/problems.js",
+      "source_location": "L12",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_1_sections_of_solids_src_problems",
+      "target": "graphics_module_3_topic_1_sections_of_solids_src_problems_js_docref_adr_0062",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/src/problems.js",
+      "source_location": "L91",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_1_sections_of_solids_src_problems",
+      "target": "graphics_module_3_topic_1_sections_of_solids_src_problems_js_docref_adr_0063",
       "confidence_score": 1.0
     },
     {
@@ -66523,6 +66823,16 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/src/sectionCut.js",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_1_sections_of_solids_src_sectioncut",
+      "target": "graphics_module_3_topic_1_sections_of_solids_src_sectioncut_js_docref_adr_0058",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "graphics_module_3_topic_1_sections_of_solids/src/sectionCut.js",
@@ -66633,6 +66943,16 @@
       "weight": 1.0,
       "source": "graphics_module_3_topic_1_sections_of_solids_src_sectionview",
       "target": "graphics_module_3_topic_1_sections_of_solids_src_sectionview_js_docref_adr_0042",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/src/sectionView.js",
+      "source_location": "L2",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_1_sections_of_solids_src_sectionview",
+      "target": "graphics_module_3_topic_1_sections_of_solids_src_sectionview_js_docref_adr_0060",
       "confidence_score": 1.0
     },
     {
@@ -66829,6 +67149,16 @@
       "weight": 1.0,
       "source": "graphics_module_3_topic_1_sections_of_solids_src_uimanager",
       "target": "graphics_module_3_topic_1_sections_of_solids_src_uimanager_js_docref_adr_0048",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_1_sections_of_solids/src/uiManager.js",
+      "source_location": "L18",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_1_sections_of_solids_src_uimanager",
+      "target": "graphics_module_3_topic_1_sections_of_solids_src_uimanager_js_docref_adr_0058",
       "confidence_score": 1.0
     },
     {
@@ -67203,6 +67533,66 @@
       "weight": 1.0,
       "source": "graphics_module_3_topic_2_development_of_surfaces_main",
       "target": "graphics_module_3_topic_2_development_of_surfaces_main_js_docref_adr_0055",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/main.js",
+      "source_location": "L500",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_2_development_of_surfaces_main",
+      "target": "graphics_module_3_topic_2_development_of_surfaces_main_js_docref_adr_0058",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/main.js",
+      "source_location": "L114",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_2_development_of_surfaces_main",
+      "target": "graphics_module_3_topic_2_development_of_surfaces_main_js_docref_adr_0059",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/main.js",
+      "source_location": "L783",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_2_development_of_surfaces_main",
+      "target": "graphics_module_3_topic_2_development_of_surfaces_main_js_docref_adr_0066",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/main.js",
+      "source_location": "L113",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_2_development_of_surfaces_main",
+      "target": "graphics_module_3_topic_2_development_of_surfaces_main_js_docref_adr_0067",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/main.js",
+      "source_location": "L116",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_2_development_of_surfaces_main",
+      "target": "graphics_module_3_topic_2_development_of_surfaces_main_js_docref_adr_0068",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/main.js",
+      "source_location": "L148",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_2_development_of_surfaces_main",
+      "target": "graphics_module_3_topic_2_development_of_surfaces_main_js_docref_adr_0070",
       "confidence_score": 1.0
     },
     {
@@ -69301,6 +69691,26 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/developmentEngine.js",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_2_development_of_surfaces_src_developmentengine",
+      "target": "graphics_module_3_topic_2_development_of_surfaces_src_developmentengine_js_docref_adr_0066",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/developmentEngine.js",
+      "source_location": "L301",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_2_development_of_surfaces_src_developmentengine",
+      "target": "graphics_module_3_topic_2_development_of_surfaces_src_developmentengine_js_docref_adr_0070",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/developmentEngine.js",
@@ -70217,6 +70627,36 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/problemLibrary.js",
+      "source_location": "L17",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_2_development_of_surfaces_src_problemlibrary",
+      "target": "graphics_module_3_topic_2_development_of_surfaces_src_problemlibrary_js_docref_adr_0063",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/problemLibrary.js",
+      "source_location": "L10",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_2_development_of_surfaces_src_problemlibrary",
+      "target": "graphics_module_3_topic_2_development_of_surfaces_src_problemlibrary_js_docref_adr_0065",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/problemLibrary.js",
+      "source_location": "L24",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_2_development_of_surfaces_src_problemlibrary",
+      "target": "graphics_module_3_topic_2_development_of_surfaces_src_problemlibrary_js_docref_adr_0070",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "imports_from",
       "context": "import",
       "confidence": "EXTRACTED",
@@ -70322,6 +70762,26 @@
       "confidence_score": 1.0
     },
     {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/problems.js",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_2_development_of_surfaces_src_problems",
+      "target": "graphics_module_3_topic_2_development_of_surfaces_src_problems_js_docref_adr_0065",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/problems.js",
+      "source_location": "L21",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_2_development_of_surfaces_src_problems",
+      "target": "graphics_module_3_topic_2_development_of_surfaces_src_problems_js_docref_adr_0070",
+      "confidence_score": 1.0
+    },
+    {
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/problems.js",
@@ -70381,6 +70841,16 @@
       "weight": 1.0,
       "source": "graphics_module_3_topic_2_development_of_surfaces_src_sectioncut",
       "target": "graphics_module_3_topic_2_development_of_surfaces_src_sectioncut_cutgeometrywithplane",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/sectionCut.js",
+      "source_location": "L1",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_2_development_of_surfaces_src_sectioncut",
+      "target": "graphics_module_3_topic_2_development_of_surfaces_src_sectioncut_js_docref_adr_0058",
       "confidence_score": 1.0
     },
     {
@@ -70524,6 +70994,36 @@
       "weight": 1.0,
       "source": "graphics_module_3_topic_2_development_of_surfaces_src_uimanager",
       "target": "graphics_module_3_topic_2_development_of_surfaces_src_uimanager_js_docref_adr_0048",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/uiManager.js",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_2_development_of_surfaces_src_uimanager",
+      "target": "graphics_module_3_topic_2_development_of_surfaces_src_uimanager_js_docref_adr_0059",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/uiManager.js",
+      "source_location": "L20",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_2_development_of_surfaces_src_uimanager",
+      "target": "graphics_module_3_topic_2_development_of_surfaces_src_uimanager_js_docref_adr_0067",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "cites",
+      "confidence": "EXTRACTED",
+      "source_file": "graphics_module_3_topic_2_development_of_surfaces/src/uiManager.js",
+      "source_location": "L13",
+      "weight": 1.0,
+      "source": "graphics_module_3_topic_2_development_of_surfaces_src_uimanager",
+      "target": "graphics_module_3_topic_2_development_of_surfaces_src_uimanager_js_docref_adr_0068",
       "confidence_score": 1.0
     },
     {
@@ -71604,7 +72104,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L202",
+      "source_location": "L250",
       "weight": 1.0,
       "source": "architecture_simatrix_architecture",
       "target": "architecture_3_module_2_component_breakdown_the_master",
@@ -71614,7 +72114,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L354",
+      "source_location": "L402",
       "weight": 1.0,
       "source": "architecture_simatrix_architecture",
       "target": "architecture_4_module_1_component_breakdown_foundations_of_projection",
@@ -71624,7 +72124,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L445",
+      "source_location": "L493",
       "weight": 1.0,
       "source": "architecture_simatrix_architecture",
       "target": "architecture_5_data_flow_how_a_user_interaction_reaches_the_scene",
@@ -71634,7 +72134,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L491",
+      "source_location": "L539",
       "weight": 1.0,
       "source": "architecture_simatrix_architecture",
       "target": "architecture_6_the_iframe_boundary",
@@ -71644,7 +72144,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L525",
+      "source_location": "L573",
       "weight": 1.0,
       "source": "architecture_simatrix_architecture",
       "target": "architecture_7_what_is_shared_across_all_codebases",
@@ -71654,7 +72154,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L571",
+      "source_location": "L619",
       "weight": 1.0,
       "source": "architecture_simatrix_architecture",
       "target": "architecture_8_what_is_intentionally_different_between_modules",
@@ -71664,7 +72164,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L626",
+      "source_location": "L674",
       "weight": 1.0,
       "source": "architecture_simatrix_architecture",
       "target": "architecture_9_known_structural_issues",
@@ -71674,7 +72174,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L263",
+      "source_location": "L311",
       "weight": 1.0,
       "source": "architecture_3_module_2_component_breakdown_the_master",
       "target": "architecture_analysis_rendering",
@@ -71684,7 +72184,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L211",
+      "source_location": "L259",
       "weight": 1.0,
       "source": "architecture_3_module_2_component_breakdown_the_master",
       "target": "architecture_data_layer",
@@ -71694,7 +72194,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L227",
+      "source_location": "L275",
       "weight": 1.0,
       "source": "architecture_3_module_2_component_breakdown_the_master",
       "target": "architecture_geometry_shape_generators",
@@ -71704,7 +72204,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L323",
+      "source_location": "L371",
       "weight": 1.0,
       "source": "architecture_3_module_2_component_breakdown_the_master",
       "target": "architecture_motion_utility",
@@ -71714,7 +72214,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L332",
+      "source_location": "L380",
       "weight": 1.0,
       "source": "architecture_3_module_2_component_breakdown_the_master",
       "target": "architecture_orchestrator_shell",
@@ -71724,7 +72224,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L291",
+      "source_location": "L339",
       "weight": 1.0,
       "source": "architecture_3_module_2_component_breakdown_the_master",
       "target": "architecture_ui_controllers_the_leaf_panel_modules",
@@ -71734,7 +72234,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L384",
+      "source_location": "L432",
       "weight": 1.0,
       "source": "architecture_4_module_1_component_breakdown_foundations_of_projection",
       "target": "architecture_leaf_modules_analogous_to_module_2_s",
@@ -71744,7 +72244,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L424",
+      "source_location": "L472",
       "weight": 1.0,
       "source": "architecture_4_module_1_component_breakdown_foundations_of_projection",
       "target": "architecture_pages_wiring",
@@ -71754,7 +72254,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L401",
+      "source_location": "L449",
       "weight": 1.0,
       "source": "architecture_4_module_1_component_breakdown_foundations_of_projection",
       "target": "architecture_pure_data_files_unique_to_module_1_its_subject_matter",
@@ -71764,7 +72264,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L363",
+      "source_location": "L411",
       "weight": 1.0,
       "source": "architecture_4_module_1_component_breakdown_foundations_of_projection",
       "target": "architecture_the_shared_frame_unique_to_module_1_no_module_2_equivalent",
@@ -71774,7 +72274,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "ARCHITECTURE.md",
-      "source_location": "L418",
+      "source_location": "L466",
       "weight": 1.0,
       "source": "architecture_4_module_1_component_breakdown_foundations_of_projection",
       "target": "architecture_vestigial",
@@ -71794,7 +72294,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "CHANGELOG.md",
-      "source_location": "L156",
+      "source_location": "L157",
       "weight": 1.0,
       "source": "changelog_changelog_simatrix_repository_root",
       "target": "changelog_2026_06_27",
@@ -71804,7 +72304,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "CHANGELOG.md",
-      "source_location": "L141",
+      "source_location": "L142",
       "weight": 1.0,
       "source": "changelog_changelog_simatrix_repository_root",
       "target": "changelog_2026_06_28",
@@ -71814,7 +72314,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "CHANGELOG.md",
-      "source_location": "L133",
+      "source_location": "L134",
       "weight": 1.0,
       "source": "changelog_changelog_simatrix_repository_root",
       "target": "changelog_2026_06_29",
@@ -71824,7 +72324,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "CHANGELOG.md",
-      "source_location": "L113",
+      "source_location": "L114",
       "weight": 1.0,
       "source": "changelog_changelog_simatrix_repository_root",
       "target": "changelog_2026_07_02",
@@ -71834,7 +72334,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "CHANGELOG.md",
-      "source_location": "L108",
+      "source_location": "L109",
       "weight": 1.0,
       "source": "changelog_changelog_simatrix_repository_root",
       "target": "changelog_2026_07_03",
@@ -71844,7 +72344,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "CHANGELOG.md",
-      "source_location": "L87",
+      "source_location": "L88",
       "weight": 1.0,
       "source": "changelog_changelog_simatrix_repository_root",
       "target": "changelog_2026_07_09",
@@ -71854,7 +72354,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "CHANGELOG.md",
-      "source_location": "L75",
+      "source_location": "L76",
       "weight": 1.0,
       "source": "changelog_changelog_simatrix_repository_root",
       "target": "changelog_2026_07_10",
@@ -71864,7 +72364,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "CHANGELOG.md",
-      "source_location": "L43",
+      "source_location": "L44",
       "weight": 1.0,
       "source": "changelog_changelog_simatrix_repository_root",
       "target": "changelog_2026_07_11",
@@ -71874,7 +72374,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "CHANGELOG.md",
-      "source_location": "L37",
+      "source_location": "L38",
       "weight": 1.0,
       "source": "changelog_changelog_simatrix_repository_root",
       "target": "changelog_2026_07_12",
@@ -71884,7 +72384,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "CHANGELOG.md",
-      "source_location": "L19",
+      "source_location": "L20",
       "weight": 1.0,
       "source": "changelog_changelog_simatrix_repository_root",
       "target": "changelog_2026_07_13",
@@ -71894,7 +72394,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "CHANGELOG.md",
-      "source_location": "L13",
+      "source_location": "L14",
       "weight": 1.0,
       "source": "changelog_changelog_simatrix_repository_root",
       "target": "changelog_2026_07_17",
@@ -72578,6 +73078,136 @@
       "weight": 1.0,
       "source": "decisions_simatrix_decisions_adr_log",
       "target": "decisions_adr_057_coincident_hidden_dashed_lines_are_forced_behind_visible_solid_lines_via_polygonoffset_renderorder_not_left_to_the_depth_test",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "DECISIONS.md",
+      "source_location": "L1968",
+      "weight": 1.0,
+      "source": "decisions_simatrix_decisions_adr_log",
+      "target": "decisions_adr_058_section_cutting_is_a_hand_authored_single_plane_triangle_clipper_not_a_csg_library",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2016",
+      "weight": 1.0,
+      "source": "decisions_simatrix_decisions_adr_log",
+      "target": "decisions_adr_059_section_plane_state_lives_outside_shapedata_beside_it_in_main_js",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2040",
+      "weight": 1.0,
+      "source": "decisions_simatrix_decisions_adr_log",
+      "target": "decisions_adr_060_projectiondrawer_js_is_a_byte_identical_module2_copy_all_section_drawing_lives_in_a_new_leaf_module",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2072",
+      "weight": 1.0,
+      "source": "decisions_simatrix_decisions_adr_log",
+      "target": "decisions_adr_061_the_true_shape_is_an_in_scene_world_scale_sheet_plus_a_camera_tween_not_an_auxiliary_camera_viewport",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2101",
+      "weight": 1.0,
+      "source": "decisions_simatrix_decisions_adr_log",
+      "target": "decisions_adr_062_the_ktu_exclude_true_shape_given_rule_is_a_problem_type_axis_with_a_hard_filter_not_an_authoring_convention",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2126",
+      "weight": 1.0,
+      "source": "decisions_simatrix_decisions_adr_log",
+      "target": "decisions_adr_063_conic_section_self_check_0_5_tolerance_a_live_generator_target_not_a_parallel_to_generator_preset",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2162",
+      "weight": 1.0,
+      "source": "decisions_simatrix_decisions_adr_log",
+      "target": "decisions_adr_064_ishape_js_taken_verbatim_from_the_module_2_master_conscious_adr_027_resolution",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2183",
+      "weight": 1.0,
+      "source": "decisions_simatrix_decisions_adr_log",
+      "target": "decisions_adr_065_through_hole_problems_are_excluded_structurally_not_editorially",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2203",
+      "weight": 1.0,
+      "source": "decisions_simatrix_decisions_adr_log",
+      "target": "decisions_adr_066_the_development_is_drawn_in_canvas2d_on_the_compare_sheet_via_a_pure_developmentengine_js_leaf",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2248",
+      "weight": 1.0,
+      "source": "decisions_simatrix_decisions_adr_log",
+      "target": "decisions_adr_067_cutting_plane_state_lives_in_main_js_outside_shapedata_commitsection_port",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2270",
+      "weight": 1.0,
+      "source": "decisions_simatrix_decisions_adr_log",
+      "target": "decisions_adr_068_cutting_plane_controls_are_angle_to_hp_cut_height_plane_always_vp_corner_sampling_takes_the_meshes_alignment_phase",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2306",
+      "weight": 1.0,
+      "source": "decisions_simatrix_decisions_adr_log",
+      "target": "decisions_adr_069_the_through_holes_exclusion_ships_as_a_hard_problem_type_filter_excluded_types_in_the_data_layer",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "DECISIONS.md",
+      "source_location": "L2331",
+      "weight": 1.0,
+      "source": "decisions_simatrix_decisions_adr_log",
+      "target": "decisions_adr_070_shortest_path_string_problems_straight_chord_on_the_development_3d_wrap_by_per_face_isometry_revealed_only_on_a_matched_self_check_via_a_non_rebuild_overlay_commit",
       "confidence_score": 1.0
     },
     {
@@ -75584,7 +76214,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "RULES.md",
-      "source_location": "L576",
+      "source_location": "L586",
       "weight": 1.0,
       "source": "rules_simatrix_rules_enforcement_checklist",
       "target": "rules_section_7_cross_module_harmony_rules",
@@ -75594,7 +76224,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "RULES.md",
-      "source_location": "L623",
+      "source_location": "L633",
       "weight": 1.0,
       "source": "rules_simatrix_rules_enforcement_checklist",
       "target": "rules_section_8_documentation_rules",
@@ -75604,7 +76234,7 @@
       "relation": "contains",
       "confidence": "EXTRACTED",
       "source_file": "RULES.md",
-      "source_location": "L646",
+      "source_location": "L656",
       "weight": 1.0,
       "source": "rules_simatrix_rules_enforcement_checklist",
       "target": "rules_section_9_anti_patterns_never_do_these",
@@ -78607,7 +79237,7 @@
       "source_location": "L94",
       "weight": 1.0,
       "source": "graphics_module_3_topic_1_sections_of_solids_claude_claude_md_simatrix_engineering_graphics_viewer_sections_of_solids",
-      "target": "graphics_module_3_topic_1_sections_of_solids_claude_section_cut_engine_src_sectioncut_js_adr_m3t1_001",
+      "target": "graphics_module_3_topic_1_sections_of_solids_claude_section_cut_engine_src_sectioncut_js_adr_058",
       "confidence_score": 1.0
     },
     {
@@ -78638,76 +79268,6 @@
       "weight": 1.0,
       "source": "graphics_module_3_topic_1_sections_of_solids_claude_session_digest_protocol",
       "target": "graphics_module_3_topic_1_sections_of_solids_claude_session_digest_date_feature_task",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "graphics_module_3_topic_1_sections_of_solids/DECISIONS.md",
-      "source_location": "L1",
-      "weight": 1.0,
-      "source": "graphics_module_3_topic_1_sections_of_solids_decisions",
-      "target": "graphics_module_3_topic_1_sections_of_solids_decisions_decisions_md_sections_of_solids_topic_local_adr_log",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "graphics_module_3_topic_1_sections_of_solids/DECISIONS.md",
-      "source_location": "L10",
-      "weight": 1.0,
-      "source": "graphics_module_3_topic_1_sections_of_solids_decisions_decisions_md_sections_of_solids_topic_local_adr_log",
-      "target": "graphics_module_3_topic_1_sections_of_solids_decisions_adr_m3t1_001_section_cutting_is_a_hand_authored_single_plane_triangle_clipper_not_a_csg_library",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "graphics_module_3_topic_1_sections_of_solids/DECISIONS.md",
-      "source_location": "L57",
-      "weight": 1.0,
-      "source": "graphics_module_3_topic_1_sections_of_solids_decisions_decisions_md_sections_of_solids_topic_local_adr_log",
-      "target": "graphics_module_3_topic_1_sections_of_solids_decisions_adr_m3t1_002_section_plane_state_lives_outside_shapedata_beside_it_in_main_js",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "graphics_module_3_topic_1_sections_of_solids/DECISIONS.md",
-      "source_location": "L80",
-      "weight": 1.0,
-      "source": "graphics_module_3_topic_1_sections_of_solids_decisions_decisions_md_sections_of_solids_topic_local_adr_log",
-      "target": "graphics_module_3_topic_1_sections_of_solids_decisions_adr_m3t1_003_projectiondrawer_js_is_a_byte_identical_module2_copy_all_section_drawing_lives_in_a_new_leaf_module",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "graphics_module_3_topic_1_sections_of_solids/DECISIONS.md",
-      "source_location": "L111",
-      "weight": 1.0,
-      "source": "graphics_module_3_topic_1_sections_of_solids_decisions_decisions_md_sections_of_solids_topic_local_adr_log",
-      "target": "graphics_module_3_topic_1_sections_of_solids_decisions_adr_m3t1_004_the_true_shape_is_an_in_scene_world_scale_sheet_plus_a_camera_tween_not_an_auxiliary_camera_viewport",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "graphics_module_3_topic_1_sections_of_solids/DECISIONS.md",
-      "source_location": "L139",
-      "weight": 1.0,
-      "source": "graphics_module_3_topic_1_sections_of_solids_decisions_decisions_md_sections_of_solids_topic_local_adr_log",
-      "target": "graphics_module_3_topic_1_sections_of_solids_decisions_adr_m3t1_005_the_ktu_exclude_true_shape_given_rule_is_a_problem_type_axis_with_a_hard_filter_not_an_authoring_convention",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "graphics_module_3_topic_1_sections_of_solids/DECISIONS.md",
-      "source_location": "L163",
-      "weight": 1.0,
-      "source": "graphics_module_3_topic_1_sections_of_solids_decisions_decisions_md_sections_of_solids_topic_local_adr_log",
-      "target": "graphics_module_3_topic_1_sections_of_solids_decisions_adr_m3t1_006_conic_section_self_check_0_5_tolerance_a_live_generator_target_not_a_parallel_to_generator_preset",
       "confidence_score": 1.0
     },
     {
@@ -79158,86 +79718,6 @@
       "weight": 1.0,
       "source": "graphics_module_3_topic_2_development_of_surfaces_claude_session_digest_protocol",
       "target": "graphics_module_3_topic_2_development_of_surfaces_claude_session_digest_date_feature_task",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "graphics_module_3_topic_2_development_of_surfaces/DECISIONS.md",
-      "source_location": "L1",
-      "weight": 1.0,
-      "source": "graphics_module_3_topic_2_development_of_surfaces_decisions",
-      "target": "graphics_module_3_topic_2_development_of_surfaces_decisions_decisions_adr_log_development_of_surfaces_module_3_topic_2",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "graphics_module_3_topic_2_development_of_surfaces/DECISIONS.md",
-      "source_location": "L7",
-      "weight": 1.0,
-      "source": "graphics_module_3_topic_2_development_of_surfaces_decisions_decisions_adr_log_development_of_surfaces_module_3_topic_2",
-      "target": "graphics_module_3_topic_2_development_of_surfaces_decisions_adr_m3t2_001_ishape_js_taken_verbatim_from_the_module_2_master_conscious_adr_027_resolution",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "graphics_module_3_topic_2_development_of_surfaces/DECISIONS.md",
-      "source_location": "L27",
-      "weight": 1.0,
-      "source": "graphics_module_3_topic_2_development_of_surfaces_decisions_decisions_adr_log_development_of_surfaces_module_3_topic_2",
-      "target": "graphics_module_3_topic_2_development_of_surfaces_decisions_adr_m3t2_002_through_hole_problems_are_excluded_structurally_not_editorially",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "graphics_module_3_topic_2_development_of_surfaces/DECISIONS.md",
-      "source_location": "L46",
-      "weight": 1.0,
-      "source": "graphics_module_3_topic_2_development_of_surfaces_decisions_decisions_adr_log_development_of_surfaces_module_3_topic_2",
-      "target": "graphics_module_3_topic_2_development_of_surfaces_decisions_adr_m3t2_003_the_development_is_drawn_in_canvas2d_on_the_compare_sheet_via_a_pure_developmentengine_js_leaf",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "graphics_module_3_topic_2_development_of_surfaces/DECISIONS.md",
-      "source_location": "L90",
-      "weight": 1.0,
-      "source": "graphics_module_3_topic_2_development_of_surfaces_decisions_decisions_adr_log_development_of_surfaces_module_3_topic_2",
-      "target": "graphics_module_3_topic_2_development_of_surfaces_decisions_adr_m3t2_004_cutting_plane_state_lives_in_main_js_outside_shapedata_commitsection_port",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "graphics_module_3_topic_2_development_of_surfaces/DECISIONS.md",
-      "source_location": "L111",
-      "weight": 1.0,
-      "source": "graphics_module_3_topic_2_development_of_surfaces_decisions_decisions_adr_log_development_of_surfaces_module_3_topic_2",
-      "target": "graphics_module_3_topic_2_development_of_surfaces_decisions_adr_m3t2_005_cutting_plane_controls_are_angle_to_hp_cut_height_plane_always_vp_corner_sampling_takes_the_meshes_alignment_phase",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "graphics_module_3_topic_2_development_of_surfaces/DECISIONS.md",
-      "source_location": "L146",
-      "weight": 1.0,
-      "source": "graphics_module_3_topic_2_development_of_surfaces_decisions_decisions_adr_log_development_of_surfaces_module_3_topic_2",
-      "target": "graphics_module_3_topic_2_development_of_surfaces_decisions_adr_m3t2_006_the_through_holes_exclusion_ships_as_a_hard_problem_type_filter_excluded_types_in_the_data_layer",
-      "confidence_score": 1.0
-    },
-    {
-      "relation": "contains",
-      "confidence": "EXTRACTED",
-      "source_file": "graphics_module_3_topic_2_development_of_surfaces/DECISIONS.md",
-      "source_location": "L170",
-      "weight": 1.0,
-      "source": "graphics_module_3_topic_2_development_of_surfaces_decisions_decisions_adr_log_development_of_surfaces_module_3_topic_2",
-      "target": "graphics_module_3_topic_2_development_of_surfaces_decisions_adr_m3t2_007_shortest_path_string_problems_straight_chord_on_the_development_3d_wrap_by_per_face_isometry_revealed_only_on_a_matched_self_check_via_a_non_rebuild_overlay_commit",
       "confidence_score": 1.0
     },
     {

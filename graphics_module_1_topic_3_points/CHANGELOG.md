@@ -1,5 +1,9 @@
 # Changelog — Projection of Points
 
+## 2026-07-20
+- Changed: `--color-vp-line` darkened `#bc5d1e → #b25718` (platform-wide AA promotion, ~4.92:1 on paper) — `index.html` `:root`.
+- Changed: `.step-body p` gained `color: var(--color-ink-secondary)` so the multi-paragraph step prose reads grey like the rest of the step card instead of near-black `--color-ink` — part of a platform-wide step-card typography pass matching Module 2 (ADR-073).
+
 ## 2026-07-16
 - Added: drag-to-pan and scroll-wheel zoom on the 2D Compare sheet (Module 2 ADR-054/055 parity) — `comparePanX/Y` + `compareZoom` (clamped 0.4–5×) post-multiply over the existing `REF_SPAN`-locked scale via a new `project()` choke point in `drawCompare()`, so the fixed-scale sheet math is untouched. Dblclick recenters and un-zooms. No live-position anchor was added (unlike Module 2's off-centre side-view block, the Points sheet is already `REF_SPAN`-symmetric — a live anchor there would jump the drawing across the XY line, so dead-space balancing is left to user pan by design). Verified via CDP: wheel clamps exactly at 0.4/5×, drag delta matches `comparePanX/Y` exactly, dblclick resets to 0/0/1. (`main.js`.)
 

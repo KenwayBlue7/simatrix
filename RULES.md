@@ -308,6 +308,26 @@ Every rule is formatted:
 > Reason: a debounce only masks a slow recompute and desyncs the lines from the part; with the BVH
 > (§2.20) the pass is cheap enough to run every frame, so edges flip visible↔hidden live under the orbit.
 
+> **§3.33 (retired 2026-07-21, ADR-076) ✅ DO**, *if* a topic ever renders two scenes as scissored
+> regions of ONE shared `WebGLRenderer`, convert every scissored-pass region from device px to
+> logical px before calling `renderer.setViewport`/`setScissor` — divide `{x,y,w,h}` by
+> `renderer.getPixelRatio()` at the call site (a shared `pass(x,y,w,h)` helper), since both APIs
+> multiply by `pixelRatio` internally. `LineMaterial.resolution` (§3.16) stays in device px,
+> unchanged — only the viewport/scissor calls convert. *(ADR-074)*
+> No topic currently does this: the two standalone Lines topics this rule was written for
+> (`graphics_module_1_topic_5_projection_of_line_types`,
+> `graphics_module_1_topic_6_projection_of_straight_lines`) moved their 2D Compare sheet onto its
+> OWN `WebGLRenderer`/canvas (ADR-076), which has no scissor pass and no viewport/scissor pixelRatio
+> boundary to get wrong. Kept as reference guidance for any future scissored-pass design.
+
+> **§3.33a (retired 2026-07-21, ADR-076) ❌ NEVER** hand a scissor-region computation's device-px
+> `{x,y,w,h}` straight to `setViewport`/`setScissor` — three.js multiplies by `pixelRatio`
+> internally, so raw device px double-applies the ratio. Invisible at `devicePixelRatio === 1`; at
+> any other DPR (Windows display scaling, not just browser zoom) it desyncs the WebGL pass from
+> CSS-positioned overlays (e.g. CSS2D labels) that sit in true logical px. *(ADR-074)*
+> Reason: bug silent on every DPR-1 dev display — verify any future two-pass topic at a non-1.0
+> DPR. Retired alongside §3.33 — no topic currently has a scissor pass to misconvert.
+
 ---
 
 ## Section 4 — UI & Visual Rules (Cross-Module Standards)
@@ -449,14 +469,18 @@ Every rule is formatted:
 > state still updates. *(ADR-013, DESIGN.md)*
 
 > **§5.16 ✅ DO** on the Lines expanded Compare split, collapse the wizard and re-parent the
-> `cfg.workbenchControls` `.ctrl` fields into the docked `#workbench-rail` (engine `syncWorkbench`),
-> so the two canvases get a true 50/50 while the live parameters stay reachable under both panes.
-> *(ADR-021)*
-> Reason: the reserved wizard otherwise cramps each pane and gates the live controls away from the dual view.
+> `WORKBENCH_CONTROLS` `[data-ctrl]` wrappers into the docked `#workbench-rail`
+> (`main.js` `enterWorkbench`/`exitWorkbench`), so the two panes get a true 50/50 while the live
+> parameters stay reachable under both. This list now includes the topic's construction launcher(s)
+> (T6: `traces`, `truelength`; T5: `rotation`) alongside the value drivers — a construction runs
+> inside the expanded split like any other control, never forcing a demotion to the compact card.
+> *(ADR-021, ADR-037, ADR-076)*
+> Reason: the reserved wizard otherwise cramps each pane and gates the live controls (and any
+> construction launcher) away from the dual view.
 
-> **§5.17 ❌ NEVER** mirror/duplicate the driver controls into the rail, or give the docked rail a
-> shadow — **re-parent** the existing nodes (one source of truth) and separate the rail with a
-> hairline only (Flat-Ink). *(ADR-021)*
+> **§5.17 ❌ NEVER** mirror/duplicate the driver or construction-launcher controls into the rail, or
+> give the docked rail a shadow — **re-parent** the existing nodes (one source of truth) and
+> separate the rail with a hairline only (Flat-Ink). *(ADR-021, ADR-037)*
 
 > **§5.18 ✅ DO** move between the 3D perspective view and a flat orthographic quick-view (Top / Front /
 > Side) with the **`projectionMorphK` dual-camera matrix morph** — element-wise lerp the ortho camera's
@@ -467,21 +491,33 @@ Every rule is formatted:
 > Reason: orthographic has no foreshortening and perspective has full foreshortening, so a straight
 > camera swap makes off-plane geometry "pop" into depth in one frame — the jarring cut the morph removes.
 
-> **§5.19 ✅ DO** render the on-demand Compare **2D orthographic drawing** at a FIXED scale that never
-> chases the live geometry — the two modules lock it to a different, but equally fixed, basis:
-> - **Module 1 / Lines:** locked to the static sheet bounds, derived from `SHEET`, not a magic constant
+> **§5.19 ✅ DO** render the on-demand Compare **2D orthographic drawing** at a scale locked to a
+> **fixed, principled basis that never chases the live-drawn geometry** — never a bare magic constant,
+> and never the live bbox of what's about to be drawn:
+> - **`Module1/lines.js` (legacy):** locked to the static sheet bounds, derived from `SHEET`
 >   (`sheet2D`: `SHEET2D_SPAN = (SHEET/2)*10`). *(ADR-038)*
+> - **The two standalone Lines topics** (`graphics_module_1_topic_5_projection_of_line_types`,
+>   `graphics_module_1_topic_6_projection_of_straight_lines`): locked to the line's own **intrinsic
+>   True Length** (`M.tl` from `resolveLine()`), recomputed per `layout2D()` call — invariant to the
+>   distance-from-HP/VP sliders (translate end A only) and the θ/φ angle sliders (reorient, don't
+>   lengthen); changes only when TL itself changes. *(ADR-075, the ADR-053 model applied to a line;
+>   supersedes ADR-038/ADR-072 for these two topics only)*
 > - **Module 2:** locked to the solid's own **intrinsic 3D size** (`solidSpanUnits`), anchored to that
 >   layout's own nominal centre — NEVER the live drawn bbox, and never `distHP`/`distVP`/angle slider
 >   values. *(ADR-053, refines the anchor in ADR-054; supersedes ADR-052's live auto-fit)*
 >
-> Either way, a real millimetre reads the same on-screen length regardless of slider/distance/angle
-> values, and a rare over-range line extends past the sheet edge rather than shrinking the drawing.
-> **❌ NEVER** auto-fit / auto-zoom the 2D drawing to chase the geometry — the ADR-014 auto-zoom is for
-> the 3D perspective main pane ONLY. *(ADR-038; ADR-053; ADR-014)*
-> Reason: the orthographic sheet is a *measured* drawing — an auto-fit shrinks 10 mm as the line grows,
-> breaking "10 mm reads as 10 mm" and making the side-by-side 3D↔2D comparison meaningless; and the old
-> magic 100 mm span let the 150 mm True-Length slider overflow the sheet.
+> All three: a real millimetre reads the same on-screen length across every slider/distance/angle
+> value **at a given intrinsic size** (span/TL/solidSpanUnits), and a rare over-range case extends past
+> the sheet edge rather than shrinking the drawing. **❌ NEVER** auto-fit / auto-zoom the 2D drawing to
+> the live-drawn bbox — the ADR-014 auto-zoom is for the 3D perspective main pane ONLY, and an
+> intrinsic-size basis (TL, `solidSpanUnits`) is not the same thing as a live-bbox auto-fit (ADR-052's
+> superseded approach): the former changes only when the underlying object's size changes, the latter
+> rescales on every slider drag. *(ADR-038; ADR-075; ADR-053; ADR-014)*
+> Reason: the orthographic sheet is a *measured* drawing — a live-bbox auto-fit shrinks 10 mm as the
+> drawn layout grows (e.g. on a distance-slider drag), breaking "10 mm reads as 10 mm" and making the
+> side-by-side 3D↔2D comparison meaningless; a fixed-but-wrong-sized span either overflows (Lines'
+> original 100 mm magic constant) or leaves a typical drawing reading as a speck (the old
+> `SHEET2D_SPAN = 150` framed to the TL slider's max, not the line's actual TL — ADR-075's motivation).
 >
 > **Exception — user-driven pan/zoom are allowed.** Drag-to-pan (ADR-054) and scroll-wheel zoom
 > (ADR-055) on Module 2's Compare canvas are permitted as independent UX view-transform layers applied
@@ -677,6 +713,7 @@ Every rule is formatted:
 - ❌ Re-add the `AxesHelper`, add PBR, or cast shadows on geometry. *(§3.24, §3.25)*
 - ❌ Ship a non-manifold solid (overlapping/duplicate extrusions), or keep a zero-area triangle in `meshAnalyzer.js`. *(§3.29, §3.30)*
 - ❌ Debounce the on-orbit hidden-line recompute (rAF-throttle it), or leave a stale/undisposed `three-mesh-bvh`. *(§3.32, §3.31)*
+- ❌ Pass device-px scissor/viewport regions straight to `setViewport`/`setScissor` — convert to logical px first. *(§3.33, §3.33a)*
 
 **UI / visual**
 - ❌ Hard-code a hex in JS or component CSS. *(§4.1)*

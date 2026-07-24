@@ -7,28 +7,29 @@
 // import it. Keeping ONE layout source guarantees the constructions land pixel-aligned on the
 // same front/top views the base sheet draws.
 //
-// FIXED scale locked to the static sheet bounds (ADR-038 / §5.19): a real millimetre reads the
-// same on-screen length at any True Length / inclination — never auto-zooming.
+// INTRINSIC-SIZE scale (ADR-053 model, ADR-075): scale derives from the line's own True Length
+// (M.tl), never a fixed mm span and never the live drawn layout — the TL-per-half analog of
+// Module 2's solidSpanUnits (bounding-sphere diameter). A view's length is always ≤ TL, so
+// framing each sheet half to TL guarantees it fits at ANY True Length, while staying invariant to
+// the distance-from-HP/VP sliders (which only translate end A, never TL) and the angle sliders
+// (which reorient, never lengthen). Supersedes ADR-038 / the ADR-072 SHEET2D_SPAN=150 amendment
+// for this topic — see ADR-075.
 
 export const SHEET = 60;         // world-unit sheet size (mirrors lineRig / the legacy Lines sheet)
 export const HW = 6.2, HH = 4.6; // sheet-space half-extents (the legacy sheet2D layout)
 export const W = (mm) => mm * 0.1;                 // mm → world units (ADR-018)
-// FIXED scale framed to the True-Length slider MAX (150 mm), the primary content dimension —
-// the Points-consistent "frame the slider max" pattern (its REF_SPAN = the distance-slider max,
-// so a typical drawing FILLS the sheet rather than floating tiny in it). §5.19's own guidance is
-// that a rare over-range line (a very tall inclined line) "extends past the sheet edge rather than
-// shrinking the drawing"; the earlier (SHEET/2)*10 = 300 mm framed the absolute worst case so
-// nothing ever overflowed, at the cost of a tiny measured drawing that broke visual parity with
-// the Points sheet. Still a FIXED scale — 10 mm reads the same length at any TL / inclination.
-export const SHEET2D_SPAN = 150;                   // mm per vertical half = True-Length slider max
-export const FIT = (HH - 0.9) / W(SHEET2D_SPAN);   // constant world-unit → sheet-space factor
+const MIN_SPAN_MM = 20;          // mm floor — a near-point line (TL→0) must not blow the scale up
 
 /**
- * Fixed-scale sheet layout: the front view (a′b′) above the XY line, the top view (ab) below.
+ * Intrinsic-scale sheet layout (ADR-053/ADR-075): the front view (a′b′) above the XY line, the
+ * top view (ab) below. Scale is recomputed per call from M.tl, so it tracks the line's True
+ * Length but never the live-drawn bbox.
  * @param {{A,B,tl,fvLen,tvLen}} M  a resolveLine() result (mm)
  * @returns layout coords + view classification flags
  */
 export function layout2D(M) {
+  const spanMm = Math.max(M.tl, MIN_SPAN_MM);        // intrinsic size = True Length
+  const FIT = (HH - 0.9) / W(spanMm);                // per-half fit: a TL-long view fills its half
   const cx = (M.A.x + M.B.x) / 2;
   const ax = W(M.A.x - cx), bx = W(M.B.x - cx);
   const F = (n) => n * FIT;

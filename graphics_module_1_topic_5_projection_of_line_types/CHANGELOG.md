@@ -2,6 +2,60 @@
 
 All notable changes to this topic. Format loosely follows Keep a Changelog.
 
+## [0.1.16] — 2026-07-23 — Compare 2D panel gains drag-to-pan + scroll-wheel zoom
+
+### Added
+- Drag-to-pan and scroll-wheel zoom (zeroed-in on the cursor, clamped 0.4–5×) on the 2D Compare
+  drawing, double-click to recenter/un-zoom — the same interaction Module 2 and the Points topic
+  ship (ADR-054/055), re-expressed against this topic's own live ortho camera (ADR-076's
+  own-`WebGLRenderer` sheet has no Canvas2D `project()` to hook into) via new `compareSheet.js`
+  `resetView()`/`panByPixels()`/`zoomAtPixel()` methods + a `setupComparePan()` wiring in `main.js`
+  (ADR-077).
+
+## [0.1.15] — 2026-07-23 — Compare 2D panel's CSS border restored (over-corrected in [0.1.12])
+
+### Fixed
+- The split workbench's 2D drawing panel (`#compare-card`) had no visible border at all, unlike
+  its `#sim-viewport` and `#workbench-rail` siblings. [0.1.12] mistook the panel's real
+  `border`/`border-left: 1px solid var(--color-border)` CSS for a duplicate of the hand-drawn
+  canvas rectangle ([0.1.13] correctly identified and removed) and deleted both — but only the
+  canvas rectangle was ever the actual leftover; the CSS border was the panel's own legitimate
+  frame (same pattern Module 2 uses). Restored `border: 1px solid var(--color-border)` on the base
+  `.compare-card` rule so both the compact float and the split view keep it; the split rule no
+  longer zeroes it back out. Same correction applied to the sibling
+  `graphics_module_1_topic_6_projection_of_straight_lines` topic.
+
+## [0.1.14] — 2026-07-23 — Rail grouped into Dimensions/Inclination; Rotation Method moved to a floating con-dock
+
+### Changed
+- The rail's three drivers now cluster under two titled groups — **Dimensions** (True Length) and
+  **Inclination** (θ, φ) — instead of one flat row, porting the `.dock__group`/`WORKBENCH_GROUPS`
+  pattern from the sibling `graphics_module_1_topic_6_projection_of_straight_lines`.
+- The Rotation Method launcher moved out of the rail into a new floating `#con-dock` at the 2D
+  drawing panel's bottom-right corner (mirrors `#rail-toggle`'s bottom-left placement on the 3D
+  pane), styled to match its chrome and the platform's 0.8125rem/600 floating-pill font.
+- The separate "Replay" button is gone — the launcher's own label now swaps to "Replay Rotation
+  Method" once triggered, and a click while active replays instead of closing.
+
+## [0.1.13] — 2026-07-23 — Compare panel hairline border: real fix (canvas-drawn frame, not CSS)
+
+### Fixed
+- The 2D Compare panel's hairline border was not a CSS border — `compareSheet.js` drew its own
+  sheet-frame rectangle in `--color-border` on every commit, a leftover from before ADR-076 gave
+  the Compare card its own opaque rounded box. Removed the frame draw (the XY line stays); the
+  CSS-only fix in 0.1.12 below verified clean via `getComputedStyle` but never touched this
+  canvas-rendered line, which is why the border was still visible. Same fix applied to the sibling
+  `graphics_module_1_topic_6_projection_of_straight_lines`, where the bug was first reported.
+
+## [0.1.12] — 2026-07-23 — Compare 2D drawing panel hairline border removed
+
+### Fixed
+- The 2D Compare drawing panel's hairline border, in both the compact float and the default
+  expanded split view — `.compare-card` and `body.compare-split #compare-card` both carried a
+  `1px solid var(--color-border)` (`border` / `border-left`); removed both. This topic duplicates
+  the sibling `graphics_module_1_topic_6_projection_of_straight_lines`'s Compare CSS verbatim,
+  where the same fix was applied.
+
 ## [0.1.11] — 2026-07-22 — Dashed hidden-edge lines tightened to Module 2's visual standard
 
 ### Changed

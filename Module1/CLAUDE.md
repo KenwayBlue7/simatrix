@@ -527,7 +527,7 @@ const lx = signLat * d.distRP;
 
 ```
 --color-hp-line = '#007f7c'  (teal,  SOLID)   → HP plane, p foot, projector to HP, p label
---color-vp-line = '#bc5d1e'  (amber, DASHED)  → VP plane, p' foot, projector to VP, p' label
+--color-vp-line = '#b25718'  (amber, DASHED)  → VP plane, p' foot, projector to VP, p' label
 ```
 
 HP is the **flat teal plane**; VP is the **upright amber plane** — the colour-blind-safe pair

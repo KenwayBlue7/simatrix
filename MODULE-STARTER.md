@@ -205,10 +205,14 @@ cp Module2/src/{cube,cone,cylinder,genericPrism,genericPyramid,genericSolid,shap
 ### 3.3 File-by-file: keep exactly as copied (the shared contracts)
 
 These are the shared engine — **byte-identical to `Module2/src/`** (md5 match, 2026-06-28). The six
-shape generators + `shapeData.js` arrive via the `Module2/` copy in Section 3.2; `anim.js`,
-`meshAnalyzer.js`, and `vertexLabeler.js` already ship inside `template_starter/` unchanged from
-Module 2. Either way, **do not touch them** in the topic — if one needs a fix, fix it in `Module2/`
-and re-copy (RULES.md §1.3, §1.4):
+shape generators + `shapeData.js` arrive via the `Module2/` copy in Section 3.2. Of the three
+platform leaves below, only `anim.js` ships inside `template_starter/`; `meshAnalyzer.js` and
+`vertexLabeler.js` do NOT — the sanitised template removed every solids-only domain leaf (see the
+Case-C note above), so a topic that needs them copies them from `Module2/src/` alongside the
+generators. (Corrected 2026-07-18: this paragraph previously claimed all three shipped in the
+template, contradicting the Case-C sanitisation note — `template_starter/src/` holds only `anim`,
+`uiManager`, `onboarding`, `problems`, `stepper`, `terms`.) Either way, **do not touch them** in
+the topic — if one needs a fix, fix it in `Module2/` and re-copy (RULES.md §1.3, §1.4):
 
 | File | Why it must stay identical |
 |---|---|

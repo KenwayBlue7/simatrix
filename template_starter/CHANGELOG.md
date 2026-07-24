@@ -3,6 +3,9 @@
 Notable changes to this template. (Module 2's history was intentionally not carried over —
 this changelog starts fresh, per MODULE-STARTER §3.2.)
 
+## 2026-07-20
+- Changed: `--color-vp-line` darkened `#bc5d1e → #b25718` (platform-wide AA promotion, ~4.92:1 on paper) — `index.html` `:root`, so new topics minted from this template inherit the darker amber.
+
 ## 2026-07-11
 - Added: Minted `template_starter/` from the Module 2 master — a dual-mode (guided-stepper +
   Compare workbench) scaffold with all Engineering-Graphics domain content stripped: the seven

@@ -28,7 +28,7 @@ import { ShapeType } from './shapeData.js';
  */
 export const TIERS = Object.freeze([
   { id: 'flat',  label: 'Plane-faced solids',                          blurb: 'Prisms and pyramids — the section is a straight-edged polygon.' },
-  { id: 'conic', label: 'Conic sections — cutting the cylinder and cone', blurb: 'An inclined plane through a curved solid cuts an ellipse, a parabola or a hyperbola, depending on its slope.' },
+  { id: 'conic', label: 'Conic sections — cutting the cylinder and cone', blurb: 'A plane through a cylinder or cone cuts a circle, an ellipse, a triangle, a parabola or a hyperbola, depending on its slope and position.' },
 ]);
 
 /**
@@ -96,8 +96,18 @@ export const FIELD_LABELS = Object.freeze({
  */
 
 /**
- * The four problems. Statements verbatim (user-supplied textbook text). All are
+ * The seven problems. Statements verbatim (user-supplied textbook text). All are
  * type 'find-true-shape' — the learner derives the true shape; none hand it over.
+ *
+ * The three extreme-angle conics (circle/triangle/hyperbola below) introduce a
+ * pattern not used by the oblique conics above: a CHECKED non-zero `offset`.
+ * Every oblique problem above leaves `offset` free because "N mm from the base/apex"
+ * needs the learner to derive a normal-offset the dock can't express 1:1. At
+ * angleDeg 90 the plane's normal is horizontal, so `offset` IS literally the
+ * plane's horizontal distance from the axis — a true 1:1 dockable quantity, and for
+ * the triangle/hyperbola pair it is the ONLY field that tells them apart (both are
+ * angleDeg 90; offset 0 clips the apex into a triangle, any other reachable offset
+ * misses it into a hyperbola). See root DECISIONS.md ADR-071.
  * @type {ReadonlyArray<Problem>}
  */
 export const PROBLEMS = Object.freeze([
@@ -174,6 +184,65 @@ export const PROBLEMS = Object.freeze([
     // discovery this problem teaches).
     setup: { baseLength: 3, height: 4 },
     target: { shape: ShapeType.Cone, section: { enabled: true, orientation: 'HP', angleDeg: 'generator' } },
+  },
+  {
+    id: 'cone-circle-parallel-base',
+    tier: 'conic',
+    type: 'find-true-shape',
+    title: 'Cone cut parallel to the base — circle',
+    statement: 'A cone, base 50 mm diameter and axis 60 mm long, has its base on the H.P. It is cut by a section plane perpendicular to the V.P. and parallel to the H.P., the plane cutting the axis well above the base.',
+    hints: [
+      'A plane parallel to the base meets every generator at the same height — the section is a circle, same shape as the base, just smaller.',
+      '“Parallel to the H.P.” is Step 2: orientation HP, inclination 0°. A flat plane needs no slope.',
+      'Slide the plane position until the sheet sits above the base and still crosses the cone — any height that keeps the cut on the solid gives a circle, so the check accepts any position that cuts it.',
+    ],
+    // angleDeg 0 pins orientation:'HP' (the only choice that reads as "parallel to
+    // the base" — 'VP' at 0° would be parallel to the axis instead, a degenerate
+    // non-cut). offset deliberately free: every horizontal slice through the cone
+    // is a circle, so only the cuts-the-solid guard matters here.
+    setup: { baseLength: 2.0, height: 2.4 },
+    target: { shape: ShapeType.Cone, section: { enabled: true, orientation: 'HP', angleDeg: 0 } },
+  },
+  {
+    id: 'cone-triangle-through-apex',
+    tier: 'conic',
+    type: 'find-true-shape',
+    title: 'Cone cut through the apex — isosceles triangle',
+    statement: 'A cone, base 60 mm diameter and axis 70 mm long, has its base on the H.P. It is cut by a section plane, perpendicular to the H.P. and to the V.P., passing through the apex and containing the axis.',
+    hints: [
+      'A plane through the apex cuts along two generators, straight lines from apex to base rim — the section is a triangle, isosceles because both generators are equal.',
+      'Vertical and “containing the axis” together mean 90° to the H.P., centred: dial the inclination to 90°.',
+      '“Passing through the apex” means the plane needs no sideways shift off the axis — set the plane position to 0 mm.',
+    ],
+    // orientation omitted: at angleDeg 90 the 'HP' and 'VP' normals coincide
+    // ((0,cos90,sin90) ≡ (cos90,0,sin90) ≡ (0,0,1)), so the dropdown is a genuine
+    // don't-care here — pinning either would fail a correct answer in the other
+    // state. offset:0 IS checked (see the class docstring above): it is what
+    // distinguishes this problem from cone-hyperbola-parallel-axis below, and at
+    // 90° it maps 1:1 onto "through the axis" with no derived trig.
+    setup: { baseLength: 2.4, height: 2.8 },
+    target: { shape: ShapeType.Cone, section: { enabled: true, angleDeg: 90, offset: 0 } },
+  },
+  {
+    id: 'cone-hyperbola-parallel-axis',
+    tier: 'conic',
+    type: 'find-true-shape',
+    title: 'Cone cut parallel to the axis — hyperbola',
+    statement: 'A cone, base 75 mm diameter and axis 90 mm long, has its base on the H.P. It is cut by a section plane, perpendicular to the H.P. and to the V.P., parallel to the axis and offset from it, not passing through the apex.',
+    hints: [
+      'A plane parallel to the axis (steeper than every generator, since it never tilts back toward them) crosses only one branch of the cone’s surface — the section is a hyperbola.',
+      '“Parallel to the axis” is the same 90° dial as the apex cut: inclination 90°.',
+      '“Offset from it, not passing through the apex”: slide the plane position off 0 mm — 8 mm clears the apex while still cutting the cone. The check wants a plane near 8 mm, not just any nonzero offset.',
+    ],
+    // orientation omitted, same don't-care as the triangle problem above. offset is
+    // checked at a specific nonzero value (0.8 world = 8 mm dock) rather than left
+    // free, because "any nonzero offset" would also accept 0.05 (the tolerance
+    // boundary against offset:0) — pinning a value comfortably clear of both 0 and
+    // the radius (1.5 world) keeps the triangle/hyperbola pair unambiguous. 0.8 <
+    // radius 1.5, so the plane still cuts the cone (misses the apex, keeps the
+    // base) — a true hyperbolic arc, not a miss.
+    setup: { baseLength: 3.0, height: 3.6 },
+    target: { shape: ShapeType.Cone, section: { enabled: true, angleDeg: 90, offset: 0.8 } },
   },
 ]);
 
