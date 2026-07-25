@@ -5,6 +5,13 @@ All notable changes to Module 3 · Topic 1 (Sections of Solids).
 (This topic's own history starts fresh from the scaffold date below — `template_starter/`'s prior
 build history belongs to the template, not this topic, per MODULE-STARTER §3.2 convention.)
 
+## 2026-07-20
+- Changed: `--color-vp-line` darkened `#bc5d1e → #b25718` (platform-wide AA promotion, ~4.92:1 on paper) — `index.html` `:root`.
+
+## 2026-07-18
+- Added: 3 conic-section problems completing the KTU set on the cone — circle (parallel to base, `angleDeg:0`), isosceles triangle (through the apex, `angleDeg:90, offset:0`), hyperbola (parallel to the axis, `angleDeg:90, offset:0.8`) — joining the existing ellipse ×2 and parabola problems in `src/problems.js` (root `DECISIONS.md` ADR-071).
+- Changed: Triangle/hyperbola both dial `angleDeg:90`, so the self-check now CHECKS `offset` to tell them apart (0 vs 8 mm) — the first conic problem to check offset, reversing the oblique problems' "offset stays free" default (legitimate here because at 90° the offset is a 1:1 dockable horizontal distance, not a derived normal-offset).
+
 ## 2026-07-17
 - Added: First-angle orthographic views (top/front/side with per-view visible/dashed classification + 3D→2D connectors) via `src/projectionDrawer.js` copied byte-identical from Module2 (ADR-060) — zero edits, so no drift; VP/PP wall grids seated per rebuild (PP at `bbox.min.z − 1.5`).
 - Added: 45° section hatching of the apparent shape in every view where the cut face projects to an area (new leaf `src/sectionView.js`); the edge-on view correctly shows no hatch — pitch fixed at 0.25 world units (2.5 mm at dock scale) per SP 46 density.

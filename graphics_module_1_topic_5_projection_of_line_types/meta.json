@@ -1,0 +1,6 @@
+{
+  "title": "Projection of Straight Lines — Types of Lines",
+  "description": "A conceptual, guided tour of the six standard positions a straight line can take relative to the HP and VP: parallel to both, perpendicular to HP, perpendicular to VP, inclined to HP, inclined to VP, and inclined to both. Each step is its own mini-lesson — see why a projection reads the true length, why it foreshortens, why it collapses to a point, and how the Rotation Method recovers the true length when the line is inclined to both planes.",
+  "difficulty": "beginner",
+  "tags": ["engineering-graphics", "projection-of-lines", "types-of-lines", "orthographic-projection", "true-length", "rotation-method", "foreshortening", "first-angle"]
+}

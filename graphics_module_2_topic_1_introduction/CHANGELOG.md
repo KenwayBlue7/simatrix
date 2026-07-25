@@ -2,6 +2,9 @@
 
 All notable changes to Module 2 · Topic 1 (Introduction).
 
+## 2026-07-20
+- Changed: `--color-vp-line` darkened `#bc5d1e → #b25718` (platform-wide AA promotion, ~4.92:1 on paper) — `index.html` `:root`.
+
 ## 2026-07-09
 - Fixed: `#shape-rail` + `#anatomy-panel` scrollbar pills actually shipped tinted `--color-accent` (the 2026-07-02 entry below described `--color-border`, but the accent tint landed in code) — WebKit thumb + Firefox `scrollbar-color` now read `var(--color-border)` per ADR-032.
 

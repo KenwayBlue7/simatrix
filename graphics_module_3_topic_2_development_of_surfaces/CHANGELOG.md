@@ -3,6 +3,9 @@
 Notable changes to this topic. (The starter template's own history was intentionally not carried
 over — this changelog starts fresh at the scaffold, per MODULE-STARTER §3.2.)
 
+## 2026-07-20
+- Changed: `--color-vp-line` darkened `#bc5d1e → #b25718` (platform-wide AA promotion, ~4.92:1 on paper) — `index.html` `:root`.
+
 ## 2026-07-18
 - Added: Phase 2 flat-pattern layer — new pure leaf `src/developmentEngine.js` draws textbook
   developments on the Compare sheet: Parallel-Line method (prisms/cylinder, stretch-out `n·s` /

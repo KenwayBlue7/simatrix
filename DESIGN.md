@@ -16,7 +16,7 @@ colors:
   border: "#e0e1e5"
   track: "#e0e1e5"
   hp-line: "#007f7c"
-  vp-line: "#bc5d1e"
+  vp-line: "#b25718"
   pp-line: "#7a5ea6"
   success: "#2e7d52"
   success-soft: "#e2efe8"
@@ -124,7 +124,7 @@ accent and every HP/VP/PP domain encoding were deliberately left untouched.
 | `success` | `#2e7d52` | 0.56 0.10 158 | A completed step — **always** with a check glyph, never colour alone. |
 | `success-soft` | `#e2efe8` | 0.94 0.03 158 | Completion-state wash. |
 | `hp-line` (HP Teal) | `#007f7c` | 0.53 0.11 192 | Horizontal-Plane projection (top view), drawn **solid**. Held off blue (~4.57:1). |
-| `vp-line` (VP Amber) | `#bc5d1e` | 0.58 0.12 55 | Vertical-Plane projection (front view), drawn **dashed**. Teal↔amber is the CVD-safe pair (~4.19:1). |
+| `vp-line` (VP Amber) | `#b25718` | 0.55 0.12 52 | Vertical-Plane projection (front view), drawn **dashed**. Teal↔amber is the CVD-safe pair (~4.92:1). *(Darkened one step from `#bc5d1e` 2026-07-20 so `.lbl--vp` label text clears AA; promoted platform-wide from Topic 6's local override.)* |
 | `pp-line` (PP Violet) | `#7a5ea6` | 0.55 0.10 305 | Profile-Plane projection (side view), the third plane. Held off chrome blue (h305 vs 252) and clear of teal/amber (~4.5:1). **Actively used in Module 2; defined-but-unused in Module 1 — see §7/§8.** |
 
 **Derived / non-colour tokens** also live in `:root` and are part of the contract:
@@ -194,13 +194,15 @@ Atkinson Hyperlegible 400, Atkinson Hyperlegible 700, IBM Plex Mono 400. The fil
 | Role | Font / weight | Size · line-height · tracking | Where |
 |---|---|---|---|
 | **Title** | Atkinson 700 | `1.35rem` · 1.2 · `-0.01em` | The step title — the tutor's headline for the current idea. |
-| **Lead** | Atkinson 400 | `1.125rem` · 1.35 | The step's one-sentence explanation under the title. |
-| **Body** | Atkinson 400 | `1rem` · 1.6 | Instructions, notes, hint copy. Comfortable measure; never below caption size. |
+| **Step-card copy** | Atkinson 400 | `0.875rem` (`--text-sm`) · 1.55, colour `--color-ink-secondary` | The step card's lead sentence (`.card__lead`) **and** its instruction body (`.step-body`) — one uniform compact grey register, matching Module 2 (the reference implementation). *(Amended 2026-07-20, ADR-073 — supersedes the `1.125rem`/`1rem` Lead/Body split below, which two Module-1 topics had drifted onto. `--text-lead` is retired: no current consumer.)* |
+| **Body** | Atkinson 400 | `1rem` · 1.6 | General body prose **outside the step card** — fallback/notice copy, overlay titles, longform hint text. Comfortable measure; never below caption size. |
 | **Label** | Atkinson 700 | `0.75rem` · 1.2 · `0.07em`, uppercase | Group titles (`.dock__group-title`) — the engineering-software register. |
 | **Value** | IBM Plex Mono 400 | `0.875rem` · 1.2, tabular figures | Every live numeric readout with its unit, plus precise text entry. |
 | **Step eyebrow** | IBM Plex Mono 400 | `0.75rem` · 1.2 · `0.07em`, uppercase | The "Step X of N" step indicator (`.card__eyebrow`), colour `--color-ink-secondary`. A **mono micro-label** — deliberately **not** the Atkinson-700 Label role. *(Split out from Label, code audit 2026-07-02: `.card__eyebrow` sets `font-family: var(--font-mono)` at the inherited 400 weight, with no `font-weight` override — not Atkinson 700.)* |
 
-(These map to the code tokens `--text-title / --text-lead / --text-base / --text-xs / --text-sm`.)
+(These map to the code tokens `--text-title / --text-base / --text-xs / --text-sm`. `--text-lead`
+remains a declared token in every module's `:root` for backward compatibility but has no active
+consumer post-ADR-073.)
 
 ### 3.3 The named type rules
 
@@ -564,7 +566,7 @@ module appendix conflicts on a token or named rule, this file wins.**
 **Do:**
 - Keep the blue accent to ~10% of the chrome and let the viewport be the loud subject.
 - Keep blue in the chrome only; viewport meaning uses the domain encodings (HP teal `#007f7c`, VP amber
-  `#bc5d1e`, PP violet `#7a5ea6`).
+  `#b25718`, PP violet `#7a5ea6`).
 - Pair every colour signal with a second cue (dash, weight, label, icon, arrow, shape).
 - Read every colour from a CSS custom property; JS/Three.js read the live token, never a hard-coded hex.
 - Convey depth with tonal layering (paper → panel → solid-fill) and 1px hairlines.
@@ -630,6 +632,26 @@ A module adds its own domain encodings and viewport behaviour **here**, never by
 - `@font-face` is declared in `src/shell.css`, so font URLs are **`../assets/fonts/…`** (stylesheet one level
   down). UI DOM ownership: the engine + `chrome.js` own the chrome; `src/uiManager.js` is a vestigial stub.
 - **The no-transform invariant** (§4.4) is required by the Compare card's `position:fixed` placement.
+
+### 7.3 Module 3 Topic 1 — Sections of Solids
+
+- **Adds Section Crimson** (`--color-section-face #b23b4f`, oklch(0.55 0.15 15)) for the section
+  cut face and the translucent cutting-plane sheet — the drafting convention for cut material.
+  Its own token per the topic CLAUDE.md rule ("do not reuse the HP/VP projection colours for the
+  cutting plane"); held clear of HP teal (h192), VP amber (h55), PP violet (h305), and the
+  chrome blue (h252); ~5.6:1 on paper. Cap fill uses it at full strength; the plane sheet at
+  0.12 opacity with a 0.55-opacity border (opacity lives in JS/material, the colour in the token).
+
+### 7.4 Module 3 Topic 2 — Development of Surfaces
+
+- Reuses **Section Crimson** (`--color-section-face`, §7.3 value) for its truncation cap +
+  cutting-plane sheet.
+- **Adds String Plum** (`--color-dev-path #8f3a86`, oklch(0.48 0.15 330)) for the
+  shortest-path "string" revealed by matched practice problems — drawn as the straight chord
+  on the 2D development sheet and as the wrapped `Line2` on the 3D solid. Held clear of
+  section crimson (h15), PP violet (h305), HP teal (h192), VP amber (h55) and the chrome blue
+  (h252); ~6.7:1 on paper. Two-Cue Rule: the 2D chord always carries endpoint dots + thin
+  crossing ticks at the fold/generator stations, so the answer line never reads by colour alone.
 
 ---
 

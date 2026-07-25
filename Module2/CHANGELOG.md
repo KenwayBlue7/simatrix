@@ -2,6 +2,9 @@
 
 All notable changes to Module 2 (Orthographic Projection of Solids).
 
+## 2026-07-20
+- Changed: `--color-vp-line` darkened `#bc5d1e → #b25718` (platform-wide AA promotion, ~4.92:1 on paper) — `index.html` `:root`.
+
 ## 2026-07-16
 - Fixed: dashed hidden-edge lines could bleed through coincident visible solid lines (e.g. the Cube's front/back faces project to the identical square) — `LineSegments2` fat lines z-fought at equal depth with no deterministic winner; `buildSegments()` now biases dashed materials with `polygonOffset` and sets `renderOrder` so visible lines always paint over hidden ones, per drafting line-precedence convention.
 - Fixed: Step 6's "Unfold to 3D"/"Flatten to 2D" button stayed stuck on the wrong label after a Flatten → open Compare (expanded split) → close Compare round-trip — `enterWorkbench()` forces the engine back to 3D but never told the stepper, so its own `state.flattened` latch went stale; `stepper.js` now exposes `setFlattened()` and `main.js` calls it right after the forced unflatten.

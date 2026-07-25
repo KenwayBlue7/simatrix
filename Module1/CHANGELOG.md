@@ -2,6 +2,9 @@
 
 All notable changes to Module 1 (Engineering Graphics — Foundations of Projection).
 
+## 2026-07-20
+- Changed: `--color-vp-line` darkened `#bc5d1e → #b25718` (platform-wide AA promotion, ~4.92:1 on paper) — `src/shell.css` `:root`; `CLAUDE.md`'s token reference updated to match.
+
 ## 2026-07-10
 - Fixed: the 3D→2D fold now SWOOPS square-on to the orthographic answer sheet (ADR-036, overturning ADR-013's held-angle hold) — the shared engine's held-angle dolly (`animateFoldHold`/`snapFoldFlatHold`/`framePerspectiveToFlat`) is replaced by `animateFoldSwoop`/`snapFoldSwoop` on the existing dual-camera stack: forward engages the ortho camera, glides it front-on to the flattened sheet and morphs perspective→ortho on the hinge's `easeFold` curve; reverse glides back to the learner's retained perspective orbit pose. Drives BOTH Module 1 sims (Points via `main.js`, Lines via `lines.js`, both `orthoViews:true`); `preFoldPose` is no longer stored on these lessons (the perspective camera never moves during the swoop). (`src/engine.js`.)
 - Changed: the Lines 2D drawing scale span was re-derived from `SHEET` — `SHEET2D_SPAN` 100 → `(SHEET/2)*10` (= 300 mm per half) — because the flat 100 mm span (above) could be overrun by the 150 mm True-Length slider (and a 150 mm end height), overflowing the static sheet; the absolute worst-case line now stays inside it. (`lines.js` `sheet2D`; ADR-038.)

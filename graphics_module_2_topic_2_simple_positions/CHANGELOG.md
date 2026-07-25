@@ -2,6 +2,9 @@
 
 All notable changes to Module 2 · Topic 2 (Simple Positions).
 
+## 2026-07-20
+- Changed: `--color-vp-line` darkened `#bc5d1e → #b25718` (platform-wide AA promotion, ~4.92:1 on paper) — `index.html` `:root`.
+
 ## 2026-07-16
 - Fixed: dashed hidden-edge lines could bleed through coincident visible solid lines (e.g. the Cube's front/back faces project to the identical square) — backported the Master's `buildSegments()` fix, biasing dashed materials with `polygonOffset` and setting `renderOrder` so visible lines always paint over hidden ones, per drafting line-precedence convention.
 - Added: Backported the full ADR-037 Compare 50/50 workbench (2D drawing sheet, drag-to-pan + scroll-zoom, docked driver rail, rail hide/reveal toggle) from the Module 2 Master — this clone previously had no Compare feature at all.

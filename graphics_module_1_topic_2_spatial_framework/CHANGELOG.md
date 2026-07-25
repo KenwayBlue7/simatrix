@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-20
+- Changed: `--color-vp-line` darkened `#bc5d1e → #b25718` (platform-wide AA promotion, ~4.92:1 on paper) — `index.html` `:root`.
+
 ## 2026-07-10 (step-4 title copy)
 - Changed: the step-4 card title "Fold (Rabattement)" → "Fold" — the `rabattement` <button class="term"> definition and the step body copy that uses it are unchanged. (`src/spatialSteps.js`.)
 

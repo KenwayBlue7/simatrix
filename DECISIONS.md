@@ -1188,6 +1188,25 @@ auto-zoom — the deliberate counterpart that this ADR carves the 2D drawing out
 **Status:** Active for the Lines topic (`Module1/lines.js`), which this ADR governs. Module 2's
 Compare drawing had adopted the same fixed-scale *pattern* by convention (not this ADR — a
 different file/sim) and has since moved off it; see **ADR-052**, which does not alter Lines.
+**Superseded 2026-07-20 (ADR-075)** for the two standalone Lines topics
+(`graphics_module_1_topic_5_projection_of_line_types` and
+`graphics_module_1_topic_6_projection_of_straight_lines`) only — they now use ADR-053's
+intrinsic-TL scale model. This ADR remains **Active, unchanged**, for the legacy `Module1/lines.js`.
+
+**Amended 2026-07-19 (ADR-072):** `SHEET2D_SPAN` in the standalone Lines topics
+(`graphics_module_1_topic_5_projection_of_line_types` and
+`graphics_module_1_topic_6_projection_of_straight_lines`, both descended from `Module1/lines.js`
+via ADR-033) is **`150`**, not the literal `(SHEET/2)*10 = 300` this ADR originally specified.
+`150` frames the True-Length slider max (the Points-consistent "frame the slider max" pattern, so
+a typical 60–150 mm drawing fills the sheet instead of floating tiny inside a worst-case-sized
+one). This is a **narrower**, not larger, span than the original derivation, so the "guarantees the
+absolute worst case stays inside" property this ADR's Alternatives-rejected clause protected
+against is now traded away for a rare over-range line — accepted per §5.19's own fallback ("extends
+past the sheet edge rather than shrinking the drawing"). The rule that the span must be a *named,
+principled fixed constant* (never a data-dependent auto-fit, never a bare unexplained magic number)
+is otherwise unchanged and still governs both topics identically. **Still Active** for the legacy
+`Module1/lines.js` at the original `(SHEET/2)*10` value — this amendment applies only to the two
+standalone topics named above.
 
 ---
 
@@ -2368,6 +2387,359 @@ ADR-067 mirror) and is cleared by `simAPI.reset()`; `simController` gains `hasCu
 topic-1 "Complete & next problem" CTA + success toast; `--color-dev-path #8f3a86` recorded in
 DESIGN.md §7.4.
 **Status:** Active
+
+---
+
+## ADR-071: Extreme-angle conic problems (circle/triangle/hyperbola) check a nonzero `offset`, overriding the oblique-conic "offset stays free" default
+
+**Date:** 2026-07-18
+**Decision:** Topic-1's problem library (`src/problems.js`) gains three cone problems completing
+the KTU conic set — circle (`orientation:'HP', angleDeg:0`, offset free), isosceles triangle
+(`angleDeg:90, offset:0`, orientation omitted), hyperbola (`angleDeg:90, offset:0.8`, orientation
+omitted). At `angleDeg:90` the `'HP'` and `'VP'` plane normals coincide
+(`(0,cos90,sin90) ≡ (cos90,0,sin90) ≡ (0,0,1)` in `main.js buildSectionPlaneWorld()`), so
+orientation is a genuine don't-care and is omitted from `target.section` for both. `offset` is
+CHECKED for triangle/hyperbola — the only field that tells them apart, since both dial
+`angleDeg:90` — reversing every prior conic problem's practice of leaving `offset` free.
+**Why:** Every oblique conic problem (ellipse ×2, parabola) leaves `offset` free because a quoted
+"N mm from the base/apex" needs the learner to derive a normal-offset the mm dock can't express
+1:1 (documented per-problem in `problems.js`). At `angleDeg:90` the plane's normal is horizontal,
+so `offset` IS literally the plane's horizontal distance from the cone's axis — a true 1:1
+dockable quantity, not a derived one — so checking it exactly is legitimate here even though it
+isn't for the oblique cases. Without a checked `offset`, the triangle and hyperbola targets would
+be identical (`angleDeg:90` alone) and either problem's self-check would accept the other's answer.
+**Alternatives rejected:** *Leave offset free on both, discriminate on `type`/title alone* — the
+self-check only compares `target` fields against the dialled plane, so an unchecked field can
+never fail a wrong answer; a learner could "solve" the triangle problem by dialling any hyperbola
+offset. *A synthetic "throughApex: boolean" field* — reinvents `offset:0`, which the engine
+already treats as passing through the solid's centre (and the apex sits on the axis at that
+centre), for no gain.
+**Consequences:** `problems.js`'s `PROBLEMS` array grows 4 → 7; its header docstring documents the
+checked-offset pattern for future conic authoring. `TIERS[1].blurb` updated to name all five
+curves (circle, ellipse, triangle, parabola, hyperbola) instead of the original three.
+**Status:** Active
+
+---
+
+## ADR-072: The teammate-contributed Lines problem-solver is promoted to catalog topic 6, its Problem Library activated, and its construction-aid tokens reconciled to DESIGN.md §2.2
+
+**Date:** 2026-07-19
+**Decision:** A second, previously untracked build of the "Projection of Straight Lines" topic —
+contributed alongside the conceptual `graphics_module_1_topic_5_projection_of_line_types` primer —
+is promoted from its non-conforming folder name `module_1_topic_lines` to
+**`graphics_module_1_topic_6_projection_of_straight_lines`**, the next free Module-1 catalog slot
+after topic 5. Three changes land together:
+1. **Rename**, no other structural change — `main.js`, `meta.json`'s title ("Projection of Straight
+   Lines"), and the `<title>` tag were already correct pre-rename.
+2. **Problem Library un-staled**, not newly built — the topic's own CLAUDE.md described the
+   Problem Library as "deferred, out of migration scope" (per ADR-042), but `main.js` already calls
+   `initProblemLibrary(simController, {list: LINE_PROBLEMS, tiers: LINE_TIERS, fieldLabels:
+   LINE_FIELD_LABELS})` and wires `isProblemActive`/`completeAndNext` into `window.simAPI`; the
+   overlay DOM is present in `index.html`. The 12 problems in `src/lineProblems.js` are
+   verbatim-identical to the legacy `Module1/src/lineProblems.js` set (N.D. Bhatt + K.C. John,
+   RULES.md §6.7 compliant) — no new problems were authored, the existing library was simply wired
+   up. The doc was corrected to match the shipped code rather than the code being rolled back.
+3. **Construction-aid tokens reconciled to DESIGN.md §2.2.** The topic's `index.html :root` defined
+   only three of the six catalogued Module-1 construction-aid tokens, and two of those three were
+   aliased to existing neutrals (`--construct: var(--color-ink-secondary)`, `--locus:
+   var(--color-bench-grey)`) rather than the platform's own distinct values; the three `*-ink` text
+   variants were absent entirely. Replaced with DESIGN.md §2.2's exact catalogued hex —
+   `--construct #8a8275`, `--locus #7b4fb5`, `--tl-green #1f8a4c`, `--construct-ink #5e564a`,
+   `--locus-ink #6a3fa3`, `--tl-green-ink #166b3c` — so this Traces/True-Length construction reads
+   with the same encodings as every other Module-1 consumer of these tokens (originally catalogued
+   from `Module1/src/shell.css` in the 2026-06-27 code audit, DESIGN.md §2.2).
+**Why:** Two intentionally-distinct sibling topics were found coexisting: topic 5 is a **concept
+primer** ("Types of Lines," six fixed positions, deliberately problem-free by design — see its own
+CLAUDE.md, "removed, not deferred"), and this topic is the **problem-solving build** (5-step
+build-up + traces + True-Length + the 12-problem textbook library). An initial read of the two
+folders looked like pedagogical drift (one topic "lost" the problems the other had); reading both
+topics' CLAUDE.md files corrected that — they are siblings by design, not competing versions, and
+the only real defects were this topic's non-conforming folder name, its stale "deferred" doc
+language for a library that was already wired, and its token drift from the platform catalog.
+Promoting it (rather than discarding it in favour of porting problems into topic 5, which would
+have violated topic 5's explicit charter) preserves the only copy of the Lines problem-solving
+topic and gives it a permanent, conforming home.
+**Alternatives rejected:** (a) *Port the 12-problem library into topic 5 and retire this folder* —
+rejected: topic 5's CLAUDE.md explicitly excludes a Problem Library ("NOT a problem library... the
+sibling topic owns all of that"); doing this would both violate that charter and delete the only
+Lines problem-solver, the opposite of the intent. (b) *Leave the folder under its non-conforming
+name* — rejected: every other Module-1/2/3 topic follows the `graphics_module_<N>_topic_<K>_<slug>`
+convention (or the deliberate unnumbered exception documented for "Simple Positions," RULES.md
+§1.9); an untracked, unnumbered sibling folder is a permanent source of confusion for the next
+contributor. (c) *Revert `SHEET2D_SPAN` to the literal ADR-038 formula (`300`)* — rejected: the
+code's own comment documents a deliberate, reasoned improvement (Points-parity sheet fill); see the
+ADR-038 amendment above instead of reverting a documented win.
+**Consequences:** `graphics_module_1_topic_6_projection_of_straight_lines/` is the canonical,
+committed home of the Lines problem-solver; `graphics_module_1_topic_5_projection_of_line_types`'s
+CLAUDE.md/CHANGELOG sibling references were updated to the new name. ADR-038 gained the 2026-07-19
+amendment above. topic 5 carries the **same** token drift from DESIGN.md §2.2 (identical `:root`
+block, ported when topic 5 was cut from this topic) — left unresolved here as a flagged follow-up,
+since fixing it is outside this topic's own folder and wasn't part of the approved scope for this
+change; a future pass should apply the identical `--construct`/`--locus`/`--tl-green` + `*-ink`
+fix there for platform consistency.
+**Status:** Active
+
+---
+
+## ADR-075: The two standalone Lines topics' 2D Compare sheet moves from ADR-038's fixed mm span to the ADR-053 intrinsic-size model — scale derives from the line's True Length
+
+**Date:** 2026-07-20
+**Decision:** `graphics_module_1_topic_5_projection_of_line_types` and
+`graphics_module_1_topic_6_projection_of_straight_lines`'s shared `sheet2DLayout.js::layout2D()`
+no longer derives its px-per-mm scale from the fixed `SHEET2D_SPAN = 150` constant (ADR-038, as
+amended by ADR-072). It now derives the scale **per call, from the resolved line's own True Length**
+(`M.tl`, `resolveLine()`'s `tl = hypot(dx,dy,dz)`, which equals `data.TL` exactly): `FIT = (HH - 0.9)
+/ W(max(M.tl, 20))`, framing each sheet half (front view above XY, top view below) to fit a
+TL-long view. This is the Module 2 **ADR-053 intrinsic-size model**, not ADR-052's live-bbox
+auto-fit: `M.tl` is invariant to the distance-from-HP/VP sliders (they translate end A only) and to
+the θ/φ angle sliders (they reorient, not lengthen) — it changes only when TL itself changes,
+exactly as `solidSpanUnits` (a bounding-sphere diameter) changes only when base/height resize a
+Module 2 solid. `SHEET2D_SPAN` and the module-level `FIT` constant are removed; `layout2D()` is the
+sole place the scale is computed, so its three consumers (`compareSheet.js`, `traces.js`,
+`trueLength.js`/`rotationMethod.js`) inherit the new scale with no signature or call-site changes.
+**Why:** ADR-038/ADR-072's fixed 150 mm span framed the True-Length slider's *maximum*, so a typical
+60–100 mm line — the common case — drew as a small fraction of the sheet, breaking visual parity
+with the Points and Module 2 Compare sheets, while a line pushed tall by a large distance offset
+could still overrun the fixed frame. Keying scale to TL means every line, at every length, fills its
+sheet half, and the "extends past the sheet edge rather than shrinking the drawing" fallback §5.19
+already sanctioned for the distance-driven case is now the exception (large distance offsets only),
+not the everyday small-TL case.
+**Alternatives rejected:** (a) *Retune `SHEET2D_SPAN` again* — rejected: any single fixed span is
+wrong at one end of the TL slider's range, the same structural problem ADR-052 identified for Module
+2's base/height sliders (ADR-053's own rationale). (b) *Live-bbox auto-fit (ADR-052's original,
+already-superseded approach)* — rejected: would rescale the sheet on a distance-slider drag (the
+combined-view bbox grows), reintroducing the exact coupling bug ADR-053 fixed in Module 2.
+**Consequences:** `sheet2DLayout.js` in both topics (byte-identical files) drops `SHEET2D_SPAN` and
+the module-level `FIT`; `layout2D()` computes `FIT` locally from `M.tl`. The "10 mm reads as 10 mm"
+fixed-ruler property (ADR-038's core rationale) is now traded away *across* different True Lengths —
+accepted, since within any single TL the ruler is still consistent, and the tradeoff exists solely to
+fill the card, mirroring ADR-053's own accepted tradeoff for Module 2. A large distance offset can
+still push a view toward the sheet edge at the (now TL-locked, not distance-locked) scale — an
+accepted, pre-existing class of edge case, unchanged in kind from ADR-038's own "rare over-range
+line" fallback. RULES.md §5.19 updated to record the split: legacy `Module1/lines.js` stays on
+ADR-038's fixed span; the two standalone topics now follow this ADR.
+**Status:** Active. Supersedes ADR-038 (and its 2026-07-19 ADR-072 amendment) for
+`graphics_module_1_topic_5_projection_of_line_types` and
+`graphics_module_1_topic_6_projection_of_straight_lines` only. ADR-038 remains Active, unamended
+further, for the legacy `Module1/lines.js`.
+
+---
+
+## ADR-073: Step-card Lead + Body copy is pinned to Module 2's compact `--text-sm` / `--color-ink-secondary` scale; DESIGN.md §3.2's `1.125rem`/`1rem` split is retired for that role
+
+**Date:** 2026-07-20
+**Decision:** The step card's lead sentence (`.card__lead`) and its instruction body (`.step-body`)
+now render, everywhere, at `font-size: var(--text-sm)` (0.875rem), `line-height: 1.55`, and
+`color: var(--color-ink-secondary)` — Module 2's existing scale, unchanged. Two files were brought
+onto it:
+- `graphics_module_1_topic_5_projection_of_line_types/index.html` — `.card__lead` was
+  `var(--text-lead)` (1.125rem, lh 1.35) and `.step-body` was `var(--text-base)` (1rem, lh 1.6), a
+  visibly larger step panel than every sibling topic; both now match `--text-sm`.
+- `.step-body p` in this topic plus `graphics_module_1_topic_6_projection_of_straight_lines` and
+  `graphics_module_1_topic_3_points` had no explicit colour and inherited `body`'s near-black
+  `--color-ink`, reading as a darker, two-tone step panel against Module 2's single grey tone;
+  all three now set `color: var(--color-ink-secondary)` on `.step-body p`, matching the pattern
+  `graphics_module_1_topic_1_foundations` already used.
+DESIGN.md §3.2 is amended to match (see the "Step-card copy" row): the `1.125rem`/`1rem` Lead/Body
+sizing it previously specified is retired for the step-card role. `--text-lead` remains a declared
+CSS custom property (harmless, unused) but has no consumer after this change.
+**Why:** A user-driven visual audit (screenshots of Module 2, topic 5, and topic 6's step panels
+side by side) found the step copy rendering at a visibly different size and a darker ink in topics
+5 and 6. Investigation showed every design token's *value* was already identical platform-wide —
+the divergence was purely which token each file's `.card__lead`/`.step-body` rule referenced. A
+platform-wide audit (`.card__lead` font-size across all 11 sims) found topic 5 was the **only**
+outlier at the larger size; topics 3, 5, and 6 were the only three with unset (near-black) body-copy
+colour. DESIGN.md §3.2 had in fact specified the larger `1.125rem`/`1rem` sizing all along — meaning
+topic 5 was arguably the spec-compliant one and Module 2 was the outlier against its own written
+doc. The user, given this conflict, explicitly chose **Module 2 — the platform's declared
+master/reference implementation (see every topic's own CLAUDE.md) — as the source of truth**, so
+the doc is amended to match the code rather than the reverse.
+**Alternatives rejected:** (a) *Grow Module 2 + topic 6 up to the `1.125rem`/`1rem` DESIGN.md
+sizing instead* — rejected per explicit user decision; Module 2 is the reference implementation and
+the user wants its exact size/ink treatment platform-wide, not a third compromise scale. (b) *Leave
+`graphics_module_1_topic_3_points`'s near-black step-body untouched, since neither audited
+screenshot showed it* — rejected: the code-level cause (`.step-body p` with no colour, inheriting
+`--color-ink`) is identical to topics 5 and 6, so leaving it would just relocate the same
+inconsistency rather than resolve it; flagged to the user as an easy revert if it should have stayed
+near-black.
+**Consequences:** `--text-lead` is now a dead-but-declared token — do not reintroduce it into a
+step-card rule without a new ADR. Any future Module-1/2/3 topic's step panel should be authored
+against `--text-sm` / `--color-ink-secondary` from the start, matching Module 2, rather than the
+DESIGN.md §3.2 table's now-superseded Lead/Body sizing for that specific role.
+**Status:** Active
+
+---
+
+## ADR-074: The Lines topics' two-pass scissor regions are computed in device px but must be handed to `renderer.setViewport`/`setScissor` as logical px, since three.js applies `pixelRatio` internally
+
+**Date:** 2026-07-20
+**Decision:** In `graphics_module_1_topic_6_projection_of_straight_lines/main.js` and
+`graphics_module_1_topic_5_projection_of_line_types/main.js`, the render `loop()`'s two scissored
+passes (the 3D scene into `regions.main`, the 2D ortho sheet into `regions.sheet` — the ADR-034
+"one `WebGLRenderer`, no second GL context" pattern) now divide every `{x,y,w,h}` by
+`renderer.getPixelRatio()` at the `setViewport`/`setScissor` call boundary. `computeRegions()` still
+derives `regions.main`/`regions.sheet` in **device** px (via `renderer.getDrawingBufferSize()`), and
+`LineMaterial.resolution` (`lineRig.setResolution` / `compareSheet.setResolution`) still receives
+device px, unchanged — only the viewport/scissor calls convert.
+**Why:** `renderer.setViewport(x,y,w,h)` / `setScissor(x,y,w,h)` take **logical (CSS) px** and
+multiply by `_pixelRatio` internally — passing device px (as the loop did) silently double-applies
+the ratio. At `devicePixelRatio === 1` (a 100%-scaled dev display) this is a no-op and invisible,
+which is why it shipped unnoticed. At any other DPR (reproduced live at the user's Windows 125%
+scaling, DPR 1.25) it is not: measured ground truth via a `gl.viewport`/`gl.scissor` capture showed
+the real buffer at 1920×765 but the actual GL calls landing in a 2400×956 space (1920×1.25) — full
+clear `[0,0,2400,956]`, 3D pass `[0,0,1203,956]`, sheet pass `[1203,-2,1196,957]` — pushing the sheet
+pass right and clipping its right edge off-buffer. The CSS2D sheet labels (`a′`/`b′`/`a`/`b`, the
+BIS dimension values) are positioned separately in true CSS px from `regions.cssSheet`, so they
+stayed correct — producing a ~300px horizontal desync between the labels and the WebGL drawing they
+annotate, visible only in the Compare workbench's 2D sheet pane on a scaled display. The 3D pane's
+identical bug read as a subtle mis-zoom rather than a gross offset only because its region starts at
+the origin `(0,0)`.
+This was reported as a suspected missing double-`requestAnimationFrame` reflow sync (Module 2's
+`remeasureAfterReflow` pattern). Audit found both topics already carry that helper, wired
+identically to the Module 2 master (`applyCompareSize()` → `remeasureAfterReflow()` → double-rAF →
+`handleResize()` → `computeRegions()`) — it was never the cause. In-browser reproduction (headless
+CDP against a live `php -S` server) traced the actual desync to this pixelRatio double-application
+instead.
+**Alternatives rejected:** *(a) Have `computeRegions()` store logical-px regions instead of device
+px* — rejected: `LineMaterial.resolution` (the fat-line width calculation) legitimately needs device
+px, and `computeRegions()` is the single source `regions` struct consumed by both the resolution
+calls and the viewport/scissor calls, so splitting it into two differently-scaled copies is more
+error-prone than converting once at the one call site that needs logical px. *(b) Set
+`renderer.setPixelRatio(1)` and manage DPR scaling manually* — rejected: loses free HiDPI
+sharpness/antialiasing quality three.js otherwise provides, and would require re-deriving every
+other device-px consumer (label overlay sizing, `getDrawingBufferSize`) from scratch.
+**Consequences:** Any new scissored-pass code added to either topic's `loop()` must route through
+the same `pass(x,y,w,h)` helper (divides by `renderer.getPixelRatio()`) rather than calling
+`setViewport`/`setScissor` directly with `regions.*` values. Module 2 and the Points topic are
+unaffected — they use Canvas2D for the 2D sheet (ADR-034), not a second WebGL scissor pass, so they
+never had this class of bug. Verify any future two-pass topic at a non-1.0 `devicePixelRatio` (e.g.
+Windows display scaling, not just Chrome zoom) — DPR-1 testing alone will not catch this.
+**Status:** Superseded 2026-07-21 by ADR-076 — the two-pass scissor mechanism this ADR patched (and
+the `regions`/`computeRegions()`/`pass()` machinery it names) no longer exists in either topic;
+ADR-076 replaces it outright with two independent `WebGLRenderer`s, so there is no `setViewport`/
+`setScissor` pixelRatio boundary left to get wrong. Recorded here as history, not to be reintroduced.
+
+---
+
+## ADR-076: The two standalone Lines topics' 2D Compare sheet moves off the shared-canvas scissor pass onto its own `WebGLRenderer`/canvas, adopting the ADR-037 floating-card workbench
+
+**Date:** 2026-07-21
+**Decision:** In `graphics_module_1_topic_5_projection_of_line_types` and
+`graphics_module_1_topic_6_projection_of_straight_lines`, the 2D orthographic Compare sheet
+(`compareSheet.js`) now renders on its **own `WebGLRenderer`**, bound to its **own `<canvas>`**
+created lazily inside the Compare card's `.compare-card__stage` on first Compare open
+(`ensureSheetRenderer()` in `main.js`), with its own `CSS2DRenderer` overlay (`sheetLabelRenderer`)
+as a DOM sibling of that canvas. This retires the two topics' original design — one shared
+`WebGLRenderer` scissored into two regions per frame (`regions.main` for the 3D scene,
+`regions.sheet` for the 2D sheet), computed by `computeRegions()` and consumed by a `pass(x,y,w,h)`
+viewport/scissor helper in the render loop — which the topics' own code comments and `CLAUDE.md`
+called "ADR-034 alternative-A for Lines" (one GL context, no second `WebGLRenderer`) and which
+ADR-074 patched for a pixelRatio double-application bug. `compareSheet.js` itself is **unchanged**:
+its `render(renderer)` method already took the renderer as an argument, so it is renderer-agnostic
+by construction — only which renderer main.js passes it changes. The render loop is correspondingly
+simplified: the 3D renderer draws its own full canvas every frame (`renderer.render(scene,
+activeCamera)`, relying on default `autoClear`), and the sheet renderer draws the sheet scene only
+while Compare is open (`compareSheet.render(sheetRenderer)`) — no scissor test, no viewport math, no
+pixelRatio boundary to get wrong (ADR-074's entire fix surface is gone with it).
+
+Alongside the renderer split, both topics adopt Module 2's **ADR-037 floating-card workbench shell**
+(DESIGN.md §5.13, PLATFORM-RULES.md §2.24) verbatim: `body.compare-split` becomes a
+`background:var(--color-panel)` shell with `gap`/`padding: var(--space-4)` between three rounded,
+hairline-bordered cards (the 3D viewport, the 2D drawing, the docked rail — previously a
+`gap:var(--space-1)` paper-white hybrid with no real gutter, since a single shared canvas couldn't
+show a gap between its own two scissored halves), plus the `#rail-toggle` Hide/Show pill
+(`setupRailToggle`/`syncRailToggleState`, ported verbatim from `Module2/main.js`). The construction
+launchers (T6: Traces `data-ctrl="traces"`, True Length & Angles `data-ctrl="truelength"`; T5:
+Rotation Method `data-ctrl="rotation"`) are added to each topic's `WORKBENCH_CONTROLS` so they
+re-parent into the rail on split entry, and `ensureCompareForCon()` no longer force-demotes to the
+compact card (`compare.show('compact')` → `compare.show()`) — a construction now runs inside the
+expanded 50/50 split like every other driver.
+**Why:** A single canvas scissored into two regions cannot show a **grey gutter between** those two
+regions — they are pixels of the same buffer, so the two topics' Compare split read as a paper-white
+hybrid (thin hairline seams, no real card separation) rather than Module 2's genuine "three floating
+cards on a grey shell" look, even though most of the ADR-037 CSS tokens (`--space-4` gap,
+`--radius-md` corners) were otherwise portable. Splitting onto two independent canvases makes the
+gutter trivial (it's simply unpainted DOM background between two real elements) and is what makes
+the rest of the ADR-037 port possible without reinventing Module 2's shell. Separately, the
+construction launchers' compact-card fallback (`ensureCompareForCon`) predated the workbench rail
+even having the construction buttons on it: the split used to collapse the wizard, which was the
+constructions' only home, so opening one on the split forced a demotion to the compact card the
+learner did not choose. Now that the launcher buttons are `[data-ctrl]` wrappers re-parented into
+the rail exactly like any other driver, that forced demotion is no longer necessary and was actively
+fighting the split's `COMPARE_DEFAULT_SIZE = 'expanded'` default (ADR-021) whenever a learner reached
+for a construction.
+**Alternatives rejected:** (a) *Keep the single shared canvas; fake the grey gutter by repainting the
+clear colour grey when split and re-deriving `computeRegions()` to leave the gap area unpainted* —
+technically possible but keeps every fragility ADR-074 had to patch (device-px/logical-px scissor
+math, sub-pixel gap coverage, stage-rect tracking on every layout change) while adding MORE of the
+same class of bug (a second region boundary at the gutter's inner edges) for a cosmetic outcome that
+two real DOM elements give for free. (b) *Rewrite `compareSheet.js` and all three construction
+leaves (`traces.js`, `trueLength.js`, `rotationMethod.js`) onto a flat Canvas2D, matching Module 2's
+`drawCompare()` literally* — considered and explicitly rejected by the user: it would require
+rewriting three working, recently-shipped animated constructions and would demote the CSS2D DOM
+labels (crisp, screen-reader-readable per RULES.md §3.27) to painted `ctx.fillText` pixels, an
+accessibility regression, for no behavioural gain over (the chosen) option. (c) *Leave the two Lines
+topics on the flush/hybrid split permanently, treating ADR-037 as Module-2-and-Points-only* —
+rejected: the whole platform's stated direction (PLATFORM-RULES.md §2.24) is that the ADR-037
+workbench shape is shared across every guided-stepper sim, not a per-module style choice; leaving two
+topics behind was the reported problem, not an acceptable end state.
+**Consequences:** A second `WebGLRenderer`/GL context now exists per topic once Compare is opened —
+a deliberate reversal of the "one GL context" constraint the topics' compareSheet.js header and
+CLAUDE.md previously cited as "ADR-034 alternative-A for Lines." This is accepted: modern browsers
+support well over a dozen simultaneous WebGL contexts per page, the sheet context is created lazily
+(only if Compare is ever opened, not at boot) and lives for the page's lifetime (not recreated per
+open/close), and the platform's own Points/Module 2 topics already run their 3D context alongside a
+Canvas2D context with no documented issue — a second *WebGL* context is a smaller step than that,
+not a larger one. `computeRegions()`, the `regions` struct, and the scissor `pass()` helper are
+deleted from both topics' `main.js`; replaced by `syncMainSizing()` (3D renderer, called from
+`handleResize`/`init`) and `ensureSheetRenderer()`/`resizeSheetRenderer()` (sheet renderer, driven by
+a `ResizeObserver` on `.compare-card__stage` rather than the old manual double-rAF
+`remeasureAfterReflow` chain — though that chain is kept for the 3D renderer's own resize, since
+`#sim-viewport`'s size is also already covered by its own `ResizeObserver` from `init()`, making the
+manual calls elsewhere in both topics pre-existing, harmless redundancy, not something this ADR
+introduces or needed to remove). `traces.js`, `trueLength.js`, `rotationMethod.js`, `labels.js`,
+`dimensions.js`, and `sheet2DLayout.js` (and its ADR-075 intrinsic-TL-scale math) are **untouched** —
+the whole point of the own-canvas approach was to keep this working, recently-built code intact.
+Both topics' `CLAUDE.md` "2D Compare vehicle" paragraph is rewritten to describe the new renderer;
+`PLATFORM-RULES.md` §2.24 no longer needs a Lines-specific carve-out, since both topics now conform
+to the shared ADR-037 shape like every other guided-stepper sim.
+**Status:** Active. Supersedes, for `graphics_module_1_topic_5_projection_of_line_types` and
+`graphics_module_1_topic_6_projection_of_straight_lines` only, the "ADR-034 alternative-A" scissor
+design those two topics used since their Phase 4C/4E migration (as most recently refined by
+ADR-074, now superseded in turn — see above). ADR-034 itself remains Active and unamended for the
+Points topic and Module 2, which were never on the scissor design and are unaffected by this entry.
+
+---
+
+## ADR-077: The two standalone Lines topics' 2D Compare pan/zoom re-expresses ADR-054/055 against the ADR-076 ortho camera, not a Canvas2D `project()` lens
+
+**Date:** 2026-07-23
+**Decision:** Module 2 (and the Points topic, a faithful copy) implement Compare drag-to-pan
+(ADR-054) and scroll-zoom (ADR-055) as two plain numbers — `comparePanX/Y`, `compareZoom` — consumed
+inside a Canvas2D `project(mmX,mmY)` function. `graphics_module_1_topic_5_projection_of_line_types`
+and `graphics_module_1_topic_6_projection_of_straight_lines` have no such function: since ADR-076
+their Compare sheet is a live Three.js scene rendered through a real `OrthographicCamera` on its own
+`WebGLRenderer` (`compareSheet.js`). Ported the same interaction — pointer-capture drag, non-passive
+zoom-to-cursor wheel (`exp(-deltaY*0.0015)`, clamped `[0.4, 5]×`), double-click reset — but the
+transform target is the ortho camera itself: pan moves `camera.position.x/y` (converted from CSS-px
+deltas via the camera's own visible span `(right-left)/zoom` over the stage's CSS size); zoom sets
+`camera.zoom` and solves the same position shift ADR-055's `pan' = (cursor-centre)*(1-k) + pan*k`
+describes, so the world point under the cursor stays fixed. `compareSheet.js` gained
+`resetView()`/`panByPixels()`/`zoomAtPixel()`; `main.js` gained a thin `setupComparePan()` (no
+Canvas2D redraw queue needed — the existing rAF loop repaints the sheet every frame while Compare is
+open). Listeners bind to `.compare-card__stage` (the canvas's parent), not the canvas itself, because
+the sheet's CSS2D label overlay is a DOM sibling layered on top of the canvas and would otherwise
+swallow drags/wheel landing on a label.
+**Why:** "Don't invent a new pan/zoom mechanism" was the goal, but ADR-076 already established that
+these two topics' Compare sheet is structurally a different rendering vehicle from Module 2/Points
+(own-canvas ortho scene vs. Canvas2D). Reusing Module 2's *code* verbatim isn't possible — there is no
+`project()` to patch — so the interaction model (gesture semantics, clamps, reset contract) is what's
+reused, re-expressed against the camera the sheet actually has.
+**Consequences:** `compareSheet.js`'s camera keeps identity rotation for the sim's lifetime (set once
+via the initial `lookAt`) — pan/zoom only ever touch `position.xy`/`zoom`, never re-orient the camera,
+so `setResolution()`'s aspect/frustum recompute on resize composes for free without resetting the
+learner's pan/zoom. `compareSheet.js` in both topics stays byte-parity (as it was pre-existing).
+**Status:** Active.
 
 ---
 

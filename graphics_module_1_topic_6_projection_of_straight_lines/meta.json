@@ -1,0 +1,6 @@
+{
+  "title": "Projection of Straight Lines",
+  "description": "Build up a straight line in space and watch its front and top views form: dial the true length, lift end A off the HP and VP, incline the line to each plane, generate the orthographic projection with a cinematic fold, then find the True Length, its true inclinations, and the horizontal and vertical traces.",
+  "difficulty": "intermediate",
+  "tags": ["engineering-graphics", "projection-of-lines", "orthographic-projection", "true-length", "traces", "first-angle"]
+}

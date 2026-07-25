@@ -534,6 +534,21 @@ injected controller, and `rebuild()` does the rest in a fixed order. Module 1 fo
 the same single-`rebuild()` discipline inside `engine.js`, where the lesson supplies
 the `resolve`/`draw3D` functions and the engine runs the pipeline.
 
+**Two renderers in the Lines topics (ADR-076):** Lines topics 5 & 6 (`graphics_module_1_topic_5_
+projection_of_line_types`, `graphics_module_1_topic_6_projection_of_straight_lines`) each run TWO
+independent `WebGLRenderer`s — the 3D scene's own full-canvas renderer, and a second renderer
+(`sheetRenderer`, created lazily on first Compare open by `ensureSheetRenderer()`) bound to its own
+`<canvas>` inside the Compare card's `.compare-card__stage`, drawing `compareSheet.js`'s 2D ortho
+scene. This replaced an earlier single-canvas design where the 2D sheet was a second *scissored*
+pass on the SAME renderer (`computeRegions()`/`pass()`, ADR-074's device-px→logical-px conversion) —
+retired because a single canvas can't show a real grey gutter between its own two scissored halves,
+which the ADR-037 floating-card workbench (DESIGN.md §5.13) needs. Each renderer now sizes to its own element
+independently — the 3D renderer via `#sim-viewport`'s `ResizeObserver` (`handleResize`/
+`syncMainSizing`), the sheet renderer via its own `ResizeObserver` on `.compare-card__stage`
+(`resizeSheetRenderer`) — with no shared region math and no pixelRatio boundary between them.
+`compareSheet.js` itself didn't need to change: its `render(renderer)` method already took the
+renderer as an argument, so it was renderer-agnostic before this change too.
+
 ---
 
 ## 6. The iframe Boundary

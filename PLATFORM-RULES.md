@@ -199,6 +199,11 @@ terms of Engineering Graphics' own files, modules, or lessons was left out entir
 > shared dual-mode shape for every guided-stepper sim — not a per-module style choice. **✅ DO**
 > keep the docked rail's own *internal* control layout (row vs. tuned multi-column grid) module-scoped;
 > only the card chrome is shared. *(DESIGN.md §5.13.)*
+> Conformant as of 2026-07-21: Module 2, Points, and the two standalone Lines topics
+> (`graphics_module_1_topic_5_projection_of_line_types`,
+> `graphics_module_1_topic_6_projection_of_straight_lines`) all ship this shape. The two Lines
+> topics needed their 2D Compare sheet moved onto its own `WebGLRenderer`/canvas first (ADR-076) —
+> a single canvas scissored into two regions cannot show a real gutter between them.
 
 ---
 

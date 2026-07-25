@@ -5,6 +5,9 @@ Notable changes to this Engineering Graphics Module 1 topic (folder
 2026-07-13 as "Glass Box Visualizer"; renamed 2026-07-13, ADR-048). History before the scaffold
 below is the starter template's, carried over from the duplication.
 
+## 2026-07-20
+- Changed: `--color-vp-line` darkened `#bc5d1e → #b25718` (platform-wide AA promotion, ~4.92:1 on paper) — `index.html` `:root`.
+
 ## 2026-07-14 (trial — rounded cards on gray, suspends ADR-021)
 - Changed: `body.compare-split` re-skinned as a **trial** — the 3D viewport, 2D drawing card, and
   workbench rail now float as three separated rounded-white (`--radius-md`, 1px `--color-border`)
