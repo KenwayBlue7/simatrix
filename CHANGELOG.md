@@ -3,6 +3,9 @@
 All notable changes at the Simatrix project root (spanning Module1, Module2, and the
 topic deploy copies). Per-module changelogs live inside each module folder.
 
+## 2026-07-26
+- Added: `../DECISIONS.md` ADR-078 — a new curriculum track ("Diploma Engineering Graphics" — **placeholder name, pending confirmation of the exact syllabus/issuing-body name**) shares the root docs and ADR sequence rather than forking; its Module 1 ("Geometrical Constructions") is namespaced `graphics_diploma_module_1_topic_1_<N>_<slug>` to avoid colliding with the current syllabus's existing Module 1, and adopts Module 2's orchestrator discipline over a 2D SVG/Canvas renderer instead of Three.js, since none of its six provisional subtopics involve 3D solid geometry. Documentation only — no topic folders created yet.
+
 ## 2026-07-23
 - Added: Topics 5 & 6's 2D Compare drawing gained drag-to-pan + scroll-wheel zoom (cursor-anchored, clamped 0.4–5×, double-click reset) — Module 2/Points' ADR-054/055 interaction, re-expressed against the topics' own ADR-076 ortho camera instead of a Canvas2D `project()` lens, since that lens doesn't exist there (ADR-077).
 

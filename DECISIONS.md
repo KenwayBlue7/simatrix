@@ -2743,6 +2743,57 @@ learner's pan/zoom. `compareSheet.js` in both topics stays byte-parity (as it wa
 
 ---
 
+## ADR-078: A new curriculum track ("Diploma Engineering Graphics") shares this repo's root docs; its Module 1 ("Geometrical Constructions") is namespaced `graphics_diploma_module_1_topic_1_<N>_<slug>` on a 2D SVG/Canvas orchestrator
+
+**Date:** 2026-07-26
+**Decision:** A new curriculum track — **"Diploma Engineering Graphics" [PLACEHOLDER — confirm
+exact syllabus/issuing-body name before this track's first topic ships]** — shares this repo's
+existing root docs (`ARCHITECTURE.md`, `DECISIONS.md`, `RULES.md`, `PRODUCT.md`, `DESIGN.md`) and
+continues the same ADR sequence rather than forking Case-C-style. Its Module 1, "Geometrical
+Constructions," is namespaced `graphics_diploma_module_1_topic_1_<N>_<slug>` to avoid colliding with
+the current syllabus's existing Module 1 (`graphics_module_1_topic_*` — foundations: planes, line
+types, dimensioning, quadrants, first-angle, points, lines). The numbering scheme (module.subtopic,
+e.g. `topic_1_1` = subtopic "1.1") is **final**; the six provisional subtopics — 1.1
+`basic_constructions`, 1.2 `tangent_arcs`, 1.3 `tangent_lines`, 1.4 `regular_polygons`, 1.5
+`polygon_circle_relations`, 1.6 `ogee_curves` — and their final count remain **provisional pending
+topic-level scoping**. None of these subtopics involve 3D solid geometry, so this Module adopts
+Module 2's orchestrator discipline (single `main.js`, no-cross-import leaves, one `rebuild()` funnel,
+`window.simAPI`) over a 2D SVG/Canvas renderer instead of Three.js.
+**Why:** RULES.md §1.11 (sourced from ADR-025) requires a subject that fits neither the Module 2
+(3D) nor Module 1 (2D-from-3D projection) template cleanly to get its own ADR before work starts —
+compass-and-straightedge plane-geometry construction is flat 2D from the outset, not a projection of
+3D geometry, so it fits neither. A repo-wide check for "syllabus"/"diploma"/"curriculum" found no
+prior second-track concept: every existing "syllabus" reference (RULES.md §6.21/§6.22, the Module 3
+problem-exclusion ADRs) is a problem-set rule *inside* the single track this repo already ships —
+`Module1/CLAUDE.md` names it explicitly ("Simatrix Engineering Graphics Platform · KTU B.Tech
+Syllabus"). Diploma Engineering Graphics is genuinely new territory, not an extension of that track.
+Reusing the orchestrator *pattern* rather than Module 1's shared-`engine.js` pattern is grounded in
+ADR-007's own text: the orchestrator (one `main.js` owning state/`rebuild()`, leaves that don't
+cross-import) is a structural/organizational discipline, not something ADR-007 or ADR-033 ties to
+Three.js specifically — every existing instance happens to render 3D, but nothing in either ADR
+requires it to.
+**Alternatives rejected:** (a) *Reusing `module_1` unprefixed* — rejected: direct folder-name
+collision with the current syllabus's existing Module 1. (b) *Forking into Case-C-style own root
+docs (a new local `DECISIONS.md` starting at ADR-001, per MODULE-STARTER.md §5.4)* — rejected: the
+explicit choice here is to share root docs and continue this ADR sequence — same discipline
+(Engineering Graphics), a different syllabus track, not a foreign discipline in the Case C sense.
+(c) *Treating this as a lesson-add to the current syllabus's existing Module 1* — rejected: a
+different syllabus entirely, with its own sequencing and numbering, not an extension of the current
+one.
+**Consequences:** Cite ADR-025 as **invoked by** (not superseded) — its Module-1-vs-Module-2
+heuristic is unchanged; this adds a third case alongside it, for a 2D-non-solids subject outside the
+current syllabus. The repeated `<M>` in `graphics_diploma_module_<M>_topic_<M>_<N>_<slug>` is
+**deliberate, not a typo** — it encodes the source syllabus's own decimal module.subtopic numbering
+(e.g. "1.4" → `topic_1_4`); a future contributor must not "fix" it to `topic_<N>` alone. Descriptively
+only: MODULE-STARTER.md's Case A/B/C table (Section 2) has no row for "same discipline, different
+syllabus track, shared root docs" — this ADR is the first instance of that pattern; a future ADR may
+formalize a Case D. Future module numbering for this track, if it grows beyond Module 1, is left
+fully open pending a future ADR if/when that happens. The exact syllabus/issuing-body name remains an
+**open placeholder until confirmed** — see the Decision field.
+**Status:** Active.
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*
