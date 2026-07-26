@@ -61,6 +61,10 @@ viewport plus its parameter dock, sliders, toggles, inline hints, and sim-intern
 The host Simatrix website (navbar, module browser, account UI, login, dashboard) is built by
 other web developers and is **out of scope** here.
 
+**`sim:ready` boot signal** (ADR-078, narrows ADR-002): `markBooted()` posts
+`{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` — the one
+sanctioned outbound `postMessage`. Do not add any other `postMessage`/inbound listener.
+
 ---
 
 ## Architecture — Module 2 orchestrator pattern (ADR-033, overturns ADR-011 for this topic)
@@ -69,15 +73,19 @@ other web developers and is **out of scope** here.
   orthographic cameras + their `OrbitControls` (the dual-camera §5.18 stack — quick-views +
   the ADR-036 fold swoop), the single `rebuild()` pipeline (full WebGL disposal contract,
   ADR-004), the render loop, the Compare state machine + the ADR-021 workbench split, the
-  Problem Library seam, and `window.simAPI`. It is the ONE place leaf modules meet (no leaf
-  imports a sibling leaf — RULES.md §3.6).
+  Problem Library seam, the **clip-aware auto-zoom** (`reframeIfClipped`, ADR-014 — dollies the
+  free-orbit perspective camera back, push-back only, when typed-field values push the line past
+  the frame), and `window.simAPI`. It is the ONE place leaf modules meet (no leaf imports a
+  sibling leaf — RULES.md §3.6).
 - **World axes** (Module-1 family convention): `HP = XZ plane (y=0)` · `VP = XY plane (z=0)` ·
   `fold line = X axis`. `lineData.resolveLine()` returns signed endpoint mm; the draw leaves
-  remap onto these world axes (÷10, ADR-018: 1 world unit = 10 mm). Sheet is **24×24 units
-  (240 mm)** — sized to the LINE data envelope (TL max 150 mm = 15u) and framed apparatus-tight, the
-  Points framing philosophy (its 9u sheet ≈ its data range). The earlier 60×60 (600 mm) sheet dwarfed
-  a 60–150 mm line, so the live camera framed a vast sparse grid with the line filling a fraction of
-  the viewport; 24u restores Points' ~87% apparatus fill (grid cell 2.5u → 1.0u = 10 mm).
+  remap onto these world axes (÷10, ADR-018: 1 world unit = 10 mm). Sheet is **44×44 units
+  (440 mm)**, `PLANE_LIFT = 16` — the HP/VP planes are OFFSET (not origin-centred), spanning
+  `[-6, +38]` on the axis the drawing uses, sized to the typed-field ceiling (TL 200mm +
+  aHP/aVP 150mm each, plus a 3u annotation margin), not just the slider max (ADR-079,
+  overturns this section's prior 24u rationale — the drawing only ever occupies the first
+  quadrant, so an origin-centred plane wastes half its area). `GRID.divs` scales with `SHEET`
+  to keep the 1.0u = 10 mm engineering cell.
 - **The 3D→2D fold** flies the ADR-036 orthographic swoop (`swoopToAnswerSheet` — square-on to the
   flattened answer sheet, perspective→ortho morph); held-angle folds are FORBIDDEN (RULES.md §5.8).
   `beforeFold` closes any open construction overlay first.
@@ -85,18 +93,20 @@ other web developers and is **out of scope** here.
   generate projection → traces, all pinned to the general `LineCase.INCL_BOTH` resolver; controls
   are dedicated per step (TL on step 1, distances on step 2, θ/φ on step 3). Do NOT revert to the
   six fixed-orientation "case" steps (§6.13). Do NOT rename "line AB"/"end A" (§6.15).
-- **Compare / workbench** (ADR-012 / ADR-021 / ADR-037): the expanded Compare docks a true 50/50
-  split — three floating rounded cards (3D viewport, 2D orthographic drawing, docked rail) on a
-  `--color-panel` shell (DESIGN.md §5.13), with an independent `#rail-toggle` Hide/Show control
-  (`setupRailToggle`) floating at the 3D viewport's bottom-left corner. `WORKBENCH_CONTROLS`
-  re-parents the geometry-driver controls (`tl`/`disthp`/`distvp`/`theta`/`phi`) into the docked
+- **Compare / workbench** (ADR-012 / ADR-021 / ADR-037, narrowed by ADR-080): Compare has exactly
+  one shape, at every viewport width — a true 50/50 split, three floating rounded cards (3D
+  viewport, 2D orthographic drawing, docked rail) on a `--color-panel` shell (DESIGN.md §5.13),
+  with an independent `#rail-toggle` Hide/Show control (`setupRailToggle`) floating at the 3D
+  viewport's bottom-left corner. There is no compact/floating fallback card and no
+  `matchMedia`-driven demotion (§5.16a) — below 768px the same split grid restacks to a single
+  column instead of switching to a different Compare UI. `WORKBENCH_CONTROLS` re-parents the
+  geometry-driver controls (`tl`/`disthp`/`distvp`/`theta`/`phi`) into the docked
   `#workbench-rail` (two titled clusters, Dimensions / Inclination); re-parent the existing
   `[data-ctrl]` nodes, never mirror inputs (§5.17). The construction launchers (`truelength`,
   `traces`) dock separately, in `#con-dock` — a direct `<body>` child that floats at the 2D
   drawing panel's bottom-right corner, mirroring `#rail-toggle`'s floating-corner convention on
-  the opposite pane (`ensureConDock()`/`CON_DOCK_CONTROLS`, topic-local). A construction now runs
-  inside the expanded split like any other control — it no longer force-demotes to the compact
-  card.
+  the opposite pane (`ensureConDock()`/`CON_DOCK_CONTROLS`, topic-local). A construction runs
+  inside the split like any other control.
 - **2D Compare vehicle — Three.js ortho sheet, own renderer (ADR-076).** Unlike the sibling Points
   topic (ADR-034, Canvas2D), the Lines 2D drawing + its animated **Traces** and **True-Length**
   constructions are rendered with the **fat-line (`Line2`) stack in a dedicated ortho scene**

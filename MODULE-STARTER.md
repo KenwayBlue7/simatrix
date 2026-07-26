@@ -107,10 +107,13 @@ Decide this **before** you create a folder. The case determines your template.
 > instead of copying `Module2/` and deleting domain files by hand. It is **fully sanitised**:
 > `main.js` is rewritten to a clean empty-scene boot (it imports only the platform leaves —
 > `stepper`, `terms`, `onboarding`, `anim` — plus Three.js and `OrbitControls`, with a
-> disposal-contract-only `rebuild()`), and every Engineering-Graphics domain leaf (`iShape.js`,
-> `meshAnalyzer.js`, `projectionDrawer.js`, `vertexLabeler.js`, `problemLibrary.js`) plus the local
-> `DESIGN.md` is already removed. So each case below spells out only what you **add or wire in** — there
-> is no leftover domain code to delete. **What you still wire yourself:** your own drivers into
+> disposal-contract-only `rebuild()`), and every solids-only domain leaf (`iShape.js`,
+> `meshAnalyzer.js`, `projectionDrawer.js`, `vertexLabeler.js`) plus the local `DESIGN.md` is
+> already removed. `problemLibrary.js` is **not** in that removed set — as of ADR-083 it ships as
+> a generic, empty-bodied stub alongside `problems.js` (RULES.md §6.24–§6.26), since the
+> problem-library interface contract is platform-wide, not solids-specific. So each case below
+> spells out only what you **add or wire in** — there is no leftover domain code to delete beyond
+> the solids leaves. **What you still wire yourself:** your own drivers into
 > `#workbench-rail` (the rail's *internal* control layout — row vs. multi-column grid — is
 > module-scoped, DESIGN.md §5.13) plus your own `drawCompare()`/click handler for `#rail-toggle` and
 > the Compare toggle button; the template ships their chrome, not their behavior.
@@ -143,9 +146,11 @@ deleting domain files by hand. You still (1) replace the copied `CLAUDE.md` — 
 titled for Engineering Graphics — with the filled-in `../CLAUDE.module-template.md`; (2) wire `main.js`
 to your own domain geometry — it boots clean and empty (a disposal-contract-only `rebuild()`), so you
 build your geometry into that empty seam; (3) adapt or replace the platform leaves that still ship as
-stubs (`uiManager.js`, `onboarding.js`) for your own controls and hints — the solids-only domain leaves
-(`iShape.js`, `meshAnalyzer.js`, `projectionDrawer.js`, `vertexLabeler.js`, `problemLibrary.js`) are
-already gone, so there is nothing to delete; and (4) write your own `ARCHITECTURE.md`, `DECISIONS.md`,
+stubs (`uiManager.js`, `onboarding.js`, and — if your subject teaches via exercises —
+`problems.js`/`problemLibrary.js`, RULES.md §6.24–§6.26) for your own controls, hints, and
+self-check; the solids-only domain leaves (`iShape.js`, `meshAnalyzer.js`, `projectionDrawer.js`,
+`vertexLabeler.js`) are already gone, so there is nothing to delete there; and (4) write your own
+`ARCHITECTURE.md`, `DECISIONS.md`,
 and `RULES.md` before development starts (Section 5.4) — new, local files, not entries in the root ones.
 Decide 2D vs 3D as your own pattern choice (Section 5.1). See the full Case C walkthrough in Section 5.
 
@@ -244,7 +249,7 @@ topic-specific parts — what "adapt" concretely means is taken from how topic 2
 | `src/iShape.js` | The shape-generator contract + `applyShapeTransform()`. **⚠️ This is NOT a copy-identical file** — Module 2's is larger (it imports THREE and carries the inclination / VP-lay-down composition) and the two topics share an older, smaller version. Adapt the transform to the poses your topic actually uses; keep the explicit **`ZXY` Euler order** and re-derive every sign visually (ADR-005, RULES.md §3.8–§3.10). |
 | `src/uiManager.js` | The parameter dock. Remove sliders/toggles for fields you deleted, and remove the matching mutual-exclusion wiring (e.g. topic 2 dropped the inclination toggles, ADR-008 consequence). |
 | `src/stepper.js` | The Guided Stepper sequence — the steps your topic teaches, gated one behind the next. |
-| `src/problemLibrary.js` | Self-check targets/labels for your problem set. Keep it ±0.5-tolerant and **never auto-fill** (ADR-015, RULES.md §6.1–§6.2). |
+| `src/problemLibrary.js` | Ships as a generic, empty-bodied stub in `template_starter/` (RULES.md §6.24–§6.26, ADR-083) — start there and fill in `evaluate()` against your own `problems.js` `target` shape. If an existing sibling topic's self-check already matches the shape you need (pose-based vs section/cut-based), copying its `problemLibrary.js` instead of the bare stub is a legitimate shortcut. Keep it ±0.5-tolerant and **never auto-fill** (ADR-015, RULES.md §6.1–§6.2). |
 | `src/projectionDrawer.js` | Only if your topic changes how projections are drawn. (Topic 2's differs slightly; keep the ADR-016 line conventions — RULES.md §6.16–§6.18.) |
 | `src/terms.js` | The inline glossary entries for your topic's vocabulary. |
 | `src/onboarding.js` | Empty-state copy and spotlight chips, adapted to your first step. |
@@ -463,17 +468,22 @@ code to delete — you fill empty seams):
    two platform leaves that still ship as stubs (`uiManager.js`, `onboarding.js`) for your own controls
    and hints, and fill the `problems.js` / `terms.js` stubs for your own problem set and glossary.
 
-The Engineering-Graphics domain leaves (`iShape.js`, `meshAnalyzer.js`, `projectionDrawer.js`,
-`vertexLabeler.js`, `problemLibrary.js`) and the local `DESIGN.md` were already removed when the
+The Engineering-Graphics solids-only domain leaves (`iShape.js`, `meshAnalyzer.js`,
+`projectionDrawer.js`, `vertexLabeler.js`) and the local `DESIGN.md` were already removed when the
 boilerplate was finalised — there is nothing to delete, and you consume the single root `../DESIGN.md`.
+`problemLibrary.js` ships instead as a generic empty stub (RULES.md §6.24–§6.26, ADR-083) — fill it
+in per step (3) above if your subject teaches via exercises.
 
 ### 5.3 Build fresh: your own domain engine
 
-There is no shared geometry/rendering engine to inherit. The Engineering-Graphics domain leaves that
-once shipped inside `template_starter/` — `iShape.js`, `meshAnalyzer.js`, `projectionDrawer.js`,
-`vertexLabeler.js`, `problemLibrary.js` — solved orthographic projection of solids and were **removed**
-when the boilerplate was finalised; they are **not** a contract your subject inherits. Build your own
-domain generators/helpers into the sanitised `main.js` `rebuild()` seam instead (Section 5.2, step 2).
+There is no shared geometry/rendering engine to inherit. The Engineering-Graphics solids-only
+domain leaves that once shipped inside `template_starter/` — `iShape.js`, `meshAnalyzer.js`,
+`projectionDrawer.js`, `vertexLabeler.js` — solved orthographic projection of solids and were
+**removed** when the boilerplate was finalised; they are **not** a contract your subject inherits.
+Build your own domain generators/helpers into the sanitised `main.js` `rebuild()` seam instead
+(Section 5.2, step 2). `problemLibrary.js` is a different case: its *interface* (RULES.md
+§6.24–§6.26, ADR-083) IS a platform-wide contract you inherit as a stub — only its self-check
+*content* is yours to write.
 If it helps, read those leaves in the `Module2/` master (and Module 1's drawing toolkit
 `asg`/`alp`/`acr`/`alb`) as worked examples — the disposal-contract discipline, the
 single-rebuild-pipeline discipline, and "no leaf module imports a sibling" are ideas worth
@@ -538,8 +548,17 @@ are the shared contracts: a fix belongs in `Module2/` and must be re-copied to e
 | `assets/fonts/*.woff2` (×3) | The three bundled fonts; byte-identical across **all four** codebases. | Legibility-first typography contract breaks; offline rendering falls back to system fonts. |
 
 **Explicitly NOT in this list — copy, then adapt** (they diverged between M2 and topic 2, by design):
-`iShape.js`, `onboarding.js`, `problemLibrary.js`, `problems.js`, `projectionDrawer.js`,
-`shapeData.js`, `stepper.js`, `terms.js`, `uiManager.js`, plus `index.html`, `main.js`, `meta.json`.
+`iShape.js`, `onboarding.js`, `problems.js`, `projectionDrawer.js`, `shapeData.js`, `stepper.js`,
+`terms.js`, `uiManager.js`, plus `index.html`, `main.js`, `meta.json`.
+
+> ⚠️ **`problemLibrary.js` moved out of this list (ADR-083).** It used to be adapt-from-a-sibling-
+> topic only; it now ships a generic, empty-bodied stub directly in `template_starter/` (RULES.md
+> §6.24–§6.26) — the same six-export / one-argument interface confirmed identical across
+> `Module2`, `graphics_module_2_topic_2_simple_positions`,
+> `graphics_module_3_topic_1_sections_of_solids`, and
+> `graphics_module_3_topic_2_development_of_surfaces`. Start from the template stub; copying a
+> sibling topic's filled-in version instead remains a legitimate shortcut when its self-check
+> shape already matches yours (see Section 3.4).
 
 > ⚠️ **`iShape.js` is a trap.** It looks like a shared contract, but Module 2's version (larger;
 > imports THREE; carries the `restingPlane:'VP'` lay-down + inclination composition) is **not**

@@ -397,6 +397,11 @@ function markBooted() {
   }
   const fallback = document.getElementById('sim-fallback');
   if (fallback) fallback.hidden = true;
+  // Platform iframe contract (ADR-078): announce a displayable sim to the host loader.
+  // Gated on document.fonts.ready so the host never reveals us mid-FOUT.
+  document.fonts.ready.then(() => {
+    window.parent.postMessage({ type: 'sim:ready' }, '*');
+  });
 }
 
 // ============================================================================
@@ -784,7 +789,6 @@ function setupWizardToggle() {
 // are pure post-multipliers over the fixed intrinsic frame (ADR-053 pattern).
 // ============================================================================
 
-const COMPARE_DEFAULT_SIZE = 'expanded';
 /** ADR-018 declared scale: 1 world unit = 10 mm. The development sheet's fixed
  *  intrinsic frame (ADR-053 pattern) is defined in mm, so the engine's world-unit
  *  layout extents convert through this before the px-per-mm scale is derived. */
@@ -793,8 +797,7 @@ const WORLD_TO_MM = 10;
 let compareCard = null;
 let compareCanvas = null;
 let compareChip = null;
-let compareOpen = false;      // the card is shown at all (compact OR expanded)
-let compareSize = 'compact';  // 'compact' | 'expanded'
+let compareOpen = false;      // the card is shown at all
 let workbenchOpen = false;
 /** Drag-to-pan offset (CSS px, ADR-054) applied on top of the fixed intrinsic frame in
  *  drawCompare's project(). User-driven only; zeroed on every fresh open, dblclick, reset. */
@@ -814,10 +817,6 @@ const WORKBENCH_CONTROLS = ['shape', 'section'];
  *  {parent, nextSibling}, captured on first re-parent so exitWorkbench restores it. */
 const driverHomes = new Map();
 
-function isWorkbenchViewport() {
-  return window.matchMedia('(min-width: 768px)').matches;
-}
-
 /** Collapse the wizard, split the viewport 50/50, and dock the driver wrappers (none yet —
  *  see WORKBENCH_CONTROLS) under both panes. Idempotent. */
 function enterWorkbench() {
@@ -835,7 +834,8 @@ function enterWorkbench() {
   }
 
   // Re-parent the drawing card out to <body> so the grid can place it as the right pane
-  // (compact anchors absolutely inside #sim-viewport, which is now the left pane).
+  // (the card is a plain grid cell in the split — ADR-080 — not absolutely positioned,
+  // but it still needs to leave #sim-viewport to become a body-level sibling).
   if (compareCard && compareCard.parentElement !== document.body) {
     document.body.appendChild(compareCard);
   }
@@ -855,7 +855,7 @@ function exitWorkbench() {
   document.body.classList.remove('rail-collapsed');
   syncRailToggleState(false);
 
-  // Card back inside the viewport (the positioned ancestor compact anchors to).
+  // Card back inside the viewport, its normal-flow parent outside the split.
   if (compareCard && viewport && compareCard.parentElement !== viewport) {
     viewport.appendChild(compareCard);
   }
@@ -866,17 +866,6 @@ function exitWorkbench() {
     const home = driverHomes.get(key);
     if (wrap && home?.parent) home.parent.insertBefore(wrap, home.next);
   }
-}
-
-/** Set the compare footprint and mount/unmount the workbench to match. 'expanded'
- *  enters the split (desktop only); anything else is the compact floating card. */
-function applyCompareSize(size) {
-  const wantSplit = size === 'expanded' && isWorkbenchViewport();
-  compareSize = wantSplit ? 'expanded' : 'compact';
-  if (compareCard) compareCard.dataset.size = compareSize;
-  if (wantSplit) enterWorkbench();
-  else exitWorkbench();
-  remeasureAfterReflow(); // TWO frames — the grid reflow isn't laid out on frame 1
 }
 
 /** Re-measure the viewport AFTER a layout-changing reflow has actually been laid out
@@ -905,11 +894,14 @@ function resetCompareView() {
 }
 
 const compare = {
-  show(size) {
+  show() {
     compareOpen = true;
     resetCompareView(); // every fresh open starts centred and unzoomed
     if (compareCard) compareCard.hidden = false;
-    applyCompareSize(size || (isWorkbenchViewport() ? COMPARE_DEFAULT_SIZE : 'compact'));
+    // Compare has exactly one shape now (ADR-080) — always the docked split, at every
+    // viewport width.
+    enterWorkbench();
+    remeasureAfterReflow(); // the grid reflow isn't laid out on frame 1 — measure after 2 frames
     updateCompareChip();
     announce('Compare view opened — 2D development drawing.');
   },
@@ -956,35 +948,15 @@ function setupRailToggle() {
   });
 }
 
-/** Bind + wire the Compare chrome once at boot: the chip toggles the card, the head
- *  buttons close / resize it. The expand button flips compact ↔ expanded. */
+/** Bind + wire the Compare chrome once at boot: the chip is Compare's only open/close
+ *  control (ADR-080) — there is no separate expand/close head chrome and no breakpoint
+ *  fallback to a floating card. */
 function setupCompareCard() {
   compareCard = document.getElementById('compare-card');
   compareChip = document.getElementById('compare-chip');
   compareCanvas = document.getElementById('compare-canvas');
 
   compareChip?.addEventListener('click', () => compare.toggle());
-  document.getElementById('compare-close')?.addEventListener('click', () => compare.hide());
-
-  const expandBtn = document.getElementById('compare-expand');
-  const syncExpandBtn = () => {
-    const expanded = compareSize === 'expanded';
-    expandBtn?.setAttribute('aria-label', expanded ? 'Shrink to floating card' : 'Expand to split view');
-    if (expandBtn) expandBtn.title = expanded ? 'Shrink' : 'Expand';
-  };
-  syncExpandBtn();
-  expandBtn?.addEventListener('click', () => {
-    applyCompareSize(compareSize === 'expanded' ? 'compact' : 'expanded');
-    syncExpandBtn();
-    announce(compareSize === 'expanded' ? 'Compare view expanded to split.' : 'Compare view shrunk to card.');
-  });
-
-  // The workbench is desktop-only. If the viewport narrows below the mobile breakpoint
-  // while the split is up, drop back to the bottom-sheet card so the layout never wedges
-  // between the grid and the mobile stack.
-  window.matchMedia('(min-width: 768px)').addEventListener('change', (e) => {
-    if (!e.matches && workbenchOpen) { applyCompareSize('compact'); syncExpandBtn(); }
-  });
 
   setupRailToggle();
   setupComparePan();

@@ -18,18 +18,40 @@ import * as THREE from 'three';
 import { Line2 } from 'three/addons/lines/Line2.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
-import { addLinearDimension } from './dimensions.js';
+import { addOrientedDimension, orientDimension } from './dimensions.js';
 import { addLabel, disposeLabels } from './labels.js';             // addLabel: shared CSS2D factory (the per-view TL tag); disposeLabels: generic CSS2D DOM sweep (the TL dimension's value label, owned by dimensions.js)
 import { createLabelManager } from './labels/LabelManager.js';     // the 3D label system (STEP 3)
 import { DIMENSION_OFFSET } from './labels/LabelPlacement.js';     // the ONE source for the TL dimension standoff
 
-// Reference-sheet extent (world units). Sized to the LINE data envelope — the Points framing
-// philosophy (its 9-unit sheet ≈ its point's data range, framed tight ~87%). The old 600 mm sheet
-// (60u) dwarfed a 60–150 mm line: the camera framed a vast sparse grid and the line filled a fraction
-// of the viewport (every label read crowded). 24u (±12) holds a centred 150 mm line's views (TL max
-// = 150 mm = 15u) while the fixed live camera (dist ≈ 32.8, frame ≈ 27u) frames it apparatus-tight,
-// like Points. GRID.divs unchanged → cell = 24/24 = 1.0u = 10 mm (a natural engineering grid; was 2.5u).
-const SHEET = 24;               // bounded reference-sheet size in world units (240 mm)
+// Reference-sheet extent (world units). The prior 24u sizing (ADR predating this comment) was
+// wrong: it treated the plane as if the drawing could use the FULL ±12u square, but the drawing
+// only ever occupies the first quadrant (end A's aHP/aVP are ≥0, and the resolver's dy/dz are
+// ≥0), so half of every origin-centred plane was permanently dead — the real usable ceiling was
+// 12u (120 mm), not 24u. Worse, the sliders (`r-tl` max 150, `r-ahp`/`r-avp` max 100) are not the
+// true ceiling: the typed numeric fields accept up to TL=200mm, aHP/aVP=150mm each (uiManager.js
+// DRIVERS inputMax, "a wider ceiling for exact textbook values"). Fixed via ADR-079: the planes
+// are now OFFSET (not origin-centred) so their full extent sits in the used quadrant, sized to
+// the typed-field worst case (aHP/aVP 150 + TL 200 = 350mm = 35u) plus a 3u annotation margin
+// (endpoint chips, the TL dimension standoff, the TL tag lift), rounded up. GRID.divs scales in
+// step so the cell stays a natural engineering grid: 44/44 = 1.0u = 10 mm.
+//
+// ADR-079 ADDENDUM: that offset fix had a side effect — a plane centred on `[-SHEET/2, +SHEET/2]`
+// and then shifted by `PLANE_LIFT` left only `SHEET/2 - PLANE_LIFT` = 6u sitting PAST the fold
+// line, down from the pre-ADR-079 12u tail (half of a 24u centred square). On screen the two
+// planes read as flush-at-a-hinge instead of visibly crossing through each other. Fixed by making
+// the plane a RECTANGLE: width (along the fold line, x) stays exactly SHEET=44 (untouched, so the
+// fold line + AXIS_X/Y_ANCHOR + PLANE_HP/VP_ANCHOR need no repositioning); the LIFT-axis extent
+// grows to PLANE_REACH + PLANE_OVERHANG, where PLANE_REACH is ADR-079's positive ceiling (kept
+// exactly, so the overrun fix is untouched) and PLANE_OVERHANG=12 restores the old 12u tail
+// exactly (the pre-ADR-079 centred SHEET/2), landing the far edge back at the same world position
+// the reference screenshot shows.
+const SHEET = 44;               // plane WIDTH along the XY fold line (x), world units — ADR-079
+const PLANE_REACH = 38;         // how far each plane reaches into the used quadrant (ADR-079's
+                                 // typed-field worst case + margin). Do not reduce — the overrun fix.
+const PLANE_OVERHANG = 12;      // how far each plane continues PAST the fold line so VP/HP visibly
+                                 // cross instead of meeting flush at a hinge (see addendum above)
+const SHEET_LIFT = PLANE_REACH + PLANE_OVERHANG; // 50 — plane extent along its lift axis
+const PLANE_LIFT = SHEET_LIFT / 2 - PLANE_OVERHANG; // 13 — offset centring that span on [-12, +38]
 const UNIT_TO_WORLD = 0.1;      // mm → world units (÷10, ADR-018)
 const W = (mm) => mm * UNIT_TO_WORLD;
 
@@ -46,7 +68,7 @@ const LW = { bold: 3.0, view: 2.0, projector: 1.4 };
 // reference (graphics_module_1_topic_3_points/src/hvPlanes.js): thin native LineSegments, the
 // plane hue faded `fade` toward paper, at `divs` divisions across the sheet, under every stroke
 // (renderOrder −1). This is the drafting/grid background DESIGN.md's "reference grids" call for.
-const GRID = { opacity: 0.55, fade: 0.60, divs: 24 };
+const GRID = { opacity: 0.55, fade: 0.60, divs: 44 };
 const GRID_CELL = SHEET / GRID.divs;
 
 const rootStyle = () => getComputedStyle(document.documentElement);
@@ -70,6 +92,12 @@ export function createLineRig({ resolved, view, foldAngle = 0, width = 1, height
   // the canvas pixel size on resize (ADR-006 §3.16) and dispose() can free them all.
   const materials = [];
   const res = new THREE.Vector2(Math.max(1, width), Math.max(1, height));
+
+  // Camera-aware BIS dimensions (ADR-081): every addOrientedDimension() entry, paired with the
+  // owner group orientDimension() should roll it against (the TL dimension's parent — always
+  // `group` here, since this topic's rig never parents a dimension to the folding `hpGroup`).
+  // Re-rolled once per frame by orientDimensions() below, called from main.js's render loop.
+  const dims = [];
 
   const COL = {
     hp:     cssColor('--color-hp-line'),
@@ -104,30 +132,42 @@ export function createLineRig({ resolved, view, foldAngle = 0, width = 1, height
   const seg = (parent, a, b, color, widthPx, dashed) =>
     fatLine(parent, [a[0], a[1], a[2], b[0], b[1], b[2]], color, widthPx, dashed);
 
-  /** A bounded reference plane: faint translucent fill + a plane-hued perimeter border. */
-  function referencePlane(parent, planeColor, fillOpacity, euler) {
-    const s = SHEET;
-    const geo = new THREE.PlaneGeometry(s, s);
+  /** A bounded reference plane: faint translucent fill + a plane-hued perimeter border.
+   *  `offset` (world-space THREE.Vector3, default origin) shifts the whole plane past its own
+   *  rotation — added AFTER `applyEuler`, the same order Object3D composes (R*local + T), so a
+   *  world-axis offset (e.g. "push HP +z") stays a world-axis offset regardless of which local
+   *  axis `euler` maps onto it. Used to move each plane's full extent into the quadrant the
+   *  drawing actually occupies instead of straddling the origin (ADR-079).
+   *  `w`/`h` (local u/v extents, default SHEET/SHEET) let the plane be a RECTANGLE rather than a
+   *  square — `h` (the lift axis) is grown past `w` (the fold-line axis) to restore the
+   *  cross-through-the-middle overhang without widening the fold line (ADR-079 addendum). */
+  function referencePlane(parent, planeColor, fillOpacity, euler, offset = new THREE.Vector3(), w = SHEET, h = SHEET) {
+    const geo = new THREE.PlaneGeometry(w, h);
     const mat = new THREE.MeshBasicMaterial({
       color: COL.fill, transparent: true, opacity: fillOpacity,
       side: THREE.DoubleSide, depthWrite: false,
     });
     const mesh = new THREE.Mesh(geo, mat);
     mesh.setRotationFromEuler(euler);
+    mesh.position.copy(offset);
     mesh.renderOrder = -2; // under the grid (−1) and all strokes (matches Points hvPlanes)
     parent.add(mesh);
 
     // The cage reference grid (platform drafting grid — Points hvPlanes.js `calmGrid`): thin
     // native lines, plane hue faded toward paper, placed on the plane in its local frame then
     // rotated by `euler`, drawn under the strokes.
-    const half = s / 2;
-    const steps = Math.round(s / GRID_CELL);
+    const hw = w / 2, hv = h / 2;
+    const stepsU = Math.round(w / GRID_CELL);
+    const stepsV = Math.round(h / GRID_CELL);
     const gridPos = [];
-    const onPlane = (u, v) => { const p = new THREE.Vector3(u, v, 0).applyEuler(euler); return [p.x, p.y, p.z]; };
-    for (let i = 0; i <= steps; i++) {
-      const t = -half + i * GRID_CELL;
-      gridPos.push(...onPlane(t, -half), ...onPlane(t, half));   // lines across v (fixed u = t)
-      gridPos.push(...onPlane(-half, t), ...onPlane(half, t));   // lines across u (fixed v = t)
+    const onPlane = (u, v) => { const p = new THREE.Vector3(u, v, 0).applyEuler(euler).add(offset); return [p.x, p.y, p.z]; };
+    for (let i = 0; i <= stepsU; i++) {
+      const t = -hw + i * GRID_CELL;
+      gridPos.push(...onPlane(t, -hv), ...onPlane(t, hv));       // lines across v (fixed u = t)
+    }
+    for (let i = 0; i <= stepsV; i++) {
+      const t = -hv + i * GRID_CELL;
+      gridPos.push(...onPlane(-hw, t), ...onPlane(hw, t));       // lines across u (fixed v = t)
     }
     const gridGeo = new THREE.BufferGeometry();
     gridGeo.setAttribute('position', new THREE.Float32BufferAttribute(gridPos, 3));
@@ -140,11 +180,10 @@ export function createLineRig({ resolved, view, foldAngle = 0, width = 1, height
     parent.add(grid);
 
     // perimeter border (fat line, plane-hued) in the plane's local frame → world
-    const h = s / 2;
-    const local = [[-h, -h], [h, -h], [h, h], [-h, h], [-h, -h]];
+    const local = [[-hw, -hv], [hw, -hv], [hw, hv], [-hw, hv], [-hw, -hv]];
     const flat = [];
     for (const [u, v] of local) {
-      const p = new THREE.Vector3(u, v, 0).applyEuler(euler);
+      const p = new THREE.Vector3(u, v, 0).applyEuler(euler).add(offset);
       flat.push(p.x, p.y, p.z);
     }
     fatLine(parent, flat, planeColor, 1.4, false).renderOrder = 1;
@@ -154,10 +193,11 @@ export function createLineRig({ resolved, view, foldAngle = 0, width = 1, height
   const hpGroup = new THREE.Group();
   group.add(hpGroup);
 
-  // VP wall (XY plane, z=0) — static
-  referencePlane(group, COL.vp, 0.07, new THREE.Euler());
-  // HP floor (XZ plane, y=0) — rides the fold
-  referencePlane(hpGroup, COL.hp, 0.10, new THREE.Euler(-Math.PI / 2, 0, 0));
+  // VP wall (XY plane, z=0) — static; offset +y so its full extent covers the used quadrant,
+  // rectangular (SHEET × SHEET_LIFT) so it overhangs past the fold line — see ADR-079 addendum
+  referencePlane(group, COL.vp, 0.07, new THREE.Euler(), new THREE.Vector3(0, PLANE_LIFT, 0), SHEET, SHEET_LIFT);
+  // HP floor (XZ plane, y=0) — rides the fold; offset +z, same reasoning
+  referencePlane(hpGroup, COL.hp, 0.10, new THREE.Euler(-Math.PI / 2, 0, 0), new THREE.Vector3(0, 0, PLANE_LIFT), SHEET, SHEET_LIFT);
 
   // XY fold line (the true HP ∩ VP intersection) — static
   seg(group, [-SHEET / 2, 0, 0], [SHEET / 2, 0, 0], COL.ink, 1.4, false);
@@ -222,16 +262,12 @@ export function createLineRig({ resolved, view, foldAngle = 0, width = 1, height
     seg(group, A, B, COL.ink, LW.bold, false);
 
     // Formal BIS Type-B True-Length dimension along AB (ADR-041) — the dimension line stands off
-    // perpendicular to the rod. Geometry only; the numeric value is the CSS2D-label phase.
+    // perpendicular to the rod, ROLLED to face whichever camera is live every frame (ADR-081,
+    // orientDimensions() below) instead of a fixed world-up standoff (correct only from Top).
     const va = new THREE.Vector3(...A), vb = new THREE.Vector3(...B);
-    const d = vb.clone().sub(va);
-    if (d.lengthSq() > 1e-4) {
-      d.normalize();
-      const up = Math.abs(d.y) > 0.95 ? new THREE.Vector3(1, 0, 0) : new THREE.Vector3(0, 1, 0);
-      const off = new THREE.Vector3().crossVectors(d, up).normalize().multiplyScalar(DIMENSION_OFFSET);
-      addLinearDimension(group, va, vb, off,
-        { color: COL.ink, resolution: res, materials, widthPx: 1.0, gap: 0.1, overshoot: 0.2, arrowLen: 0.4, flat: false, value: `TL ${Math.round(M.tl)}` });
-    }
+    const tlDim = addOrientedDimension(group, va, vb,
+      { color: COL.ink, resolution: res, materials, widthPx: 1.0, gap: 0.1, overshoot: 0.2, arrowLen: 0.4, offsetLen: DIMENSION_OFFSET, value: `TL ${Math.round(M.tl)}` });
+    if (tlDim) dims.push({ entry: tlDim, owner: group });
 
     // Hand the label system the endpoint coordinates (LOCAL to their owner groups). It creates,
     // positions, and parents every A/B/a/b/a′/b′/θ/φ label — no label logic lives in this leaf.
@@ -255,6 +291,13 @@ export function createLineRig({ resolved, view, foldAngle = 0, width = 1, height
     /** Drive the rabatment hinge (0 = open 3D corner, +π/2 = folded flat). Pure
      *  transform — no rebuild while swinging (the fold tween calls this per frame). */
     setFoldAngle(a) { hpGroup.rotation.x = a; },
+
+    /** Re-roll every BIS dimension to face `camera` (ADR-081) — call once per render frame, for
+     *  ANY active camera (free-orbit perspective or an engaged ortho quick-view/fold). Pure
+     *  transform, like setFoldAngle above: no rebuild. */
+    orientDimensions(camera) {
+      for (const { entry, owner } of dims) orientDimension(entry, owner, camera);
+    },
 
     /** Keep every fat-line material's resolution in sync with the canvas px size
      *  (ADR-006 §3.16 — stale resolution renders line weights wrong on resize). */

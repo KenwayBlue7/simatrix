@@ -1,5 +1,75 @@
 # Changelog — Projection of Straight Lines
 
+## 2026-07-27
+- Changed: the Problem Library overlay's title now centers in its header row (was hard-left) — a 44px spacer counterweights the close button so it stays corner-anchored (ADR-082). (`index.html`.)
+
+## 2026-07-25 — Tighter default 3D camera framing
+
+- Changed: the free-orbit perspective camera's default boot pose (`CAMERA_POSITION`) is pulled in
+  from a distance of ~32.8 to ~28.1 world units (same direction/target, so the same 3/4 viewing
+  angle) — the old distance was tuned for the legacy 60×60 sheet and never revisited after ADR-079
+  shrank it, leaving the line looking small against a lot of empty HP/VP plane. Verified the
+  clip-aware auto-zoom (ADR-014) still yields to a manual orbit, still leaves ordinary single-slider
+  exploration (e.g. aHP or aVP alone at its 100 mm slider max) untouched, and still dollies back
+  with no clipping at the typed-field ceilings (TL 200 mm, aHP/aVP 150 mm).
+
+## 2026-07-25 — 3D BIS dimension now rolls to face the camera in every view (ADR-081)
+
+- Fixed: the True-Length dimension's extension/tick marks and filled arrowheads read correctly
+  only in the Top quick-view; Front and Side showed a skewed parallelogram with edge-on
+  (near-invisible) arrowheads. Root cause: the dimension's standoff direction was computed once
+  from a fixed world-up vector (`cross(rod, worldUp)`), which is only screen-perpendicular to the
+  rod from directly overhead — Top was a coincidence, not a design guarantee. `dimensions.js`
+  gained `addOrientedDimension`/`orientDimension`: the same Type-B geometry is now built once in a
+  dedicated group's own local frame (rod along local +X, standoff along local +Y) and that group's
+  rotation is re-driven every render frame to keep the standoff perpendicular to BOTH the rod and
+  the current view direction, in any camera pose (free-orbit, Top/Front/Side, or the fold swoop).
+  Verified: Top is an exact fixed point of the new formula (cannot regress); Front/Side/free-orbit
+  now render a clean perpendicular bracket with filled arrowheads. The flat 2D Compare sheet
+  (`compareSheet.js`, a fixed square-on ortho camera) was unaffected and left untouched.
+
+## 2026-07-25 — Floating Compare card removed; split is now the only shape (ADR-080)
+
+- Fixed: resizing the browser while the Compare split was open could strand the 2D drawing panel
+  as a small floating "picture-in-picture" window (its own title bar, expand button, close button)
+  instead of the docked 50/50 split. Root cause was a one-way narrow-viewport listener (added
+  2026-07-19) that demoted the split to the compact floating card below 768px but never re-entered
+  the split on widening back past it.
+- Removed: the compact floating Compare card entirely — `applyCompareSize`, `compareSize`,
+  `isWorkbenchViewport`, the card's head chrome (tab + expand + close buttons), and the breakpoint
+  listener are gone. Compare is now always the docked split, at every viewport width; below 768px
+  the same split restacks to a single column instead of switching to a different Compare UI.
+
+## 2026-07-25 — Clip-aware 3D camera auto-zoom (ADR-014)
+
+- Added: the free-orbit perspective camera now dollies back automatically when typed-field values
+  (TL/aHP/aVP up to their 150–200 mm ceilings) push the line past the default frame — the case
+  ADR-079 flagged but didn't fix, since a larger reference grid can't compensate for a fixed camera
+  pose. Ported from Module 2 / Module 1's `reframeIfClipped` (`main.js`); push-back only, boot/reset
+  keeps the existing fixed pose unchanged.
+
+## 2026-07-25 — 3D reference-plane overrun fixed (ADR-079)
+
+- Fixed: at high end-A distances + steep inclination, the line's endpoint, front/top views, and
+  their labels could run off the edge of the 3D HP/VP reference-plane grid. Root cause was two
+  compounding mis-sizings: the planes were origin-centred (`PlaneGeometry` at `0,0`) while the
+  drawing only ever occupies the first quadrant, so half of every plane's `SHEET=24` extent was
+  permanently dead (real ceiling was 120 mm, not 240 mm); and the sizing was measured against the
+  slider max (`r-tl` 150 / `r-ahp`,`r-avp` 100) rather than the wider typed-field ceiling
+  (`uiManager.js` `inputMax`: TL 200, aHP/aVP 150 each) a learner can type directly. `lineRig.js`
+  `SHEET` 24 → 44 with a new `PLANE_LIFT = 16` world-space offset (planes now span `[-6, +38]`
+  instead of `[-12, +12]`), `GRID.divs` 24 → 44 to keep the 1.0u = 10 mm cell; `referencePlane()`
+  gained an `offset` parameter. `labels/LabelPlacement.js`'s `PLANE_HP/VP_ANCHOR` and
+  `AXIS_X/Y_ANCHOR` updated to track the new plane edges. `main.js` `SHEET_HALF` 12 → 22 (verified
+  unreferenced; kept as a documented constant only). Same fix applied to the sibling
+  `graphics_module_1_topic_5_projection_of_line_types` topic with its own numbers (SHEET 24 → 32,
+  `PLANE_LIFT = 10`). `contentBoxWorld()`/`flatSheetBox()` (camera framing) and `sheet2DLayout.js`
+  (the separate 2D Compare sheet, ADR-075) were confirmed out of scope and untouched.
+- Fixed: the plane-offset fix above left VP/HP flush at the fold line instead of visibly crossing through each other (the tail past the fold line shrank from the pre-fix 12u to 6u); planes are now rectangular (fold-line width unchanged, lift axis grown to `PLANE_REACH + PLANE_OVERHANG`) so they overhang the fold line by 12u again, matching the original look, without reducing the overrun fix's reach (ADR-079 addendum).
+
+## 2026-07-24
+- Added: `markBooted()` now posts `{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` resolves — the host loading screen's boot-ready signal (ADR-078, narrows ADR-002). (`main.js`.)
+
 ## 2026-07-23 — Compare 2D panel gains drag-to-pan + scroll-wheel zoom
 
 - Added: drag-to-pan and scroll-wheel zoom (zeroed-in on the cursor, clamped 0.4–5×) on the 2D

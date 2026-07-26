@@ -682,7 +682,8 @@ body.wizard-collapsed .wizard-toggle__icon{transform:rotate(180deg)}
   flex:0 0 auto;display:flex;align-items:center;justify-content:space-between;gap:var(--space-3);
   padding:var(--space-4) var(--space-5);border-bottom:1px solid var(--color-border);
 }
-.problem-library__title{margin:0;font-size:var(--text-title);font-weight:700;letter-spacing:-.01em}
+.problem-library__header::before{content:"";flex:none;width:44px}
+.problem-library__title{flex:1 1 auto;min-width:0;text-align:center;margin:0;font-size:var(--text-title);font-weight:700;letter-spacing:-.01em}
 .problem-library__close{
   flex:none;width:44px;height:44px;display:grid;place-items:center;padding:0;
   border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-paper);

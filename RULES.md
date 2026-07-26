@@ -142,8 +142,11 @@ Every rule is formatted:
 > **§2.9 ❌ NEVER** create a second reset path — the in-sim Reset button must route through
 > `simAPI.reset()`. *(ADR-002, CLAUDE.md)*
 
-> **§2.10 ❌ NEVER** add `postMessage`, `window.parent`, or `window.top` usage anywhere. The
-> host↔sim surface is `window.simAPI` + `meta.json` only. *(ADR-002, ARCHITECTURE.md §6)*
+> **§2.10 ❌ NEVER** add `postMessage`, `window.parent`, or `window.top` usage anywhere **except**
+> the single sanctioned `window.parent.postMessage({ type: 'sim:ready' }, '*')` fired once from
+> `markBooted()`. The host↔sim surface is `window.simAPI` + `meta.json` for control, plus that one
+> outbound boot signal — nothing else, and no inbound `message` listener. *(ADR-002, ADR-078,
+> ARCHITECTURE.md §6)*
 
 > **§2.11 ✅ DO** ship a `meta.json` at the root with all four fields — `title`, `description`,
 > `difficulty`, `tags`. Uploads missing any field are rejected. *(ADR-002, CLAUDE.md)*
@@ -478,6 +481,22 @@ Every rule is formatted:
 > Reason: the reserved wizard otherwise cramps each pane and gates the live controls (and any
 > construction launcher) away from the dual view.
 
+> **§5.16a ❌ NEVER** demote an expanded Compare split to a floating/compact card — platform-wide,
+> Compare has exactly one shape at every viewport width. Below the 768px breakpoint the same docked
+> split restacks to a single column (`"view" "compare" "rail"`) instead of switching to a different
+> Compare UI. This narrows §5.16's older "never forcing a demotion to the compact card" clause: the
+> compact card no longer exists anywhere to demote to. *(ADR-080 — supersedes the compact-card half
+> of ADR-012/ADR-021/ADR-037 platform-wide: `graphics_module_1_topic_5_projection_of_line_types`,
+> `graphics_module_1_topic_6_projection_of_straight_lines`, `graphics_module_1_topic_3_points`,
+> `graphics_module_2_topic_2_simple_positions`, `graphics_module_3_topic_2_development_of_surfaces`,
+> and `Module2` — the platform-wide reference module — are all fixed; `template_starter`'s
+> CSS/markup scaffolding was cleaned the same way so new topics stop inheriting the dead chrome.)*
+> Reason: a one-way narrow-viewport listener with no widening branch left the compact card
+> permanently stuck floating at full window width once the viewport widened back past 768px — a
+> picture-in-picture-style panel with its own title bar and expand/close buttons, sitting on top
+> of the page instead of docked. Removing the second Compare shape removes the state a resize could
+> strand it in.
+
 > **§5.17 ❌ NEVER** mirror/duplicate the driver or construction-launcher controls into the rail, or
 > give the docked rail a shadow — **re-parent** the existing nodes (one source of truth) and
 > separate the rail with a hairline only (Flat-Ink). *(ADR-021, ADR-037)*
@@ -617,6 +636,50 @@ Every rule is formatted:
 > discipline ("just don't author them") — both vanish silently when tiers are reshuffled.
 > *(ADR-062, ADR-069)*
 
+> **§6.23 ✅ DO** give any 3D-scene (non-flat) BIS dimension a camera-aware standoff, re-derived
+> every render frame as `normalize(rod × viewDirection)` — never a standoff fixed at build time
+> from a constant world-up vector. **❌ NEVER** assume a fixed formula chosen for one camera pose
+> (e.g. Top) stays correct as the camera orbits or a quick-view/fold engages a different one — it
+> is a coincidence of that one pose, not a property of the formula. The flat 2D Compare sheet's
+> own dimensions (`compareSheet.js`'s `addViewDim`, under a fixed square-on ortho camera) are
+> exempt — they need no camera-tracking and must keep using the plain `addLinearDimension`.
+> *(ADR-081)*
+
+> **§6.24 ✅ DO** shape every new topic's `problems.js` / `problemLibrary.js` pair — for a Case A
+> (Module 2 family) or Case C (new subject module) topic built from 2026-07-27 onward — to the
+> interface contract confirmed identical across all four shipped Family-A pairs (`Module2`,
+> `graphics_module_2_topic_2_simple_positions`, `graphics_module_3_topic_1_sections_of_solids`,
+> `graphics_module_3_topic_2_development_of_surfaces`):
+> - `problems.js` exports exactly six names: `TIERS`, `ENABLED_TIERS`, `FIELD_LABELS`, `PROBLEMS`,
+>   `enabledProblems()`, `groupByTier(list)`. `ENABLED_TIERS` is the single clone-scoping switch
+>   (ADR-009, RULES.md §1.6); `enabledProblems()` filters `PROBLEMS` by it.
+> - `problemLibrary.js` exports exactly one name: `initProblemLibrary(sim)` — **one positional
+>   argument**. It imports only `{ PROBLEMS, FIELD_LABELS, enabledProblems, groupByTier }` from
+>   `./problems.js` — never `TIERS`/`ENABLED_TIERS` directly.
+> - The `main.js` call site is always `initProblemLibrary(simController)` — one argument.
+> - `initProblemLibrary` returns exactly `{ open, exit, isActive, dispose }`, including on its
+>   fail-silent early return when the overlay's DOM is missing.
+> `template_starter/src/problemLibrary.js` ships a conforming, empty-bodied stub — start there.
+> *(ADR-083)*
+
+> **§6.25 ✅ DO**, when a syllabus bans a problem KIND outright (not just a tier), add it the way
+> `graphics_module_3_topic_1_sections_of_solids` and `graphics_module_3_topic_2_development_of_surfaces`
+> already do: an `EXCLUDED_TYPES` array in `problems.js` + a `type` field per problem (RULES.md
+> §6.21–§6.22, ADR-062, ADR-065, ADR-069). §6.24's six-export contract is a floor, not a ceiling —
+> `EXCLUDED_TYPES`, and any per-problem field a topic's own self-check needs (`setup`, `path`,
+> `type`), are additive, per-topic decisions, never required exports.
+> *(ADR-083)*
+
+> **§6.26 ❌ NEVER** read §6.24 as applying to Case B (a new Module 1 lesson). Case B never
+> creates its own `problemLibrary.js` — it injects into Module 1's existing shared engine leaf
+> (`Module1/src/problemLibrary.js`) the same way it injects into `engine.js` without ever editing
+> it (ADR-011), so §6.24 has no new file to apply to there. This rule does **not** require
+> Module 1's shared leaf — or its two current consumers, `graphics_module_1_topic_3_points` and
+> `graphics_module_1_topic_6_projection_of_straight_lines`, both on the existing 2-argument
+> `initProblemLibrary(sim, config)` form — to migrate. That migration, if it ever happens, is a
+> separate, not-yet-decided ADR.
+> *(ADR-083)*
+
 ---
 
 ## Section 7 — Cross-Module Harmony Rules
@@ -699,7 +762,8 @@ Every rule is formatted:
 - ❌ Use the UMD global, `@latest`, or unpinned `three`. *(§2.2)*
 - ❌ Write extensionless or absolute-path imports. *(§2.4, §2.5)*
 - ❌ Open the sim from `file://` or assume port 80 works. *(§2.6)*
-- ❌ Add `postMessage`/`window.parent`/`window.top`, a second reset path, or any non-CDN network call. *(§2.9, §2.10, §2.12)*
+- ❌ Add `postMessage`/`window.parent`/`window.top` beyond the one sanctioned `sim:ready` boot
+  signal, a second reset path, or any non-CDN network call. *(§2.9, §2.10, §2.12, ADR-078)*
 - ❌ Install puppeteer/playwright, or verify against a hand-typed replica instead of the shipped module. *(§2.17, §2.19)*
 - ❌ Add `three-mesh-bvh` via npm/a bundler, or pin it to `@latest` instead of the shared import map. *(§2.20)*
 
@@ -727,6 +791,7 @@ Every rule is formatted:
 - ❌ Re-cite "camera never moves during the fold," or use the held-angle fold dolly (`animateFoldHold`). *(§5.6, §5.8)*
 - ❌ Use a per-frame exponential camera follow, or run tight-fit and push-back in one rebuild. *(§5.2, §5.3)*
 - ❌ Reintroduce the persistent dual-pane PiP/`swap()`, or show a snapshot in the Compare card. *(§5.11, §5.14)*
+- ❌ Demote an expanded Compare split to a floating/compact card on resize. *(§5.16a)*
 - ❌ Put a CSS `transform` on `#sim-viewport`/`#canvas-area`/`body`. *(§5.13)*
 - ❌ Mirror the workbench rail controls instead of re-parenting, or give the docked rail a shadow. *(§5.17)*
 - ❌ Hard-swap perspective↔orthographic cameras in one frame instead of the `projectionMorphK` morph. *(§5.18)*

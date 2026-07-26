@@ -505,7 +505,6 @@
     .quick-view::before,
     .connector-toggle::before,
     .compare-chip::before,
-    .compare-card__btn::before,
     .vp-hint__dismiss::before {
       content: "";
       position: absolute;
@@ -519,88 +518,21 @@
     }
 
     /* ============================================================
-       Compare view — ported from the Points topic (ADR-012 / ADR-037).
+       Compare view — ported from the Points topic (ADR-012, narrowed by ADR-080).
        WIRED in this topic (Phase 2, ADR-066): main.js owns the enter/exit-workbench
        logic, the #compare-chip toggle, and a drawCompare() that delegates the actual
-       flat-pattern drawing to src/developmentEngine.js. The structure below is the
-       dual-mode shell: a floating compact "drawing sheet" card that expands into a
-       true 50/50 workbench split.
+       flat-pattern drawing to src/developmentEngine.js. Compare has exactly one shape —
+       always a cell of the body.compare-split grid (grid-area: compare, assigned below).
        ============================================================ */
-    /* Compact floating card — the on-demand 2D "drawing sheet". Transient overlay, so the
-       Flat-Ink rule permits its shadow. position:absolute inside #sim-viewport (positioned ancestor). */
     .compare-card {
-      position: absolute;
-      z-index: var(--z-compare);
       display: flex;
       flex-direction: column;
       overflow: hidden;
       background: var(--color-paper);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
-      box-shadow: var(--shadow-md);
     }
     .compare-card[hidden] { display: none; }
-    /* Sits below the wizard-toggle chevron (top-right, 44px) so the card never covers it. */
-    .compare-card[data-size="compact"] {
-      top: calc(var(--space-3) + 44px + var(--space-2));
-      right: var(--space-3);
-      width: min(420px, 38vw);
-      height: min(320px, 42vh);
-    }
-    /* Expanded = the 50/50 workbench split (ADR-037). The card is re-parented to <body>
-       (by main.js, once wired) and placed as the grid's right pane by the body.compare-split
-       rules below; here it just sheds the floating-card's absolute positioning. The card KEEPS
-       its base .compare-card border/radius/paper fill so it reads as a floating rounded card on
-       the gray split background — box-shadow stays off (Flat-Ink: docked surfaces don't earn the
-       transient-overlay shadow). */
-    body.compare-split #compare-card {
-      position: static;
-      inset: auto;
-      width: auto;
-      height: auto;
-      min-height: 0;
-      transform: none;
-      box-shadow: none;
-    }
-    .compare-card__head {
-      flex: 0 0 auto;
-      display: flex;
-      align-items: center;
-      gap: var(--space-1);
-      padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
-      background: var(--color-panel);
-      border-bottom: 1px solid var(--color-border);
-    }
-    .compare-card__tab {
-      flex: 1 1 auto;
-      font-family: var(--font-sans);
-      font-size: 0.6875rem;
-      font-weight: 700;
-      line-height: 1;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: var(--color-ink-secondary);
-    }
-    .compare-card__btn {
-      position: relative; /* anchors the centred 44px hit-area ::before */
-      flex: none;
-      width: 32px;
-      height: 32px;
-      display: grid;
-      place-items: center;
-      padding: 0;
-      border: 0;
-      background: none;
-      color: var(--color-ink-secondary);
-      cursor: pointer;
-      border-radius: var(--radius-xs);
-      transition: background var(--dur-fast) var(--ease-standard),
-                  color var(--dur-fast) var(--ease-standard),
-                  transform var(--dur-fast) var(--ease-standard);
-    }
-    .compare-card__btn svg { width: 18px; height: 18px; }
-    .compare-card__btn:active { transform: scale(0.97); }
-    .compare-card__btn:focus-visible { outline: none; box-shadow: var(--ring-focus); }
     .compare-card__stage {
       flex: 1 1 auto;
       position: relative;
@@ -621,8 +553,11 @@
          "rail  rail"      (auto row spanning both panes)
        The wizard drops out; wire main.js to re-parent your drivers into #workbench-rail.
        Because #sim-viewport IS the left pane, handleResize() (which measures it) sizes the
-       renderer to half-width with no JS sizing change. Desktop-only (mobile keeps the sheet).
-       Synced to the Module 2 master's floating-card chrome 2026-07-16: the split's own
+       renderer to half-width with no JS sizing change. Compare has exactly one shape at
+       every viewport width (ADR-080 — no floating/compact fallback); the mobile @media
+       block below restyles this same grid into a single stacked column instead of
+       switching to a different Compare UI. Synced to the Module 2 master's floating-card
+       chrome 2026-07-16: the split's own
        background is the gray --color-panel surface, with a --space-4 gap/padding so the three
        panes read as floating rounded cards, not flush edge-to-edge regions. */
     body.compare-split {
@@ -647,9 +582,9 @@
     body.compare-split #workbench-rail { grid-area: rail; }
     /* The wizard is collapsed BY the split; the chevron (main.js) exits it to bring it back. */
     body.compare-split #wizard { display: none; }
-    /* In the 50/50 split the drawing head + the viewport chevron are redundant chrome — the
-       still-visible, pressed Compare chip in the 3D pane is the single way back out. */
-    body.compare-split .compare-card__head { display: none; }
+    /* The Compare card has no head chrome to hide anymore (ADR-080) — the still-visible,
+       pressed Compare chip in the 3D pane is the split's only exit, same as the viewport
+       chevron is redundant and hidden here. */
     body.compare-split #wizard-toggle { display: none; }
 
     /* The docked driver rail — spans both panes, a paper-white rounded card (matching the
@@ -728,18 +663,18 @@
       grid-template-areas: "view compare";
     }
 
-    /* Narrow viewports: the compare card becomes a full-width bottom sheet (no room to float). */
+    /* Compare split, narrow viewport (ADR-080): no floating/bottom-sheet fallback — the
+       same docked split just restacks to a single column, 3D on top, the 2D drawing
+       under it, the rail at the bottom. */
     @media (max-width: 767px) {
-      .compare-card[data-size="compact"],
-      .compare-card[data-size="expanded"] {
-        top: auto;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        transform: none;
-        width: 100%;
-        height: 70%;
-        border-radius: var(--radius-md) var(--radius-md) 0 0;
+      body.compare-split {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) auto;
+        grid-template-areas: "view" "compare" "rail";
+      }
+      body.compare-split.rail-collapsed {
+        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-areas: "view" "compare";
       }
     }
 
@@ -1740,7 +1675,17 @@
       padding: var(--space-4) var(--space-5);
       border-bottom: 1px solid var(--color-border);
     }
+    /* Counterweight for the 44px close button, so the title reads on true centre
+       without un-anchoring the button from its top-right corner (§5.12 convention). */
+    .problem-library__header::before {
+      content: "";
+      flex: none;
+      width: 44px;
+    }
     .problem-library__title {
+      flex: 1 1 auto;
+      min-width: 0;
+      text-align: center;
       margin: 0;
       font-size: var(--text-title);
       font-weight: 700;
@@ -2238,25 +2183,14 @@
       </button>
     </div>
 
-    <!-- Compare card (ADR-012) — the on-demand 2D "drawing sheet" frame hosting the flat
-         pattern (the development). The stage owns a plain 2D <canvas> that main.js
-         drawCompare() live-redraws on every commit, delegating the unrolling math + paths
-         to src/developmentEngine.js (ADR-066). Hidden until the #compare-chip in the
-         vp-cluster opens it; enter/exit-workbench logic lives in main.js. -->
-    <div id="compare-card" class="compare-card" data-size="compact" role="region" aria-label="Compare: the 2D drawing" hidden>
-      <div class="compare-card__head">
-        <span class="compare-card__tab">2D drawing</span>
-        <button id="compare-expand" class="compare-card__btn" type="button" aria-label="Expand compare view" title="Expand">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M9 3H5a2 2 0 0 0-2 2v4M15 3h4a2 2 0 0 1 2 2v4M9 21H5a2 2 0 0 1-2-2v-4M15 21h4a2 2 0 0 0 2-2v-4"/>
-          </svg>
-        </button>
-        <button id="compare-close" class="compare-card__btn" type="button" aria-label="Close compare view" title="Close">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M6 6l12 12M18 6L6 18"/>
-          </svg>
-        </button>
-      </div>
+    <!-- Compare card (ADR-012, narrowed by ADR-080) — the docked 2D "drawing sheet" frame
+         hosting the flat pattern (the development). The stage owns a plain 2D <canvas> that
+         main.js drawCompare() live-redraws on every commit, delegating the unrolling math +
+         paths to src/developmentEngine.js (ADR-066). Hidden until the #compare-chip in the
+         vp-cluster opens it; enter/exit-workbench logic lives in main.js. Compare has exactly
+         one shape now (ADR-080): the docked 50/50 split — no floating/compact state, no head
+         chrome; the still-visible Compare chip is the single open/close control. -->
+    <div id="compare-card" class="compare-card" role="region" aria-label="Compare: the 2D drawing" hidden>
       <div class="compare-card__stage">
         <canvas id="compare-canvas" aria-label="2D drawing surface"></canvas>
       </div>

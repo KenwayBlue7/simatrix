@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-24
+- Added: `markBooted()` now posts `{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` resolves — the host loading screen's boot-ready signal (ADR-078, narrows ADR-002). (`src/main.js`.)
+
 ## 2026-07-09 (ADR-032 scrollbar retint)
 - Fixed: the `.card__scroll` scrollbar pill was still tinted `--color-accent` (the surrounding CSS comment already described the border token) — WebKit thumb + Firefox `scrollbar-color` retinted to `var(--color-border)` per ADR-032 Quiet Chrome.
 

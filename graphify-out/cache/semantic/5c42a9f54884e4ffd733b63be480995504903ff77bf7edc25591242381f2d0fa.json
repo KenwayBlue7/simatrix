@@ -1,1 +1,0 @@
-{"nodes": [], "edges": [{"source": "template_starter_claude_starter_template", "target": "template_starter_readme_module2_master", "relation": "conceptually_related_to", "confidence": "EXTRACTED", "confidence_score": 1.0, "source_file": "template_starter/CHANGELOG.md", "source_location": null, "weight": 1.0}], "hyperedges": []}

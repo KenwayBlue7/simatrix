@@ -16,6 +16,12 @@ an empty pipeline that already runs the disposal contract, ready for your domain
 this paragraph, fill in the sections below, wire `main.js` to your own domain, and build your own
 `ARCHITECTURE.md`/`DECISIONS.md`/`RULES.md` before writing simulation code.
 
+**Do not remove `markBooted()`'s `sim:ready` emit.** The platform-wide `../PLATFORM-RULES.md`
+§1.10 (ADR-078, narrows the root `../DECISIONS.md` ADR-002) requires every subject to announce
+boot completion to the host via one sanctioned `window.parent.postMessage({ type: 'sim:ready' },
+'*')`, fired once from `markBooted()` after `document.fonts.ready`. This template already wires
+it — keep it even as you replace everything else in `main.js`.
+
 ---
 
 ## Before you write any code

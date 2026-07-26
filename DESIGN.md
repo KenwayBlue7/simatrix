@@ -538,6 +538,28 @@ that offers a 2D/3D or before/after comparison, not a per-module style choice.
   (`display:none`) — the still-visible, pressed Compare chip in the 3D pane is the single way back
   out of the split.
 
+### 5.14 Problem Library overlay (`.problem-library`, ADR-032, ADR-082)
+
+*(New section — this component previously had no §5 spec; its rules were scattered across §4.2,
+§4.3, and §5.11. Consolidated here 2026-07-27, ADR-082.)* A full-viewport, focus-trapped modal
+dialog (`role="dialog"`) that opens from the `.library-entry` ghost action in the step card's
+eyebrow row. Token-only; flat ink-on-paper; it is one of the few surfaces that earns the overlay
+shadow (the Flat-Ink exception, §4.2), since it is a transient surface leaving the normal page flow.
+
+- **Surface:** pure-white content surface (`--color-paper`), `--shadow-md`, `--z-overlay` (120).
+  Enters with a calm slide-and-fade (`libraryIn`, collapses to instant under reduced motion).
+- **Header (`.problem-library__header`):** a flex row, `space-between` structurally, but the title
+  reads **centered** — a `44px` `::before` spacer on the header counterweights the `44px`
+  `.problem-library__close` button on the opposite side, and the title itself is `flex: 1 1 auto;
+  text-align: center`. This keeps the close button corner-anchored (matching the platform's other
+  44px corner chips, §5.12) while the title sits on true header-width center rather than reading
+  hard-left. Title type is the **Title** role (§3.2) — Atkinson 700, `--text-title`.
+- **Close button:** the standard 44px target, hairline border, `--radius-sm`, `scale(0.97)` on
+  `:active`, `--ring-focus` on `:focus-visible` — no exception from the platform button/press rules.
+- **Body (`.problem-library__body`):** scrollable, carries the floating padded scrollbar pill
+  (§5.11) — matches `#step-card`'s pattern.
+- **Cards:** `.problem-card` sits on `--color-paper` (§4.2's Host-Integration White Exception list).
+
 ---
 
 ## 6. Cross-module consistency rules (must be identical everywhere)

@@ -391,9 +391,20 @@ into the orchestrator directly.
 
 - **`index.html`** (~102 KB) — The single page. It holds the **import map** pinning
   `three@0.160.0`, a small inline boot-watchdog script (shows an on-brand fallback if
-  the module fails to load), the bundled `@font-face` declarations, **all of the CSS
-  and design tokens inline in one big `<style>` block**, the complete wizard/viewport
-  markup (step card, rail, sliders, toggles, mobile notice), and finally loads
+  the module fails to load, via `__simBootTimer`), the bundled `@font-face`
+  declarations, **all of the CSS and design tokens inline in one big `<style>`
+  block**, the complete wizard/viewport markup (step card, rail, sliders, toggles,
+  mobile notice), and finally loads
+
+  **Mandatory boot sequence (every topic, ADR-078):** `index.html`'s inline script
+  arms `window.__simBooted = false` and a 15 s `__simBootTimer` watchdog before
+  anything else runs. `main.js` must call `markBooted()` **last**, and only on a
+  fully successful boot, which (1) flips `__simBooted = true` and clears the
+  watchdog, (2) hides the `#sim-fallback` UI, and (3) once `document.fonts.ready`
+  resolves, posts `{ type: 'sim:ready' }` to `window.parent` — the one signal the
+  host loading screen waits on. A new topic that skips this step leaves the host
+  loader guessing; cloning `template_starter/main.js`'s `markBooted()` verbatim is
+  the required starting point.
   `main.js` as an ES module. (Note: Module 2 keeps its CSS *inline* here, unlike
   Module 1 — see §8.)
 
@@ -554,7 +565,8 @@ renderer as an argument, so it was renderer-agnostic before this change too.
 ## 6. The iframe Boundary
 
 Each Simatrix sim runs inside a sandboxed `iframe` on the host website. The contract
-between the two sides is **a global JavaScript API object, not message passing.**
+is mostly **a global JavaScript API object, not message passing** — with one
+deliberate, narrow exception: a single outbound boot-ready signal (ADR-078).
 
 **Confirmed from the code:**
 
@@ -567,21 +579,28 @@ between the two sides is **a global JavaScript API object, not message passing.*
 - The sim ships a **`meta.json`** at its root (`title`, `description`, `difficulty`,
   `tags`) that the platform reads to catalog the sim. All four fields are present in
   every module/topic.
+- **The sim announces its own boot completion.** `markBooted()` — called once, last,
+  only on a fully successful boot — fires
+  `window.parent.postMessage({ type: 'sim:ready' }, '*')` after `document.fonts.ready`
+  resolves, so the host's loading screen can close exactly when the scene is
+  displayable rather than guessing from the iframe's `load` event (ADR-078). This is
+  the sim's **only** outbound message; it never listens for inbound `message` events.
 - The sim makes **no runtime network calls** beyond the initial Three.js CDN fetch,
   assumes **no same-origin access**, and uses only **relative asset paths**, so it can
   be served from any URL prefix the host chooses.
 
 **What crosses the boundary:** control signals from host → sim (`pause`/`resume`/
-`reset` calls into the iframe's `window.simAPI`) and the static `meta.json` metadata
-the host reads. That is the entire surface.
+`reset` calls into the iframe's `window.simAPI`), the static `meta.json` metadata the
+host reads, and the one sim → host `sim:ready` boot signal. That is the entire surface.
 
-**What is NOT in this codebase:** there is **no `postMessage` and no `window.parent`/
-`window.top` usage anywhere in the repository** (verified by search across all
-folders). So the actual host-side code that reaches into the iframe and calls
-`simAPI.*` lives in the separate host website, which is not part of this repository.
-The exact wiring of *how* the host invokes these methods (e.g.
-`iframe.contentWindow.simAPI.pause()`) **could not be confirmed from code — needs
-review** against the host project.
+**What is NOT in this codebase:** beyond the single sanctioned `sim:ready` emit, there
+is **no other `postMessage` and no `window.parent`/`window.top` usage anywhere in the
+repository** (verified by search across all folders; ADR-002, narrowed by ADR-078). So
+the actual host-side code that reaches into the iframe and calls `simAPI.*`, and the
+code that listens for `sim:ready` to close the loading screen, lives in the separate
+host website, which is not part of this repository. The exact wiring of *how* the host
+invokes `simAPI.*` (e.g. `iframe.contentWindow.simAPI.pause()`) **could not be
+confirmed from code — needs review** against the host project.
 
 ---
 

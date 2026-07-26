@@ -5,6 +5,9 @@ Notable changes to this Engineering Graphics Module 1 topic (folder
 2026-07-13 as "Glass Box Visualizer"; renamed 2026-07-13, ADR-048). History before the scaffold
 below is the starter template's, carried over from the duplication.
 
+## 2026-07-24
+- Added: `markBooted()` now posts `{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` resolves — the host loading screen's boot-ready signal (ADR-078, narrows ADR-002). (`main.js`.)
+
 ## 2026-07-20
 - Changed: `--color-vp-line` darkened `#bc5d1e → #b25718` (platform-wide AA promotion, ~4.92:1 on paper) — `index.html` `:root`.
 
