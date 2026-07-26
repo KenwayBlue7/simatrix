@@ -180,6 +180,9 @@ allocation-light port and is the literal subject of "keep it."
   extensions on every import; all paths relative.
 - `meta.json` with all four fields; `window.simAPI` (`pause`/`resume`/`reset`); mobile notice
   `< 768px`; self-starting on load.
+- **`sim:ready` boot signal** (ADR-078, narrows ADR-002): `markBooted()` posts
+  `{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` — the one
+  sanctioned outbound `postMessage`. Do not add any other `postMessage`/inbound listener.
 - Single `rebuild()` is the only path for geometry change; full disposal contract every rebuild
   (verify `renderer.info.memory` stays flat across 50 rebuilds).
 - Engineering-textbook visual style: flat light, no cast shadows, `MeshPhongMaterial`

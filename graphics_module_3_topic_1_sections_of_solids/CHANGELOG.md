@@ -5,6 +5,9 @@ All notable changes to Module 3 · Topic 1 (Sections of Solids).
 (This topic's own history starts fresh from the scaffold date below — `template_starter/`'s prior
 build history belongs to the template, not this topic, per MODULE-STARTER §3.2 convention.)
 
+## 2026-07-24
+- Added: `markBooted()` now posts `{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` resolves — the host loading screen's boot-ready signal (ADR-078, narrows ADR-002). (`main.js`.)
+
 ## 2026-07-20
 - Changed: `--color-vp-line` darkened `#bc5d1e → #b25718` (platform-wide AA promotion, ~4.92:1 on paper) — `index.html` `:root`.
 

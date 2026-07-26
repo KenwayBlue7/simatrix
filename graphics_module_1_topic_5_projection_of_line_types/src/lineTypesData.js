@@ -105,7 +105,7 @@ export const STEPS = [
     spotlight: 'two-views',
     set: { case: LineCase.PARALLEL_BOTH, theta: 0, phi: 0 },
     controls: ['tl', 'fold'],
-    cam: { pos: [-21, 15, 22], target: [0, 2, 0] },
+    cam: { pos: [-18, 13.1, 18.9], target: [0, 2, 0] }, // scaled ~6/7 closer, same angle as before (main.js CAMERA_POSITION)
     orbitHint: true,
   },
   {

@@ -75,7 +75,9 @@ access and makes no runtime network calls beyond the CDN. Harder/constraint: the
 button **must** route through `simAPI.reset()` — there is exactly one reset path, no second one.
 The actual host-side code that calls `simAPI.*` lives in the separate host repo and is **not
 verifiable here** (ARCHITECTURE.md §6 flags the exact wiring as "needs review").
-**Status:** Active
+**Status:** Narrowed by ADR-078 — the blanket "no `postMessage`" ban no longer holds; one sanctioned
+outbound message (`sim:ready`) is now part of the contract. `window.simAPI` remains the sole
+*inbound* control surface; nothing here about `simAPI`/`meta.json`/the reset-path rule changes.
 
 ---
 
@@ -379,6 +381,29 @@ Harder: a lesson must supply an accurate `contentBox` (returning the whole `S3.g
 the 60-unit grid and never fit); the boot path and edit path must stay distinguishable so the right
 one runs.
 **Status:** Active (supersedes the per-frame exponential follow)
+
+**Addendum (2026-07-25):** Ported into `graphics_module_1_topic_5_projection_of_line_types` and
+`graphics_module_1_topic_6_projection_of_straight_lines`, the fix for the camera-framing gap ADR-079
+flagged and explicitly left open. Two adaptations, both scoped to these two topics:
+1. **Split detect/move pivot.** Both prior ports (Module 2, Module 1's engine.js) pivot the fit
+   distance on the same point they move the camera toward. In these topics the default orbit
+   `target` sits measurably off the content box's centre (the drawing is one-quadrant-only, ADR-079),
+   so engine.js's steady-state guard (`target ≈ centre`) does not hold at defaults — a straight port
+   would pan the target on the very first rebuild, an unrequested drift at boot. Fixed by **detecting**
+   clipping with the fit pivoted on the *live, unmoved* `controls.target` (so a value that already
+   fits leaves the pose untouched, exactly matching pre-port framing) and only pivoting the **move**
+   destination on the box centre once a push-back is actually warranted (engine.js's fix for pivot
+   lurch still applies once movement is happening).
+2. **No boot/reset tight-fit branch.** Both topics keep their existing fixed `CAMERA_POSITION`/
+   `CAMERA_TARGET` pose on boot/reset rather than adding a `frameToSolid`-style fit — ADR-079 verified
+   that pose's default framing by live screenshot the same day, and the tight-fit/push-back XOR this
+   ADR requires is satisfied trivially (boot/reset never fits, edits only push back).
+Verified (headless, projected content-box corners into camera NDC space): worst-case typed values in
+both topics stay inside frame after the dolly settles; default/typical values produce zero camera
+movement; a manual grab (`OrbitControls` `'start'`) cancels an in-flight dolly with the camera frozen
+in place; the fold swoop and quick-view ortho engage own the camera with no interference (per §5.10).
+topic_5 additionally sequences this against its own per-step `frameStep()` vantage glide via a
+`stepFraming` guard, so the two movers never race from the same outgoing pose.
 
 ---
 
@@ -2740,6 +2765,288 @@ via the initial `lookAt`) — pan/zoom only ever touch `position.xy`/`zoom`, nev
 so `setResolution()`'s aspect/frustum recompute on resize composes for free without resetting the
 learner's pan/zoom. `compareSheet.js` in both topics stays byte-parity (as it was pre-existing).
 **Status:** Active.
+
+---
+
+## ADR-078: One sanctioned outbound `postMessage` — `sim:ready` — narrows ADR-002
+
+**Date:** 2026-07-24
+**Decision:** Every sim now emits exactly one outbound message to the host,
+`window.parent.postMessage({ type: 'sim:ready' }, '*')`, fired once from `markBooted()` after
+`document.fonts.ready` resolves — i.e. after the boot watchdog (`__simBootTimer`) would already
+consider the sim successfully booted, and after webfonts are painted so the host never reveals a
+FOUT'd sim. This is the **only** direction of the message (sim → host); the sim still reads nothing
+back via `postMessage` and installs no `message` listener. `window.simAPI` (`pause`/`resume`/`reset`)
+remains the sole *inbound* control surface — this ADR does not touch it.
+**Why:** The host platform's outer loading screen (built by the separate web team) previously had no
+reliable signal for "this iframe is actually displayable" and had to guess, either closing the
+loader over an incomplete scene or holding it open past when the sim was ready. `window.simAPI` is a
+host→sim call surface; it cannot carry a sim→host event, so an outbound channel was unavoidable for
+this one signal. `postMessage` targeting `'*'` was chosen over a fixed origin because the host origin
+is not knowable at build time (the payload is served from "an arbitrary URL prefix," ADR-001) and the
+message payload (`{ type: 'sim:ready' }`) carries no sensitive data, so origin-restriction has no
+security benefit here.
+**Alternatives rejected:** Leaving ADR-002's ban intact and inferring readiness from the iframe's
+`load` event — rejected because `load` fires on document/script load, not on "the 3D scene has
+actually rendered a frame," which is exactly the premature-reveal failure mode the web team reported.
+Polling `window.__simBooted` from the host via a repeated read — rejected as impossible; cross-origin
+iframes cannot read the child's globals synchronously, which is the same reason ADR-002 needed
+`simAPI` as an explicit call surface in the first place. A bidirectional `postMessage` handshake
+(host asks "ready?", sim answers) — rejected as unnecessary complexity; a single fire-once event is
+sufficient since the host already owns its own fallback timeout.
+**Consequences:** Easier: the host loading screen can close exactly on scene-readiness instead of
+guessing. Harder/constraint: `RULES.md §2.10`, `PLATFORM-RULES.md §1.10`/§273, and `ARCHITECTURE.md
+§6` all stated a blanket postMessage ban and needed updating to name this one exception explicitly,
+so the rule stays enforceable rather than quietly violated. Every current topic's `markBooted()` is
+byte-identical, so the change is one identical patch across 10 topics + `template_starter` (so future
+topics inherit it for free); the two capital-letter legacy monoliths (`Module1/`, `Module2/`) were
+left out of this pass — `Module1` has no `markBooted()`/boot-tracking equivalent to hook at all, and
+both are superseded by the split topics, so a decision on their live-embed status was deferred back
+to whoever owns them rather than assumed here.
+**Status:** Active
+
+---
+
+## ADR-079: The Lines topics' 3D reference planes are OFFSET into the used quadrant, sized to the typed-field ceiling, overturning the earlier 60→24 `SHEET` shrink's stated rationale
+
+**Date:** 2026-07-25
+**Decision:** In `graphics_module_1_topic_6_projection_of_straight_lines/src/lineRig.js` and
+`graphics_module_1_topic_5_projection_of_line_types/src/lineTypeRig.js`, the HP/VP reference
+planes are no longer centred on the origin. `referencePlane()` gained a world-space `offset`
+parameter (a `THREE.Vector3`, applied to the mesh, the grid vertices, and the border after
+`applyEuler` — i.e. after rotation, the same order `Object3D` composes its own transform, so a
+"push +y" offset stays a world +y push regardless of which local axis the plane's `euler` maps
+onto it). Both planes are offset by a new `PLANE_LIFT` constant along the axis the drawing
+actually uses (VP: `+y`; HP: `+z`), so a plane's full `SHEET × SHEET` extent sits in
+`[-6, SHEET-6]` instead of straddling `[-SHEET/2, +SHEET/2]`. `SHEET` itself grew: topic 6
+24 → 44 (`PLANE_LIFT = 16`), topic 5 24 → 32 (`PLANE_LIFT = 10`); `GRID.divs` scaled in step in
+both files so the cell stays the 1.0u = 10 mm engineering grid. `labels/LabelPlacement.js`'s
+`PLANE_HP_ANCHOR`/`PLANE_VP_ANCHOR`/`AXIS_X_ANCHOR`/`AXIS_Y_ANCHOR` (both topics) were
+repositioned to track the new edges — they are hand-placed constants, not derived from `SHEET`.
+**Why:** Live repro (driving both sims to their typed-field maxima, not just the slider maxima)
+found the prior 24u sizing wrong on two counts. First, `referencePlane()` builds a
+`PlaneGeometry(s, s)` centred at the origin, but the line data is constrained to the first
+quadrant (`aHP`/`aVP` ≥ 0, and the resolver's `dy`/`dz` ≥ 0 in every case), so the `-y`/`-z` half
+of every plane was geometrically unreachable — the real usable ceiling was `SHEET/2` (120 mm),
+not `SHEET` (240 mm), roughly twice as tight as the original sizing assumed. Second, `uiManager.js`
+`DRIVERS` gives the typed numeric fields a deliberately wider ceiling than the sliders ("a wider
+ceiling for exact textbook values": TL `inputMax` 200 vs. slider max 150; topic 6's `aHP`/`aVP`
+`inputMax` 150 vs. slider max 100) — reachable today by typing a value, so sizing against the
+slider max left a reachable overrun in place. Together this explains why the reported overrun was
+worse than the "250mm vs. 240mm" estimate that motivated the original bug report. This directly
+overturns the stated rationale of the prior `SHEET` 60→24 shrink (this topic's own CHANGELOG,
+2026-07-1x entries, and both `CLAUDE.md` Architecture sections): that pass sized the sheet to "a
+centred 150mm line's views" under the Points ~87%-fill philosophy, which is a correct read of the
+*visual* framing goal but did not account for the planes being origin-centred while the data is
+one-quadrant-only, nor for the typed-field ceiling above the sliders.
+**Alternatives rejected:** A symmetric enlargement (just grow `SHEET`, keep planes origin-centred)
+was rejected — it would need roughly 2.5× the area of the offset fix to cover the same worst case
+(most of it on the permanently-dead negative side), reintroducing the exact "vast sparse grid, tiny
+line" problem the 60→24 shrink was written to fix. Sizing against the slider ceiling only (TL 150,
+`aHP`/`aVP` 100) was rejected because the typed fields reach further than that today, so it would
+leave the reported bug reachable via the numeric input. Sizing topic 6 to its 12 real Problem
+Library textbook maxima (TL 130, `aHP` 40, `aVP` 55) was rejected for the same reason — free
+slider/typed-field play past those values is still possible and still overruns.
+**Consequences:** Both topics' 3D grid is visually larger at rest — confirmed via live screenshot
+this does not read as oversized/sparse at typical parameter values (grid density is unchanged,
+1.0u = 10 mm cell in both). `contentBoxWorld()` (camera quick-view framing) and `flatSheetBox()`
+(the fold-swoop's flat-sheet framing) were confirmed to derive purely from resolved line geometry,
+never from `SHEET` — genuinely zero changes needed there, unaffected by this ADR. The 2D Compare
+sheet (`sheet2DLayout.js` `SHEET = 60`, ADR-075's intrinsic-TL-scale model) and the Compare
+pan/zoom clamp (`COMPARE_ZOOM_MIN/MAX`, ADR-077) are a fully separate rendering vehicle (own
+`OrthographicCamera`, own `WebGLRenderer`, ADR-076) with no reference to the 3D `SHEET` at all —
+confirmed no interaction, and pan/zoom re-verified working unchanged at both clamp ends. Not fixed
+by this ADR, flagged as a separate finding: at the true worst case (typed-field maxima at a steep
+angle) the line's own endpoint still leaves the *default 3D camera's viewport* (confirmed: `B` at
+~614px above a 776px canvas at topic 6's default framing) — a larger grid cannot fix this, since
+the camera pose (`CAMERA_POSITION`/`CAMERA_TARGET`, unchanged by this ADR) is fixed regardless of
+grid size. `main.js`'s `SHEET_HALF` in both topics was confirmed to have exactly one occurrence
+(its own declaration) in each file — it is dead, unreferenced by any other code — updated to a
+correct value and comment rather than removed, since deleting an unused-but-documented constant
+was not part of the requested change.
+**Status:** Active
+
+**Addendum (2026-07-25):** The offset fix above had an unnoticed side effect on the visual it was
+never meant to touch. Before ADR-079, each plane was a `PlaneGeometry(SHEET, SHEET)` centred on
+the origin, so along its lift axis it spanned `[-SHEET/2, +SHEET/2]`; the negative half (12u, when
+`SHEET` was 24) was the visible "pierce-through" — VP continuing below where HP sits, HP
+continuing behind where VP sits, so the two planes read as genuinely crossing rather than meeting
+at a hinge. Shifting the plane by `PLANE_LIFT` without changing its square shape left only
+`SHEET/2 − PLANE_LIFT` past the fold line — 6u in both topics, down from the pre-ADR-079 12u —
+which reads on screen as flush-at-the-hinge instead of crossing (confirmed by direct arithmetic on
+the diff, not assumed; the camera pose is unchanged so the same absolute tail reads smaller against
+a larger plane). Fixed by making each plane a **rectangle**: the fold-line-axis extent stays
+exactly `SHEET` (44 / 32, untouched, so the fold line and every hand-placed label anchor in
+`labels/LabelPlacement.js` needed no repositioning), while the lift-axis extent becomes a new
+`SHEET_LIFT = PLANE_REACH + PLANE_OVERHANG`, where `PLANE_REACH` is this ADR's original positive
+ceiling kept byte-for-byte (38 / 26 — the overrun fix is untouched) and `PLANE_OVERHANG = 12`
+restores the exact pre-ADR-079 tail. `referencePlane()` in both `lineRig.js` and `lineTypeRig.js`
+gained `w`/`h` parameters (default `SHEET`/`SHEET`) so `PlaneGeometry`, the grid, and the border
+all build from independent width/height instead of one square `s`; `PLANE_LIFT` is now derived
+(`SHEET_LIFT/2 − PLANE_OVERHANG` = 13 / 7) so the span keeps landing on `[-12, +38]` / `[-12, +26]`.
+VP and HP stay equal size within each topic (both calls pass the same `SHEET`/`SHEET_LIFT` pair).
+Verified: topic 6's worst case (aHP/aVP 150 + TL 200 = 35u) still fits inside `PLANE_REACH = 38`;
+topic 5's (TL 200 = 21.8u, no `aHP`/`aVP` driver) still fits inside `PLANE_REACH = 26` — neither
+number changed from this ADR's original sizing. Pan/zoom and `sheet2DLayout.js` remain unaffected
+for the same reason as the original ADR (separate rendering vehicle, no reference to 3D `SHEET`).
+**Status:** Active
+
+---
+
+## ADR-080: Compare platform-wide is collapsed to a single docked shape — the compact floating card is removed, not fixed
+
+**Date:** 2026-07-25
+**Decision:** No Compare-card topic on the platform has a `.compare-card[data-size="compact"]`
+floating state anymore. Compare has exactly one shape everywhere: the docked ADR-037 50/50 split.
+Fixed, in order: `graphics_module_1_topic_5_projection_of_line_types` and
+`graphics_module_1_topic_6_projection_of_straight_lines` (same day, first pass), then confirmed
+present and fixed identically in `graphics_module_1_topic_3_points`,
+`graphics_module_2_topic_2_simple_positions`, `graphics_module_3_topic_2_development_of_surfaces`,
+and `Module2` (the platform-wide reference module). `template_starter`'s CSS/markup scaffolding
+(no JS wiring exists there) was cleaned the same way so a new topic cut from it no longer re-seeds
+the dead compact-card chrome. In every location, `compare.show()` now calls `enterWorkbench()`
+unconditionally, at every viewport width; `applyCompareSize()`, `isWorkbenchViewport()`, the
+`compareSize` state, `COMPARE_DEFAULT_SIZE`, the card's head chrome (`.compare-card__head`/`__tab`/
+`__btn`, the `#compare-expand`/`#compare-close` buttons and their
+`matchMedia('(min-width: 768px)').addEventListener('change', ...)` demotion listener) are deleted
+outright. `.compare-card` is a plain flex column and a grid cell (`grid-area: compare`) — never
+`position: absolute`, never a transient overlay, so it no longer earns the Flat-Ink shadow
+exception. Below the existing 768px mobile breakpoint the same `body.compare-split` grid restacks
+to a single column (`"view" "compare" "rail"`, and `"view" "compare"` when the rail is collapsed)
+via one `@media (max-width: 767px)` override — there is no second Compare UI to fall back to, so
+there is no state a resize can strand.
+**Why:** The floating card was a real, shipped mode (reached via `applyCompareSize('compact')`
+when the wizard-toggle chevron was clicked mid-split, or automatically when the viewport narrowed
+below 768px while the split was open), not a debug artifact — but the demotion listener only had a
+narrowing branch, never a widening one, so widening back past 768px left the card stuck floating at
+full window width: exactly the picture-in-picture-style panel (title bar + expand + close) reported
+against topic 6, reproduced identically in topic 5, and confirmed present (same markup, same
+listener, byte-for-byte) in `graphics_module_1_topic_3_points`,
+`graphics_module_2_topic_2_simple_positions`, `graphics_module_3_topic_2_development_of_surfaces`,
+and `Module2` — pre-existing since the listener's introduction (`60b8ece`, 2026-07-19), not a
+regression from the same-day con-dock/pan-zoom/auto-zoom session that prompted the report. The
+`topic_3_points` wizard-toggle chevron needed the same `applyCompareSize('compact')` →
+`compare.hide()` swap topic 5/6 required; `Module2` and `graphics_module_2_topic_2_simple_positions`
+had no mobile Compare `@media` rules to replace at all (the restack rule is net-new there);
+`graphics_module_3_topic_2_development_of_surfaces` carried its own small standalone
+`@media (max-width: 767px)` block for the compact card, separate from the topic's main mobile
+block, which the restack rule replaced in place. No location needed a camera/`frameStep()`-style
+fix — topic 5's `stepFraming` interaction was ADR-014 auto-zoom landing in the same commit as this
+fix, not part of it. `graphics_module_1_topic_4_understanding_orthographic_views` and
+`graphics_module_3_topic_1_sections_of_solids` were checked and are NOT part of this decision: both
+ship the same dead `.compare-card[data-size="compact"]` CSS/markup but neither has the demotion
+listener (topic_4 drives its own `enterCompareSplit`/`exitCompareSplit`; sections-of-solids has no
+Compare wiring at all) — left alone as pre-existing dead code, not a resize-strandable bug.
+Repairing the listener (adding a widening branch)
+was considered and rejected: Compare's whole point is a full drawing-sheet read next to the 3D
+solid, and a 420×320px floating card serving that job on a phone- or tablet-width viewport is not a
+usable secondary state worth keeping around — it exists only because the split couldn't fit two
+side-by-side panes that narrow, which is exactly what a single-column stack solves without a second
+mode. Module 2's *code* was not usable as a template for this fix — it carries the byte-identical
+compact card and the byte-identical one-way listener — so "make Compare behave the way it already
+reads everywhere else" here means the single-shape outcome, not copying Module 2's implementation.
+**Alternatives rejected:** A two-way `matchMedia` listener that re-enters the split on widening —
+rejected because it still needs the compact card to exist as a landing state during the narrow
+window, and (per the first AskUserQuestion round on this task, overridden by this decision) any
+such listener has an intent-tracking problem: it can't distinguish a breakpoint-forced demotion from
+a user's deliberate Shrink click without extra state, which the single-shape design sidesteps
+entirely by not having a second state to track. Keeping the compact card only for the sub-768px case
+(effectively restoring its pre-ADR-021 mobile role) was rejected for the same reasons above, plus it
+would leave the exact demotion/restoration bug live at that one boundary — just renamed as "expected
+behavior" rather than fixed.
+**Consequences:** `driveFold()`'s forward-fold guard drops its `!workbenchOpen` term (always false
+now that Compare-open implies split-open) but is kept, not deleted, as a defensive no-op guard,
+since `simAPI.reset()` also routes through `compare.hide()`. The `#wizard-toggle` chevron's
+split-exit branch now calls `compare.hide()` (closing Compare) instead of `applyCompareSize('compact')`
+(demoting it) — consistent with the split being Compare's only shape. `loop()` no longer toggles
+`labelRenderer.domElement.style.display` to hide the 3D scene's CSS2D labels while Compare is
+"compact" (that state no longer exists; the split's two panes never overlapped, so the labels render
+unconditionally now). Verified in both topics via a same-origin same-document iframe harness (real
+window/tab resize proved unreliable in this session's browser-automation environment, and a
+backgrounded automation tab suspends `matchMedia` `change`-event dispatch entirely — the exact
+mechanism that hid this bug from earlier manual QA): the grid's `gridTemplateColumns`/
+`gridTemplateAreas` switch correctly and reversibly at 1200→900→760→500→900→1200px, `.compare-card__head`,
+`#compare-expand`, and `#compare-close` are absent from the DOM at every width, and — because the
+fix is now pure CSS with no JS listener driving it — this holds even where the `change` event itself
+never fires. `#rail-toggle` and `#con-dock` needed no changes; both already claim their grid areas
+positionally and follow the stack. The same verification approach (iframe width-walk, DOM absence
+checks for the deleted head-chrome ids, `node --check` syntax validation on every edited `main.js`)
+was repeated for `graphics_module_1_topic_3_points`, `graphics_module_2_topic_2_simple_positions`,
+`graphics_module_3_topic_2_development_of_surfaces`, and `Module2` in the follow-up pass that
+completed this ADR platform-wide the same day. `graphics_module_1_topic_4_understanding_orthographic_views`
+and `graphics_module_3_topic_1_sections_of_solids` remain untouched (see Why) — their dead compact-card
+CSS/markup is a separate, non-urgent cleanup, not covered by this ADR.
+**Status:** Active — resolved platform-wide across every Compare-card topic + `template_starter`.
+
+---
+
+## ADR-081: The Lines topics' 3D BIS dimensions roll about the rod axis to face the live camera, instead of a fixed world-up standoff
+
+**Date:** 2026-07-25
+**Decision:** In `graphics_module_1_topic_6_projection_of_straight_lines/src/dimensions.js` and
+`graphics_module_1_topic_5_projection_of_line_types/src/dimensions.js` (byte-identical, per this
+module pair's existing convention), the True-Length BIS Type-B dimension used in the 3D scene no
+longer computes a single fixed standoff direction at build time (`off = normalize(cross(rod,
+worldUp))`, ADR-041's original geometry). A new `addOrientedDimension()` builds the same extension
++ dimension-line + filled-3:1-arrowhead geometry once, in a dedicated child `THREE.Group`'s own
+local frame (rod along local +X, standoff along local +Y, centred at the rod's midpoint); a new
+`orientDimension()` re-derives that group's rotation every render frame as
+`standoff = normalize(rod × viewDirection)`, both terms taken in the dimension's OWNER group's
+local space (so a dimension riding a folding group — topic 5's top-view dimension parented to
+`hpGroup` — still resolves against the camera correctly through a fold tween, by dividing out the
+owner's world quaternion). `lineRig.js`/`lineTypeRig.js` track every dimension's `{entry, owner}`
+and expose `orientDimensions(camera)`, called once per frame from each topic's `main.js` render
+loop immediately before `renderer.render()`, passing whichever camera is live (free-orbit
+perspective, an engaged Top/Front/Side quick-view, or the fold-swoop ortho camera). The original
+`addLinearDimension()` (fixed world-space `off`) is UNCHANGED and still used by `compareSheet.js`'s
+`addViewDim()` — the flat 2D Compare sheet's own square-on ortho camera never moves, so its
+dimensions were never affected and needed no camera-tracking.
+**Why:** `off = cross(rod, worldUp)` always has zero y-component, committing the dimension to a
+horizontal plane that only reads as screen-perpendicular to the rod from directly overhead — i.e.
+Top was a coincidence of that one camera pose, not a property of the formula. From Front or Side
+the extension/tick marks projected at an angle (reading as a skewed parallelogram instead of a
+drafting bracket) and the filled arrowhead triangles were seen edge-on (near-invisible slivers).
+Reported against topic 6's Front/Side quick-views; reproduced live in both topics via a same-origin
+`:8123` PHP dev server (matching this pair's established `graphics_module_1_topic_5/6`
+browser-verification pattern). Topic 5 additionally dimensions the VIEW PROJECTIONS (not the space
+rod) — for its front-view dimension the rod lies exactly in the VP plane, so the old formula's `off`
+degenerated to a vector ALONG the view axis: the whole dimension collapsed flat onto the `a′b′` line
+in Front view, arrowheads gone entirely, confirmed live at Step 1 (Parallel to both). A per-view
+"pick a different fixed formula for Top vs Front vs Side" fix was rejected in favour of a single
+camera-relative formula, since the quick-view set is not exhaustive (free perspective orbit and the
+fold-swoop ortho camera both need the same correctness with no enumerable set of "known" views).
+**Alternatives rejected:** Billboard the WHOLE dimension flat to face the camera (like the CSS2D
+text labels) — rejected because the extension lines and arrowheads measure real 3D endpoints; a
+free billboard would tear their feet off the rod's actual A/B terminators the instant the camera
+moved off-axis from the billboard plane, which is a correctness defect a text label doesn't have
+(a label's position is a single point; a dimension's extension lines connect TWO specific points to
+a line). The chosen fix keeps every vertex glued to its measured feature and rotates only the
+STANDOFF axis — an axis-constrained roll, not a free billboard. Rebuilding the dimension's geometry
+every frame from a live camera-derived `off` (i.e. keep `addLinearDimension`'s shape, just re-run it
+per frame) was rejected as unnecessary allocation/GC churn against the leaf's ADR-004 disposal
+discipline, when a pure quaternion transform on a static local-frame widget (mirroring the existing
+`setFoldAngle` pattern) achieves the identical visual result with zero new geometry.
+**Consequences:** Every `addOrientedDimension()` call site must also register its returned
+`{group, dLocal, prevPerp}` entry (paired with the owner group it was parented to) so the rig's
+`orientDimensions(camera)` can find it; a dimension built but never registered would freeze at its
+build-time seed pose (the same world-up formula, kept ONLY as a deterministic fallback — see the
+seed-pose note in `dimensions.js`) and silently reproduce the old bug in non-Top views. Disposal
+needed NO new code: both `group.traverse()` (geometry/material) and `disposeLabels(group)`
+(CSS2D DOM) in `lineRig.js`/`lineTypeRig.js`'s `dispose()` already recurse into arbitrarily nested
+children, so the dimension's extra wrapping `THREE.Group` (one level deeper than the old flat
+`addLinearDimension` output) is swept by the same generic traversal, unchanged. A per-frame
+continuity rule (hold the previous frame's standoff sign when `rod × viewDirection` flips or
+degenerates near end-on) prevents the dimension from visibly snapping to the opposite side of the
+rod as the camera orbits past it. Verified: Top view is an exact algebraic fixed point of the new
+formula (`viewDirection = (0,−1,0)` reduces `rod × viewDirection` to the old `(−rod.z, 0, rod.x)`
+up to sign), so it was re-checked for pixel-level parity, not assumed safe. Topic 6's Front/Side
+quick-views, topic 5's Front/Side quick-views and its Step 1/4/5 view-projection dimensions, both
+topics' fold swoop (including topic 5's `hpGroup`-parented top-view dimension riding the fold), and
+a free-orbit drag sweep were all re-verified live; the 2D Compare sheet was confirmed pixel-identical
+to its pre-fix rendering in both topics.
+**Status:** Active — landed in both `graphics_module_1_topic_5_projection_of_line_types` and
+`graphics_module_1_topic_6_projection_of_straight_lines`. No other topic in the catalog builds a 3D
+(non-flat) BIS dimension via this `dimensions.js` pattern, so no further backport is in scope.
 
 ---
 

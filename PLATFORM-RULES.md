@@ -64,8 +64,11 @@ terms of Engineering Graphics' own files, modules, or lessons was left out entir
 > **§1.9 ❌ NEVER** create a second reset path — any in-sim Reset control must route through
 > `simAPI.reset()`. *(ADR-002, CLAUDE.md)*
 
-> **§1.10 ❌ NEVER** add `postMessage`, `window.parent`, or `window.top` usage anywhere. The
-> host↔sim surface is `window.simAPI` + `meta.json` only. *(ADR-002, ARCHITECTURE.md §6)*
+> **§1.10 ❌ NEVER** add `postMessage`, `window.parent`, or `window.top` usage anywhere **except**
+> the single sanctioned `window.parent.postMessage({ type: 'sim:ready' }, '*')` fired once from
+> `markBooted()`. The host↔sim surface is `window.simAPI` + `meta.json` for control, plus that one
+> outbound boot signal — nothing else, and no inbound `message` listener. *(ADR-002, ADR-078,
+> ARCHITECTURE.md §6)*
 
 > **§1.11 ✅ DO** ship a `meta.json` at the sim's root with all four fields — `title`,
 > `description`, `difficulty`, `tags`. Uploads missing any field are rejected. *(ADR-002, CLAUDE.md)*
@@ -270,8 +273,9 @@ terms of Engineering Graphics' own files, modules, or lessons was left out entir
 - ❌ Use a UMD global, `@latest`, or an unpinned external library. *(§1.2)*
 - ❌ Write extensionless or absolute-path imports. *(§1.4, §1.5)*
 - ❌ Open the sim from `file://` or assume port 80 works. *(§1.6)*
-- ❌ Add `postMessage`/`window.parent`/`window.top`, a second reset path, or any network call beyond
-  the one-time pinned CDN fetch. *(§1.9, §1.10, §1.12)*
+- ❌ Add `postMessage`/`window.parent`/`window.top` beyond the one sanctioned `sim:ready` boot
+  signal, a second reset path, or any network call beyond the one-time pinned CDN fetch. *(§1.9,
+  §1.10, §1.12, ADR-078)*
 
 **UI / visual**
 - ❌ Hard-code a hex in JS or component CSS. *(§2.1)*

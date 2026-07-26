@@ -3,6 +3,14 @@
 All notable changes at the Simatrix project root (spanning Module1, Module2, and the
 topic deploy copies). Per-module changelogs live inside each module folder.
 
+## 2026-07-25
+- Fixed: Topics 5 & 6's Compare split could get stuck as a small floating "picture-in-picture" card (title bar + expand/close buttons) instead of the docked 50/50 split — a one-way narrow-viewport listener demoted the split below 768px but never restored it on widening. Removed the compact floating card entirely; Compare now has exactly one shape (the docked split) at every viewport width, restacking to a single column below 768px instead of switching UI (ADR-080). The identical listener + floating card still exists in `graphics_module_1_topic_3_points`, `graphics_module_2_topic_2_simple_positions`, `graphics_module_3_topic_2_development_of_surfaces`, and `Module2` — flagged as a follow-up backport, out of scope for this fix.
+- Fixed: applied the same ADR-080 fix to `graphics_module_1_topic_3_points`, `graphics_module_2_topic_2_simple_positions`, `graphics_module_3_topic_2_development_of_surfaces`, and `Module2` — same byte-for-byte one-way listener + floating compact card confirmed in each, same removal (single docked shape, CSS-only restack below 768px). `template_starter`'s dead compact-card CSS/markup was cleaned too so new topics stop inheriting it. ADR-080 and RULES.md §5.16a widened from "topics 5+6 only" to platform-wide; the picture-in-picture Compare bug is now resolved everywhere it existed.
+- Fixed: Topics 5 & 6's 3D True-Length BIS dimension (extension/tick marks + filled arrowheads) read correctly only in the Top quick-view — Front/Side showed a skewed parallelogram with edge-on arrowheads, because the standoff direction was a fixed world-up vector, screen-perpendicular to the rod only from directly overhead. `dimensions.js` gained a camera-aware variant (`addOrientedDimension`/`orientDimension`) that re-rolls the dimension's standoff to face whichever camera is live every render frame — Top is an exact fixed point of the new formula, so it cannot regress (ADR-081).
+
+## 2026-07-24
+- Added: every shipped topic (10) + `template_starter` now posts `{ type: 'sim:ready' }` to `window.parent` once boot fully succeeds and webfonts are painted, so the host site's loading screen can close on genuine readiness instead of guessing (ADR-078, narrows ADR-002's postMessage ban) — see `RULES.md` §2.10, `PLATFORM-RULES.md` §1.10, `ARCHITECTURE.md` §6.
+
 ## 2026-07-23
 - Added: Topics 5 & 6's 2D Compare drawing gained drag-to-pan + scroll-wheel zoom (cursor-anchored, clamped 0.4–5×, double-click reset) — Module 2/Points' ADR-054/055 interaction, re-expressed against the topics' own ADR-076 ortho camera instead of a Canvas2D `project()` lens, since that lens doesn't exist there (ADR-077).
 

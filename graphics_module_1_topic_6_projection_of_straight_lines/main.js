@@ -47,9 +47,11 @@ const prefersReducedMotion =
 const cssColor = (name) =>
   new THREE.Color(getComputedStyle(document.documentElement).getPropertyValue(name).trim());
 
-/** Default 3D framing (from the legacy Lines cam3): a 3/4 view pulled back to suit the
- *  enlarged 60×60 (600 mm) sheet, target lifted so the subject line centres. */
-const CAMERA_POSITION = new THREE.Vector3(-21, 16, 21);
+/** Default 3D framing (from the legacy Lines cam3): a 3/4 view pulled in closer than the old
+ *  cam3 pull-back (tuned for the since-shrunk 60×60 legacy sheet, ADR-079) to frame the subject
+ *  line tighter at boot; same direction/angle as before (uniform scale toward CAMERA_TARGET), just
+ *  a shorter distance. Target lifted so the subject line centres. */
+const CAMERA_POSITION = new THREE.Vector3(-18, 14, 18);
 const CAMERA_TARGET = new THREE.Vector3(0, 2, 0);
 
 /** The base viewport flags each step's `view` merges over. */
@@ -71,6 +73,11 @@ const FOLD_MS = 1600;
 const CAMERA_MOVE_MS = 900;
 const ORTHO_FRUSTUM = 12;
 const FIT_PADDING = 1.12;
+/** Clip-aware auto-zoom (ADR-014, ported from Module 2 / Module 1's engine.js). Margin the
+ *  perspective fit leaves around the content box, and the one-shot dolly's duration — snappier
+ *  than CAMERA_MOVE_MS so it keeps up with a continuous slider drag. */
+const FRAME_PADDING = 1.1;
+const AUTO_ZOOM_MS = 500;
 /** Quick-view directions + screen-ups (world axes: HP = XZ y=0, VP = XY z=0, fold line = X).
  *  Each view stands the ORTHOGRAPHIC camera off along `dir` and rolls it with `up`; the ortho
  *  zoom does the framing (RULES.md §5.18). The fold swoop reuses `front`. */
@@ -79,7 +86,7 @@ const QV_DIR = {
   front: { dir: new THREE.Vector3(0, 0, 1), up: new THREE.Vector3(0, 1, 0) },  // look along −Z at VP
   side:  { dir: new THREE.Vector3(1, 0, 0), up: new THREE.Vector3(0, 1, 0) },  // look along −X down the fold line
 };
-const SHEET_HALF = 12; // reference sheet is 24 world units (240 mm); half-extent for framing (matches lineRig SHEET)
+const SHEET_HALF = 22; // reference plane is now a 44×50 RECTANGLE (SHEET × SHEET_LIFT, offset +PLANE_LIFT, span [-12,+38] on the lift axis — ADR-079 rectangle addendum); this half-extent tracks only the fold-line axis (SHEET/2, unchanged by the addendum). Verified unreferenced elsewhere in this file — kept only as a documented constant.
 
 // ============================================================================
 // Orchestrator-owned state (the ONLY owner — no engine.js)
@@ -99,6 +106,10 @@ let lastFrameTime = 0;
 let orthoCamera, orthoControls, activeCamera, activeControls;
 let projMorphK = null;
 let cameraTween = null;
+
+/** In-flight clip-aware auto-zoom dolly (ADR-014), or null. Separate handle from cameraTween
+ *  (the quick-view / fold swoop mover) so the two moves never fight over one tween slot. */
+let autoZoomTween = null;
 
 /** The lit quick-view chip's kind ('top'|'front'|'side'), or null in free orbit / any other pose. */
 let activeQuickView = null;
@@ -133,7 +144,6 @@ let onboarding = null;
 //     (own-canvas architecture, ADR-076 — supersedes the topics' original single-canvas
 //     scissor design; see DECISIONS.md) ---
 let compareOpen = false;
-let compareSize = 'compact';                 // 'compact' | 'expanded'
 let workbenchOpen = false;
 let workbenchRail = null;
 let conDock = null;                          // floating construction-launcher dock (2D panel's bottom-right corner)
@@ -145,7 +155,6 @@ let sheetLabelRenderer = null;               // the sheet's OWN CSS2D overlay �
 let compareStage = null;                     // .compare-card__stage — the sheet canvas's parent element
 let sheetResizeObserver = null;              // keeps the sheet canvas sized to its stage across every layout change
 let comparePanWired = false;                 // setupComparePan() guard — wire the stage listeners once
-const COMPARE_DEFAULT_SIZE = 'expanded';     // desktop opens straight into the 50/50 split (ADR-021)
 const WORKBENCH_CONTROLS = ['tl', 'disthp', 'distvp', 'theta', 'phi', 'truelength', 'traces'];
 // Rail clustering (topic-local visual grouping, not a platform convention): breaks the flat
 // 5-wide instrument row into two titled .dock__group clusters so the rail scans instead of
@@ -238,6 +247,11 @@ function markBooted() {
   }
   const fallback = document.getElementById('sim-fallback');
   if (fallback) fallback.hidden = true;
+  // Platform iframe contract (ADR-078): announce a displayable sim to the host loader.
+  // Gated on document.fonts.ready so the host never reveals us mid-FOUT.
+  document.fonts.ready.then(() => {
+    window.parent.postMessage({ type: 'sim:ready' }, '*');
+  });
 }
 
 // ============================================================================
@@ -297,8 +311,12 @@ function buildScene(container) {
   activeControls = controls;
 
   // A user drag mid-flight cancels the camera tween so the learner's hand wins the swoop's
-  // tail. The FOLD tween is left alone (orbiting during the rabatment is fine).
-  controls.addEventListener('start', () => { cameraTween?.cancel(); cameraTween = null; });
+  // tail. The FOLD tween is left alone (orbiting during the rabatment is fine). Also cancels
+  // any in-flight auto-zoom dolly (ADR-014) — a manual grab is the last word.
+  controls.addEventListener('start', () => {
+    cameraTween?.cancel(); cameraTween = null;
+    autoZoomTween?.cancel(); autoZoomTween = null;
+  });
 
   // An attempted ORBIT on the rotate-locked ortho camera (a lit quick-view) fires no
   // OrbitControls event — catch the pointerdown and nudge the lit chip so the learner reads
@@ -355,6 +373,8 @@ function rebuild() {
   // The ONE seam the Problem Library self-check subscribes to (every parameter / step / reset
   // change passes through here). Empty subscriber set before the library wires up → a no-op.
   notifyStateChange();
+
+  reframeIfClipped(); // clip-aware auto-zoom (ADR-014): dolly back if the line outgrew the frame
 }
 
 /** Merge a partial change into the line data and re-derive the scene — the one write
@@ -416,6 +436,88 @@ function contentBoxWorld() {
   return new THREE.Box3().setFromPoints(pts).expandByScalar(0.8);
 }
 
+/** Required PERSPECTIVE camera-to-pivot distance to frame `box` with `padding` margin, looking
+ *  along `dir` (unit, pivot→camera) with screen-up `up`. Accurate PROJECTED-BOX fit: each of the
+ *  8 corners is resolved onto the camera's right/up axes (perpendicular screen extents) and its
+ *  depth toward the camera, and the binding corner sets the distance — unlike a bounding-sphere
+ *  fit (its radius is the box half-diagonal, far larger than the on-screen silhouette), this does
+ *  not over-frame. Verbatim Module 2 / Module 1 engine.js port (ADR-014) — only `camera` is
+ *  renamed from `S3.cam`/the Module 2 module-level `camera`. */
+function fitPerspectiveDistance(box, pivot, dir, up, padding = FRAME_PADDING) {
+  const forward = dir.clone().negate();
+  const right = new THREE.Vector3().crossVectors(forward, up).normalize();
+  const camUp = new THREE.Vector3().crossVectors(right, forward).normalize();
+  const vHalf = THREE.MathUtils.degToRad(camera.fov / 2);
+  const hHalf = Math.atan(Math.tan(vHalf) * camera.aspect);
+  const tanV = Math.tan(vHalf);
+  const tanH = Math.tan(hHalf);
+  const v = new THREE.Vector3();
+  let D = 0;
+  for (let i = 0; i < 8; i++) {
+    v.set(
+      (i & 1) ? box.max.x : box.min.x,
+      (i & 2) ? box.max.y : box.min.y,
+      (i & 4) ? box.max.z : box.min.z,
+    ).sub(pivot);
+    const a = v.dot(dir);
+    const px = Math.abs(v.dot(right));
+    const py = Math.abs(v.dot(camUp));
+    D = Math.max(D, a + (px * padding) / tanH, a + (py * padding) / tanV);
+  }
+  return D;
+}
+
+/** Clip-aware auto-zoom (ADR-014, ported from Module 2's `reframeIfClipped` / Module 1's
+ *  engine.js). Called at the end of rebuild() — the one seam every parameter/step change passes
+ *  through — so it NEVER runs per-frame and never fights a manual orbit: between edits
+ *  OrbitControls owns the camera completely. Push-back ONLY: if the current line already fits
+ *  the free-orbit perspective view, this returns and touches NOTHING (not even the orbit
+ *  target) — so today's fixed default framing is preserved exactly and a learner's manual
+ *  zoom-in survives an edit. If the line has grown past the frame, it eases the camera BACK
+ *  along its current view direction (and re-centres the orbit target onto the content box's
+ *  centre, so growth stays framed instead of lurching as the box translates off a fixed pivot —
+ *  see the DETECT-vs-MOVE pivot split below) over one 500 ms tween, restarted from the camera's
+ *  live pose on every call so a continuous slider drag chases smoothly with no end-of-drag jump. */
+function reframeIfClipped() {
+  // Only the free-orbit perspective view auto-frames: a fold swoop, an in-flight quick-view
+  // camera move, or the folded flat sheet owns the camera instead (RULES.md §5.10).
+  if (activeCamera !== camera || folded || foldTween || cameraTween) return;
+
+  const box = contentBoxWorld();
+  const target = controls.target;
+  const dir = camera.position.clone().sub(target);
+  if (dir.lengthSq() < 1e-6) return;
+  dir.normalize();
+
+  // DETECT pivoting on the LIVE (unmoved) target: "is anything clipped from where the camera
+  // actually is right now?" This keeps the default pose's steady state exact — at any value that
+  // already fits, dCur >= dClip and the function returns having touched nothing.
+  const dClip = fitPerspectiveDistance(box, target, dir, camera.up);
+  const dCur = camera.position.distanceTo(target);
+  if (dCur >= dClip) return;
+
+  // MOVE pivoting on the box CENTRE (engine.js): once something genuinely clips, centring the
+  // subject on the optical axis makes the required distance grow linearly with the subject
+  // instead of lurching as it translates away from the fixed target. Push-back only on distance
+  // — never dolly closer than the learner's current zoom.
+  const center = box.getCenter(new THREE.Vector3());
+  const dFit = fitPerspectiveDistance(box, center, dir, camera.up);
+  const toDist = Math.max(dCur, dFit);
+  const fromPos = camera.position.clone();
+  const fromTgt = target.clone();
+  const toPos = center.clone().addScaledVector(dir, toDist);
+
+  autoZoomTween?.cancel(); // retarget from the LIVE pose — smooth chase on a continuous drag
+  autoZoomTween = tween({
+    from: 0, to: 1, duration: AUTO_ZOOM_MS, ease: easeStandard,
+    onUpdate: (t) => {
+      controls.target.lerpVectors(fromTgt, center, t);
+      camera.position.lerpVectors(fromPos, toPos, t);
+    },
+    onComplete: () => { autoZoomTween = null; },
+  });
+}
+
 /** Blend the ortho projection matrix toward the perspective one by projMorphK (0 = pure
  *  ortho, 1 = pure perspective), element-wise — a smooth gain/loss of depth over the
  *  sub-second move (§5.18). Stamped by the loop AFTER the tween + controls rebuilt the
@@ -440,6 +542,7 @@ function clearProjectionMorph() {
  *  + a zoom matching the perspective frustum (so frame 0 doesn't pop) and arm the
  *  perspective→ortho morph. Reduced motion skips the morph (projMorphK stays null). */
 function engageOrtho() {
+  autoZoomTween?.cancel(); autoZoomTween = null; // a quick-view takes the camera — auto-zoom yields
   if (activeCamera !== orthoCamera) {
     orthoCamera.position.copy(camera.position);
     orthoControls.target.copy(controls.target);
@@ -464,6 +567,8 @@ function engageOrtho() {
 function restorePerspective(animate = false, duration = CAMERA_MOVE_MS, ease = easeStandard) {
   cameraTween?.cancel();
   cameraTween = null;
+  autoZoomTween?.cancel();
+  autoZoomTween = null;
   clearProjectionMorph();
   clearQuickView(); // the camera is heading home → no Top/Front/Side chip stays lit
   const handOff = () => {
@@ -644,12 +749,15 @@ function setupQuickViews() {
  *  camera and planes move as one. Held-angle folds are FORBIDDEN (§5.8). */
 function driveFold(toAngle) {
   foldTween?.cancel();
-  // A forward fold closes a floating (compact) Compare card so it can't fight the fold; the
-  // split can't fold (its fold control lives in the collapsed wizard), so leave it alone.
-  if (toAngle === FOLD_ANGLE && compareOpen && !workbenchOpen) compare.hide();
+  // A forward fold closes Compare so the split can't fight the fold — Compare's fold control
+  // lives in the collapsed wizard, unreachable while the split is open (ADR-080: Compare is
+  // always the split now, so this used to also guard against a since-removed floating state).
+  if (toAngle === FOLD_ANGLE && compareOpen) compare.hide();
   clearQuickView(); // the fold takes the camera → no quick-view chip stays lit
   cameraTween?.cancel();
   cameraTween = null;
+  autoZoomTween?.cancel(); // the fold takes the camera → auto-zoom yields (RULES.md §5.10)
+  autoZoomTween = null;
   const arc = Math.abs(toAngle - foldAngle) / FOLD_ANGLE;
   const duration = Math.max(1, FOLD_MS * arc);
 
@@ -763,9 +871,6 @@ function completeAndNext() {
 // (ADR-037 amendment).
 // ============================================================================
 
-/** The workbench is a desktop affordance (ADR-021 parity); < 768px keeps the compact card. */
-function isWorkbenchViewport() { return window.matchMedia('(min-width: 768px)').matches; }
-
 function updateCompareChip() { compareChip?.setAttribute('aria-pressed', String(compareOpen)); }
 
 /** Hide the chip until both views exist (the legacy Lines compareGate: showFV && showTV),
@@ -778,13 +883,14 @@ function syncCompareChipVisibility() {
 }
 
 const compare = {
-  show(size) {
+  show() {
     if (foldTween) return; // the fold owns the camera + card
     compareOpen = true;
     if (compareCard) compareCard.hidden = false;
     ensureSheetRenderer(); // lazy: only pay for the 2nd WebGL context once Compare is actually used
     compareSheet?.resetView(); // every fresh open starts centred and unzoomed (ADR-055 reset contract)
-    applyCompareSize(size || (isWorkbenchViewport() ? COMPARE_DEFAULT_SIZE : 'compact'));
+    enterWorkbench(); // Compare has exactly one shape (ADR-080) — always the docked split
+    remeasureAfterReflow(); // the grid reflow isn't laid out on frame 1 — measure after 2 frames
     if (compareSheet) compareSheet.setData(resolveLine(currentData), currentView);
     updateCompareChip();
     announce('Compare view opened — 2D drawing.');
@@ -802,16 +908,6 @@ const compare = {
   toggle() { compareOpen ? compare.hide() : compare.show(); },
   isOpen() { return compareOpen; },
 };
-
-/** Set the Compare footprint and mount/unmount the workbench. 'expanded' enters the split
- *  (desktop only); anything else is the compact floating card. */
-function applyCompareSize(size) {
-  const wantSplit = size === 'expanded' && isWorkbenchViewport();
-  compareSize = wantSplit ? 'expanded' : 'compact';
-  if (compareCard) compareCard.dataset.size = compareSize;
-  if (wantSplit) enterWorkbench(); else exitWorkbench();
-  remeasureAfterReflow(); // the grid reflow isn't laid out on frame 1 — measure after 2 frames
-}
 
 function ensureWorkbenchRail() {
   if (workbenchRail) return workbenchRail;
@@ -941,24 +1037,9 @@ function setupRailToggle() {
 function setupCompareCard() {
   compareCard = document.getElementById('compare-card');
   compareChip = document.getElementById('compare-chip');
+  // The chip is Compare's only open/close control (ADR-080) — there is no separate
+  // expand/close head chrome and no breakpoint fallback to a floating card.
   compareChip?.addEventListener('click', () => compare.toggle());
-  document.getElementById('compare-close')?.addEventListener('click', () => compare.hide());
-  const expandBtn = document.getElementById('compare-expand');
-  const syncExpandBtn = () => {
-    const expanded = compareSize === 'expanded';
-    expandBtn?.setAttribute('aria-label', expanded ? 'Shrink to floating card' : 'Expand to split view');
-    if (expandBtn) expandBtn.title = expanded ? 'Shrink' : 'Expand';
-  };
-  syncExpandBtn();
-  expandBtn?.addEventListener('click', () => {
-    applyCompareSize(compareSize === 'expanded' ? 'compact' : 'expanded');
-    syncExpandBtn();
-  });
-  // Desktop-only workbench: if the viewport narrows below the breakpoint while split, drop
-  // back to the compact card so the layout never wedges.
-  window.matchMedia('(min-width: 768px)').addEventListener('change', (e) => {
-    if (!e.matches && workbenchOpen) { applyCompareSize('compact'); syncExpandBtn(); }
-  });
 }
 
 /** Sync the 3D renderer's dependent state (camera aspect, ortho frustum, fat-line
@@ -1198,13 +1279,14 @@ function setupWizardToggle() {
   if (!btn) return;
 
   btn.addEventListener('click', () => {
-    // In the workbench split the wizard is collapsed BY the split; the chevron's job there is to
-    // bring the steps back — i.e. shrink out of the split (ADR-037, mirroring ADR-021).
+    // In the workbench split the wizard is collapsed BY the split; the chevron's job there is
+    // to bring the steps back — i.e. close Compare entirely, since the split is Compare's only
+    // shape now (ADR-080, mirroring ADR-037/ADR-021's original "shrink out of the split").
     if (workbenchOpen) {
-      applyCompareSize('compact');
+      compare.hide();
       btn.setAttribute('aria-expanded', 'true');
       btn.title = 'Hide steps panel';
-      announce('Left the split — steps panel shown.');
+      announce('Compare closed — steps panel shown.');
       return;
     }
     const collapsed = document.body.classList.toggle('wizard-collapsed');
@@ -1231,18 +1313,19 @@ function loop(now) {
   // pure-ortho matrix, so the blended matrix is the last word before render. Null = no morph.
   if (projMorphK !== null) applyProjectionMorph();
 
+  // Camera-aware BIS dimensions (ADR-081): re-roll every 3D dimension to face WHICHEVER camera is
+  // live this frame — free-orbit perspective, or an engaged ortho quick-view/fold — right before
+  // it is drawn, mirroring the morph stamp above (last transform before render wins).
+  lineRig?.orientDimensions(activeCamera);
+
   // Own-canvas architecture (ADR-076): the 3D renderer draws its own full
   // canvas, no scissoring, no region math — autoClear (default true) handles the paper
   // clear on every render() call.
   renderer.render(scene, activeCamera); // perspective, or the ortho camera during the fold swoop
 
-  // The compact Compare card FLOATS over the 3D viewport; its 2D sheet now lives on a
-  // separate canvas, but the 3D scene's CSS2D labels are still DOM elements that could
-  // visually bleed over the compact card's screen-space rect, so the same "hide the 3D
-  // labels while compact" rule still applies. In the split the two panes don't overlap.
-  const hideMainLabels = compareOpen && compareSize === 'compact';
-  labelRenderer.domElement.style.display = hideMainLabels ? 'none' : '';
-  if (!hideMainLabels) labelRenderer.render(scene, activeCamera); // 3D scene labels
+  // Compare is always the docked split now (ADR-080) — its pane never overlaps the 3D
+  // viewport, so the 3D scene's CSS2D labels no longer need hiding while Compare is open.
+  labelRenderer.render(scene, activeCamera); // 3D scene labels
 
   // The 2D sheet renders on its OWN renderer into its OWN canvas — only while Compare is
   // open (a closed card costs nothing beyond the idle GL context).
@@ -1294,6 +1377,7 @@ window.simAPI = {
     cancelTweens();               // drop in-flight fold + camera tweens
     foldTween = null;
     cameraTween = null;
+    autoZoomTween = null;
     if (activeCamera === orthoCamera) restorePerspective(false); // instant hand-off back to perspective
     clearQuickView();
     folded = false;

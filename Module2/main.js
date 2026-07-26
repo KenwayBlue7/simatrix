@@ -2318,9 +2318,6 @@ function cueOrthoLock() {
  *  drivers, and the wizard itself is unreachable while the split is open (aria-label on
  *  #workbench-rail notes this). */
 const WORKBENCH_CONTROLS = ['size', 'disthp', 'distvp', 'anglehp', 'anglevp', 'resting', 'roty'];
-/** Desktop opens the Compare card straight into the 50/50 split, matching the Points
- *  reference; mobile has no workbench and always gets the compact bottom-sheet card. */
-const COMPARE_DEFAULT_SIZE = 'expanded';
 /** ADR-018 declared scale: 1 world unit = 10 mm. projectionDrawer.js keeps its own private
  *  copy of this same constant (for its dimension labels); drawCompare needs it too, to turn
  *  flattened world-space points into the same mm units the sheet's fixed scale is defined in. */
@@ -2329,8 +2326,7 @@ const WORLD_TO_MM = 10;
 let compareCard = null;
 let compareCanvas = null;
 let compareChip = null;
-let compareOpen = false;      // the card is shown at all (compact OR expanded)
-let compareSize = 'compact';  // 'compact' | 'expanded'
+let compareOpen = false;      // the card is shown at all
 let workbenchOpen = false;
 /** Drag-to-pan offset (CSS px, ADR-054) applied on top of the fixed intrinsic-nominal frame
  *  in drawCompare's project(). User-driven only — never touched by slider/angle changes, so
@@ -2351,10 +2347,6 @@ let workbenchRail = null;
  *  restore it to its EXACT home slot — unlike the Points reference's single `#controls`
  *  dock, these 7 wrappers come home to TWO different Step panels (Step 1 and Step 2). */
 const driverHomes = new Map();
-
-function isWorkbenchViewport() {
-  return window.matchMedia('(min-width: 768px)').matches;
-}
 
 /** The docked rail, created once and kept for the session. */
 function ensureWorkbenchRail() {
@@ -2397,7 +2389,8 @@ function enterWorkbench() {
   }
 
   // Re-parent the drawing card out to <body> so the grid can place it as the right pane
-  // (compact anchors absolutely inside #sim-viewport, which is now the left pane).
+  // (the card is a plain grid cell in the split — ADR-080 — not absolutely positioned,
+  // but it still needs to leave #sim-viewport to become a body-level sibling).
   if (compareCard && compareCard.parentElement !== document.body) {
     document.body.appendChild(compareCard);
   }
@@ -2419,7 +2412,7 @@ function exitWorkbench() {
   document.body.classList.remove('rail-collapsed');
   syncRailToggleState(false);
 
-  // Card back inside the viewport (the positioned ancestor compact anchors to).
+  // Card back inside the viewport, its normal-flow parent outside the split.
   if (compareCard && viewport && compareCard.parentElement !== viewport) {
     viewport.appendChild(compareCard);
   }
@@ -2429,17 +2422,6 @@ function exitWorkbench() {
     const home = driverHomes.get(key);
     if (wrap && home?.parent) home.parent.insertBefore(wrap, home.next);
   }
-}
-
-/** Set the compare footprint and mount/unmount the workbench to match. 'expanded'
- *  enters the split (desktop only); anything else is the compact floating card. */
-function applyCompareSize(size) {
-  const wantSplit = size === 'expanded' && isWorkbenchViewport();
-  compareSize = wantSplit ? 'expanded' : 'compact';
-  if (compareCard) compareCard.dataset.size = compareSize;
-  if (wantSplit) enterWorkbench();
-  else exitWorkbench();
-  remeasureAfterReflow(); // TWO frames — the grid reflow isn't laid out on frame 1
 }
 
 /** Re-measure the viewport AFTER a layout-changing reflow has actually been laid out
@@ -2478,12 +2460,15 @@ function resetCompareView() {
 }
 
 const compare = {
-  show(size) {
+  show() {
     if (foldTween) return; // the fold owns the camera + card
     compareOpen = true;
     resetCompareView(); // ADR-054/055: every fresh open starts centred and unzoomed, not wherever a past drag/zoom left it
     if (compareCard) compareCard.hidden = false;
-    applyCompareSize(size || (isWorkbenchViewport() ? COMPARE_DEFAULT_SIZE : 'compact'));
+    // Compare has exactly one shape now (ADR-080) — always the docked split, at every
+    // viewport width.
+    enterWorkbench();
+    remeasureAfterReflow(); // the grid reflow isn't laid out on frame 1 — measure after 2 frames
     updateCompareChip();
     announce('Compare view opened — 2D drawing.');
   },
@@ -2918,35 +2903,15 @@ function setupRailToggle() {
   });
 }
 
-/** Bind + wire the Compare chrome once at boot: the chip toggles the card, the head
- *  buttons close / resize it. The expand button flips compact ↔ expanded. */
+/** Bind + wire the Compare chrome once at boot: the chip is Compare's only open/close
+ *  control (ADR-080) — there is no separate expand/close head chrome and no breakpoint
+ *  fallback to a floating card. */
 function setupCompareCard() {
   compareCard = document.getElementById('compare-card');
   compareChip = document.getElementById('compare-chip');
   compareCanvas = document.getElementById('compare-canvas');
 
   compareChip?.addEventListener('click', () => compare.toggle());
-  document.getElementById('compare-close')?.addEventListener('click', () => compare.hide());
-
-  const expandBtn = document.getElementById('compare-expand');
-  const syncExpandBtn = () => {
-    const expanded = compareSize === 'expanded';
-    expandBtn?.setAttribute('aria-label', expanded ? 'Shrink to floating card' : 'Expand to split view');
-    if (expandBtn) expandBtn.title = expanded ? 'Shrink' : 'Expand';
-  };
-  syncExpandBtn();
-  expandBtn?.addEventListener('click', () => {
-    applyCompareSize(compareSize === 'expanded' ? 'compact' : 'expanded');
-    syncExpandBtn();
-    announce(compareSize === 'expanded' ? 'Compare view expanded to split.' : 'Compare view shrunk to card.');
-  });
-
-  // The workbench is desktop-only. If the viewport narrows below the mobile breakpoint
-  // while the split is up, drop back to the bottom-sheet card so the layout never wedges
-  // between the grid and the mobile stack.
-  window.matchMedia('(min-width: 768px)').addEventListener('change', (e) => {
-    if (!e.matches && workbenchOpen) { applyCompareSize('compact'); syncExpandBtn(); }
-  });
 
   setupRailToggle();
   setupComparePan();
