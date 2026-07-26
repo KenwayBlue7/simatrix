@@ -1,5 +1,8 @@
 # Changelog — Projection of Straight Lines
 
+## 2026-07-27
+- Changed: the Problem Library overlay's title now centers in its header row (was hard-left) — a 44px spacer counterweights the close button so it stays corner-anchored (ADR-082). (`index.html`.)
+
 ## 2026-07-25 — Tighter default 3D camera framing
 
 - Changed: the free-orbit perspective camera's default boot pose (`CAMERA_POSITION`) is pulled in

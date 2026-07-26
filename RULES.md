@@ -645,6 +645,41 @@ Every rule is formatted:
 > exempt — they need no camera-tracking and must keep using the plain `addLinearDimension`.
 > *(ADR-081)*
 
+> **§6.24 ✅ DO** shape every new topic's `problems.js` / `problemLibrary.js` pair — for a Case A
+> (Module 2 family) or Case C (new subject module) topic built from 2026-07-27 onward — to the
+> interface contract confirmed identical across all four shipped Family-A pairs (`Module2`,
+> `graphics_module_2_topic_2_simple_positions`, `graphics_module_3_topic_1_sections_of_solids`,
+> `graphics_module_3_topic_2_development_of_surfaces`):
+> - `problems.js` exports exactly six names: `TIERS`, `ENABLED_TIERS`, `FIELD_LABELS`, `PROBLEMS`,
+>   `enabledProblems()`, `groupByTier(list)`. `ENABLED_TIERS` is the single clone-scoping switch
+>   (ADR-009, RULES.md §1.6); `enabledProblems()` filters `PROBLEMS` by it.
+> - `problemLibrary.js` exports exactly one name: `initProblemLibrary(sim)` — **one positional
+>   argument**. It imports only `{ PROBLEMS, FIELD_LABELS, enabledProblems, groupByTier }` from
+>   `./problems.js` — never `TIERS`/`ENABLED_TIERS` directly.
+> - The `main.js` call site is always `initProblemLibrary(simController)` — one argument.
+> - `initProblemLibrary` returns exactly `{ open, exit, isActive, dispose }`, including on its
+>   fail-silent early return when the overlay's DOM is missing.
+> `template_starter/src/problemLibrary.js` ships a conforming, empty-bodied stub — start there.
+> *(ADR-083)*
+
+> **§6.25 ✅ DO**, when a syllabus bans a problem KIND outright (not just a tier), add it the way
+> `graphics_module_3_topic_1_sections_of_solids` and `graphics_module_3_topic_2_development_of_surfaces`
+> already do: an `EXCLUDED_TYPES` array in `problems.js` + a `type` field per problem (RULES.md
+> §6.21–§6.22, ADR-062, ADR-065, ADR-069). §6.24's six-export contract is a floor, not a ceiling —
+> `EXCLUDED_TYPES`, and any per-problem field a topic's own self-check needs (`setup`, `path`,
+> `type`), are additive, per-topic decisions, never required exports.
+> *(ADR-083)*
+
+> **§6.26 ❌ NEVER** read §6.24 as applying to Case B (a new Module 1 lesson). Case B never
+> creates its own `problemLibrary.js` — it injects into Module 1's existing shared engine leaf
+> (`Module1/src/problemLibrary.js`) the same way it injects into `engine.js` without ever editing
+> it (ADR-011), so §6.24 has no new file to apply to there. This rule does **not** require
+> Module 1's shared leaf — or its two current consumers, `graphics_module_1_topic_3_points` and
+> `graphics_module_1_topic_6_projection_of_straight_lines`, both on the existing 2-argument
+> `initProblemLibrary(sim, config)` form — to migrate. That migration, if it ever happens, is a
+> separate, not-yet-decided ADR.
+> *(ADR-083)*
+
 ---
 
 ## Section 7 — Cross-Module Harmony Rules

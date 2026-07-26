@@ -3050,6 +3050,97 @@ to its pre-fix rendering in both topics.
 
 ---
 
+## ADR-082: Problem Library overlay title centres; close button stays corner-anchored
+
+**Date:** 2026-07-27
+**Decision:** The `.problem-library__title` ("Practice problems", the `<h1>` in the Problem
+Library modal's header) now reads centered in its header row, on every deployed copy. The
+`.problem-library__close` 44px button stays where it was — pinned top-right, the platform's
+standard corner-anchored chip (DESIGN.md §5.12). Achieved with a `44px` `::before` spacer on the
+opposite side of `.problem-library__header` plus `.problem-library__title { flex: 1 1 auto;
+text-align: center }`, so the spacer and the close button counterweight each other and the title
+box sits on true header-width center. No markup changed in any location.
+**Why:** Requested UI polish; the header previously used plain `justify-content: space-between`,
+so the title read hard-left. Audited DECISIONS.md, DESIGN.md, RULES.md, and the graphify knowledge
+graph first — the top-left placement was never a recorded decision (no `#NOTE`/`#WHY` convention
+exists in this repo, and no ADR mentions this title's alignment), and DESIGN.md's §5 component
+catalog had **no subsection for the Problem Library dialog at all** (it ran 5.1→5.13 and stopped).
+Centering it does not overturn anything (§8.4 not triggered) and does not conflict with any
+existing typography or Quiet Chrome rule (§2.3/§3.3), which govern colour coverage and weight, not
+alignment.
+**Alternatives rejected:** Absolute-positioning the close button (`position: absolute; right:
+var(--space-5)`) with `justify-content: center` on the header — also centers the title, but
+requires merging its `translateY(-50%)` into the existing `:active { transform: scale(0.97) }`
+press rule (§6 rule 6) in all 8 files, more edit surface for the same visual result, and touches
+Module 1's no-transform-sensitive shell (DESIGN.md §4.4) for no benefit. Centering the whole header
+group (`justify-content: center` alone) was also rejected — it drags the close button off its
+top-right corner, breaking the platform's §5.12 corner-chip convention.
+**Consequences:** Easier: the header now reads as a conventional centered dialog title, matching
+the pattern learners see in every other full-viewport modal on the platform; DESIGN.md gains a
+proper §5.14 component spec for this overlay so future topic clones inherit the intent instead of
+copying blind. Harder/known: this is one more rule that must be manually re-applied in any *new*
+topic folder that adds its own Problem Library from scratch rather than copying `template_starter/`
+(RULES.md §1.3/§1.4 — no shared file, no build step). The 44px spacer literal deliberately mirrors
+`.problem-library__close`'s own `width: 44px` (the platform's minimum-target constant, DESIGN.md §6
+rule 4) rather than introducing a new token for it.
+**Status:** Active — landed in `Module2/index.html` (master), `Module1/src/shell.css` (Module 1's
+own master), the five deployed topic copies (`graphics_module_2_topic_2_simple_positions`,
+`graphics_module_3_topic_1_sections_of_solids`, `graphics_module_3_topic_2_development_of_surfaces`,
+`graphics_module_1_topic_3_points`, `graphics_module_1_topic_6_projection_of_straight_lines`), and
+`template_starter/index.html` so future topic scaffolds inherit it.
+
+## ADR-083: The problem-library interface contract (`problems.js` six exports, `problemLibrary.js` one-arg `initProblemLibrary(sim)`) is a platform-wide standard for every new topic, not scoped to the Module 2 family
+
+**Date:** 2026-07-27
+**Decision:** Every new `problems.js`/`problemLibrary.js` pair created for a NEW topic — Case A
+(a new Module 2 family topic) or Case C (a whole new subject module) — must follow the interface
+confirmed identical across all four shipped Family-A pairs (`Module2`,
+`graphics_module_2_topic_2_simple_positions`, `graphics_module_3_topic_1_sections_of_solids`,
+`graphics_module_3_topic_2_development_of_surfaces`): `problems.js` exports exactly `TIERS`,
+`ENABLED_TIERS`, `FIELD_LABELS`, `PROBLEMS`, `enabledProblems()`, `groupByTier(list)`;
+`problemLibrary.js` exports exactly one `initProblemLibrary(sim)` (one positional argument),
+importing only `{ PROBLEMS, FIELD_LABELS, enabledProblems, groupByTier }`, returning exactly
+`{ open, exit, isActive, dispose }`. `EXCLUDED_TYPES` + a per-problem `type` field remain an
+additive, optional layer for a hard syllabus-KIND exclusion (already proven by ADR-062/065/069),
+never a required export. This is now documented as RULES.md §6.24–§6.26, and `template_starter/`
+gains a real (empty-bodied) `problemLibrary.js` stub alongside its existing `problems.js` stub, so
+every future Case A/C builder gets working starter code instead of "copy a sibling topic's file"
+instructions (MODULE-STARTER.md §3.4, Section 6 updated to match).
+
+Case B (a new Module 1 lesson) is structurally exempt: it never creates its own
+`problemLibrary.js` — it injects into Module 1's existing **shared engine leaf**
+(`Module1/src/problemLibrary.js`, MODULE-STARTER.md's Case-B shared-leaf table), the same way it
+injects into `engine.js` without ever editing it (ADR-011). This ADR does **not** touch that shared
+file, and does **not** require `graphics_module_1_topic_3_points` or
+`graphics_module_1_topic_6_projection_of_straight_lines` — its two existing consumers, both on the
+2-argument `initProblemLibrary(sim, config)` form — to migrate. Migrating Module 1's shared engine
+leaf onto the 1-arg contract is a real, separately-decided future task, not a consequence of this
+ADR.
+
+**Why:** The interface shape — export names, arity, return keys — is subject-agnostic on
+inspection: nothing in it names a solid, a tier, or an Engineering-Graphics concept. Confining it
+to the Module 2 family was narrower than the evidence supported. Reading all four shipped pairs
+first (rather than generalizing from the richest one) kept the drafted contract from
+over-specifying `EXCLUDED_TYPES`/`setup`/`path` as if universal — they stay optional (§6.25).
+**Alternatives rejected:** (1) Scoping the contract to Case A only, revisiting later — rejected;
+nothing case-specific was found once the four pairs were actually compared, so a narrower rule
+would just need the same widening the next time a Case C module needed a problem library. (2)
+Silently broadening an already-narrow rule instead of stating the platform-wide scope directly —
+not applicable here: RULES.md §6.24 and this ADR did not exist prior to this entry. An earlier
+drafting pass proposed Case-A-only wording for both, but it was never confirmed or committed — no
+prior rule exists to silently reverse. (3) Forcing Module 1's two existing lessons to migrate now —
+rejected, out of scope, working code shouldn't be touched opportunistically just because a new rule
+was written.
+**Consequences:** A future Case A or Case C topic can be checked against §6.24 as a pass/fail
+contract, and can start from a working `template_starter/src/problemLibrary.js` stub instead of
+copying and stripping a sibling topic's filled-in file. `EXCLUDED_TYPES`/`setup`/`path`/`type`
+remain undocumented as generic members — addable by any future topic without contradicting §6.24.
+Known follow-up, not part of this ADR: whether Module 1's shared engine leaf should eventually move
+to the 1-arg form is an open question for a separate ADR.
+**Status:** Active
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*

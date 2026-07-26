@@ -1693,7 +1693,17 @@
       padding: var(--space-4) var(--space-5);
       border-bottom: 1px solid var(--color-border);
     }
+    /* Counterweight for the 44px close button, so the title reads on true centre
+       without un-anchoring the button from its top-right corner (§5.12 convention). */
+    .problem-library__header::before {
+      content: "";
+      flex: none;
+      width: 44px;
+    }
     .problem-library__title {
+      flex: 1 1 auto;
+      min-width: 0;
+      text-align: center;
       margin: 0;
       font-size: var(--text-title);
       font-weight: 700;

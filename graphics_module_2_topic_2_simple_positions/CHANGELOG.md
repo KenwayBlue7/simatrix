@@ -2,6 +2,9 @@
 
 All notable changes to Module 2 · Topic 2 (Simple Positions).
 
+## 2026-07-27
+- Changed: the Problem Library overlay's title now centers in its header row (was hard-left) — a 44px spacer counterweights the close button so it stays corner-anchored (ADR-082). (`index.html`.)
+
 ## 2026-07-25
 - Fixed: the Compare split's floating "compact" card (its own title bar + expand/close buttons) could get stuck stranded at full window width after the viewport narrowed below 768px and then widened back — a one-way `matchMedia` listener demoted the split but never restored it. Removed the compact card entirely: Compare now has exactly one shape (the docked 50/50 split) at every viewport width, and below 768px the same grid restacks to a single column via CSS instead of switching UI (ADR-080, platform-wide). (`main.js`, `index.html`.)
 
