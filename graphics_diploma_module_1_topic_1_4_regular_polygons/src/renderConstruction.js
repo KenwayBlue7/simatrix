@@ -142,7 +142,7 @@ function buildStepNode(step) {
       const reveal = (t) => { node.style.opacity = String(t); };
       return { node, reveal, finalize: () => {} };
     }
-    // A 'move'/'result' circle (this topic's enlarged/auxiliary tangent circles) IS
+    // A 'move'/'result' circle (an auxiliary circle, or a circumscribing circle) IS
     // animated through playSteps() — the same compass needle+leg+tip sweep as an 'arc'
     // step, just carried all the way around (2π) instead of a short span, so it reads as
     // "the compass drew this" instead of "this shape appeared." The swept path is capped
@@ -249,6 +249,36 @@ function buildStepNode(step) {
     return { node: group, reveal, finalize: () => {} };
   }
 
+  if (step.kind === 'angledim') {
+    // An angle mark: a small arc between two rays from `center`, plus its degree value —
+    // the angular counterpart to 'dim' (which marks a LENGTH). Static reveal (opacity fade,
+    // like 'dim'), not compass-animated — it's labelling an angle the construction already
+    // implies, not a new drafting move.
+    const { center, rayA, rayB, text, role } = step;
+    const color = roleColor(role);
+    const radius = step.radius ?? 10;
+    const a0 = Math.atan2(rayA.y - center.y, rayA.x - center.x);
+    const a1raw = Math.atan2(rayB.y - center.y, rayB.x - center.x);
+    let diff = a1raw - a0;
+    while (diff > Math.PI) diff -= 2 * Math.PI;
+    while (diff < -Math.PI) diff += 2 * Math.PI;
+    const a1 = a0 + diff; // normalized to the minor (<=180°) arc between the two rays
+    const group = el('g', {});
+    const arcNode = el('path', { d: arcPathD(center, radius, a0, a1), fill: 'none', stroke: color, 'stroke-width': 0.5 });
+    const midAngle = a0 + diff / 2;
+    const labelR = radius + 4;
+    const label = el('text', {
+      x: (center.x + labelR * Math.cos(midAngle)).toFixed(2),
+      y: (center.y + labelR * Math.sin(midAngle)).toFixed(2),
+      fill: color, 'font-family': 'var(--font-mono)', 'font-size': 5.5,
+      'text-anchor': 'middle', 'dominant-baseline': 'middle',
+    });
+    label.textContent = text;
+    group.append(arcNode, label);
+    const reveal = (t) => { group.style.opacity = String(t); };
+    return { node: group, reveal, finalize: () => {} };
+  }
+
   // 'label' kind — text only, no geometry.
   const node = el('text', {
     x: step.p.x + (step.dx ?? 4), y: step.p.y + (step.dy ?? -4),
@@ -300,6 +330,10 @@ export function computeBounds(steps) {
       const off = step.offset ?? 10;
       upd(step.a.x + px * off, step.a.y + py * off);
       upd(step.b.x + px * off, step.b.y + py * off);
+    } else if (step.kind === 'angledim') {
+      const reach = (step.radius ?? 10) + 6; // label sits a few units past the arc itself
+      upd(step.center.x - reach, step.center.y - reach);
+      upd(step.center.x + reach, step.center.y + reach);
     }
   }
   if (!Number.isFinite(minX)) return { minX: 0, maxX: 0, minY: 0, maxY: 0 };
