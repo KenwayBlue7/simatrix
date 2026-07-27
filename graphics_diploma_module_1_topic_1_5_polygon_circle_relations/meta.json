@@ -1,0 +1,6 @@
+{
+  "title": "Polygon-Circle Relations",
+  "description": "Two mirrored pairs of constructions: inscribe a circle in a triangle, then circumscribe one about it; superscribe a regular polygon (square, hexagon, octagon, or 12-gon) about a given circle, then inscribe a regular polygon (any n from 5 to 9) inside one — animated step by step, then set up as a textbook problem to verify.",
+  "difficulty": "intermediate",
+  "tags": ["diploma-engineering-graphics", "geometrical-constructions", "incircle", "circumcircle", "regular-polygons", "guided-stepper", "2d-svg"]
+}
