@@ -129,6 +129,21 @@ function buildStepNode(step) {
     return { node: group, reveal, finalize };
   }
 
+  if (step.kind === 'circle') {
+    // A full given circle (line+circle / circle+circle constructions' starting circle).
+    // Native <circle>, not an arc path — an SVG elliptical-arc command can't express a
+    // full 360° sweep (start/end points coincide). Always role 'given' (constructions.js's
+    // givenCircle()), so it's drawn statically via renderStatic(), never through playSteps()
+    // — reveal() only needs to support the immediate reveal(1) that renderStatic calls.
+    const { center, radius, role } = step;
+    const node = el('circle', {
+      cx: center.x, cy: center.y, r: radius,
+      fill: 'none', stroke: roleColor(role), 'stroke-width': roleWidth(role),
+    });
+    const reveal = (t) => { node.style.opacity = String(t); };
+    return { node, reveal, finalize: () => {} };
+  }
+
   if (step.kind === 'point') {
     const group = el('g', {});
     const r = step.role === 'result' ? 2.4 : 1.6;

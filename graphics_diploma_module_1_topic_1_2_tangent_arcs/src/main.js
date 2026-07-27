@@ -1,8 +1,16 @@
-// Orchestrator — Diploma Engineering Graphics, Module 1 Topic 1.1: Basic Constructions.
+// Orchestrator — Diploma Engineering Graphics, Module 1 Topic 1.2: Tangent Arcs.
 //
 // No Three.js, no CDN import map (ADR-078): the viewport is inline SVG. Owns `state`
 // (which construction is active, its given params, and how much of it has been drawn),
 // the single rebuild() pipeline, window.simAPI, and the boot watchdog.
+//
+// Copied from Topic 1.1's main.js (graphics_diploma_module_1_topic_1_1_basic_constructions/
+// src/main.js) — the orchestrator shape, rebuild() funnel, simController contract, render
+// loop, wizard-toggle, and Verify-step actions are all unchanged. The one addition this
+// topic needs and 1.1 didn't: `state.params.mode` defaults to 'external' everywhere state
+// gets (re)initialized, for "Tangent Arc Between Two Circles"' internal/external toggle
+// (uiManager.js's mode-toggle buttons call commit({mode}) through the same funnel as every
+// other param — this file doesn't know or care that `mode` is a string, not a number).
 //
 // rebuild()'s shape (re-expressed from ADR-004's 3D-solid pipeline for a 2D SVG
 // substrate, per ADR-078's own "no prior ADR tested this" admission):
@@ -33,7 +41,7 @@ const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)
 // Module state
 // ============================================================================
 
-/** @type {{ constructionId: string|null, params: Record<string, number> }} */
+/** @type {{ constructionId: string|null, params: Record<string, number|string> }} */
 let state = { constructionId: null, params: {} };
 
 /** The last built recipe (constructions.js output) for the active construction+params. */
@@ -74,8 +82,10 @@ function flowNote(msg) {
 // rebuild() — the single funnel every construction/param change routes through
 // ============================================================================
 
+/** Defaults for a construction's own `given` sliders, PLUS the topic-wide `mode` default
+ *  ("Tangent Arc Between Two Circles" is the only construction that reads it). */
 function defaultsFor(construction) {
-  return Object.fromEntries(construction.given.map((g) => [g.key, g.default]));
+  return { ...Object.fromEntries(construction.given.map((g) => [g.key, g.default])), mode: 'external' };
 }
 
 function rebuild() {
@@ -209,9 +219,8 @@ function setupWizardToggle() {
 
 // ============================================================================
 // Verify step actions — "Choose another construction" returns to the picker without
-// a full reset (stepper.js's restart(), scaffolded for exactly this); "Try it as a
-// problem" opens the same Problem Library as the persistent eyebrow entry, offered
-// again here since Verify is the natural end of the un-prompted flow.
+// a full reset (stepper.js's restart()); "Try it as a problem" opens the same Problem
+// Library as the persistent eyebrow entry.
 // ============================================================================
 
 function setupVerifyActions() {

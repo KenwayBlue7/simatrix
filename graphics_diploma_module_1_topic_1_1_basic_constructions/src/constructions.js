@@ -191,19 +191,25 @@ export const CONSTRUCTIONS = [
     principle: "Two equal-radius arcs centred on A and B cross at two points that are equidistant from both — so both points lie on AB's perpendicular bisector, which must cross AB exactly at its midpoint.",
     given: [{ key: 'length', label: 'Length AB', unit: 'mm', min: 40, max: 160, step: 5, default: 100 }],
     build({ length }) {
-      const A = { x: 25, y: 75 };
-      const B = { x: 25 + length * 0.9, y: 75 };
+      // The bisector arcs' own radius (extendFactor * |AB|) grows with |AB|, and their
+      // drawn 64°-wide compass-mark sweep can reach further than the crossing point
+      // itself — at the slider's full 40-160mm range this ran off both top and bottom.
+      // Cap the DRAWN length (dim() still shows the real mm value) so the arcs' radius
+      // never outgrows the canvas, and use a shallower extendFactor for more headroom.
+      const scale = Math.min(1, 120 / (length * 0.9));
+      const A = { x: 30, y: 70 };
+      const B = { x: 30 + length * 0.9 * scale, y: 70 };
       const steps = [
         L(A, B, 'given'), P(A, 'given', 'A'), P(B, 'given', 'B'),
-        dim(A, B, `${length} mm`, 'given', 16),
+        dim(A, B, `${length} mm`, 'given', 24),
       ];
-      const bis = perpendicularBisector(A, B, { extendFactor: 0.68 });
+      const bis = perpendicularBisector(A, B, { extendFactor: 0.55 });
       steps.push(...bis.steps);
       const M = lineIntersect(bis.upper, bis.lower, A, B) ?? midpoint(A, B);
       const half = `${(length / 2).toFixed(1)} mm`;
       steps.push(
         L(bis.upper, bis.lower, 'result'), P(M, 'result', 'M'),
-        dim(A, M, half, 'result', -10), dim(M, B, half, 'result', -10),
+        dim(A, M, half, 'result', -15), dim(M, B, half, 'result', -15),
       );
       return { steps, resultText: `AM = MB = ${(length / 2).toFixed(1)} mm` };
     },
@@ -219,22 +225,26 @@ export const CONSTRUCTIONS = [
       { key: 'span', label: 'Arc span', unit: '°', min: 60, max: 160, step: 10, default: 100 },
     ],
     build({ radius, span }) {
-      const O = { x: 100, y: 118 };
+      // A wide span at the max 70mm radius puts the chord's bisector arcs (64°-wide
+      // compass sweeps) well past the canvas — draw at a capped radius (dim() still
+      // shows the real mm value) so the whole construction always fits.
+      const drawR = Math.min(radius, 45);
+      const O = { x: 100, y: 85 };
       const start = deg2rad(-90 - span / 2);
       const end = deg2rad(-90 + span / 2);
-      const A = pointAt(O, radius, start);
-      const B = pointAt(O, radius, end);
+      const A = pointAt(O, drawR, start);
+      const B = pointAt(O, drawR, end);
       const steps = [
-        givenArc(O, radius, start, end), P(A, 'given', 'A'), P(B, 'given', 'B'), P(O, 'given', 'O'),
-        dim(O, A, `${radius} mm`, 'given', outwardOffset(O, A, B, 10)),
+        givenArc(O, drawR, start, end), P(A, 'given', 'A'), P(B, 'given', 'B'), P(O, 'given', 'O'),
+        dim(O, A, `${radius} mm`, 'given', outwardOffset(O, A, B, 15)),
       ];
       const chordMid = midpoint(A, B);
-      const bis = perpendicularBisector(A, B, { extendFactor: 0.68 });
+      const bis = perpendicularBisector(A, B, { extendFactor: 0.65 });
       if (!bis) return { steps, resultText: 'Span too small to bisect at this radius.', invalid: 'span-too-small' };
       steps.push(...bis.steps);
       const dir = { x: chordMid.x - O.x, y: chordMid.y - O.y };
       const dirLen = Math.hypot(dir.x, dir.y) || 1;
-      const M = { x: O.x + (radius * dir.x) / dirLen, y: O.y + (radius * dir.y) / dirLen };
+      const M = { x: O.x + (drawR * dir.x) / dirLen, y: O.y + (drawR * dir.y) / dirLen };
       steps.push(L(chordMid, M, 'result'), P(chordMid, 'result', 'N'), P(M, 'result', 'M'));
       return { steps, resultText: `Arc AM = arc MB (each ${(span / 2).toFixed(1)}°)` };
     },
@@ -255,7 +265,7 @@ export const CONSTRUCTIONS = [
       const Pt = pointAlong(A, B, position / 100);
       const steps = [
         L(A, B, 'given'), P(A, 'given', 'A'), P(B, 'given', 'B'), P(Pt, 'given', 'P'),
-        dim(A, B, `${length} mm`, 'given', 16),
+        dim(A, B, `${length} mm`, 'given', 24),
       ];
       const armLen = Math.min(dist(A, Pt), dist(B, Pt)) * 0.7;
       const perp = perpendicularAtPoint(Pt, B, Math.max(armLen * 1.6, 25));
@@ -272,25 +282,29 @@ export const CONSTRUCTIONS = [
     principle: 'C and D are the two points on AB equidistant from P; a second pair of equal arcs from C and D crosses again at Q, and PQ — the perpendicular bisector of CD — is exactly the perpendicular dropped from P to the line.',
     given: [
       { key: 'length', label: 'Length AB', unit: 'mm', min: 60, max: 160, step: 5, default: 120 },
-      { key: 'height', label: 'Height of P above AB', unit: 'mm', min: 20, max: 60, step: 5, default: 40 },
-      { key: 'position', label: 'P horizontal position', unit: '%', min: 20, max: 80, step: 5, default: 45 },
+      { key: 'height', label: 'Height of P above AB', unit: 'mm', min: 20, max: 45, step: 5, default: 40 },
+      { key: 'position', label: 'P horizontal position', unit: '%', min: 25, max: 75, step: 5, default: 45 },
     ],
     build({ length, height, position }) {
-      const A = { x: 25, y: 100 };
-      const B = { x: 25 + length * 0.9, y: 100 };
-      const Pt = { x: A.x + (B.x - A.x) * (position / 100), y: 100 - height };
+      // A.y sits higher (smaller y) than the other horizontal-line constructions so P —
+      // up to 45mm above AB — and the two compass circles below it both have headroom;
+      // the compass-width multipliers are shallower (1.1x, not 1.4x/1.3x) so those
+      // circles stay tight to the line instead of ballooning past the canvas edges.
+      const A = { x: 40, y: 90 };
+      const B = { x: 40 + length * 0.9, y: 90 };
+      const Pt = { x: A.x + (B.x - A.x) * (position / 100), y: 90 - height };
       const steps = [
         L(A, B, 'given'), P(A, 'given', 'A'), P(B, 'given', 'B'), P(Pt, 'given', 'P'),
-        dim(A, B, `${length} mm`, 'given', 16),
+        dim(A, B, `${length} mm`, 'given', 24),
       ];
-      const r1 = Math.max(height * 1.4, 30);
+      const r1 = Math.max(height * 1.1, 30);
       if (r1 <= height) return { steps, resultText: 'Raise P higher to construct.', invalid: 'degenerate' };
       const dx = Math.sqrt(r1 * r1 - height * height);
-      const C = { x: Pt.x - dx, y: 100 };
-      const D = { x: Pt.x + dx, y: 100 };
+      const C = { x: Pt.x - dx, y: 90 };
+      const D = { x: Pt.x + dx, y: 90 };
       steps.push(P(C, 'move', 'C'), P(D, 'move', 'D'),
         arcMark(Pt, r1, C, 64), arcMark(Pt, r1, D, 64));
-      const r2 = dx * 1.3;
+      const r2 = dx * 1.1;
       const cands = circleIntersect(C, r2, D, r2);
       if (!cands) return { steps, resultText: 'Adjust P to construct.', invalid: 'degenerate' };
       const Q = cands[0].y >= cands[1].y ? cands[0] : cands[1]; // lower one (below the line)
@@ -298,7 +312,7 @@ export const CONSTRUCTIONS = [
       const F = lineIntersect(Pt, Q, A, B) ?? midpoint(C, D);
       steps.push(
         L(Pt, Q, 'result'), P(F, 'result', 'F'),
-        dim(Pt, F, `${dist(Pt, F).toFixed(1)} mm`, 'result', 10),
+        dim(Pt, F, `${dist(Pt, F).toFixed(1)} mm`, 'result', 15),
       );
       return { steps, resultText: `PF = ${dist(Pt, F).toFixed(1)} mm, foot F is the perpendicular` };
     },
@@ -326,7 +340,7 @@ export const CONSTRUCTIONS = [
       // pre-drawn back in the Given step.
       steps.push(
         moveArc(O, r1, deg2rad(-angle), 0), P(C, 'move', 'C'), P(D, 'move', 'D'),
-        dim(O, C, `${r1} mm`, 'move', 8),
+        dim(O, C, `${r1} mm`, 'move', 13),
       );
       // r2 is sized off the ACTUAL chord CD (like perpendicularBisector's extendFactor),
       // not a fixed fraction of r1 — that fixed fraction made wide angles (e.g. 140°)
@@ -382,8 +396,8 @@ export const CONSTRUCTIONS = [
       // used to render instantly, mis-classified as part of the given angle).
       steps.push(
         moveArc(O, r1, deg2rad(-angle), 0), P(C, 'move', 'C'), P(D, 'move', 'D'),
-        dim(O, C, `${r1} mm`, 'move', 8),
-        dim(C, D, chordText, 'move', outwardOffset(C, D, O, 8)),
+        dim(O, C, `${r1} mm`, 'move', 13),
+        dim(C, D, chordText, 'move', outwardOffset(C, D, O, 13)),
       );
       const Cp = pointAt(Op, r1, 0); // lies on ray O'R' itself — aim the mark there so it overshoots past the ray
       steps.push(arcMark(Op, r1, Cp, 64), P(Cp, 'move', "C'"));
@@ -394,7 +408,7 @@ export const CONSTRUCTIONS = [
       // value as the C–D mark above, making the "transfer" visually obvious.
       steps.push(
         arcMark(Cp, chord, Dp, 64), P(Dp, 'move', "D'"),
-        dim(Cp, Dp, chordText, 'move', outwardOffset(Cp, Dp, Op, 8)),
+        dim(Cp, Dp, chordText, 'move', outwardOffset(Cp, Dp, Op, 13)),
       );
       const Dext = pointAt(Op, rayLen * 0.95, angleOf(Op, Dp));
       steps.push(L(Op, Dext, 'result'));
@@ -416,12 +430,16 @@ export const CONSTRUCTIONS = [
       if (a + b <= c || b + c <= a || c + a <= b) {
         return { steps: [], resultText: 'No triangle: each side must be shorter than the sum of the other two.', invalid: 'triangle-inequality' };
       }
-      const scale = Math.min(0.85, 150 / (a + b + c));
-      const A = { x: 30, y: 115 };
-      const B = { x: 30 + c * scale, y: 115 };
+      // A thin/tall triangle (one short side, two long near-equal ones) apexes close to
+      // A or B despite a modest perimeter, sometimes to the LEFT of A — 150 wasn't a
+      // tight enough perimeter cap, 115 too low a baseline, and 30 too little left
+      // margin. Tighter cap, higher baseline, A shifted right for headroom on both sides.
+      const scale = Math.min(0.85, 130 / (a + b + c));
+      const A = { x: 60, y: 90 };
+      const B = { x: 60 + c * scale, y: 90 };
       const steps = [
         L(A, B, 'given'), P(A, 'given', 'A'), P(B, 'given', 'B'),
-        dim(A, B, `${c} mm`, 'given', 12),
+        dim(A, B, `${c} mm`, 'given', 18),
       ];
       const rb = b * scale;
       const ra = a * scale;
@@ -432,8 +450,8 @@ export const CONSTRUCTIONS = [
       steps.push(arcMark(A, rb, C, 70), arcMark(B, ra, C, 70));
       steps.push(
         P(C, 'move'), L(A, C, 'result'), L(B, C, 'result'), P(C, 'result', 'C'),
-        dim(A, C, `${b} mm`, 'result', outwardOffset(A, C, B, 9)),
-        dim(B, C, `${a} mm`, 'result', outwardOffset(B, C, A, 9)),
+        dim(A, C, `${b} mm`, 'result', outwardOffset(A, C, B, 14)),
+        dim(B, C, `${a} mm`, 'result', outwardOffset(B, C, A, 14)),
       );
       return { steps, resultText: `Triangle ABC: a=${a} mm, b=${b} mm, c=${c} mm` };
     },
@@ -446,8 +464,12 @@ export const CONSTRUCTIONS = [
     principle: 'Erecting equal perpendiculars (length = side) at both A and B, then closing the top edge DC, gives four equal sides and four right angles — the definition of a square.',
     given: [{ key: 'side', label: 'Side length', unit: 'mm', min: 30, max: 100, step: 5, default: 60 }],
     build({ side }) {
-      const A = { x: 40, y: 110 };
-      const B = { x: 40 + side, y: 110 };
+      // A.y moved down from 110 to 115 — at the 100mm max side length the square's top
+      // edge (+ the compass-mark arcs' own overshoot past it) crept above y=0. The given
+      // AB dim below the line is pulled in from 20 to 14 so it doesn't in turn push past
+      // y=140 with A this low.
+      const A = { x: 40, y: 115 };
+      const B = { x: 40 + side, y: 115 };
       const steps = [
         L(A, B, 'given'), P(A, 'given', 'A'), P(B, 'given', 'B'),
         dim(A, B, `${side} mm`, 'given', 14),
@@ -464,9 +486,12 @@ export const CONSTRUCTIONS = [
       const sideText = `${side.toFixed(1)} mm`;
       steps.push(
         L(A, D, 'result'), L(B, C, 'result'), L(D, C, 'result'), P(D, 'result', 'D'), P(C, 'result', 'C'),
-        dim(A, D, sideText, 'result', outwardOffset(A, D, center, 9)),
-        dim(B, C, sideText, 'result', outwardOffset(B, C, center, 9)),
-        dim(D, C, sideText, 'result', outwardOffset(D, C, center, 9)),
+        dim(A, D, sideText, 'result', outwardOffset(A, D, center, 14)),
+        dim(B, C, sideText, 'result', outwardOffset(B, C, center, 14)),
+        // The top edge DC's outward offset points UP, off the top of the canvas at large
+        // side lengths (D/C already sit close to y=0 there) — kept tighter than the two
+        // side edges' dims.
+        dim(D, C, sideText, 'result', outwardOffset(D, C, center, 8)),
       );
       return { steps, resultText: `Square ABCD, side = ${side.toFixed(1)} mm` };
     },
@@ -487,11 +512,13 @@ export const CONSTRUCTIONS = [
       const B = { x: 20 + length * 0.85, y: 95 };
       const steps = [
         L(A, B, 'given'), P(A, 'given', 'A'), P(B, 'given', 'B'),
-        dim(A, B, `${length} mm`, 'given', -14), // above AB — the auxiliary ray occupies below
+        dim(A, B, `${length} mm`, 'given', -20), // above AB — the auxiliary ray occupies below
       ];
-      // Auxiliary ray AC at a shallow angle below AB.
+      // Auxiliary ray AC at a shallow angle below AB. Tick spacing shrinks as n grows so
+      // the ray's total length stays bounded — a fixed 12mm tick at n=12 ran the ray
+      // well past the bottom of the canvas.
       const rayAngle = deg2rad(28);
-      const tick = 12;
+      const tick = Math.min(12, 85 / (parts + 0.6));
       const C = pointAt(A, tick * (parts + 0.6), rayAngle);
       steps.push(L(A, C, 'move'));
       // n equal tick marks along AC (a fixed compass width stepped off n times).
