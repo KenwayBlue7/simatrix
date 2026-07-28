@@ -5,8 +5,13 @@
 // Layering (CLAUDE.md): leaf module, imports nothing. main.js calls build(params) for the
 // active construction and hands the recipe to renderConstruction.js.
 //
-// Coordinate system: fixed 200x140 SVG viewBox, origin top-left, y increases downward —
-// same convention as every prior topic. Generic primitives/step-builders below are copied
+// Coordinate system: fixed 260x182 SVG viewBox, origin top-left, y increases downward.
+// Enlarged from the platform family's usual 200x140 partway through this session (real
+// feedback: even after de-cluttering labels, these four constructions' own geometry —
+// especially the two circle/polygon pairs, with up to 12 vertices — read as congested on
+// the smaller canvas; a genuinely bigger canvas, not tighter packing, was the actual fix.
+// index.html's `viewBox` and viewTransform.js's `BASE_W`/`BASE_H` were updated to match —
+// see viewTransform.js's own comment). Generic primitives/step-builders below are copied
 // verbatim from Topics 1.1-1.4 (dist/midpoint/angleOf/pointAt/pointAlong/circleIntersect/
 // lineIntersect/sortByY/P/L/arcMark/moveArc/circleStep/dim/angleDim/outwardOffset/
 // perpendicularBisector). New primitives this topic needs and no prior topic did:
@@ -155,8 +160,11 @@ function outwardOffset(a, b, awayFrom, magnitude) {
 // ----------------------------------------------------------------------------
 
 /** The classic "equal arcs from both ends" perpendicular-bisector technique (Topic 1.1),
- *  applied here to a triangle SIDE (circumcircle) instead of a lone given segment. */
-function perpendicularBisector(A, B, { radius, extendFactor = 0.65, labels = ['c', 'd'] } = {}) {
+ *  applied here to a triangle SIDE (circumcircle) instead of a lone given segment.
+ *  The two compass-crossing points are drawn as unlabelled dots — see the "de-clutter"
+ *  note above `angleBisectorAt` for why none of these auxiliary helper functions letter
+ *  their intermediate points any more. */
+function perpendicularBisector(A, B, { radius, extendFactor = 0.65 } = {}) {
   const r = radius ?? dist(A, B) * extendFactor;
   if (r <= dist(A, B) / 2) return null;
   const sorted = sortByY(circleIntersect(A, r, B, r));
@@ -166,8 +174,7 @@ function perpendicularBisector(A, B, { radius, extendFactor = 0.65, labels = ['c
     arcMark(A, r, upper, 64), arcMark(A, r, lower, 64),
     arcMark(B, r, upper, 64), arcMark(B, r, lower, 64),
   ];
-  const [labelUpper, labelLower] = labels;
-  steps.push(P(upper, 'move', labelUpper), P(lower, 'move', labelLower));
+  steps.push(P(upper, 'move'), P(lower, 'move'));
   return { steps, upper, lower };
 }
 
@@ -176,13 +183,23 @@ function perpendicularBisector(A, B, { radius, extendFactor = 0.65, labels = ['c
  *  fixed ray length — a triangle's vertex angles are never a convenient fixed value). E is
  *  a point on the true bisector ray from V, at whatever distance the construction lands it;
  *  callers extend a drawn ray from V through a further point (e.g. an already-known
- *  intersection) rather than relying on V-E alone to look long enough. */
-function angleBisectorAt(V, P1, P2, r1, labels = ['c', 'd', 'e']) {
+ *  intersection) rather than relying on V-E alone to look long enough.
+ *
+ * De-clutter note (this session, in response to real feedback — see CLAUDE.md): earlier
+ * the compass-crossing helper points here (and in the three functions below) each carried
+ * their own single-letter label (c, d, e...). With several of these sub-constructions
+ * chained in one drawing (incircle alone runs this twice, plus a perpendicular-foot
+ * construction), those helper points land close together and their labels visually
+ * collided — measured directly (Node, this session): 14 label pairs under 10 SVG units
+ * apart in the incircle construction alone, the worst of any construction in this topic.
+ * The dots themselves still show every compass mark; only the letters (never referenced by
+ * resultText or principle() — they existed purely as decoration) are gone. */
+function angleBisectorAt(V, P1, P2, r1) {
   const a1 = angleOf(V, P1);
   const a2 = angleOf(V, P2);
   const C = pointAt(V, r1, a1);
   const D = pointAt(V, r1, a2);
-  const steps = [moveArc(V, r1, a1, a2), P(C, 'move', labels[0]), P(D, 'move', labels[1])];
+  const steps = [moveArc(V, r1, a1, a2), P(C, 'move'), P(D, 'move')];
   const chordCD = dist(C, D);
   const r2 = chordCD * 0.65;
   if (r2 * 2 <= chordCD) return null;
@@ -190,7 +207,7 @@ function angleBisectorAt(V, P1, P2, r1, labels = ['c', 'd', 'e']) {
   if (!cands) return null;
   // the bisector point is the crossing FARTHER from V (the near one sits between V and CD)
   const E = dist(cands[0], V) > dist(cands[1], V) ? cands[0] : cands[1];
-  steps.push(arcMark(C, r2, E, 64), arcMark(D, r2, E, 64), P(E, 'move', labels[2]));
+  steps.push(arcMark(C, r2, E, 64), arcMark(D, r2, E, 64), P(E, 'move'));
   return { steps, E };
 }
 
@@ -199,7 +216,7 @@ function angleBisectorAt(V, P1, P2, r1, labels = ['c', 'd', 'e']) {
  *  sits inside the triangle, whose apex is placed above AB). Topic 1.1's
  *  perpendicular-off-line technique, pulled into a reusable helper (used here for the
  *  incircle's inradius; no prior topic needed it as a shared function). */
-function perpendicularFootFromAbove(P0, A, B, baselineY, labels = ['c', 'd', 'q']) {
+function perpendicularFootFromAbove(P0, A, B, baselineY) {
   const height = baselineY - P0.y;
   if (height <= 1e-6) return null;
   const r1 = Math.max(height * 1.1, 18);
@@ -212,10 +229,10 @@ function perpendicularFootFromAbove(P0, A, B, baselineY, labels = ['c', 'd', 'q'
   const Q = cands[0].y >= cands[1].y ? cands[0] : cands[1]; // lower candidate (below the baseline)
   const F = lineIntersect(P0, Q, A, B) ?? midpoint(C, D);
   const steps = [
-    P(C, 'move', labels[0]), P(D, 'move', labels[1]),
+    P(C, 'move'), P(D, 'move'),
     arcMark(P0, r1, C, 64), arcMark(P0, r1, D, 64),
     arcMark(C, r2, Q, 64), arcMark(D, r2, Q, 64),
-    P(Q, 'move', labels[2]),
+    P(Q, 'move'),
   ];
   return { steps, F };
 }
@@ -225,7 +242,7 @@ function perpendicularFootFromAbove(P0, A, B, baselineY, labels = ['c', 'd', 'q'
  *  full tangent LINE, not a one-sided ray. Generalizes Topic 1.1's perpendicular-at-point
  *  technique (which only ever built toward one fixed "up" side) to any orientation around a
  *  circle — none of Topics 1.1-1.4 needed a tangent to a full circle from a point ON it. */
-function tangentAtPoint(T, O, length, labels = ['c', 'd']) {
+function tangentAtPoint(T, O, length) {
   const dirAngle = angleOf(O, T); // outward radius direction
   const r1 = Math.max(Math.min(length * 0.3, 16), 7);
   const C = pointAt(T, r1, dirAngle);
@@ -237,7 +254,7 @@ function tangentAtPoint(T, O, length, labels = ['c', 'd']) {
   const endA = pointAt(T, length / 2, angleOf(T, E1));
   const endB = pointAt(T, length / 2, angleOf(T, E2));
   const steps = [
-    P(C, 'move', labels[0]), P(D, 'move', labels[1]),
+    P(C, 'move'), P(D, 'move'),
     arcMark(C, r2, E1, 60), arcMark(D, r2, E1, 60),
     arcMark(C, r2, E2, 60), arcMark(D, r2, E2, 60),
   ];
@@ -251,7 +268,12 @@ function divideSegment(A, B, n, rayAngleDeg = 28) {
   const steps = [];
   const rayAngle = deg2rad(rayAngleDeg);
   const abLen = dist(A, B);
-  const tick = Math.min(12, (abLen * 0.85) / (n + 0.6));
+  // A floor on tick spacing (not just a ceiling) — at n=8-9 on a modest-sized circle the
+  // unfloored formula packed the numbered tick labels ~5.8 units apart, unreadably close
+  // (measured this session, in response to real feedback). The ray is allowed to run
+  // longer than 0.85*AB to keep that floor; callers must include `rayEnd` in their own
+  // canvas-fit bounds calculation to account for it (inscribe-polygon does).
+  const tick = Math.max(9, Math.min(13, (abLen * 0.85) / (n + 0.6)));
   const auxEnd = pointAt(A, tick * (n + 0.6), rayAngle);
   steps.push(L(A, auxEnd, 'move'));
   const ticks = [];
@@ -273,7 +295,7 @@ function divideSegment(A, B, n, rayAngleDeg = 28) {
       steps.push(L(from, onAB, 'move'));
     }
   }
-  return { steps, divisions };
+  return { steps, divisions, rayEnd: auxEnd };
 }
 
 // ----------------------------------------------------------------------------
@@ -324,10 +346,10 @@ export const CONSTRUCTIONS = [
       if (a + b <= c || b + c <= a || c + a <= b) {
         return { steps: [], resultText: 'No triangle: each side must be shorter than the sum of the other two.', invalid: 'triangle-inequality' };
       }
-      const scale = Math.min(0.85, 130 / (a + b + c));
-      const Y0 = 100;
-      const A0 = { x: 52, y: Y0 };
-      const B0 = { x: 52 + c * scale, y: Y0 };
+      const scale = Math.min(1.4, 205 / (a + b + c));
+      const Y0 = 132;
+      const A0 = { x: 72, y: Y0 };
+      const B0 = { x: A0.x + c * scale, y: Y0 };
       const rb = b * scale;
       const ra = a * scale;
       const cands = sortByY(circleIntersect(A0, rb, B0, ra));
@@ -341,11 +363,11 @@ export const CONSTRUCTIONS = [
         dim(C0, A0, `${b} mm`, 'given', outwardOffset(C0, A0, B0, 14)),
       ];
       const r1a = Math.min(dist(A0, B0), dist(A0, C0)) * 0.5;
-      const bisA = angleBisectorAt(A0, B0, C0, r1a, ['p', 'q', 'r']);
+      const bisA = angleBisectorAt(A0, B0, C0, r1a);
       if (!bisA) return { steps, resultText: 'Adjust the sides to construct.', invalid: 'degenerate' };
       steps.push(...bisA.steps);
       const r1b = Math.min(dist(B0, A0), dist(B0, C0)) * 0.5;
-      const bisB = angleBisectorAt(B0, A0, C0, r1b, ["p'", "q'", "r'"]);
+      const bisB = angleBisectorAt(B0, A0, C0, r1b);
       if (!bisB) return { steps, resultText: 'Adjust the sides to construct.', invalid: 'degenerate' };
       steps.push(...bisB.steps);
       const I = lineIntersect(A0, bisA.E, B0, bisB.E);
@@ -357,7 +379,7 @@ export const CONSTRUCTIONS = [
         L(B0, pointAt(B0, extB, angleOf(B0, I)), 'move'),
         P(I, 'move', 'I'),
       );
-      const foot = perpendicularFootFromAbove(I, A0, B0, Y0, ['s', 't', 'u']);
+      const foot = perpendicularFootFromAbove(I, A0, B0, Y0);
       if (!foot) return { steps, resultText: 'Adjust the sides to construct.', invalid: 'degenerate' };
       steps.push(...foot.steps);
       const r = dist(I, foot.F);
@@ -390,10 +412,10 @@ export const CONSTRUCTIONS = [
       const s = (a + b + c) / 2;
       const areaRaw = Math.sqrt(Math.max(s * (s - a) * (s - b) * (s - c), 1e-9));
       const Rraw = (a * b * c) / (4 * areaRaw);
-      const scale = Math.min(0.75, 100 / (a + b + c), 25 / Rraw);
-      const Y0 = 76;
-      const A0 = { x: 100 - (c * scale) / 2, y: Y0 };
-      const B0 = { x: 100 + (c * scale) / 2, y: Y0 };
+      const scale = Math.min(1.15, 150 / (a + b + c), 34 / Rraw);
+      const Y0 = 99;
+      const A0 = { x: 130 - (c * scale) / 2, y: Y0 };
+      const B0 = { x: 130 + (c * scale) / 2, y: Y0 };
       const rb = b * scale;
       const ra = a * scale;
       const cands = sortByY(circleIntersect(A0, rb, B0, ra));
@@ -406,8 +428,8 @@ export const CONSTRUCTIONS = [
         dim(B0, C0, `${a} mm`, 'given', outwardOffset(B0, C0, A0, 14)),
         dim(C0, A0, `${b} mm`, 'given', outwardOffset(C0, A0, B0, 14)),
       ];
-      const bis1 = perpendicularBisector(A0, B0, { extendFactor: 0.62, labels: ['p', 'q'] });
-      const bis2 = perpendicularBisector(B0, C0, { extendFactor: 0.62, labels: ["p'", "q'"] });
+      const bis1 = perpendicularBisector(A0, B0, { extendFactor: 0.62 });
+      const bis2 = perpendicularBisector(B0, C0, { extendFactor: 0.62 });
       if (!bis1 || !bis2) return { steps, resultText: 'Adjust the sides to construct.', invalid: 'degenerate' };
       steps.push(...bis1.steps, ...bis2.steps);
       const O = lineIntersect(bis1.upper, bis1.lower, bis2.upper, bis2.lower);
@@ -444,14 +466,14 @@ export const CONSTRUCTIONS = [
       const bisected = n === 8 ? ' Bisecting each 90° sector doubles it to 8.' : n === 12 ? ' Bisecting each 60° sector doubles it to 12.' : '';
       return `${base}${bisected} A tangent line, perpendicular to the radius, drawn at each point, encloses the circle with straight sides that touch it there and nowhere else — this technique is EXACT for every n offered here, unlike its mirror construction's general method.`;
     },
-    given: [{ key: 'diameter', label: 'Circle diameter', unit: 'mm', min: 50, max: 100, step: 2, default: 70 }],
+    given: [{ key: 'diameter', label: 'Circle diameter', unit: 'mm', min: 64, max: 100, step: 2, default: 76 }],
     build({ diameter, n: nId }) {
       const nSpec = SUPERSCRIBE_N_CHOICES.find((c) => c.id === String(nId)) ?? SUPERSCRIBE_N_CHOICES[2];
       const n = nSpec.n;
       const r = diameter / 2;
-      const scale = Math.min(1, 42 / r);
+      const scale = Math.min(1.35, 56 / r);
       const R = r * scale;
-      const O = { x: 100, y: 72 };
+      const O = { x: 130, y: 94 };
       const steps = [
         circleStep(O, R, 'given'), P(O, 'given', 'O'),
         dim(O, { x: O.x + R, y: O.y }, `⌀${diameter} mm`, 'given', -13),
@@ -477,17 +499,21 @@ export const CONSTRUCTIONS = [
       let circlePts = basePts;
       if (n === 8 || n === 12) {
         const full = n === 8 ? Math.PI / 2 : Math.PI / 3;
-        const bis = angleBisectorAt(O, basePts[0], basePts[1], Math.min(R * 0.7, 26), ['m', 'k', 'j']);
+        const bis = angleBisectorAt(O, basePts[0], basePts[1], Math.min(R * 0.7, 34));
         if (!bis) return { steps, resultText: 'Adjust the diameter to construct.', invalid: 'degenerate' };
         steps.push(...bis.steps);
         const bisAngle0 = angleOf(O, bis.E);
         const firstBisected = pointAt(O, R, bisAngle0);
-        steps.push(P(firstBisected, 'move', 'x1'));
+        // Unlabelled — same de-clutter as angleBisectorAt's own helper points (this
+        // session): with up to 12 vertices already labelled A-L below, a second full set
+        // of x1..x6 labels on the bisected points crowded this construction the worst of
+        // any in this topic (measured: up to 24 label pairs under 9 units apart at n=12).
+        steps.push(P(firstBisected, 'move'));
         const chordHalf = dist(basePts[0], firstBisected);
         const bisectedPts = [firstBisected];
         for (let k = 1; k < basePts.length; k++) {
           const nextPt = pointAt(O, R, bisAngle0 + k * full);
-          steps.push(arcMark(bisectedPts[k - 1], chordHalf, nextPt, 45), P(nextPt, 'move', `x${k + 1}`));
+          steps.push(arcMark(bisectedPts[k - 1], chordHalf, nextPt, 45), P(nextPt, 'move'));
           bisectedPts.push(nextPt);
         }
         circlePts = [];
@@ -495,7 +521,7 @@ export const CONSTRUCTIONS = [
       }
 
       const tangentLen = R * 0.95;
-      const first = tangentAtPoint(circlePts[0], O, tangentLen, ['g', 'h']);
+      const first = tangentAtPoint(circlePts[0], O, tangentLen);
       if (!first) return { steps, resultText: 'Adjust the diameter to construct.', invalid: 'degenerate' };
       steps.push(...first.steps, L(first.a, first.b, 'move'));
       const tangentLines = [{ a: first.a, b: first.b }];
@@ -536,7 +562,7 @@ export const CONSTRUCTIONS = [
       return "Dividing the diameter into n equal parts, then swinging two arcs of the diameter's own length from its ends to fix an apex P above and P' below, gives two fixed reference points: a ray from either apex through a division point, extended to the circle, lands close to a true vertex position. This general method works for ANY n — even n where the polygon (a heptagon, for instance) is not buildable with a compass alone — but it is only mathematically EXACT for n = 3, 4, and 6; for every other n it is a close practical approximation (within a fraction of a degree here), which is exactly why textbooks call this the general method rather than an exact one — the mirror of its partner construction, which IS exact for every n it offers, at the cost of only offering a few.";
     },
     given: [
-      { key: 'diameter', label: 'Circle diameter', unit: 'mm', min: 50, max: 100, step: 2, default: 70 },
+      { key: 'diameter', label: 'Circle diameter', unit: 'mm', min: 64, max: 100, step: 2, default: 76 },
       { key: 'n', label: 'Number of sides (n)', unit: '', min: 5, max: 9, step: 1, default: 5 },
     ],
     build({ diameter, n }) {
@@ -545,9 +571,9 @@ export const CONSTRUCTIONS = [
       // Both apex points sit at h = R*sqrt(3) ABOVE and BELOW centre O (the two arcs, each
       // of radius = the diameter itself, meet an equilateral-triangle apex away — a much
       // longer reach than R alone) — cap against that reach, not the circle's own radius.
-      const scale = Math.min(1, 30 / r);
+      const scale = Math.min(1.35, 43 / r);
       const R = r * scale;
-      const O = { x: 100, y: 70 };
+      const O = { x: 130, y: 91 };
       const A = { x: O.x - R, y: O.y };
       const B = { x: O.x + R, y: O.y };
       const steps = [
@@ -555,7 +581,11 @@ export const CONSTRUCTIONS = [
         dim(O, { x: O.x + R, y: O.y }, `⌀${diameter} mm`, 'given', -13),
         L(A, B, 'given'), P(A, 'given', 'A'), P(B, 'given', 'B'),
       ];
-      const div = divideSegment(A, B, nn);
+      // A steeper ray (45°, not divideSegment's own 28° default) clears the circle's lower
+      // arc faster — at 28° the ray ran close enough to graze near where a result vertex
+      // lands for large n, so its tick numbers and a vertex letter sat almost on top of
+      // each other (measured this session: as close as 3.7 units at n=9).
+      const div = divideSegment(A, B, nn, 42);
       steps.push(...div.steps);
 
       const AB = dist(A, B);

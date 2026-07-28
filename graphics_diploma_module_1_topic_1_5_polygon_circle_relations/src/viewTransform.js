@@ -9,8 +9,11 @@
 // and ensureVisible() right before Play (so a zoomed-in/panned view can't miss geometry the
 // animation is about to draw outside it).
 
-const BASE_W = 200;
-const BASE_H = 140;
+// This topic's own canvas is 260x182, not the platform-family's 200x140 — enlarged this
+// session (real feedback: the drawings read as congested even after de-cluttering labels;
+// the fix was a genuinely bigger canvas, not more aggressive packing into the old one).
+const BASE_W = 260;
+const BASE_H = 182;
 const MIN_ZOOM = 0.4; // zoom OUT to 2.5x the default view area, to see past wide overshoot/pan
 const MAX_ZOOM = 5;
 
