@@ -1,0 +1,6 @@
+{
+  "title": "Roulettes",
+  "description": "Twelve curves traced by a circle rolling without slipping — cycloids, trochoids, epicycloids, hypocycloids — plus the involute of a circle and of a polygon, each built from one shared rolling-curve mechanism, with a scrubbable roll angle and a tangent/normal construction at the end.",
+  "difficulty": "intermediate",
+  "tags": ["diploma-engineering-graphics", "roulettes", "cycloid", "involute", "guided-stepper", "2d-svg"]
+}
