@@ -2794,6 +2794,30 @@ fully open pending a future ADR if/when that happens. The exact syllabus/issuing
 
 ---
 
+## ADR-079: "Misc Curves" (Roulettes / Spiral Curves / Helix) is Diploma Module 1 Topic 2, not a new module
+
+**Date:** 2026-07-28
+**Decision:** Misc Curves — roulettes, spiral curves, helix — is **Diploma Module 1, Topic 2**, sitting
+beside Topic 1 ("Geometrical Constructions", ADR-078) inside the same module. Namespaced per ADR-078's
+established `graphics_diploma_module_<M>_topic_<M>_<N>_<slug>` convention:
+`graphics_diploma_module_1_topic_2_1_roulettes`, `graphics_diploma_module_1_topic_2_2_spiral_curves`,
+`graphics_diploma_module_1_topic_2_3_helix`.
+**Why:** These three curve families belong to the same course module as Geometrical Constructions in
+the source syllabus — the module boundary is the syllabus's own, not this repo's to redraw. The topic
+index (`topic_2_*` vs. `topic_1_*`) is sufficient to disambiguate them without minting a new module
+number.
+**Alternatives rejected:** *New Module 2 for this track* — rejected as premature: nothing yet confirms
+the source syllabus actually draws a module boundary here rather than a topic boundary within Module 1;
+inventing a second module number ahead of that confirmation risks the same kind of renumbering churn
+ADR-078 was written to avoid.
+**Consequences:** Invokes ADR-078, does not supersede it — resolves ADR-078's own open note ("future
+module numbering for this track... left fully open pending a future ADR") by settling that this
+particular growth (Misc Curves) stays inside Module 1 as Topic 2, not a new module. ADR-078's provisional
+six-subtopic list for Topic 1 (1.1-1.6) is unaffected. Docs only — no topic folders created yet.
+**Status:** Active.
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*
