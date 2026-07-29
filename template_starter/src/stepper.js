@@ -78,7 +78,11 @@ export function initStepper(sim) {
   /** Show one step's panel (progressive disclosure) and update card copy + chrome. */
   function goToStep(n, { announce = true } = {}) {
     currentStep = Math.min(Math.max(n, 1), TOTAL);
+    // First arrival at the terminal step = the lesson-complete signal (ADR-078 addendum).
+    // Computed BEFORE `visited` absorbs this visit; reset() re-arms it by clearing `visited`.
+    const firstArrival = currentStep === TOTAL && !visited.has(TOTAL);
     visited.add(currentStep);
+    if (firstArrival) sim.markComplete?.();
 
     const meta = STEPS[currentStep - 1];
     if (elTitle) elTitle.textContent = meta.title;

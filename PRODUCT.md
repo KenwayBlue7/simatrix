@@ -284,7 +284,7 @@ against the code on 2026-06-28.
 | **Keyboard — Shift+arrow for finer steps.** | **⚠️ COMMITTED but not yet implemented** — no `shiftKey` handling exists in any module. See §8. |
 | **Reduced motion.** `prefers-reduced-motion: reduce` collapses transitions, draw-on, camera easing, and decorative animation to instant state changes; the simulation still updates. | **IMPLEMENTED** — both modules honor it and snap to the end state. |
 | **Screen readers.** Controls carry ARIA labels and `aria-valuetext`; a live region announces step and mode changes; every value driving the viewport, and every step instruction, is surfaced as readable text. | **IMPLEMENTED** — `aria-valuetext` on sliders, `#live` (`aria-live=polite`), ~44 `announce()` call sites, plus `cfg.describe()` viewport mirror (M1). |
-| **Legibility-first typography.** Body typeface chosen for maximum legibility (disambiguated letterforms). | **IMPLEMENTED** — bundled Atkinson Hyperlegible woff2 (no Google-Fonts CDN). |
+| **Legibility-first typography.** Body typeface chosen for maximum legibility (disambiguated letterforms). | **IMPLEMENTED** — Atkinson Hyperlegible, served from the Supabase Storage CDN (ADR-086; never a Google-Fonts CDN). |
 | **Known accommodations.** ~8% color-blind male students, classroom-projector users in the back row, keyboard-only laptop users, motion-sensitive users, low-vision and reading-fatigued learners. | *Design intent* — served by the mechanisms above. |
 
 **Mobile notice (platform contract, ARCHITECTURE.md §7 / RULES.md §2.13 — "dismissible best-on-desktop

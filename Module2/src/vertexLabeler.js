@@ -150,8 +150,13 @@ function sampleRing(ring, n) {
  *   axis: { bottom: THREE.Vector3, top: THREE.Vector3 },
  *   generators: [THREE.Vector3, THREE.Vector3][],
  * }}
+ *
+ * Exported (ADR-084) so main.js's Show Method walkthrough can plan corner labels + the
+ * chain-line axis for a HEADLESS stage pose (a Set that is not the live 3D solid) — this
+ * function is already pure local-space math with no scene/DOM dependency, so exporting it
+ * changes nothing about generate()'s own behaviour above.
  */
-function planAnnotations(geometry) {
+export function planAnnotations(geometry) {
   const verts = uniqueLocalVertices(geometry);
   const empty = {
     labels: [],
@@ -224,7 +229,7 @@ function planAnnotations(geometry) {
  * @param {THREE.Vector3} b Axis end (world).
  * @returns {number[]}
  */
-function chainPositions(a, b) {
+export function chainPositions(a, b) {
   const out = [];
   const total = a.distanceTo(b);
   if (total < 1e-4) return out;

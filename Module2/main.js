@@ -30,9 +30,11 @@ import { initStepper } from './src/stepper.js';
 import { initProblemLibrary } from './src/problemLibrary.js';
 import { initTerms } from './src/terms.js';
 import { initOnboarding } from './src/onboarding.js';
-import { initVertexLabeler } from './src/vertexLabeler.js';
+import { initVertexLabeler, planAnnotations, chainPositions } from './src/vertexLabeler.js';
 import { buildEdgeMap } from './src/meshAnalyzer.js';
 import { drawProjections } from './src/projectionDrawer.js';
+import { applyShapeTransform } from './src/iShape.js';
+import { initMethodController } from './src/methodController.js';
 import { tween, tick as tickTweens, cancelAll as cancelTweens, easeFold, easeCamera, easeDraw, easeDissolve, easeStandard } from './src/anim.js';
 
 const DEG2RAD = Math.PI / 180;
@@ -208,6 +210,11 @@ let problemLibrary;
 /** First-run onboarding handle from initOnboarding — { setSolidPresent }. */
 let onboarding;
 
+/** Show Method handle from initMethodController (ADR-084) — { sync, dispose }. Owns its own
+ *  DOM (the Step-6 button + progress/chip UI) and beat-sequencing state; reaches the engine
+ *  only through simController.method (mirrors problemLibrary's own leaf pattern). */
+let methodController;
+
 /** Holds the active solid (+ its edge overlay, + future projections). The
  *  disposal contract iterates this group's direct children, so everything
  *  per-shape is added here as a sibling — never nested. */
@@ -258,6 +265,14 @@ let solidSpanUnits = 0;
  * @type {import('./src/shapeData.js').ShapeData | null}
  */
 let currentShapeData = null;
+
+/** The Problem Library's currently-loaded problem (its full `problems.js` object, target and
+ *  all), or `null` in free-explore. Pushed in by problemLibrary.js's loadProblem/exitProblem via
+ *  simController.setActiveProblem — problemLibrary.js's OWN return shape stays the ADR-083
+ *  platform-wide contract `{ open, exit, isActive, dispose }` verbatim; this is a separate,
+ *  additive channel. Show Method (methodController.js, ADR-084) reads it via
+ *  simController.activeProblem() for the per-problem `method` stage data (src/problems.js). */
+let activeProblemRef = null;
 
 /** Axis→nearest-face X extent (world units) of the last-seated solid. Floor for distVP
  *  under distVPRef:'axis' so the near face never crosses the VP. Set in seatOnPlanes();
@@ -481,14 +496,19 @@ function orientationPeriod(shape) {
  * └──────────────────────────────────────────────────────────────────────────┘
  *
  * @param {import('./src/shapeData.js').ShapeData} data
+ * @param {{faceInclinationHP:boolean,faceInclinationVP:boolean,orientToCorner:boolean}} [modeSet=modes]
+ *   Which rotation-hierarchy flags to resolve against. Defaults to the live module-level
+ *   `modes` so every existing call site (rebuild()) is behaviourally unchanged. A headless
+ *   Show Method stage passes its OWN mode set here (e.g. Set 1 = every flag off) instead of
+ *   mutating the live `modes` object, which the 3D pane and its dock are still reading.
  * @returns {import('./src/shapeData.js').ShapeData} effective shape data (copy)
  */
-function computeEffectiveAngles(data) {
+function computeEffectiveAngles(data, modeSet = modes) {
   const eff = { ...data };
   const pyramid = isPyramidType(data.shape);
 
   // === PRIORITY 1: FACE INCLINATION ===
-  if (modes.faceInclinationHP && pyramid) {
+  if (modeSet.faceInclinationHP && pyramid) {
     const alpha = slantAngleDeg(data.shape, data.baseLength, data.height);
     // Lay the front slant face flat ON the HP, then incline it by the target.
     //   X-tilt = (180 − α) − target. target 0 ⇒ 180 − α tips the solid forward
@@ -499,7 +519,7 @@ function computeEffectiveAngles(data) {
     return eff;
   }
 
-  if (modes.faceInclinationVP && pyramid) {
+  if (modeSet.faceInclinationVP && pyramid) {
     const alpha = slantAngleDeg(data.shape, data.baseLength, data.height);
     // Build the VP pose from the HP solution, then swing it up onto the VP about
     // the ground line (the Z axis, where HP meets VP):  Rz(−90) · Rx(180 − α − t).
@@ -515,7 +535,7 @@ function computeEffectiveAngles(data) {
   }
 
   // === PRIORITY 2: ORIENT TO CORNER / EDGE ===
-  if (modes.orientToCorner) {
+  if (modeSet.orientToCorner) {
     eff.rotationY = orientationAngle(data.shape);
     return eff;
   }
@@ -754,7 +774,36 @@ function createEdgeOverlay(sourceGeometry) {
  * @param {import('./src/shapeData.js').ShapeData} data  Effective data — for distHP/distVP.
  */
 function seatOnPlanes(mesh, data) {
-  const positions = mesh.geometry.getAttribute('position');
+  const seat = computeSeating(mesh.geometry, mesh.quaternion, data);
+  // Distance from the central axis (local x = 0) out to the nearest face. The floor for
+  // distVP when distVPRef:'axis' seats the AXIS at distVP — without this the near face
+  // (at distVP + minX) can sit behind the VP. uiManager reads it via sim.vpMinUnits().
+  // Lives on the module-level solid only — a headless Show Method stage (computeSeating
+  // called directly, below) must NOT touch this: it would clobber the live distVP slider
+  // floor with a different pose's inset while the dock is still showing the real solid.
+  vpAxisInset = seat.inset;
+  mesh.position.set(seat.x, seat.y, 0);
+}
+
+/**
+ * Pure seating math extracted from seatOnPlanes: given a geometry, an orientation
+ * quaternion, and effective shape data, return the local-space position that rests the
+ * solid's nearest extremes on the HP/VP per distHP/distVP (see seatOnPlanes' header for
+ * the full rationale — this is the SAME algorithm, verbatim, with the one module-level
+ * side effect (vpAxisInset) lifted out into the return value instead of a global write.
+ * This is what makes a headless Show Method stage possible: it can compute a pose's
+ * seating without disturbing the live solid's vpAxisInset (which uiManager's distVP
+ * slider floor depends on).
+ *
+ * @param {THREE.BufferGeometry} geometry
+ * @param {THREE.Quaternion} quaternion  Orientation to seat (already resolved, e.g. via
+ *   applyShapeTransform against some effective data — may differ from `data` below, e.g. a
+ *   headless stage's own effective angles).
+ * @param {import('./src/shapeData.js').ShapeData} data  Effective data — for distHP/distVP.
+ * @returns {{x:number, y:number, inset:number}}
+ */
+function computeSeating(geometry, quaternion, data) {
+  const positions = geometry.getAttribute('position');
   const vertex = new THREE.Vector3();
   let minX = Infinity;
   let minY = Infinity;
@@ -763,15 +812,10 @@ function seatOnPlanes(mesh, data) {
   // extremes. Setting obj.rotation keeps obj.quaternion in sync, so this matches
   // what the GPU will render. Vertex counts are tiny (a few dozen), once per rebuild.
   for (let i = 0; i < positions.count; i++) {
-    vertex.fromBufferAttribute(positions, i).applyQuaternion(mesh.quaternion);
+    vertex.fromBufferAttribute(positions, i).applyQuaternion(quaternion);
     if (vertex.x < minX) minX = vertex.x;
     if (vertex.y < minY) minY = vertex.y;
   }
-
-  // Distance from the central axis (local x = 0) out to the nearest face. The floor for
-  // distVP when distVPRef:'axis' seats the AXIS at distVP — without this the near face
-  // (at distVP + minX) can sit behind the VP. uiManager reads it via sim.vpMinUnits().
-  vpAxisInset = -minX;
 
   // Offset so the minimum corner lands exactly on each plane's distance. HP is
   // always measured to the nearest point (so distHP = 0 rests ON the floor). VP
@@ -784,7 +828,7 @@ function seatOnPlanes(mesh, data) {
   const xPlace = data.distVPRef === 'axis' && data.distVP !== 0
     ? data.distVP
     : data.distVP - minX;
-  mesh.position.set(xPlace, data.distHP - minY, 0);
+  return { x: xPlace, y: data.distHP - minY, inset: -minX };
 }
 
 // ============================================================================
@@ -971,9 +1015,17 @@ function refreshProjections() {
 
   const edgeMap = buildEdgeMap(currentMesh.geometry, currentMesh.matrixWorld);
   const { width, height } = viewportSize();
+  // ADR-087: the solid's world-space axis (local +Y rotated into world space), driving the
+  // base/generator edge split. `transformDirection` applies only the 3×3 rotation+scale part of
+  // matrixWorld (ignores translation) and normalizes — exactly the rotated-axis direction, and
+  // correct even though `currentMesh` sits under `shapeGroup` (shapeGroup carries no rotation of
+  // its own, but matrixWorld is used here anyway so this stays correct if that ever changes).
+  const worldAxis = new THREE.Vector3(0, 1, 0).transformDirection(currentMesh.matrixWorld);
   // Pass the seated PP standoff (set in rebuild before this runs) so the flat
   // connectors can land the side-view projectors at z0 − y in the folded layout.
-  activeProjection = drawProjections(edgeMap, { width, height, z0: ppHingeGroup.position.z });
+  activeProjection = drawProjections(edgeMap, {
+    width, height, z0: ppHingeGroup.position.z, axis: worldAxis,
+  });
 
   // HP top view + connectors render in world space; the VP front view hinges on
   // the ground line, so move it under the VP fold pivot. The PP side view hinges on the
@@ -1237,7 +1289,15 @@ function animateFold(target) {
     duration: FOLD_DURATION_MS,
     ease: easeFold, // heavy in/out so the hinge eases open and settles flat
     onUpdate: applyFoldVisual,
-    onComplete: () => { foldTween = null; },
+    onComplete: () => {
+      foldTween = null;
+      // methodCanRun() (ADR-084) gates on foldProgress === 1, which this tween is what
+      // actually sets — stepper.js's own sim.method.refresh() call fires synchronously right
+      // after sim.flatten()/unflatten(), i.e. BEFORE this tween has finished, so the Show
+      // Method button would otherwise stay stuck disabled/enabled from the pose it was in at
+      // click time. Re-sync here, once foldProgress has actually settled at its target.
+      methodController?.sync();
+    },
   });
 }
 
@@ -2183,6 +2243,10 @@ function handleResize(container) {
   // The Compare card's stage tracks the viewport (grid/flex sizing) — repaint its
   // drawing at the new backing-store size so the linework stays crisp.
   if (compareOpen) drawCompare();
+  // Show Method's takeover (ADR-085) is `position: fixed; inset: 0` — it resizes with the
+  // window, not with #sim-viewport, but the container's ResizeObserver still fires on every
+  // window resize (the container itself resizes too), so this is the same hook, forked.
+  if (methodViewOpen) queueMethodRedraw();
 }
 
 // ============================================================================
@@ -2341,6 +2405,208 @@ let comparePanY = 0;
 let compareZoom = 1;
 const COMPARE_ZOOM_MIN = 0.4;
 const COMPARE_ZOOM_MAX = 5;
+
+// ---- Show Method state (ADR-085). All Set-1/2/3 walkthrough state lives here, entirely
+// SEPARATE from `activeProjection`/`currentMesh` (the live 3D pane) — the Sets are additive
+// headless data, never a scene mutation (methodController.js owns the DOM + beat sequencing;
+// this module only builds/draws the data and the sheet layout math). Show Method draws into its
+// OWN takeover (#method-view/#method-canvas), never the Compare card — see drawMethodView below.
+// ----
+let methodActive = false;          // walkthrough is running (the takeover is open and drawing)
+let methodSets = [];                // built ONCE per method.begin(): [{ label, z0, data, eff }]
+let methodSet = 0;                  // 0-based index of the Set currently being drawn
+let methodBeat = 0;                 // 0-based beat index within methodSet (see BEAT ORDER, drawMethodSheet)
+/** Set-N focus (main.js CLAUDE.md naming note, ADR-084/085): purely visual — which Set's block
+ *  the camera lens (methodPanX/Y, methodZoom) is currently framed on. Independent of methodSet/
+ *  methodBeat (what is DRAWN); null = the whole row. "Set" not "Stage" — .compare-card__stage
+ *  already owns that word in this file/CSS. */
+let focusSet = null;
+
+/** Coalesce Compare-sheet repaints to one per animation frame — shared by drag/wheel (ADR-054/
+ *  055) and any future driver of a rapid repaint sequence, so none of them can independently
+ *  queue up a backlog of drawCompare() calls. Show Method (ADR-085) has its own, separate
+ *  queueMethodRedraw — the two surfaces are fully independent post-ADR-085. */
+let redrawQueued = false;
+function queueRedraw() {
+  if (redrawQueued) return;
+  redrawQueued = true;
+  requestAnimationFrame(() => {
+    redrawQueued = false;
+    if (compareOpen) drawCompare();
+  });
+}
+
+// ---- Show Method's OWN surface + camera lens (ADR-085) — forked from compareCanvas/
+// comparePanX/Y/compareZoom so a drag on either surface can never re-frame the other. ----
+let methodCanvas = null;           // #method-canvas — grabbed in the boot block beside compareCanvas
+let methodViewEl = null;           // #method-view — the takeover container main.js shows/hides
+let methodViewOpen = false;        // the takeover is visible at all (mirrors compareOpen's role)
+let methodPanX = 0;
+let methodPanY = 0;
+let methodZoom = 1;
+
+/** Show Method's own reset contract (ADR-085) — resetCompareView() no longer touches this state;
+ *  the two surfaces reset independently. Called on begin() and on every teardown path. */
+function resetMethodView() {
+  methodPanX = 0;
+  methodPanY = 0;
+  methodZoom = 1;
+  focusSet = null;
+}
+
+// ---- Show Method per-line stroke-in (ADR-091). Each beat's lines draw one at a time, ~0.2-0.4s
+// apiece, instead of the whole beat's batch popping in at once. Only ONE beat can ever be
+// mid-reveal at a time — the current frontier (methodSet, methodBeat) — everything behind it is
+// already fully drawn and everything ahead of it is still empty, so a single flat set of module
+// vars (not a per-beat map) is enough. Driven by anim.js's shared tween()/tick() (same helper the
+// live pane's own draw-on reveals use, see setProjectionsVisible), but pumped by THIS module's
+// OWN requestAnimationFrame loop rather than the sim's animate() — that loop is paused for the
+// entire time Show Method is open (ADR-085), so reusing it would mean nothing ever ticks. Reusing
+// anim.js's `active` Set is still safe: nothing else can be tweening while animate() is paused. ----
+const METHOD_SEG_DURATION_MS = 300; // ~0.2-0.4s band per line/segment, spec'd by ADR-091
+let methodAnimBeat = -1;     // beat index currently mid-reveal, or -1 = none (draw beats in full)
+let methodAnimIndex = 0;     // 0-based index of the unit currently drawing within methodAnimBeat
+let methodAnimUnitT = 0;     // 0..1 eased reveal fraction of that unit
+let methodAnimHandle = null; // the live tween handle, so a snap-finish can cancel it mid-flight
+let methodAnimRafId = null;  // this module's own rAF loop handle (animate()'s loop is paused)
+let methodAnimLastT = 0;
+
+/** One atomic stroked line ("moveTo→lineTo→stroke") per k-step — the animation-unit granularity;
+ *  matches strokeMethodLines'/the projector-loop's/strokeAxisInto's own iteration exactly, so an
+ *  index computed here always lands on the same unit drawMethodSheet's reveal-aware draw does. */
+function segUnitCount(pts) {
+  let n = 0;
+  for (let k = 0; k + 5 < pts.length; k += 6) n++;
+  return n;
+}
+
+function lineArrayUnitCount(lines, onlyHidden, onlyKind) {
+  let n = 0;
+  for (const seg of lines) {
+    if (onlyHidden !== undefined && seg.hidden !== onlyHidden) continue;
+    if (onlyKind !== undefined && seg.kind !== onlyKind) continue;
+    n += segUnitCount(seg.pts);
+  }
+  return n;
+}
+
+/** The firstIsHP/view-A/view-B split drawMethodSheet and methodContentBeats each need — pulled
+ *  out here because methodBeatUnitCount below is now a THIRD site that needs the identical split;
+ *  two independent copies (methodContentBeats' own, predating this change) was the accepted
+ *  precedent, a third was not. */
+function methodViewSplit(set) {
+  const firstIsHP = set.trueShape !== 'front';
+  return {
+    firstIsHP,
+    viewA: firstIsHP
+      ? { outline: set.data.hpOutline, data: set.data.hp }
+      : { outline: set.data.vpOutline, data: set.data.vp },
+    viewB: firstIsHP
+      ? { outline: set.data.vpOutline, data: set.data.vp }
+      : { outline: set.data.hpOutline, data: set.data.hp },
+  };
+}
+
+/** Total animation units for a given Set + beat index — world-space counts only (no screen
+ *  transform), so pacing stays correct even if the learner pans/zooms/focuses mid-reveal. Mirrors
+ *  the exact filters drawMethodSheet's own per-beat gates use (see that function's beat-index
+ *  table); beats 0 (caption/xy) and 13 (labels, text not lines) have nothing to animate. */
+function methodBeatUnitCount(set, beatIndex) {
+  const { viewA, viewB } = methodViewSplit(set);
+  switch (beatIndex) {
+    case 1: return lineArrayUnitCount(viewA.outline);
+    case 2: return lineArrayUnitCount(viewA.data, false, 'base');
+    case 3: return lineArrayUnitCount(viewA.data, true, 'base');
+    case 4: return lineArrayUnitCount(viewA.data, false, 'generator');
+    case 5: return lineArrayUnitCount(viewA.data, true, 'generator');
+    case 6: return set.ann.labels.length;
+    case 7: return lineArrayUnitCount(viewB.outline);
+    case 8: return lineArrayUnitCount(viewB.data, false, 'base');
+    case 9: return lineArrayUnitCount(viewB.data, true, 'base');
+    case 10: return lineArrayUnitCount(viewB.data, false, 'generator');
+    case 11: return lineArrayUnitCount(viewB.data, true, 'generator');
+    case 12: return segUnitCount(set.ann.axis) * 2; // strokeAxisInto runs twice — HP pass, VP pass
+    default: return 0;
+  }
+}
+
+/** Hard-stop: cancels the live tween AND this module's own rAF loop, and resets reveal state so
+ *  the next repaint draws methodAnimBeat's beat (if any) fully — the "snap to fully-drawn" half of
+ *  ADR-091's Next-mid-animation contract, and the teardown-time cleanup. */
+function stopMethodBeatAnim() {
+  methodAnimHandle?.cancel();
+  methodAnimHandle = null;
+  methodAnimBeat = -1;
+  if (methodAnimRafId !== null) {
+    cancelAnimationFrame(methodAnimRafId);
+    methodAnimRafId = null;
+  }
+  methodAnimLastT = 0;
+}
+
+function methodAnimFrame(now) {
+  const delta = methodAnimLastT ? Math.min(now - methodAnimLastT, 64) : 16;
+  methodAnimLastT = now;
+  tickTweens(delta); // drives methodAnimHandle.onUpdate below — safe to share anim.js's `active`
+                      // Set with the (paused) live pane: nothing else can be tweening right now.
+  if (methodAnimBeat !== -1) {
+    methodAnimRafId = requestAnimationFrame(methodAnimFrame);
+  } else {
+    methodAnimRafId = null;
+    methodAnimLastT = 0;
+  }
+}
+
+/** Begin the sequential stroke-in for `set`'s `beatIndex` — one tween spanning the whole beat
+ *  (0..totalUnits over totalUnits*METHOD_SEG_DURATION_MS, linear), so every unit gets an equal
+ *  wall-clock slice; `easeDraw` then shapes EACH unit's own reveal (fast start, gentle settle) —
+ *  the same curve setProjectionsVisible's draw-on already uses, reused here for the same
+ *  "glides on and settles" read. No-ops (methodAnimBeat stays -1) when the beat has no lines to
+ *  animate, so the caller never needs to check methodBeatUnitCount itself. Reduced motion is
+ *  handled entirely by tween() itself (main.js CLAUDE.md / anim.js): it jumps straight to the end
+ *  value, so this still resolves to a normal instant full-draw, no special-casing needed here. */
+function startMethodBeatAnim(set, beatIndex) {
+  const total = methodBeatUnitCount(set, beatIndex);
+  if (total === 0) return;
+  methodAnimBeat = beatIndex;
+  methodAnimIndex = 0;
+  methodAnimUnitT = 0;
+  if (methodAnimRafId === null) {
+    methodAnimLastT = 0;
+    methodAnimRafId = requestAnimationFrame(methodAnimFrame);
+  }
+  methodAnimHandle = tween({
+    from: 0,
+    to: total,
+    duration: total * METHOD_SEG_DURATION_MS,
+    ease: (x) => x, // linear across units — easeDraw (below) shapes each unit's own reveal instead
+    onUpdate: (v) => {
+      const idx = Math.min(Math.floor(v), total - 1);
+      methodAnimIndex = idx;
+      const rawT = idx === total - 1 && v >= total ? 1 : v - idx;
+      methodAnimUnitT = easeDraw(THREE.MathUtils.clamp(rawT, 0, 1));
+      queueMethodRedraw();
+    },
+    onComplete: () => {
+      methodAnimBeat = -1; // done — next repaint takes the normal, fully-drawn cumulative path
+      queueMethodRedraw();
+    },
+  });
+}
+
+/** Coalesce Show Method repaints to one per animation frame — mirrors queueRedraw's shape but
+ *  targets the takeover's own canvas. Plain requestAnimationFrame, NOT the sim's rAF loop, so it
+ *  keeps working while window.simAPI.pause() has stopped animate() (ADR-085). */
+let methodRedrawQueued = false;
+function queueMethodRedraw() {
+  if (methodRedrawQueued) return;
+  methodRedrawQueued = true;
+  requestAnimationFrame(() => {
+    methodRedrawQueued = false;
+    if (methodViewOpen) drawMethodView();
+  });
+}
+
 let workbenchRail = null;
 /** @type {Map<string, {parent: Element, next: Node|null}>} Each driver wrapper's original
  *  {parent, nextSibling}, captured the first time it is re-parented so exitWorkbench can
@@ -2361,7 +2627,12 @@ function ensureWorkbenchRail() {
 }
 
 /** Collapse the wizard, split the viewport 50/50, and dock the 7 driver wrappers under
- *  both panes. Idempotent. */
+ *  both panes. Idempotent.
+ *  ADR-085: previously took a `keepFlattened` param so Show Method could suspend the
+ *  forced-unflatten below while opening Compare for its own sheet. Show Method no longer opens
+ *  Compare at all (its own takeover, #method-view, is fully independent) — so this is
+ *  unconditional again, restoring the ADR-037/080 invariant: entering the split ALWAYS shows
+ *  the 3D pictorial in the left pane. */
 function enterWorkbench() {
   if (workbenchOpen) return;
   workbenchOpen = true;
@@ -2451,12 +2722,806 @@ function syncCompareChipVisibility() {
 }
 
 /** Single reset point for the Compare sheet's user-driven view state (ADR-054 pan + ADR-055
- *  zoom) — called on fresh open, dblclick recenter, and sim reset, so the three sites can't
- *  drift out of sync with each other. */
+ *  zoom) — called on fresh open, dblclick recenter, and sim reset. ADR-085: Show Method no
+ *  longer shares this state (it forked its own methodPanX/Y/methodZoom + resetMethodView), so
+ *  this reverts to the plain ADR-054/055 pan+zoom reset it was before ADR-084. */
 function resetCompareView() {
   comparePanX = 0;
   comparePanY = 0;
   compareZoom = 1;
+}
+
+// ============================================================================
+// SHOW METHOD (ADR-084 pedagogy, ADR-085 container) — headless per-Set projection + the
+// n-Set independent takeover sheet (#method-view/#method-canvas, drawMethodView).
+//
+// Set-1/2/3 are successive POSES of the SAME solid (never separate problems.js entries),
+// projected headlessly: compose a stage matrix → buildEdgeMap (meshAnalyzer.js) →
+// drawProjections (projectionDrawer.js, pure) → harvest to plain arrays → dispose the THREE
+// result in the same tick. `activeProjection`/`currentMesh` — the live 3D pane — are never
+// touched; every Set is built ONCE at method.begin() and re-read on every repaint/focus
+// switch, so nothing is created or disposed again until the NEXT begin() (see the Verification
+// section of the ADR-084 plan for why this is what keeps memory flat across repeated Set
+// switches, rather than a disposal loop).
+// ============================================================================
+
+const ONE_SCALE = new THREE.Vector3(1, 1, 1);
+const _methodScratch = new THREE.Object3D();
+/** Effective-angle magnitude below which an axis counts as "not inclined" — same role as a
+ *  dead-zone, not a precision guard (targets are authored in whole degrees). */
+const ANGLE_EPS = 0.05;
+/** Fixed generic beat template (ADR-087, overturns ADR-084's flat 7-beat version — see
+ *  DECISIONS.md for the full "Method of Drawing.md" audit this replaces it with). Follows the
+ *  textbook's actual draw sequence (outline → visible face → hidden face → visible generators →
+ *  hidden generators, PER VIEW, axis genuinely LAST), not "whole view visible, then whole view
+ *  hidden": 0 xy (sheet-wide, ADR-088) · 1 outline(A) · 2 visible face(A) · 3 hidden face(A) ·
+ *  4 visible generators(A) · 5 hidden generators(A) · 6 projectors · 7 outline(B) · 8 visible
+ *  face(B) · 9 hidden face(B) · 10 visible generators(B) · 11 hidden generators(B) · 12 axis
+ *  (last, both views) · 13 labels. "View A" is whichever of HP/VP carries this Set's true shape
+ *  (trueShapeForPlane), "view B" the other — same firstIsHP split as ADR-084. ADR-089 drops the
+ *  trailing dimensions beat (14 → gone): Show Method is the construction walkthrough, and BIS
+ *  dimensioning is a separate, already-existing concern the learner reaches via the live pane's
+ *  own "Show dimensions" toggle — bundling it into the replay taught the wrong lesson (that
+ *  dimensioning is part of *drawing method*). MUST match methodController.js's own duplicated
+ *  BEAT_COUNT (that file's header explains why the duplication is deliberate) — the two
+ *  constants move together or `goNext`'s beat-boundary math desyncs from the gates below. */
+const METHOD_BEAT_COUNT = 14;
+
+/** ADR-088 — Show Method's OWN side-view flag, always `false`, replacing the 5 call sites that
+ *  used to read the LIVE `showSideViewFlag` inside `drawMethodSheet`/`setMethodFocus`. The side
+ *  view is NOT removed from the sim: Step 5 still reveals it live on the 3D pane, and
+ *  `drawCompare()`'s own (unrelated) uses of the live flag are untouched — only the Show Method
+ *  REPLAY drops it, because ADR-087's beat budget can't afford a third view's worth of
+ *  outline/face/generator beats per Set (would take 15 beats/Set to ~21). Named separately from
+ *  `showSideViewFlag` rather than just inlining `false` at each site, so a future reversal is a
+ *  one-line change instead of a 5-site grep. */
+const METHOD_SHOW_SIDE_VIEW = false;
+
+/** Which of HP/VP shows the TRUE angle for an axis inclined to that plane (standard drafting
+ *  convention: inclination to HP reads true in the front/elevation view; inclination to VP
+ *  reads true in the top/plan view). */
+function trueShapeForPlane(plane) { return plane === 'HP' ? 'front' : 'top'; }
+
+/** How many Sets a pose needs: 1 = simple (nothing to walk through, Show Method disabled),
+ *  2 = one axis inclined, 3 = both. Applied uniformly to a loaded problem's effective angles
+ *  OR free-explore's live dialled angles — so 'base'/'corner-edge' (no inclination) and
+ *  'corner-edge' presets (yaw only, angleHP=angleVP=0) fall out of this test for free, with no
+ *  hard-coded tier string check. */
+function inclinationStageCount(eff) {
+  const hp = Math.abs(eff.angleHP) > ANGLE_EPS;
+  const vp = Math.abs(eff.angleVP) > ANGLE_EPS;
+  if (hp && vp) return 3;
+  if (hp || vp) return 2;
+  return 1;
+}
+
+/**
+ * Derive each Set's construction-pose plan for the CURRENTLY loaded solid: `{overrides, modes,
+ * trueShape, label}` per Set, Set 1 always "simple position". Sets 2/3 resolve one inclination
+ * axis at a time, per `order` (problems.js's optional `method.order`, defaulting HP-then-VP —
+ * the audit found "the textbook doesn't follow one fixed order" for both-planes problems).
+ *
+ * Face-inclination poses (today's ENTIRE one-plane tier) don't decompose into partial per-axis
+ * steps — their formula ties BOTH eff.angleHP/eff.angleVP to one target+alpha (main.js
+ * computeEffectiveAngles). A 2-Set walkthrough doesn't need that decomposition: it goes
+ * straight from simple position to the fully resolved live pose, which is already
+ * textbook-correct for a single-axis problem. A both-planes pose driven by a face-inclination
+ * mode (not present in today's problems.js data) falls back to the same "straight to the live
+ * pose" shape for its remaining Sets rather than guessing a wrong partial decomposition.
+ */
+function planMethodStages(eff) {
+  const n = inclinationStageCount(eff);
+  if (n < 2) return [];
+
+  const order = activeProblemRef?.method?.order || ['HP', 'VP'];
+  const plans = [{
+    overrides: { angleHP: 0, angleVP: 0 },
+    modes: { faceInclinationHP: false, faceInclinationVP: false, orientToCorner: false },
+    trueShape: 'top',
+    label: 'Simple position',
+  }];
+
+  if (n === 2) {
+    const axis = Math.abs(eff.angleHP) > ANGLE_EPS ? 'HP' : 'VP';
+    const angle = axis === 'HP' ? eff.angleHP : eff.angleVP;
+    plans.push({
+      overrides: {},        // the full live shapeData — already the fully resolved pose
+      modes: { ...modes },  // the full live mode set (may be face-inclination, orient, or manual)
+      trueShape: trueShapeForPlane(axis),
+      label: `Axis ${Math.round(angle)}° to the ${axis}`,
+    });
+    return plans;
+  }
+
+  // n === 3 (both-planes). Manual dual-angle decomposition — today's only both-planes data
+  // shape (problems.js's both-planes tier never sets a face-inclination mode).
+  const firstPlane = order[0] === 'VP' ? 'VP' : 'HP';
+  const secondPlane = firstPlane === 'HP' ? 'VP' : 'HP';
+  if (modes.faceInclinationHP || modes.faceInclinationVP) {
+    // Defensive fallback (no current data exercises this): can't cleanly split a
+    // face-inclination formula into a single resolved axis, so go straight to the live pose
+    // for both remaining Sets rather than compute a wrong partial pose.
+    plans.push({ overrides: {}, modes: { ...modes }, trueShape: trueShapeForPlane(firstPlane), label: `Axis inclined to the ${firstPlane}` });
+    plans.push({ overrides: {}, modes: { ...modes }, trueShape: trueShapeForPlane(secondPlane), label: 'Axis inclined to both planes' });
+    return plans;
+  }
+  const firstAngle = firstPlane === 'HP' ? eff.angleHP : eff.angleVP;
+  const secondAngle = secondPlane === 'HP' ? eff.angleHP : eff.angleVP;
+  plans.push({
+    overrides: firstPlane === 'HP' ? { angleHP: eff.angleHP, angleVP: 0 } : { angleHP: 0, angleVP: eff.angleVP },
+    modes: { ...modes },
+    trueShape: trueShapeForPlane(firstPlane),
+    label: `Axis ${Math.round(firstAngle)}° to the ${firstPlane}`,
+  });
+  plans.push({
+    overrides: {},           // unused by projectSetPose when `sequential` is set (kept only so
+                             // this plan shape still matches plans[0]/[1] for any future reader)
+    modes: { ...modes },
+    trueShape: trueShapeForPlane(secondPlane),
+    label: `Axis ${Math.round(firstAngle)}° to the ${firstPlane} and ${Math.round(secondAngle)}° to the ${secondPlane}`,
+    // ADR-093: Set 3's pose is NOT the combined-Euler shortcut above (that's what `overrides: {}`
+    // would trigger) — projectSetPose branches on this marker to a separate sequential "tip, then
+    // turn" composition instead. See projectSequentialBothPlanesPose's own header for why.
+    sequential: { firstPlane, firstAngle, secondAngle },
+  });
+  return plans;
+}
+
+/** Compose a headless stage's orientation + seating WITHOUT touching the live mesh, the live
+ *  `modes` object, or `vpAxisInset` (computeSeating is the pure extraction from seatOnPlanes —
+ *  see its own header for why the live solid's distVP slider floor must not be clobbered by a
+ *  different pose's inset). Returns the effective angles (for labelling) and the resulting
+ *  world matrix (shapeGroup carries no transform of its own, so this IS the equivalent of
+ *  mesh.matrixWorld for a stage that was never actually built as a mesh). */
+function projectSetPose(overrides, modeSet, sequential) {
+  if (sequential) return projectSequentialBothPlanesPose(sequential, modeSet);
+  const raw = { ...currentShapeData, ...overrides };
+  const eff = computeEffectiveAngles(raw, modeSet);
+  _methodScratch.rotation.order = 'ZXY';
+  applyShapeTransform(_methodScratch, eff);
+  const seat = computeSeating(currentMesh.geometry, _methodScratch.quaternion, eff);
+  const m = new THREE.Matrix4().compose(new THREE.Vector3(seat.x, seat.y, 0), _methodScratch.quaternion, ONE_SCALE);
+  return { eff, m };
+}
+
+/** ADR-093 — Show Method's both-planes Set 3 ONLY. planMethodStages' combined-Euler shortcut
+ *  (the `overrides: {}` branch above) computes Set 3 as ONE Euler from the ORIGINAL upright
+ *  shape — iShape.js's order 'ZXY' applies the VP (Z) lean BEFORE the HP (X) tilt, so adding the
+ *  second angle genuinely re-derives the pose from scratch rather than building on Set 2's own.
+ *  The real textbook auxiliary-view technique never does that: it tips the solid to the first
+ *  plane, THEN turns the already-tipped solid about the TRUE VERTICAL to bring it true to the
+ *  second — "turning" is a yaw about world-up, not a second lean. This function reproduces that:
+ *  Set 2's pose is built the normal way (same applyShapeTransform/iShape.js call everyone else
+ *  uses, untouched, called here read-only), then yawed about world Y by the second angle.
+ *
+ *  Why this is provably right, not just visually close: a rotation about world Y can only ever
+ *  mix a point's x/z — it leaves y (height) exactly alone, for every point, always. computeSeating
+ *  re-seats off `minY`, which is likewise untouched by that same yaw. So every labeled vertex's
+ *  final world-Y comes out bit-for-bit identical to Set 2's — which is exactly what keeps the new
+ *  cross-Set derivation line (drawMethodSheet's merged "projectors" beat, ADR-092) flat for THIS
+ *  transition, the same way Set 1→Set 2's line is trivially flat (a pure X-tilt never touches x).
+ *
+ *  Self-contained: reads currentShapeData/currentMesh.geometry like projectSetPose's own branch
+ *  already does, but never touches iShape.js, computeEffectiveAngles, or the live solid's pose. */
+function projectSequentialBothPlanesPose(sequential, modeSet) {
+  const { firstPlane, firstAngle, secondAngle } = sequential;
+  const raw1 = {
+    ...currentShapeData,
+    angleHP: firstPlane === 'HP' ? firstAngle : 0,
+    angleVP: firstPlane === 'VP' ? firstAngle : 0,
+  };
+  const eff1 = computeEffectiveAngles(raw1, modeSet);
+  _methodScratch.rotation.order = 'ZXY';
+  applyShapeTransform(_methodScratch, eff1);          // Set 2's own pose, verbatim, reused
+  const q1 = _methodScratch.quaternion.clone();
+  const yaw = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -secondAngle * DEG2RAD);
+  const q = yaw.multiply(q1);                         // second tilt applied ON TOP, world frame
+  const seat = computeSeating(currentMesh.geometry, q, eff1);
+  const m = new THREE.Matrix4().compose(new THREE.Vector3(seat.x, seat.y, 0), q, ONE_SCALE);
+  return { eff: eff1, m };
+}
+
+/** Copy every LineSegments2 child's instanceStart/instanceEnd endpoints into a plain array —
+ *  the harvested shape drawMethodSheet strokes from after the live THREE result is disposed.
+ *  ADR-087: also copies `userData.kind` ('base' | 'generator' | 'outline' | undefined) through
+ *  beside the existing `hidden` tag — this is the ONE chokepoint where THREE.js userData crosses
+ *  into the harvested plain-array shape strokeMethodLines filters on. */
+function harvestLineGroup(group) {
+  const lines = [];
+  if (!group) return lines;
+  for (const child of group.children) {
+    if (!child.isLineSegments2) continue;
+    const start = child.geometry.attributes.instanceStart;
+    const end = child.geometry.attributes.instanceEnd;
+    if (!start || !end) continue;
+    const pts = [];
+    for (let i = 0; i < start.count; i++) {
+      pts.push(start.getX(i), start.getY(i), start.getZ(i), end.getX(i), end.getY(i), end.getZ(i));
+    }
+    lines.push({ pts, hidden: !!child.userData.hidden, kind: child.userData.kind });
+  }
+  return lines;
+}
+
+/** Corner labels (A, B, C…, O, P) + the axis chain line, planned in vertexLabeler.js's
+ *  planAnnotations (LOCAL space, pure) and carried to WORLD space by the stage matrix `m` —
+ *  the two new beats the audit found absent from both flat surfaces (vertexLabeler.js only
+ *  ever annotates the upright 3D solid, and fades OUT on fold). */
+function harvestAnnotations(m) {
+  const { labels, axis } = planAnnotations(currentMesh.geometry);
+  const worldOf = (local) => local.clone().applyMatrix4(m);
+  const worldLabels = labels.map(({ local, text }) => {
+    const w = worldOf(local);
+    return { text, x: w.x, y: w.y, z: w.z };
+  });
+  const axisSegs = chainPositions(worldOf(axis.bottom), worldOf(axis.top));
+  return { labels: worldLabels, axis: axisSegs };
+}
+
+/** Build one Set's complete drawable data for a stage plan. No mesh, no geometry allocation:
+ *  every stage shares currentMesh.geometry (overrides never touch shape/baseLength/height).
+ *  The only THREE objects created are drawProjections' own result, harvested to plain arrays
+ *  and disposed in this SAME tick — same disposal contract as refreshProjections(), just
+ *  without ever parenting the result into the scene. */
+function projectSet(plan) {
+  const { eff, m } = projectSetPose(plan.overrides, plan.modes, plan.sequential);
+  const box = new THREE.Box3().setFromBufferAttribute(currentMesh.geometry.getAttribute('position'));
+  box.applyMatrix4(m); // mirrors rebuild()'s own `new THREE.Box3().setFromObject(mesh)` (main.js)
+  const z0 = box.min.z - PP_MARGIN; // per-Set standoff — NEVER read the live ppHingeGroup (ADR-084)
+  const { width, height } = viewportSize();
+  const edgeMap = buildEdgeMap(currentMesh.geometry, m);
+  // ADR-087: this stage's own world-space axis (local +Y rotated by the STAGE's pose, not the
+  // live mesh's) — same `transformDirection` reasoning as refreshProjections' worldAxis, against
+  // the headless matrix `m` instead of a live matrixWorld. Drives the base/generator split for
+  // this Set specifically (a Set's pose differs from the live mesh's, so its axis direction does
+  // too — reading the live mesh's axis here would misclassify every stage but the live one, the
+  // same trap z0/dimensions already avoid per ADR-084).
+  const axis = new THREE.Vector3(0, 1, 0).transformDirection(m);
+  const res = drawProjections(edgeMap, { width, height, z0, axis });
+  const data = {
+    hp: harvestLineGroup(res.hpGroup),
+    vp: harvestLineGroup(res.vpGroup),
+    pp: harvestLineGroup(res.ppGroup), // ADR-088: side view dropped from the replay; left harmless
+    hpOutline: harvestLineGroup(res.hpOutlineGroup),
+    vpOutline: harvestLineGroup(res.vpOutlineGroup),
+    // ADR-089: no hpDim*/vpDim* harvest — Show Method no longer replays the dimension layer.
+  };
+  res.dispose(); // WebGL buffers + CSS2D DOM nodes gone before this function returns
+  const ann = harvestAnnotations(m);
+  const set = { label: plan.label, trueShape: plan.trueShape, eff, z0, data, ann };
+  set.contentBeats = methodContentBeats(set);
+  return set;
+}
+
+/** ADR-090 — per-Set, per-beat "does this beat actually add a mark to the sheet" table, computed
+ *  once at begin() from the same harvested `data`/`ann` drawMethodSheet itself reads, so it can
+ *  never drift from what actually gets drawn. Some poses have no hidden edge on a given view (a
+ *  prism square-on to a plane casts no dashed generator there) — Next used to still spend a click
+ *  on that beat and repaint an IDENTICAL frame, reading to a learner as a dead button. Index 0
+ *  (the Set's caption reveal) is always true; the caller (methodController.js's goNext/goBack)
+ *  treats it as such regardless of this table, since projectors/labels (index 6/13) legitimately
+ *  read the same `ann.labels` source and would otherwise fall out in lockstep. */
+function methodContentBeats(set) {
+  const firstIsHP = set.trueShape !== 'front';
+  const viewA = firstIsHP
+    ? { outline: set.data.hpOutline, data: set.data.hp }
+    : { outline: set.data.vpOutline, data: set.data.vp };
+  const viewB = firstIsHP
+    ? { outline: set.data.vpOutline, data: set.data.vp }
+    : { outline: set.data.hpOutline, data: set.data.hp };
+  const hasKind = (arr, hidden, kind) => arr.some((seg) => seg.hidden === hidden && seg.kind === kind);
+  const hasAxis = set.ann.axis.length >= 6;
+  const hasLabels = set.ann.labels.length > 0;
+  return [
+    true,                                     // 0  caption reveal
+    viewA.outline.length > 0,                 // 1  outline(A)
+    hasKind(viewA.data, false, 'base'),       // 2  visible face(A)
+    hasKind(viewA.data, true, 'base'),        // 3  hidden face(A)
+    hasKind(viewA.data, false, 'generator'),  // 4  visible generators(A)
+    hasKind(viewA.data, true, 'generator'),   // 5  hidden generators(A)
+    hasLabels,                                // 6  projectors (one per labelled corner)
+    viewB.outline.length > 0,                 // 7  outline(B)
+    hasKind(viewB.data, false, 'base'),       // 8  visible face(B)
+    hasKind(viewB.data, true, 'base'),        // 9  hidden face(B)
+    hasKind(viewB.data, false, 'generator'),  // 10 visible generators(B)
+    hasKind(viewB.data, true, 'generator'),   // 11 hidden generators(B)
+    hasAxis,                                  // 12 axis
+    hasLabels,                                // 13 labels
+  ];
+}
+
+/** ADR-094 — plain-English name for a plane in a walkthrough caption: HP is always "top view",
+ *  VP always "front view" (the PP/"side view" never appears here, ADR-088). */
+function planeViewWord(plane) { return plane === 'HP' ? 'top' : 'front'; }
+
+/** ADR-094 — per-beat caption audit found "Next sometimes does nothing" wasn't the only gap:
+ *  a learner landing on any of the 14 beats had no words for what just appeared, only the Set's
+ *  own caption (painted once, beat 0) and mute Back/Next/Skip buttons. This is deliberately NOT
+ *  the numeric counter ADR-089 removed — no position, no total, just what the beat drew — read
+ *  by methodController.js's syncCaption() into both the visible `#method-caption` pill and the
+ *  existing `#sim-status` announce channel. Reuses `methodContentBeats`' own `firstIsHP` split
+ *  (same `set.trueShape !== 'front'` test) so view-A/view-B always name the same plane here as
+ *  the content-gate does. */
+function methodBeatLabel(set, beat) {
+  const s = methodSets[set];
+  if (!s) return '';
+  if (beat === 0) return `Set ${set + 1} — ${s.label}`;
+  const firstIsHP = s.trueShape !== 'front';
+  const wordA = planeViewWord(firstIsHP ? 'HP' : 'VP');
+  const wordB = planeViewWord(firstIsHP ? 'VP' : 'HP');
+  switch (beat) {
+    case 1: return `Outline of the ${wordA} view`;
+    case 2: return `Visible face lines — ${wordA} view`;
+    case 3: return `Hidden face lines — ${wordA} view`;
+    case 4: return `Visible generators — ${wordA} view`;
+    case 5: return `Hidden generators — ${wordA} view`;
+    case 6: return 'Projectors linking the two views';
+    case 7: return `Outline of the ${wordB} view`;
+    case 8: return `Visible face lines — ${wordB} view`;
+    case 9: return `Hidden face lines — ${wordB} view`;
+    case 10: return `Visible generators — ${wordB} view`;
+    case 11: return `Hidden generators — ${wordB} view`;
+    case 12: return 'Axis of the solid';
+    case 13: return 'Vertex labels';
+    default: return '';
+  }
+}
+
+/** Whether Show Method may start right now: a solid exists, the sheet is fully flattened
+ *  (foldProgress === 1 — the engine-level signal stepper.js's state.flattened mirrors), and
+ *  the live/loaded pose actually has an axis to resolve (excludes 'base'/'corner-edge'). */
+function methodCanRun() {
+  if (!currentShapeData || !currentMesh || foldProgress !== 1) return false;
+  return inclinationStageCount(computeEffectiveAngles(currentShapeData)) >= 2;
+}
+
+/** ADR-085: opens Show Method's own full-viewport takeover (#method-view), independent of
+ *  Compare — no split, no workbench rail, Step 1/2's sliders stay covered + focus-trapped by
+ *  methodController.js's own trap. The sim loop is paused for the duration (matches the
+ *  #problem-library contract: the 3D scene is fully covered, so rendering it is wasted GPU) —
+ *  which also means no anim.js tween may run in this view (tick() rides the paused rAF loop);
+ *  Set-focus (setMethodFocus) is an instant snap for exactly this reason. */
+function beginShowMethod() {
+  if (methodActive || !methodCanRun()) return false;
+  const plans = planMethodStages(computeEffectiveAngles(currentShapeData));
+  if (plans.length < 2) return false;
+  stopMethodBeatAnim(); // defensive — a prior session should have already torn this down
+  methodSets = plans.map(projectSet);
+  methodActive = true;
+  methodSet = 0;
+  methodBeat = 0;
+  resetMethodView();
+  if (methodViewEl) methodViewEl.hidden = false;
+  methodViewOpen = true;
+  window.simAPI?.pause(); // ADR-085 — matches .problem-library; scene is fully covered
+  // A freshly un-hidden `position:fixed` element has no committed layout rect on frame 1 (same
+  // reasoning as remeasureAfterReflow's double-rAF) — wait two frames before the first paint.
+  requestAnimationFrame(() => requestAnimationFrame(queueMethodRedraw));
+  return true;
+}
+
+/** Shared teardown for a normal finish (end), an Exit-button/Escape close, and a mid-method edit
+ *  (abort) — the only difference between the paths is the flowNote wording methodController.js
+ *  shows, not this engine-side behaviour. ADR-085: synchronous now — the takeover always draws
+ *  all of its Sets at once (no 1-wide↔n-wide morph to collapse first), so there is nothing to
+ *  tween through before tearing down. Does NOT call resetCompareView() or unflatten(): Show
+ *  Method no longer touches Compare's state or the fold at all post-ADR-085. */
+function teardownShowMethod() {
+  if (!methodActive) return;
+  stopMethodBeatAnim();
+  methodActive = false;
+  methodSets = [];
+  methodSet = 0;
+  methodBeat = 0;
+  methodViewOpen = false;
+  if (methodViewEl) methodViewEl.hidden = true;
+  window.simAPI?.resume();
+  resetMethodView();
+  // The moment methodActive actually flips false — whether this teardown was reached via end()
+  // (methodController's own Exit/Escape/Next-when-done, which already re-syncs itself right
+  // after calling sim.method.end()) or abort() (stepper.js, which does NOT re-sync) — is exactly
+  // when methodController's sync() needs to run to catch an abort-driven teardown. Calling it
+  // unconditionally here is a harmless extra call on the end() path (sync() is idempotent) and
+  // the ONLY correct trigger on the abort() path.
+  methodController?.sync();
+}
+
+function endShowMethod() { teardownShowMethod(); }
+function abortShowMethod() { teardownShowMethod(); }
+
+function setMethodProgress(set, beat) {
+  if (!methodActive || methodSets.length === 0) return;
+  const prevFlat = methodSet * METHOD_BEAT_COUNT + methodBeat;
+  // ADR-091: whatever beat was mid-reveal snaps to fully-drawn before the new position takes
+  // effect — this is the "Next mid-animation" half of the contract, and it is a harmless no-op
+  // when nothing was animating (Back, a skip, or a fresh Next after the prior beat finished).
+  stopMethodBeatAnim();
+  methodSet = Math.min(Math.max(set, 0), methodSets.length - 1);
+  methodBeat = Math.min(Math.max(beat, 0), METHOD_BEAT_COUNT - 1);
+  const newFlat = methodSet * METHOD_BEAT_COUNT + methodBeat;
+  // Only a genuine forward step (Next) animates in — Back/skip/focus jumps land on the fully-drawn
+  // state instantly, matching how those already behaved before this change.
+  if (newFlat > prevFlat) startMethodBeatAnim(methodSets[methodSet], methodBeat);
+  queueMethodRedraw();
+}
+
+/** Set-N focus (ADR-084 audit round 2, Decision 6/7; ADR-085: instant snap, no tween): purely
+ *  visual, never touches methodSet/methodBeat. Target is the Set's INTRINSIC block centre (same
+ *  E/GAP/showSideViewFlag inputs as `scale`/`anchorSX` themselves) — never a live bbox of what
+ *  that Set has actually drawn so far, which is exactly what keeps this from reopening the
+ *  live-bbox coupling ADR-053 removed. Inverts drawMethodSheet's own project() formula for the
+ *  block centre. ADR-085: the sim loop is paused while this view is open, so no anim.js tween
+ *  can run here — a second, independent rAF-driven animation path for one interaction was
+ *  rejected as worse than an instant jump, so methodPanX/Y/methodZoom are assigned directly. */
+function setMethodFocus(i) {
+  if (!methodActive) return;
+  focusSet = (i === null || i === undefined) ? null : Math.min(Math.max(i, 0), methodSets.length - 1);
+
+  const stage = methodCanvas?.parentElement;
+  const w = stage?.clientWidth || 0;
+  const h = stage?.clientHeight || 0;
+  if (!w || !h) return;
+
+  const E = Math.max(solidSpanUnits, 1e-3);
+  const GAP = E * 0.35;
+  const STAGE_GAP = GAP;
+  const blockW = E + (METHOD_SHOW_SIDE_VIEW ? GAP + E : 0);
+  const blockH = E + GAP + E;
+  const n = methodSets.length || 1; // always the actual Set count (2 or 3) — no 1-wide state post-ADR-085
+  const marginPx = 40;
+  const nomWmm = (n * blockW + (n - 1) * STAGE_GAP) * WORLD_TO_MM;
+  const nomHmm = blockH * WORLD_TO_MM;
+  const scale = Math.min((w - 2 * marginPx) / nomWmm, (h - 2 * marginPx) / nomHmm);
+  const blockLocalCenterX = METHOD_SHOW_SIDE_VIEW ? (E + GAP) / 2 : 0;
+  const anchorSX = blockLocalCenterX + (n - 1) * (blockW + STAGE_GAP) / 2;
+
+  let targetSX;
+  let targetZoom;
+  if (focusSet === null) {
+    targetSX = anchorSX;
+    targetZoom = 1;
+  } else {
+    targetSX = blockLocalCenterX + focusSet * (blockW + STAGE_GAP);
+    const zFitW = (w - 2 * marginPx) / (blockW * WORLD_TO_MM * scale);
+    const zFitH = (h - 2 * marginPx) / (blockH * WORLD_TO_MM * scale);
+    targetZoom = Math.min(COMPARE_ZOOM_MAX, Math.max(COMPARE_ZOOM_MIN, Math.min(zFitW, zFitH)));
+  }
+  methodPanX = -(targetSX - anchorSX) * WORLD_TO_MM * scale * targetZoom;
+  methodPanY = 0; // every Set is nominally centred about sheetY=0, same as anchorSY
+  methodZoom = targetZoom;
+  queueMethodRedraw();
+}
+
+/** Read-only chip-UI summary: a Set is `reached` once the walkthrough has drawn it at least
+ *  once — mirrors stepper.js's one-way-back `current || complete` gate (stepper.js
+ *  renderRail) so an un-reached Set's chip can be disabled the same way. */
+function methodSetsSummary() {
+  return methodSets.map((s, i) => ({ label: s.label, reached: i <= methodSet }));
+}
+
+/** How many of a Set's 7 beats are currently revealed: every beat once the walkthrough has
+ *  moved past this Set, methodBeat+1 for the Set being drawn right now, 0 for a Set not yet
+ *  reached (its slot in the row stays visually empty until Next reaches it). */
+function methodBeatsShown(i) {
+  if (i < methodSet) return METHOD_BEAT_COUNT;
+  if (i === methodSet) return methodBeat + 1;
+  return 0;
+}
+
+/** Stroke every harvested line segment, filtered by `onlyHidden` (undefined = draw both solid
+ *  and dashed, e.g. the dimension layer's single ink line style) — mirrors drawCompare's own
+ *  strokeGroup, just reading the harvested plain-array shape instead of a live THREE group.
+ *  ADR-087: `onlyKind` additionally filters on the harvested `kind` tag ('base' | 'generator' |
+ *  'outline' | undefined) — undefined (default) draws every kind, matching how the dimension
+ *  layer's calls (whose segments carry no `kind` at all) never pass it.
+ *  ADR-091: optional `reveal` ({index, t}) draws units `0..index-1` in full, unit `index` lerped
+ *  from its start point by fraction `t`, and stops — everything after it is simply not drawn yet.
+ *  Omitted (the default), this draws every unit in full, i.e. the pre-ADR-091 behaviour exactly —
+ *  every call site that is never the current animating beat passes nothing and is unaffected. */
+function strokeMethodLines(ctx, lines, flattenFn, color, onlyHidden, widthOverride, onlyKind, reveal) {
+  let idx = 0;
+  for (const seg of lines) {
+    if (onlyHidden !== undefined && seg.hidden !== onlyHidden) continue;
+    if (onlyKind !== undefined && seg.kind !== onlyKind) continue;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = widthOverride ?? (seg.hidden ? 1 : 1.6);
+    ctx.setLineDash(seg.hidden ? [5, 4] : []);
+    for (let k = 0; k + 5 < seg.pts.length; k += 6) {
+      if (reveal && idx > reveal.index) { ctx.setLineDash([]); return; }
+      const a = flattenFn(seg.pts[k], seg.pts[k + 1], seg.pts[k + 2]);
+      const b = flattenFn(seg.pts[k + 3], seg.pts[k + 4], seg.pts[k + 5]);
+      let bx = b.x, by = b.y;
+      if (reveal && idx === reveal.index) {
+        bx = a.x + (b.x - a.x) * reveal.t;
+        by = a.y + (b.y - a.y) * reveal.t;
+      }
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(bx, by);
+      ctx.stroke();
+      idx++;
+    }
+  }
+  ctx.setLineDash([]);
+}
+
+/** Draw every harvested CSS2D label as flat Canvas2D text with a paper-colour break behind it
+ *  — mirrors drawCompare's drawGroupText over the harvested plain-array shape. */
+function drawMethodLabels(ctx, labels, flattenFn, color, font, paperColor) {
+  ctx.font = font;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const { text, x, y, z } of labels) {
+    const p = flattenFn(x, y, z);
+    const half = ctx.measureText(text).width / 2 + 2;
+    ctx.fillStyle = paperColor;
+    ctx.fillRect(p.x - half, p.y - 6, half * 2, 12);
+    ctx.fillStyle = color;
+    ctx.fillText(text, p.x, p.y);
+  }
+}
+
+/**
+ * ADR-087/-088 — draw every Show Method Set side by side, into Show Method's OWN independent
+ * takeover canvas (called from drawMethodView(), never drawCompare()). Sizing follows the same
+ * intrinsic-only law ADR-053/054 established for Compare (E/GAP/Set-count, never a live bbox —
+ * ADR-088 drops `showSideViewFlag` from the inputs entirely, see METHOD_SHOW_SIDE_VIEW), applied
+ * here as the sole sizing law for this view — the takeover is always exactly `n` Sets wide, with
+ * no 1-wide state to morph from (ADR-085 retires the methodSpread tween ADR-084 needed for that
+ * morph). Per-Set beat gating comes from methodBeatsShown(i); each Set's beat template now
+ * follows Method of Drawing.md's own draw sequence (ADR-087): outline → visible face → hidden
+ * face → visible generators → hidden generators, per view, axis genuinely last.
+ * ADR-091: within the single Set currently mid-beat (i === methodSet), that beat's own lines
+ * stroke in one at a time rather than popping in as a batch — `animatingBeat`/`revealFor` below
+ * feed each candidate strokeMethodLines/projector/axis call its `{index, t}` reveal state (or
+ * `undefined`, drawing in full, for every beat that isn't the live one — every already-settled
+ * Set and every already-drawn beat of the current Set take that path, unchanged from ADR-087).
+ */
+function drawMethodSheet(ctx, w, h) {
+  const paper = cssVar('--color-paper');
+  const hpCol = cssVar('--color-hp-line');
+  const vpCol = cssVar('--color-vp-line');
+  const inkCol = cssVar('--color-ink');
+  const refCol = cssVar('--color-ink-secondary');
+  const captionFont = `12px ${cssVar('--font-sans') || 'sans-serif'}`;
+  const labelFont = `11px ${cssVar('--font-sans') || 'sans-serif'}`;
+
+  // ---- Sizing (ADR-085/-088, follows the ADR-053/054 intrinsic-only law) — always `n` Sets
+  // wide; no 1-wide state exists in this view, so there is nothing to morph from. ----
+  const E = Math.max(solidSpanUnits, 1e-3);
+  const GAP = E * 0.35;
+  const STAGE_GAP = GAP;
+  const blockW = E + (METHOD_SHOW_SIDE_VIEW ? GAP + E : 0);
+  const blockH = E + GAP + E;
+  const n = methodSets.length;
+  const marginPx = 40;
+  const nomWmm = (n * blockW + (n - 1) * STAGE_GAP) * WORLD_TO_MM;
+  const nomHmm = blockH * WORLD_TO_MM;
+  const scale = Math.min((w - 2 * marginPx) / nomWmm, (h - 2 * marginPx) / nomHmm);
+  const blockLocalCenterX = METHOD_SHOW_SIDE_VIEW ? (E + GAP) / 2 : 0;
+  const anchorSX = blockLocalCenterX + (n - 1) * (blockW + STAGE_GAP) / 2;
+  const anchorSY = 0;
+  const cx = w / 2;
+  const cy = h / 2;
+
+  // Sheet-space projection with NO per-Set `dx` — the frame the sheet-wide XY line (ADR-088)
+  // draws in; each per-Set `project()` below is this PLUS that Set's own `dx`.
+  const projectSheet = (p) => ({
+    x: cx + (p.x - anchorSX) * WORLD_TO_MM * scale * methodZoom + methodPanX,
+    y: cy - (p.y - anchorSY) * WORLD_TO_MM * scale * methodZoom + methodPanY,
+  });
+
+  // ---- ADR-088: ONE sheet-wide XY line, not one per Set. Every Set already lands on the
+  // identical screen row — anchorSY=0 above, and `dx` (added per-Set below) only ever perturbs
+  // sheet-x — so a single stroke spanning the whole intrinsic row width is strictly TIGHTER than
+  // the old per-Set version: no live bbox anywhere, only E/GAP/n, the same constants blockW/
+  // anchorSX already use. Drawn unconditionally: methodBeat starts at 0 the instant the view
+  // opens, so this line is visible for the view's entire lifetime, same as before. ----
+  {
+    const REF_OVERSHOOT = 0.3;
+    const xMin = blockLocalCenterX - blockW / 2 - REF_OVERSHOOT;
+    const xMax = (n - 1) * (blockW + STAGE_GAP) + blockLocalCenterX + blockW / 2 + REF_OVERSHOOT;
+    ctx.strokeStyle = refCol;
+    ctx.lineWidth = 0.75;
+    ctx.setLineDash([1]);
+    const a = projectSheet({ x: xMin, y: 0 });
+    const b = projectSheet({ x: xMax, y: 0 });
+    ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  for (let i = 0; i < n; i++) {
+    const shown = methodBeatsShown(i);
+    if (shown === 0) continue; // this Set's slot stays empty until Next actually reaches it
+
+    const set = methodSets[i];
+    const dx = i * (blockW + STAGE_GAP);
+    const project = (p) => projectSheet({ x: p.x + dx, y: p.y });
+    const flattenHP = (x, y, z) => project({ x: -z, y: -x });
+    const flattenVP = (x, y, z) => project({ x: -z, y });
+
+    // "View A" is whichever of HP/VP carries this Set's true shape (drawn first, same
+    // firstIsHP split ADR-084 used); "view B" is the other. Both run the identical 5-beat
+    // outline→visible-face→hidden-face→visible-generators→hidden-generators sub-sequence
+    // (Method of Drawing.md §12.6) — ADR-087's fix for the old template treating "the other
+    // view" as a single undifferentiated beat.
+    const { firstIsHP, viewA: splitA, viewB: splitB } = methodViewSplit(set);
+    const viewA = firstIsHP
+      ? { flatten: flattenHP, color: hpCol, ...splitA }
+      : { flatten: flattenVP, color: vpCol, ...splitA };
+    const viewB = firstIsHP
+      ? { flatten: flattenVP, color: vpCol, ...splitB }
+      : { flatten: flattenHP, color: hpCol, ...splitB };
+
+    // ADR-091: which beat (if any) of THIS Set is mid-stroke-in right now — only the current
+    // frontier Set can ever be mid-reveal (everything behind it already drew in full and settled;
+    // everything ahead of it hasn't been reached), so this is a single index, not a per-beat map.
+    const animatingBeat = i === methodSet ? methodAnimBeat : -1;
+    const revealFor = (beatIdx) =>
+      animatingBeat === beatIdx ? { index: methodAnimIndex, t: methodAnimUnitT } : undefined;
+
+    // Beat gates (ADR-087's 15-beat template; beat 0 = the sheet-wide XY line above, drawn
+    // outside this loop). `shown > N` ⟺ the walkthrough has reached beat index N — same
+    // convention ADR-084 established (methodBeatsShown returns METHOD_BEAT_COUNT outright for
+    // any Set already fully behind the current one, so every gate below is trivially true there).
+    const showOutlineA = shown > 1;
+    const showFaceVisA = shown > 2;
+    const showFaceHidA = shown > 3;
+    const showGenVisA = shown > 4;
+    const showGenHidA = shown > 5;
+    const showProjectors = shown > 6;
+    const showOutlineB = shown > 7;
+    const showFaceVisB = shown > 8;
+    const showFaceHidB = shown > 9;
+    const showGenVisB = shown > 10;
+    const showGenHidB = shown > 11;
+    const showAxis = shown > 12;
+    const showLabels = shown > 13;
+
+    // ---- Beats 1-5: view A's own outline → visible face → hidden face → visible generators →
+    // hidden generators. The outline beat reads a SEPARATE harvested array (hpOutline/vpOutline,
+    // ADR-087) — a deliberate redundant copy of edges the visible-face/generator beats redraw a
+    // few beats later (see onOutlineHP's header in projectionDrawer.js for why that overlap is
+    // intentional, not a bug). ----
+    if (showOutlineA) strokeMethodLines(ctx, viewA.outline, viewA.flatten, viewA.color, undefined, undefined, undefined, revealFor(1));
+    if (showFaceVisA) strokeMethodLines(ctx, viewA.data, viewA.flatten, viewA.color, false, undefined, 'base', revealFor(2));
+    if (showFaceHidA) strokeMethodLines(ctx, viewA.data, viewA.flatten, viewA.color, true, undefined, 'base', revealFor(3));
+    if (showGenVisA) strokeMethodLines(ctx, viewA.data, viewA.flatten, viewA.color, false, undefined, 'generator', revealFor(4));
+    if (showGenHidA) strokeMethodLines(ctx, viewA.data, viewA.flatten, viewA.color, true, undefined, 'generator', revealFor(5));
+
+    // ---- Beat 6: projectors — vertical construction lines from each corner in the
+    // already-drawn view to its counterpart's position in the view about to appear, PLUS
+    // (i>0 only) the horizontal DERIVATION carry-over from the PREVIOUS Set's untouched view
+    // (ADR-092 — merged into this existing beat rather than a new one: viewA is already a
+    // direct rotated copy by the time this beat runs, nothing to derive before it; the actual
+    // derivation of "this Set from the last one" happens exactly here, once both this Set's
+    // own views exist to correlate against). Set 0 has no previous Set, so its horizontal half
+    // never draws. The Set2→Set3 (both-planes) transition used to draw a visibly diagonal line
+    // here — planMethodStages' old combined-Euler Set-3 pose didn't preserve the untouched view's
+    // height between those two Sets. Fixed at the SOURCE (ADR-093, projectSequentialBothPlanesPose
+    // in main.js), not here: Set 3 now composes as Set 2's own pose yawed about world-Y on top,
+    // which leaves every vertex's height exactly alone — so this beat draws the same real
+    // computed points as before and they now land flat for every Set transition, no special-
+    // casing needed in this drawing code.
+    // sheetHP.x === sheetVP.x (= −worldZ) for ANY point, so a corner's Top-view and
+    // Front-view sheet positions always share the same sheet-x — the vertical projector is
+    // exactly the vertical segment between them, never a diagonal point-to-point guess. ----
+    if (showProjectors) {
+      ctx.strokeStyle = refCol;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 2]);
+      const reveal = revealFor(6);
+      // Previous Set's SAME untouched-view flatten, rebuilt at ITS OWN dx — only used for i>0.
+      // "Untouched" for THIS Set is viewB (firstIsHP ? VP : HP) — same split already computed
+      // above for viewA/viewB, reused rather than re-derived.
+      const prevSet = i > 0 ? methodSets[i - 1] : null;
+      const prevDx = (i - 1) * (blockW + STAGE_GAP);
+      const prevProject = (p) => projectSheet({ x: p.x + prevDx, y: p.y });
+      const prevFlattenUntouched = firstIsHP
+        ? (x, y, z) => prevProject({ x: -z, y })       // untouched = VP (front)
+        : (x, y, z) => prevProject({ x: -z, y: -x });  // untouched = HP (top)
+      if (prevSet && prevSet.ann.labels.length !== set.ann.labels.length) {
+        console.warn(`Show Method: Set ${i} label count (${set.ann.labels.length}) != Set ${i - 1}'s (${prevSet.ann.labels.length}) — cross-Set correspondence assumption broken.`);
+      }
+      let idx = 0;
+      for (const lbl of set.ann.labels) {
+        if (reveal && idx > reveal.index) break;
+        const hp = flattenHP(lbl.x, lbl.y, lbl.z);
+        const vp = flattenVP(lbl.x, lbl.y, lbl.z);
+        let vx = vp.x, vy = vp.y;
+        if (reveal && idx === reveal.index) {
+          vx = hp.x + (vp.x - hp.x) * reveal.t;
+          vy = hp.y + (vp.y - hp.y) * reveal.t;
+        }
+        ctx.beginPath();
+        ctx.moveTo(hp.x, hp.y);
+        ctx.lineTo(vx, vy);
+        ctx.stroke();
+
+        // Cross-Set horizontal derivation — this Set's untouched-view point traces back to
+        // the SAME corner's position in the previous Set's SAME view (same row, different
+        // block). Reveals in lockstep with the vertical segment above (same idx/reveal.t) —
+        // one corner, one construction step, not two animation units.
+        if (prevSet && prevSet.ann.labels[idx]) {
+          const untouchedPt = firstIsHP ? vp : hp;
+          const pLbl = prevSet.ann.labels[idx];
+          const prevPt = prevFlattenUntouched(pLbl.x, pLbl.y, pLbl.z);
+          let ux = untouchedPt.x, uy = untouchedPt.y;
+          if (reveal && idx === reveal.index) {
+            ux = prevPt.x + (untouchedPt.x - prevPt.x) * reveal.t;
+            uy = prevPt.y + (untouchedPt.y - prevPt.y) * reveal.t;
+          }
+          ctx.beginPath();
+          ctx.moveTo(prevPt.x, prevPt.y);
+          ctx.lineTo(ux, uy);
+          ctx.stroke();
+        }
+
+        idx++;
+      }
+      ctx.setLineDash([]);
+    }
+
+    // ---- Beats 7-11: view B's own outline → visible face → hidden face → visible generators →
+    // hidden generators — the identical 5-beat sub-sequence beats 1-5 ran for view A. ----
+    if (showOutlineB) strokeMethodLines(ctx, viewB.outline, viewB.flatten, viewB.color, undefined, undefined, undefined, revealFor(7));
+    if (showFaceVisB) strokeMethodLines(ctx, viewB.data, viewB.flatten, viewB.color, false, undefined, 'base', revealFor(8));
+    if (showFaceHidB) strokeMethodLines(ctx, viewB.data, viewB.flatten, viewB.color, true, undefined, 'base', revealFor(9));
+    if (showGenVisB) strokeMethodLines(ctx, viewB.data, viewB.flatten, viewB.color, false, undefined, 'generator', revealFor(10));
+    if (showGenHidB) strokeMethodLines(ctx, viewB.data, viewB.flatten, viewB.color, true, undefined, 'generator', revealFor(11));
+
+    // ---- Beat 12: axis chain-line — genuinely LAST (Method of Drawing.md §12.6's own rule of
+    // thumb: "boundary → nearest visible face → hidden face/edges → axis line"), fixing ADR-084's
+    // draw-2-beats-too-early divergence. Both views are already fully drawn by this point
+    // (their own last beats, 5 and 11, are both < 12), so — unlike the old template — no showHP/
+    // showVP guard is needed here. ----
+    if (showAxis) {
+      ctx.strokeStyle = refCol;
+      ctx.lineWidth = 1;
+      ctx.setLineDash([]);
+      const reveal = revealFor(12);
+      let idx = 0; // shared across both passes below — HP's units are drawn/counted before VP's
+      const strokeAxisInto = (flattenFn) => {
+        for (let k = 0; k + 5 < set.ann.axis.length; k += 6) {
+          if (reveal && idx > reveal.index) return;
+          const a = flattenFn(set.ann.axis[k], set.ann.axis[k + 1], set.ann.axis[k + 2]);
+          const b = flattenFn(set.ann.axis[k + 3], set.ann.axis[k + 4], set.ann.axis[k + 5]);
+          let bx = b.x, by = b.y;
+          if (reveal && idx === reveal.index) {
+            bx = a.x + (b.x - a.x) * reveal.t;
+            by = a.y + (b.y - a.y) * reveal.t;
+          }
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(bx, by); ctx.stroke();
+          idx++;
+        }
+      };
+      strokeAxisInto(flattenHP);
+      strokeAxisInto(flattenVP);
+    }
+
+    // ---- Beat 13: corner labels — its OWN beat now (ADR-087 fixes ADR-084's labels-welded-to-
+    // axis divergence; Method of Drawing.md's own 5 steps don't mention labels at all — a
+    // Module-2 pedagogical addition, placed after the axis rather than inside it). ----
+    if (showLabels) {
+      drawMethodLabels(ctx, set.ann.labels, flattenHP, inkCol, labelFont, paper);
+      drawMethodLabels(ctx, set.ann.labels, flattenVP, inkCol, labelFont, paper);
+    }
+
+    // ---- ADR-089: no dimensions beat — Show Method is the construction walkthrough only; BIS
+    // Type-B dimensioning stays behind the live pane's own "Show dimensions" toggle. ----
+
+    // ---- Set caption: "Set N — <label>" replaces the per-view Top/Front/Side captions while
+    // the method runs (ADR-084 — 9 view captions at ~1/3 scale collide with the dimension
+    // numerals). Placed intrinsically below the block, same E/GAP-only inputs as everything
+    // else here — never a measured bbox of what this Set has actually drawn. ----
+    const captionY = -(blockH / 2 + GAP * 0.4);
+    const capPos = project({ x: blockLocalCenterX, y: captionY });
+    ctx.font = captionFont;
+    ctx.fillStyle = refCol;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText(`Set ${i + 1} — ${set.label}`, capPos.x, capPos.y);
+  }
 }
 
 const compare = {
@@ -2474,6 +3539,8 @@ const compare = {
   },
   hide() {
     if (!compareOpen) return;
+    // ADR-085: Show Method is its own independent takeover now and no longer opens Compare, so
+    // closing Compare has no reason to end it — abortShowMethod() call removed here.
     compareOpen = false;
     const wasSplit = workbenchOpen;
     if (wasSplit) exitWorkbench(); // tear the split down before the card vanishes
@@ -2532,6 +3599,31 @@ const compare = {
  * this sheet is where they now live). See the per-view bbox comment ahead of the draw calls
  * below for the placement math.
  */
+/** ADR-085 — Show Method's own repaint, targeting its independent takeover canvas
+ *  (#method-canvas). Mirrors drawCompare's canvas-sizing preamble exactly (DPR backing store,
+ *  paper fill) then hands off to drawMethodSheet, which is otherwise unchanged from ADR-084.
+ *  Compare's own drawCompare() no longer has a methodActive branch — the two surfaces are
+ *  fully independent post-ADR-085. */
+function drawMethodView() {
+  if (!methodCanvas) return;
+  const stage = methodCanvas.parentElement;
+  const w = stage?.clientWidth || 0;
+  const h = stage?.clientHeight || 0;
+  if (!w || !h) return;
+
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  methodCanvas.width = Math.round(w * dpr);
+  methodCanvas.height = Math.round(h * dpr);
+  const ctx = methodCanvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+
+  const paper = cssVar('--color-paper');
+  ctx.fillStyle = paper;
+  ctx.fillRect(0, 0, w, h);
+
+  drawMethodSheet(ctx, w, h);
+}
+
 function drawCompare() {
   if (!compareCanvas) return;
   const stage = compareCanvas.parentElement;
@@ -2929,16 +4021,8 @@ function setupComparePan() {
   let dragging = false;
   let lastX = 0;
   let lastY = 0;
-  let redrawQueued = false;
-
-  const queueRedraw = () => {
-    if (redrawQueued) return;
-    redrawQueued = true;
-    requestAnimationFrame(() => {
-      redrawQueued = false;
-      if (compareOpen) drawCompare();
-    });
-  };
+  // queueRedraw is module-scope — see its declaration beside the other Compare-sheet state
+  // above. (Show Method has its own queueMethodRedraw post-ADR-085 — fully independent.)
 
   compareCanvas.addEventListener('pointerdown', (e) => {
     dragging = true;
@@ -2994,6 +4078,74 @@ function setupComparePan() {
   }, { passive: false });
 }
 
+/** Bind Show Method's own takeover surface once at boot (ADR-085) — grabs #method-view/
+ *  #method-canvas and wires drag-to-pan + scroll-wheel zoom on the forked methodPanX/Y/
+ *  methodZoom state, entirely independent of setupComparePan/compareCanvas above. */
+function setupMethodView() {
+  methodViewEl = document.getElementById('method-view');
+  methodCanvas = document.getElementById('method-canvas');
+  setupMethodPan();
+}
+
+/** Drag-to-pan + scroll-wheel zoom on Show Method's own canvas — same shape as
+ *  setupComparePan(), forked onto methodPanX/Y/methodZoom + queueMethodRedraw so a drag on
+ *  either surface can never re-frame the other (ADR-085 Decision 3). Double-click recenters AND
+ *  un-zooms via resetMethodView (Show Method's own reset contract, not resetCompareView's). */
+function setupMethodPan() {
+  if (!methodCanvas) return;
+  let dragging = false;
+  let lastX = 0;
+  let lastY = 0;
+
+  methodCanvas.addEventListener('pointerdown', (e) => {
+    dragging = true;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    methodCanvas.setPointerCapture(e.pointerId);
+    methodCanvas.style.cursor = 'grabbing';
+  });
+  methodCanvas.addEventListener('pointermove', (e) => {
+    if (!dragging) return;
+    methodPanX += e.clientX - lastX;
+    methodPanY += e.clientY - lastY;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    queueMethodRedraw();
+  });
+  const endDrag = (e) => {
+    if (!dragging) return;
+    dragging = false;
+    if (methodCanvas.hasPointerCapture?.(e.pointerId)) {
+      methodCanvas.releasePointerCapture(e.pointerId);
+    }
+    methodCanvas.style.cursor = 'grab';
+  };
+  methodCanvas.addEventListener('pointerup', endDrag);
+  methodCanvas.addEventListener('pointerleave', endDrag);
+  methodCanvas.addEventListener('pointercancel', endDrag);
+  methodCanvas.addEventListener('dblclick', () => {
+    resetMethodView();
+    if (methodViewOpen) drawMethodView();
+  });
+
+  methodCanvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = methodCanvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const midX = rect.width / 2;
+    const midY = rect.height / 2;
+    const factor = Math.exp(-e.deltaY * 0.0015);
+    const nextZoom = Math.min(COMPARE_ZOOM_MAX, Math.max(COMPARE_ZOOM_MIN, methodZoom * factor));
+    if (nextZoom === methodZoom) return; // clamped — nothing to do
+    const k = nextZoom / methodZoom;
+    methodPanX = (mx - midX) * (1 - k) + methodPanX * k;
+    methodPanY = (my - midY) * (1 - k) + methodPanY * k;
+    methodZoom = nextZoom;
+    queueMethodRedraw();
+  }, { passive: false });
+}
+
 // ============================================================================
 // Platform API (CLAUDE.md "Platform contract")
 // ============================================================================
@@ -3016,6 +4168,13 @@ window.simAPI = {
     // Single reset path (CLAUDE.md): return to the EMPTY START + Step 1. Clear the
     // rotation modes, all revealed layers (labels, projections), and any fold, then
     // empty the scene and re-drive both the controls and the wizard.
+    // Show Method (ADR-085) torn down FIRST, via the SAME synchronous teardownShowMethod() every
+    // other exit path uses (no-op if it wasn't running) — this is what pairs window.simAPI's
+    // pause()/resume() correctly (a reset while the takeover is open must resume the loop, or
+    // the sim comes back from reset permanently frozen). Safe unconditionally now that teardown
+    // is synchronous (ADR-085 retired the collapse tween, so there is no pending onComplete that
+    // could fire after rebuild(null) and read/write stale state).
+    teardownShowMethod();
     compare.hide(); // no-op when closed; also tears the workbench split down first
     resetCompareView(); // ADR-054/055: hide() doesn't touch pan/zoom — a Reset must return the sheet to 1×/centred for the next open
     modes.faceInclinationHP = false;
@@ -3044,6 +4203,7 @@ window.simAPI = {
     rebuild(null); // empty: disposes solid + projection, clears labels (grids remain)
     ui?.sync();
     stepper?.reset();
+    methodController?.sync(); // reconcile its DOM against the hard teardown above
     announce('Simulation reset. Add a solid to begin.');
   },
 };
@@ -3097,6 +4257,19 @@ const simController = {
 
   /** Whether a solid currently exists (false on the empty start). */
   hasSolid: () => currentShapeData !== null,
+
+  /** The live solid's effective (post-rotation-hierarchy) angles — computeEffectiveAngles'
+   *  result against the CURRENT shapeData + modes, `null` before a solid exists. Was previously
+   *  internal-only (main.js's own rebuild() call). Show Method (methodController.js) needs this
+   *  to label Set-2/Set-3 with the ACTUAL axis angle a face-inclination problem resolves to —
+   *  the raw angleHP slider is not that angle (see computeEffectiveAngles' header). */
+  effectiveAngles: () => (currentShapeData ? computeEffectiveAngles(currentShapeData) : null),
+
+  /** The Problem Library's currently-loaded problem object (or null in free-explore) — see
+   *  activeProblemRef's declaration for why this is a separate channel from problemLibrary.js's
+   *  own ADR-083 return contract. problemLibrary.js calls setActiveProblem; nothing else should. */
+  activeProblem: () => activeProblemRef,
+  setActiveProblem(p) { activeProblemRef = p; },
 
   /** Canonical defaults — lets the dock show placeholder values on the empty
    *  start without importing the data layer (keeps uiManager a leaf). */
@@ -3160,6 +4333,59 @@ const simController = {
   /** Whether a textbook problem is currently loaded (drives the Step-6 button label). */
   isProblemActive: () => problemLibrary?.isActive?.() ?? false,
 
+  /** Show Method (ADR-084, container moved to its own takeover by ADR-085) — the narrow
+   *  surface methodController.js drives, mirroring problemLibrary.js's own leaf pattern (it owns
+   *  its own DOM/beat state and reaches the engine only through here). Implementations are free
+   *  functions elsewhere in this file (see the "SHOW METHOD" section, beside drawMethodView). */
+  method: {
+    /** Whether Show Method may be started right now: a solid exists, the sheet is flattened,
+     *  and the loaded problem's (or free-explore's) tier isn't 'base'/'corner-edge'. */
+    canRun: () => methodCanRun(),
+    /** Build every Set headlessly (once) and open the takeover at Set 1 / beat 1. */
+    begin: () => beginShowMethod(),
+    /** Normal completion — closes the takeover, resumes the sim loop, and resets its own
+     *  pan/zoom/focus state (ADR-085; no longer touches Compare's resetCompareView). */
+    end: () => endShowMethod(),
+    /** Learner edited Step 1/2 mid-method (stepper.js reflowFrom, or unfold) — engine-only
+     *  teardown (no-op if nothing is running). methodController's own DOM (.method-bar/chips,
+     *  the Step-6 button's hidden state) is NOT touched here — it reconciles itself reactively
+     *  the next time sync() runs (its onStateChange subscription, or the explicit refresh()
+     *  call stepper.js makes right after), by noticing `running` is stuck true while
+     *  isActive() has already gone false. This one-way flow (engine tears down → controller
+     *  reconciles) is what keeps this from being a second, competing teardown path. */
+    abort: () => abortShowMethod(),
+    /** Whether the engine considers a walkthrough currently active — methodController's sync()
+     *  uses this to detect an EXTERNAL teardown (stepper.js's abort, or a full sim reset) that
+     *  happened without going through its own Exit button / Next-when-done path. */
+    isActive: () => methodActive,
+    /** Advance/jump the walkthrough to a given (set, beat) — Next-button driven only; never
+     *  called by the focus chips (Decision 7, ADR-084 audit round 2). */
+    setProgress: (set, beat) => setMethodProgress(set, beat),
+    /** Set-N focus chip target, or `null` to frame the whole row. Purely visual — never moves
+     *  setProgress. */
+    setFocus: (i) => setMethodFocus(i),
+    /** Re-check whether the Step-6 trigger should be enabled — stepper.js calls this right
+     *  after flatten()/unflatten() (methodCanRun() depends on foldProgress, but flatten/
+     *  unflatten don't run through rebuild(), so they aren't covered by the onStateChange
+     *  subscription methodController already uses for angle-driven changes). */
+    refresh: () => methodController?.sync(),
+    /** Read-only summary for the chip UI: [{ label, reached }], reached = has this Set been
+     *  drawn at least once (mirrors stepper.js's one-way-back `current || complete` gate). */
+    sets: () => methodSetsSummary(),
+    /** ADR-090 — does (set, beat) actually add a mark to the sheet? methodController.js's
+     *  goNext/goBack loop past any beat this reports false for, so every click a learner makes
+     *  produces a visible change. `true` for an out-of-range Set (defensive; never expected). */
+    hasContent: (set, beat) => methodSets[set]?.contentBeats?.[beat] ?? true,
+    /** ADR-094 — the single source of truth `METHOD_BEAT_COUNT` this file keeps, exposed so
+     *  methodController.js can assert its own hand-duplicated `BEAT_COUNT` twin matches at init
+     *  instead of trusting the "these must move together" comment alone. */
+    beatCount: METHOD_BEAT_COUNT,
+    /** ADR-094 — plain-language caption for (set, beat), read from the same `trueShape`/label
+     *  data `methodContentBeats` already derives its A/B view split from. Never guesses at a
+     *  numeric position; out-of-range Set returns ''. */
+    beatLabel: (set, beat) => methodBeatLabel(set, beat),
+  },
+
   announce,
   flowNote,
 
@@ -3203,10 +4429,12 @@ function init() {
     setupQuickViews();
     setupConnectorToggle();
     setupCompareCard(); // Compare chip/card/expand-close + the workbench rail toggle
+    setupMethodView(); // Show Method's own takeover surface (ADR-085) — independent of Compare
     syncCompareChipVisibility(); // starts hidden — no views projected yet at boot
     ui = initUIManager(simController);
     stepper = initStepper(simController);
     problemLibrary = initProblemLibrary(simController); // textbook problem library + self-check
+    methodController = initMethodController(simController); // Show Method walkthrough (ADR-084)
     initTerms(); // wire the inline term-definition popovers (static markup)
     onboarding = initOnboarding(controls); // empty-state overlay + one-time orbit hint
 

@@ -110,7 +110,11 @@ export function initStepper(sim) {
    *  camera). */
   function goToStep(n, { announce = true } = {}) {
     currentStep = Math.min(Math.max(n, 1), TOTAL);
+    // First arrival at the terminal step = the lesson-complete signal (ADR-078 addendum).
+    // Computed BEFORE highestVisited absorbs this visit.
+    const firstArrival = currentStep === TOTAL && highestVisited < TOTAL;
     highestVisited = Math.max(highestVisited, currentStep);
+    if (firstArrival) sim.markComplete?.();
 
     const meta = STEPS[currentStep - 1];
 

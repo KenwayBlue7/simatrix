@@ -102,13 +102,14 @@ needs an extra token passes `tokens:{ key:'--css-var' }` to `initSim` and the en
 - **All paths relative** — `./src/pointData.js`, never `/src/...`. The folder may be served
   from any URL prefix.
 
-- **Fonts are bundled woff2** in `assets/fonts/` (Atkinson Hyperlegible 400/700, IBM Plex
-  Mono 400), loaded via `@font-face` in `src/shell.css` — no Google-Fonts CDN. Because the
-  stylesheet lives in `src/`, its font URLs are `../assets/fonts/…` (one level up). The pages
-  work offline after the first Three.js CDN fetch is cached.
+- **Fonts are served from Supabase Storage CDN** (Atkinson Hyperlegible 400/700, IBM Plex
+  Mono 400), loaded via `@font-face` in `src/shell.css` — never a Google-Fonts CDN (ADR-086,
+  reverses the prior bundled-local-woff2 rule). There is no local `assets/fonts/` anymore.
 
-- **Requires internet on first load** for the Three.js CDN fetch. Once cached by the browser
-  it works offline.
+- **Requires internet on first load** for the Three.js CDN fetch and the font fetch. Once cached
+  by the browser it works offline; a fresh visit without network still boots (system-font
+  fallback via `font-display: swap`, no hang) but renders fallback typography until/unless the
+  font fetch succeeds.
 
 ---
 
@@ -141,8 +142,6 @@ Module1/
 ├── CLAUDE.md           ← this file (architecture & conventions)
 ├── DESIGN.md           ← module-local premium-interaction spec (Compare View, fold camera, z ladder, chrome, motion)
 ├── Module 1 Premium Upgrade.md ← the increment-by-increment upgrade plan (historical record)
-├── assets/
-│   └── fonts/          ← bundled woff2 (Atkinson Hyperlegible 400/700, IBM Plex Mono 400)
 └── src/
     ├── engine.js       ← SHARED 3D + stepper engine: initSim(config) + the helper toolkit + live COL
     ├── shell.css       ← SHARED chrome: :root tokens, @font-face, #wizard/#sim-viewport shell, rail, controls, premium CSS
@@ -205,7 +204,7 @@ roundRect, setRange, setNote, announce, flowNote, showToast, toW, foldStateAt` a
 `LW` (line weights) and `COL` (colours).
 
 **`src/shell.css`** holds the chrome: `:root{}` tokens (including the `--z-*` ladder, `--color-success*`,
-and the premium motion keyframes), bundled `@font-face`, the
+and the premium motion keyframes), CDN-hosted `@font-face` (ADR-086), the
 `#wizard`/`#sim-viewport`/`.wizard-main`/`#step-card`/`#step-rail`/`.brand`/`.chapnav` shell,
 control primitives, `#term-pop`, and the premium component CSS injected by `chrome.js`
 (`.wizard-toggle`, `.vp-cluster` quick-views/connector/Compare chip, `.compare-card`, `.fa-symbol`,

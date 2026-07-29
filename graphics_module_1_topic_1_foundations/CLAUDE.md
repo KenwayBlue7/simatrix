@@ -156,7 +156,8 @@ graphics_module_1_topic_1_foundations/
 ├── meta.json             ← platform metadata (title, description, difficulty, tags)
 ├── CLAUDE.md             ← THIS plan
 ├── DESIGN.md             ← topic design tokens/spec (to add; inherits ../DESIGN.md)
-├── assets/fonts/         ← bundled woff2 (as Module 2)
+│                          (fonts: @font-face served from Supabase Storage CDN, ADR-086 —
+│                           no local assets/fonts/ anymore)
 └── src/
     ├── main.js           ← orchestrator: scene, OrbitControls, single rebuild(), rAF loop,
     │                       window.simAPI, the on-orbit (rAF-throttled) visible/hidden re-classify

@@ -143,10 +143,11 @@ Every rule is formatted:
 > `simAPI.reset()`. *(ADR-002, CLAUDE.md)*
 
 > **§2.10 ❌ NEVER** add `postMessage`, `window.parent`, or `window.top` usage anywhere **except**
-> the single sanctioned `window.parent.postMessage({ type: 'sim:ready' }, '*')` fired once from
-> `markBooted()`. The host↔sim surface is `window.simAPI` + `meta.json` for control, plus that one
-> outbound boot signal — nothing else, and no inbound `message` listener. *(ADR-002, ADR-078,
-> ARCHITECTURE.md §6)*
+> the two sanctioned outbound messages: `window.parent.postMessage({ type: 'sim:ready' }, '*')`
+> fired once from `markBooted()`, and `window.parent.postMessage({ type: 'sim:complete' }, '*')`
+> fired once from `markComplete()` when the lesson reaches its finished state. The host↔sim surface
+> is `window.simAPI` + `meta.json` for control, plus those two outbound signals — nothing else, and
+> no inbound `message` listener. *(ADR-002, ADR-078, ARCHITECTURE.md §6)*
 
 > **§2.11 ✅ DO** ship a `meta.json` at the root with all four fields — `title`, `description`,
 > `difficulty`, `tags`. Uploads missing any field are rejected. *(ADR-002, CLAUDE.md)*
@@ -154,16 +155,24 @@ Every rule is formatted:
 > **§2.11a ❌ NEVER** use a capitalised difficulty value in meta.json. The backend requires
 > exactly: `beginner`, `intermediate`, or `advanced` (all lowercase). *(PLATFORM-RULES.md §1.11a)*
 
-> **§2.12 ❌ NEVER** make a runtime network call beyond the one-time Three.js CDN fetch; the sim must
-> work fully offline once loaded. *(ADR-002, CLAUDE.md)*
+> **§2.12 ❌ NEVER** make a runtime network call beyond the one-time Three.js CDN fetch and the
+> font fetch from Supabase Storage (§2.15); the sim must work fully offline once those load.
+> *(ADR-002, ADR-086, CLAUDE.md)*
+> Note: since ADR-086, first-load typography is no longer guaranteed offline — see §2.15.
 
 > **§2.13 ✅ DO** render only a dismissible "Best experienced on desktop" banner below 768px — never
 > block, redirect, or disable the sim. *(CLAUDE.md)*
 
 > **§2.14 ✅ DO** make the sim self-starting on page load; there is no external `init()` call. *(CLAUDE.md)*
 
-> **§2.15 ✅ DO** bundle fonts as local `woff2` (Atkinson Hyperlegible + IBM Plex Mono) loaded via
-> `@font-face`; **never** use a Google-Fonts CDN. *(ARCHITECTURE.md §7, CLAUDE.md)*
+> **§2.15 ✅ DO** load fonts (Atkinson Hyperlegible + IBM Plex Mono) via `@font-face` pointed at
+> the Supabase Storage CDN (ADR-086, reverses the prior "bundle local woff2, never CDN" rule);
+> **never** point at a Google-Fonts CDN or any other third-party font host. *(ARCHITECTURE.md §7,
+> DESIGN.md §3.1, ADR-086)*
+> Reason: web-team directive to centralize font hosting instead of duplicating the same three
+> files in every module/topic's `assets/fonts/`. Tradeoff: first-load typography now depends on
+> reaching Supabase; `font-display: swap` keeps the fallback safe (system font, no hang) but the
+> sim's typography is no longer guaranteed correct fully offline on first load (§2.12).
 
 > **§2.16 ✅ DO** keep a packaged Module 2 payload ≤ 10 MB — prefer `.glb` over `.gltf+bin`, `.webp`
 > over `.png`/`.jpg`, and skip HDR environments. *(CLAUDE.md)*
@@ -762,8 +771,9 @@ Every rule is formatted:
 - ❌ Use the UMD global, `@latest`, or unpinned `three`. *(§2.2)*
 - ❌ Write extensionless or absolute-path imports. *(§2.4, §2.5)*
 - ❌ Open the sim from `file://` or assume port 80 works. *(§2.6)*
-- ❌ Add `postMessage`/`window.parent`/`window.top` beyond the one sanctioned `sim:ready` boot
-  signal, a second reset path, or any non-CDN network call. *(§2.9, §2.10, §2.12, ADR-078)*
+- ❌ Add `postMessage`/`window.parent`/`window.top` beyond the two sanctioned outbound signals
+  (`sim:ready` boot, `sim:complete` lesson-finish), a second reset path, or any non-CDN network
+  call. *(§2.9, §2.10, §2.12, ADR-078, ADR-086)*
 - ❌ Install puppeteer/playwright, or verify against a hand-typed replica instead of the shipped module. *(§2.17, §2.19)*
 - ❌ Add `three-mesh-bvh` via npm/a bundler, or pin it to `@latest` instead of the shared import map. *(§2.20)*
 

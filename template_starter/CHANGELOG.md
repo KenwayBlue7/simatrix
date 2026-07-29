@@ -3,6 +3,9 @@
 Notable changes to this template. (Module 2's history was intentionally not carried over —
 this changelog starts fresh, per MODULE-STARTER §3.2.)
 
+## 2026-07-28
+- Added: a new `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` once, fired on first arrival at the terminal step (step 3) — the host's second sanctioned outbound signal, for a "next topic / stay" overlay (ADR-078 addendum), so every future topic minted from this template inherits it. (`main.js`, `src/stepper.js`.)
+
 ## 2026-07-27
 - Changed: the Problem Library overlay's title now centers in its header row (was hard-left) — a 44px spacer counterweights the close button so it stays corner-anchored (ADR-082), and future topics minted from this template inherit it. (`index.html`.)
 

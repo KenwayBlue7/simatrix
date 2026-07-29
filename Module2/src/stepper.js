@@ -235,6 +235,11 @@ export function initStepper(sim) {
 
   function reflowFrom(step) {
     if (step < 6 && state.flattened) {
+      // Show Method (ADR-084) depends on the flatten this branch is about to reverse — tear
+      // it down FIRST (before sim.unflatten()), same reasoning as this branch's own existing
+      // order: the edit should be visible in 3D, and a running walkthrough pointed at a sheet
+      // that's about to stop existing would otherwise be left stranded mid-beat.
+      sim.method.abort();
       sim.unflatten();
       state.flattened = false;
       renderRail();
@@ -304,12 +309,15 @@ export function initStepper(sim) {
     state.flattened = true;
     sim.announce('Planes folded flat into the 2D orthographic drawing.');
     renderRail(); renderActions(); renderNav();
+    sim.method.refresh(); // ADR-084: Show Method's trigger becomes available now flattened=true
   }, listen);
   btnUnfold?.addEventListener('click', () => {
+    sim.method.abort(); // no-op if it wasn't running — same guard as reflowFrom's own call
     sim.unflatten();
     state.flattened = false;
     sim.announce('Unfolded back to the 3D view.');
     renderRail(); renderActions(); renderNav();
+    sim.method.refresh(); // trigger becomes unavailable again now flattened=false
   }, listen);
 
   // Step 6 — TOGGLE the BIS Type-B dimension layer on the top + front views (ADR-041).

@@ -2,6 +2,16 @@
 
 All notable changes to this topic. Format loosely follows Keep a Changelog.
 
+## [0.1.23] — 2026-07-28 — Host lesson-complete signal
+
+### Added
+- A new `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` once, fired on first
+  arrival at the terminal step (step 6) — the host's second sanctioned outbound signal, for a
+  "next topic / stay" overlay (ADR-078 addendum). This topic is a conceptual tour with no answer
+  gates, so there is no in-sim payoff moment to ride alongside; the hook is a plain first-arrival
+  guard, the same `highestVisited` idiom the sibling Spatial Framework topic already used for its
+  own toast. (`main.js`, `src/stepper.js`.)
+
 ## [0.1.22] — 2026-07-25 — Tighter default 3D camera framing
 
 ### Changed

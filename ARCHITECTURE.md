@@ -359,6 +359,19 @@ into the orchestrator directly.
   driven by `main.js`'s state-change notifications. **Imports:** `problems.js` + the
   injected controller. **Provides:** `initProblemLibrary(sim)`.
 
+- **`methodController.js`** (ADR-084 pedagogy, ADR-085 container) — "Show Method": a
+  Step-6 walkthrough that replays the loaded problem's construction as 2-3 side-by-side
+  Sets (simple position → one axis resolved → both), one construction beat at a time
+  via Next/Back, plus Set-N focus chips. It draws into its OWN independent, focus-
+  trapped, full-viewport takeover (`#method-view`/`#method-canvas` in `index.html`) —
+  mirroring `problemLibrary.js`'s own overlay shell — NOT the Compare card; the sim
+  loop pauses while it's open, same contract as the Problem Library. Back/Next/Exit
+  float bottom-centre and the Set-N chips float top-right, overlaying the drawing
+  directly; there is no title bar. **Imports:** nothing (injected controller only — the
+  headless per-Set projection pipeline itself lives in `main.js`, reusing
+  `meshAnalyzer.js`/`projectionDrawer.js`/`vertexLabeler.js`'s exports). **Provides:**
+  `initMethodController(sim)` → `{ sync, dispose }`.
+
 - **`terms.js`** — The inline glossary popovers (dotted-underline terms like "HP",
   "VP" that explain themselves on hover/focus/tap). **Imports:** nothing. **Provides:**
   `initTerms()`.
@@ -391,8 +404,8 @@ into the orchestrator directly.
 
 - **`index.html`** (~102 KB) — The single page. It holds the **import map** pinning
   `three@0.160.0`, a small inline boot-watchdog script (shows an on-brand fallback if
-  the module fails to load, via `__simBootTimer`), the bundled `@font-face`
-  declarations, **all of the CSS and design tokens inline in one big `<style>`
+  the module fails to load, via `__simBootTimer`), the CDN-hosted `@font-face`
+  declarations (ADR-086), **all of the CSS and design tokens inline in one big `<style>`
   block**, the complete wizard/viewport markup (step card, rail, sliders, toggles,
   mobile notice), and finally loads
 
@@ -401,10 +414,22 @@ into the orchestrator directly.
   anything else runs. `main.js` must call `markBooted()` **last**, and only on a
   fully successful boot, which (1) flips `__simBooted = true` and clears the
   watchdog, (2) hides the `#sim-fallback` UI, and (3) once `document.fonts.ready`
-  resolves, posts `{ type: 'sim:ready' }` to `window.parent` — the one signal the
-  host loading screen waits on. A new topic that skips this step leaves the host
-  loader guessing; cloning `template_starter/main.js`'s `markBooted()` verbatim is
-  the required starting point.
+  resolves, posts `{ type: 'sim:ready' }` to `window.parent` — the signal the host
+  loading screen waits on. A new topic that skips this step leaves the host loader
+  guessing; cloning `template_starter/main.js`'s `markBooted()` verbatim is the
+  required starting point.
+
+  **Mandatory completion signal (ADR-078 addendum):** a sibling `markComplete()`,
+  called once when the lesson reaches its own finished state (the trigger point is
+  topic-specific — a stepper's terminal-step arrival, a fold, a flatten — but the
+  emitted function body is byte-identical across every topic, the same pattern as
+  `markBooted()`), posts `{ type: 'sim:complete' }` to `window.parent` so the host
+  can surface its "next topic / stay" overlay. It is latched on `window.__simComplete`
+  and, unlike the in-sim celebration UI it often rides alongside, is **not** re-armed
+  by `simAPI.reset()` — a replayed lesson never re-fires the outbound message. One
+  topic, `graphics_module_2_topic_1_introduction`, omits `markComplete()` entirely —
+  it is a free-browse anatomy gallery with no steps and no "finished" state to hook
+  (a deliberate exclusion, not an oversight; see the ADR-078 addendum).
   `main.js` as an ES module. (Note: Module 2 keeps its CSS *inline* here, unlike
   Module 1 — see §8.)
 
@@ -436,9 +461,9 @@ frame, so the seven pages cannot drift apart.
   (`alb`/`albBox`/`acr`) rather than a separate `vertexLabeler.js`.
 
 - **`src/shell.css`** (~53 KB) — The shared stylesheet: the `:root` design tokens,
-  bundled `@font-face`, the wizard/viewport shell, all control styling, and the CSS
-  for the chrome that `chrome.js` injects. (Module 2 has no equivalent file — it keeps
-  this same material inline in `index.html`.)
+  CDN-hosted `@font-face` (ADR-086), the wizard/viewport shell, all control styling,
+  and the CSS for the chrome that `chrome.js` injects. (Module 2 has no equivalent
+  file — it keeps this same material inline in `index.html`.)
 
 ### Leaf modules (analogous to Module 2's)
 
@@ -583,24 +608,33 @@ deliberate, narrow exception: a single outbound boot-ready signal (ADR-078).
   only on a fully successful boot — fires
   `window.parent.postMessage({ type: 'sim:ready' }, '*')` after `document.fonts.ready`
   resolves, so the host's loading screen can close exactly when the scene is
-  displayable rather than guessing from the iframe's `load` event (ADR-078). This is
-  the sim's **only** outbound message; it never listens for inbound `message` events.
+  displayable rather than guessing from the iframe's `load` event (ADR-078).
+- **The sim announces its own lesson completion.** `markComplete()` — called once,
+  when the topic-specific "finished" trigger fires — posts
+  `window.parent.postMessage({ type: 'sim:complete' }, '*')`, so the host can surface
+  its "next topic / stay" overlay (ADR-078 addendum). These are the sim's **only two**
+  outbound messages; it never listens for inbound `message` events. One topic
+  (`graphics_module_2_topic_1_introduction`, a free-browse gallery with no "finished"
+  state) emits `sim:ready` only.
 - The sim makes **no runtime network calls** beyond the initial Three.js CDN fetch,
   assumes **no same-origin access**, and uses only **relative asset paths**, so it can
   be served from any URL prefix the host chooses.
 
 **What crosses the boundary:** control signals from host → sim (`pause`/`resume`/
 `reset` calls into the iframe's `window.simAPI`), the static `meta.json` metadata the
-host reads, and the one sim → host `sim:ready` boot signal. That is the entire surface.
+host reads, and the two sim → host signals, `sim:ready` (boot) and `sim:complete`
+(lesson finish). That is the entire surface.
 
-**What is NOT in this codebase:** beyond the single sanctioned `sim:ready` emit, there
-is **no other `postMessage` and no `window.parent`/`window.top` usage anywhere in the
-repository** (verified by search across all folders; ADR-002, narrowed by ADR-078). So
+**What is NOT in this codebase:** beyond the two sanctioned emits (`sim:ready`,
+`sim:complete`), there is **no other `postMessage` and no `window.parent`/`window.top`
+usage anywhere in the repository** (verified by search across all folders; ADR-002,
+narrowed by ADR-078). So
 the actual host-side code that reaches into the iframe and calls `simAPI.*`, and the
-code that listens for `sim:ready` to close the loading screen, lives in the separate
-host website, which is not part of this repository. The exact wiring of *how* the host
-invokes `simAPI.*` (e.g. `iframe.contentWindow.simAPI.pause()`) **could not be
-confirmed from code — needs review** against the host project.
+code that listens for `sim:ready`/`sim:complete` to drive the loading screen and the
+next-topic overlay, lives in the separate host website, which is not part of this
+repository. The exact wiring of *how* the host invokes `simAPI.*` (e.g.
+`iframe.contentWindow.simAPI.pause()`) **could not be confirmed from code — needs
+review** against the host project.
 
 ---
 
@@ -624,7 +658,8 @@ Confirmed identical or common by reading the files:
 - **The build/runtime contract is identical everywhere:** no build step, no
   `package.json`; ES modules loaded via an import map pinned to **`three@0.160.0`**
   from jsDelivr; `.js` extensions required on imports; all paths relative; fonts
-  bundled as local `woff2` (Atkinson Hyperlegible + IBM Plex Mono) — no Google Fonts.
+  served from the Supabase Storage CDN (Atkinson Hyperlegible + IBM Plex Mono),
+  never a Google-Fonts CDN (ADR-086, reverses the prior bundled-local-woff2 rule).
 - **Platform dependencies (pinned CDN ES modules).** The only runtime library every
   sim loads is **`three@0.160.0`** (plus `three/addons/`). One topic adds a **second**
   pinned dependency in the *same* import map: **`three-mesh-bvh`** — used by

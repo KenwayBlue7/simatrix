@@ -170,24 +170,24 @@ reduced opacity plus a lock icon**.
 ## 3. Typography
 
 **Body / UI font:** **Atkinson Hyperlegible** (fallback `system-ui, -apple-system, BlinkMacSystemFont,
-"Segoe UI", Roboto, sans-serif`), bundled as subset `woff2`.
+"Segoe UI", Roboto, sans-serif`), served as subset `woff2` from the Supabase Storage CDN (ADR-086).
 **Numeric font:** **IBM Plex Mono** (fallback `ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono",
-Consolas, "Liberation Mono", monospace`), bundled alongside.
+Consolas, "Liberation Mono", monospace`), served alongside.
 
-These two are the **only** fonts loaded anywhere. **No external font CDN** (Google Fonts, Typekit, etc.) is
-referenced in any module — confirmed by audit.
+These two are the **only** fonts loaded anywhere. Both are served from Supabase Storage — a
+single shared CDN location, not a third-party font service (ADR-086).
 
 ### 3.1 Where the fonts are hosted
 
-Bundled `woff2`, loaded via `@font-face` with `font-display: swap`. Three faces only:
-Atkinson Hyperlegible 400, Atkinson Hyperlegible 700, IBM Plex Mono 400. The files
-(`atkinson-hyperlegible-latin-400-normal.woff2`, `…-700-normal.woff2`,
-`ibm-plex-mono-latin-400-normal.woff2`) live in each module's **`assets/fonts/`** and are present in both.
+Served from Supabase Storage CDN, loaded via `@font-face` with `font-display: swap` (ADR-086 —
+reverses the prior bundled-local-woff2/no-CDN rule). Three faces only: Atkinson Hyperlegible 400,
+Atkinson Hyperlegible 700, IBM Plex Mono 400, all under one path:
+`https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/…`.
 
-- **Module 2:** `@font-face` is declared in `index.html`; URLs are `./assets/fonts/…` (the HTML is at the
-  module root).
-- **Module 1:** `@font-face` is declared in `src/shell.css`; because the stylesheet lives one level down in
-  `src/`, its URLs are **`../assets/fonts/…`**. *(Module-specific path detail, §7 — not a violation.)*
+Every module and topic declares the identical `@font-face` block in place — 12 in `index.html`
+(module/topic root) and one in `Module1/src/shell.css`. Because the URLs are absolute, there is no
+longer a `./` vs `../` path distinction between them (the old per-module path detail this section
+used to document no longer applies — all 13 blocks are now byte-identical).
 
 ### 3.2 When each font is used (hierarchy)
 
@@ -626,8 +626,8 @@ A module adds its own domain encodings and viewport behaviour **here**, never by
   formerly `--color-host-white` — retired, §4.2) applies to `#step-card`, `#active-problem`,
   `.problem-card`, and the `.problem-library` backdrop; the `.vp-hint`/spotlight chips sit on the
   grey `--color-panel` chrome surface.
-- `@font-face` URLs are `./assets/fonts/…` (HTML at module root). UI DOM ownership: `uiManager.js` owns the
-  parameter dock.
+- `@font-face` URLs point at the Supabase Storage CDN (ADR-086 — no more local `./assets/fonts/…`).
+  UI DOM ownership: `uiManager.js` owns the parameter dock.
 - Pressable chips/toggles all use `scale(0.97)` (`.wizard-toggle:active`, `.quick-view:active`,
   `.connector-toggle:active`, `.btn:active`, etc.).
 
@@ -651,8 +651,10 @@ A module adds its own domain encodings and viewport behaviour **here**, never by
   card is addressed by **class** (`.step-card`), and the surface applies to `.step-card`, `#active-problem`,
   `.problem-card`, the `.problem-library` backdrop, and the `.compare-card` frame; `.vp-hint`/spotlight
   chips sit on the grey `--color-panel` chrome surface.
-- `@font-face` is declared in `src/shell.css`, so font URLs are **`../assets/fonts/…`** (stylesheet one level
-  down). UI DOM ownership: the engine + `chrome.js` own the chrome; `src/uiManager.js` is a vestigial stub.
+- `@font-face` is declared in `src/shell.css`; its URLs now point at the same Supabase Storage CDN
+  as every other module (ADR-086) — the old `../assets/fonts/…` one-level-down path distinction no
+  longer applies. UI DOM ownership: the engine + `chrome.js` own the chrome; `src/uiManager.js` is
+  a vestigial stub.
 - **The no-transform invariant** (§4.4) is required by the Compare card's `position:fixed` placement.
 
 ### 7.3 Module 3 Topic 1 — Sections of Solids

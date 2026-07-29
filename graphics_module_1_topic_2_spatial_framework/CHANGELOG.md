@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-07-28
+- Added: a new `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` once, fired on first arrival at the terminal step (step 5) alongside the existing "Spatial Framework completed!" toast — the host's second sanctioned signal, for a "next topic / stay" overlay (ADR-078 addendum). (`src/main.js`, `src/stepper.js`.)
+
 ## 2026-07-24
 - Added: `markBooted()` now posts `{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` resolves — the host loading screen's boot-ready signal (ADR-078, narrows ADR-002). (`src/main.js`.)
 

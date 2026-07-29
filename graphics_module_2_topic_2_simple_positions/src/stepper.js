@@ -303,6 +303,9 @@ export function initStepper(sim) {
     sim.flatten();
     state.flattened = true;
     sim.announce('Planes folded flat into the 2D orthographic drawing.');
+    // The flattened 2D drawing is this lesson's finish line (ADR-078 addendum);
+    // markComplete() self-latches, so re-flattening after an unflatten is a no-op.
+    sim.markComplete?.();
     renderRail(); renderActions(); renderNav();
   }, listen);
   btnUnfold?.addEventListener('click', () => {

@@ -75,9 +75,10 @@ access and makes no runtime network calls beyond the CDN. Harder/constraint: the
 button **must** route through `simAPI.reset()` — there is exactly one reset path, no second one.
 The actual host-side code that calls `simAPI.*` lives in the separate host repo and is **not
 verifiable here** (ARCHITECTURE.md §6 flags the exact wiring as "needs review").
-**Status:** Narrowed by ADR-078 — the blanket "no `postMessage`" ban no longer holds; one sanctioned
-outbound message (`sim:ready`) is now part of the contract. `window.simAPI` remains the sole
-*inbound* control surface; nothing here about `simAPI`/`meta.json`/the reset-path rule changes.
+**Status:** Narrowed by ADR-078 (and its 2026-07-28 addendum) — the blanket "no `postMessage`" ban
+no longer holds; two sanctioned outbound messages (`sim:ready`, `sim:complete`) are now part of the
+contract. `window.simAPI` remains the sole *inbound* control surface; nothing here about
+`simAPI`/`meta.json`/the reset-path rule changes.
 
 ---
 
@@ -2805,6 +2806,59 @@ both are superseded by the split topics, so a decision on their live-embed statu
 to whoever owns them rather than assumed here.
 **Status:** Active
 
+**Addendum (2026-07-28): a second sanctioned outbound message, `sim:complete`.** The host gained a
+second need — a "next topic / stay" overlay it can only show once it knows the learner *finished*
+the lesson, not merely that the iframe booted. This addendum extends the ADR-078 contract (not a
+new ADR — same decision, same mechanism, a second trigger point) to a second message:
+`window.parent.postMessage({ type: 'sim:complete' }, '*')`, fired from a new `markComplete()`
+sitting beside `markBooted()`. `markComplete()`'s body is byte-identical across every topic that
+carries it (verified by hash), the same parity property as `markBooted()`:
+```js
+function markComplete() {
+  if (window.__simComplete) return;
+  window.__simComplete = true;
+  window.parent.postMessage({ type: 'sim:complete' }, '*');
+}
+```
+**Fires at most once per page load; the `window.__simComplete` latch is deliberately NOT cleared by
+`simAPI.reset()`** — replaying a finished lesson never re-opens the host overlay. This is a
+considered departure from several topics' own in-sim celebration toasts (e.g.
+`graphics_module_1_topic_4_understanding_orthographic_views`'s `lessonCompleteShown`, which *does*
+re-arm on stepping back off the terminal step): the in-sim UI is free to re-celebrate on every
+visit, but the outbound signal to the host is a one-time event, because a host overlay that could
+reopen mid-session would be a worse experience than one that never returns after the first win.
+The payload stays bare (`{ type: 'sim:complete' }`, no topic id or metadata) to preserve
+`sim:ready`'s byte-parity property — the host already knows which iframe it loaded and can
+attribute the event itself.
+
+**Call-site placement varies by topic, same as `markBooted()`'s per-topic call site does** — each
+topic hooks its own existing notion of "finished" rather than a uniform signal, on the reasoning
+that the most honest completion signal is the topic's real payoff moment, not a generic "reached
+the last step" click-through:
+- `graphics_module_1_topic_1_foundations`, `..._topic_2_spatial_framework`, `..._topic_3_points`,
+  `..._topic_4_understanding_orthographic_views`, `..._topic_6_projection_of_straight_lines`, and
+  `graphics_module_2_topic_2_simple_positions` hook an existing semantic payoff already latched
+  in-sim (a dimension reveal, first arrival at a stepper's terminal step, a first fold/rabatment,
+  a first flatten).
+- `graphics_module_1_topic_5_projection_of_line_types`, `graphics_module_3_topic_1_sections_of_solids`,
+  `graphics_module_3_topic_2_development_of_surfaces`, and `template_starter` have no such payoff
+  (a conceptual tour with no answer gates, or a terminal step whose own arrival *is* the payoff), so
+  they use a uniform "first arrival at the terminal step" guard instead, the same
+  `highestVisited`/`visited`-Set idiom `graphics_module_1_topic_2_spatial_framework`'s stepper
+  already used for its own in-sim toast.
+- Several topics' "Complete & next problem" button (`completeAndNext()`) was deliberately **not**
+  used as the hook — that action calls `simAPI.reset()` in the same click, which would fight the
+  "never re-arm" rule above; the fold/flatten/dimension-reveal moment that precedes it is the real
+  finish line.
+
+**Excluded: `graphics_module_2_topic_1_introduction`.** This topic is a free-browse anatomy
+gallery with no stepper, no steps, and no progress tracking (`src/gallery.js` tracks no
+visited/viewed set) — there is no "finished" state to hook without inventing a completion rule
+(e.g. "all 11 solids viewed"), which is a product decision, not something this pass should assume.
+It continues to emit `sim:ready` only. `Module1/`, `Module2/` stay out of scope for the same reason
+ADR-078 deferred them originally.
+**Status:** Active
+
 ---
 
 ## ADR-079: The Lines topics' 3D reference planes are OFFSET into the used quadrant, sized to the typed-field ceiling, overturning the earlier 60→24 `SHEET` shrink's stated rationale
@@ -3138,6 +3192,613 @@ remain undocumented as generic members — addable by any future topic without c
 Known follow-up, not part of this ADR: whether Module 1's shared engine leaf should eventually move
 to the 1-arg form is an open question for a separate ADR.
 **Status:** Active
+
+---
+
+## ADR-084: Show Method lays its construction Sets SIDE BY SIDE on the 2D Compare sheet; ADR-053's scale-lock and ADR-054's anchor extend to an n-Set nominal layout
+
+**Date:** 2026-07-27
+**Decision:** Step 6's "Show Method" walkthrough replays a problem's textbook construction as 2 or 3
+*Sets* (successive poses of the same solid) on the existing Canvas2D Compare sheet. The Sets are drawn
+SIDE BY SIDE, all visible at once, matching the change-of-position convention every textbook and exam
+answer uses — not replaced in place. That requires `drawCompare()` to size for n drawings instead of
+one, which touches the two ADRs that currently assume a single drawing. Both are EXTENDED, not
+reversed; neither ADR's own text is edited.
+
+- **Extends ADR-053 (scale-lock).** ADR-053's invariant is "`scale` derives ONLY from the solid's
+  intrinsic 3D size (`solidSpanUnits`) and never from the live drawn bbox." That invariant is
+  PRESERVED verbatim. What changes is the nominal layout the intrinsic size is measured against:
+  `nomWmm` becomes `(n·blockW + (n−1)·STAGE_GAP) · WORLD_TO_MM`, with
+  `blockW = E + (showSideViewFlag ? GAP + E : 0)` and `STAGE_GAP = GAP = E·0.35`. Every input is
+  still `E`, `GAP`, `showSideViewFlag` and a Set count — all distance- and angle-independent
+  constants. No live bbox is introduced anywhere, including for the per-Set focus targets (below).
+  This is legitimate because a Set is the SAME solid at a different pose: `solidSpanUnits` is a
+  bounding-sphere diameter read off LOCAL geometry before `position`/`quaternion` apply, so it is
+  provably identical for every Set. One scale serves all of them.
+- **Extends ADR-054 (balanced anchor).** ADR-054 centres the nominal layout rather than the world
+  origin. The same reasoning now carries the Set row:
+  `anchorSX = (showSideViewFlag ? (E+GAP)/2 : 0) + (n−1)·(blockW + STAGE_GAP)/2`, `anchorSY = 0`.
+  Same intrinsic-only inputs, same "changes only when base/height resize the solid" guarantee.
+- **n is gated on `methodActive`, and the transition is TWEENED.** The sheet is 1-wide in ordinary
+  use and expands to n-wide only while Show Method runs. Sizing for 3 permanently would shrink the
+  ordinary single-drawing case by ~3× for a feature most sessions never open; snapping between the
+  two would jump `scale` and `anchorSX` visibly. So a `methodSpread` 0→1 tween feeds a continuous
+  `nEff = 1 + (n−1)·methodSpread` into BOTH formulas, and each Set's `dx = i·(blockW+STAGE_GAP)·
+  methodSpread`. The Sets slide apart from a stack; `scale` moves continuously with them and lands
+  on exactly the intrinsic value at both ends. The honest cost this ADR accepts: while Show Method
+  runs, the drawing IS ~3× smaller than normal. That is what the per-Set focus chips exist for.
+- **Captions follow the Set, not the view, while the method runs.** The per-view Top/Front/Side
+  captions are suppressed and each block carries one `Set N — <label>` caption instead; 9 view
+  captions at the reduced scale collide with the dimension numerals. The per-view captions return
+  unchanged on exit.
+- **Per-Set focus is intrinsic too.** A Set's focus target is its block centre, derived from the same
+  `E`/`GAP`/`showSideViewFlag`/index inputs — never a measured bbox of what was actually drawn.
+  Tighter framing from a live per-Set bbox was rejected specifically because it would reintroduce the
+  live-bbox coupling ADR-053 removed. Focus drives `comparePanX/Y` + `compareZoom` only (ADR-054/055
+  screen-space lens), so it composes with the scale-lock instead of fighting it.
+- **On method exit, `resetCompareView()` fires.** `nEff` returning 3→1 changes both `scale` and
+  `anchorSX`; a pan/zoom left pointing at where Set 3 used to be would strand the single drawing
+  off-frame. `resetCompareView()` gains a third call site (fresh open, dblclick, sim reset → plus
+  method exit) and also clears `focusSet`.
+
+**Why:** A learner comparing Set 2 against Set 1 needs both on screen — that comparison IS the
+pedagogy of a change-of-position problem, and it is how the answer is drawn on real exam paper.
+Replace-in-place would have kept the sheet large but destroyed the comparison. Extending the two
+layout ADRs was preferable to carving out an exception because their actual invariant (intrinsic,
+never live-bbox) survives untouched — only a constant in the nominal layout became a variable.
+**Alternatives rejected:** (a) *Size for 3 Sets always* — rejected, penalises every ordinary session
+for a feature most never open. (b) *Snap n on enter/exit* — rejected, a visible scale jump reads as a
+bug. (c) *Replace-in-place, one Set at a time* — rejected, destroys the side-by-side comparison that
+is the whole point. (d) *Per-Set live-bbox framing for tighter focus* — rejected, reopens ADR-053's
+original coupling.
+**Consequences:** ADR-055 (zoom) and ADR-018 (`WORLD_TO_MM`) are untouched and compose unchanged.
+ADR-056's analytic pinning RULE is unchanged but now applies PER SET: each Set draws its own XY at
+`sheetY=0` and its own X1-Y1 at `sheetX=−z0ᵢ`, both offset by that Set's `dx`. `z0` is genuinely
+per-Set (it derives from the pose's world bbox, `main.js:892`), so reading the live `ppHingeGroup`
+would misplace every Set but the live one. ADR-052's "no projector lines on the sheet" de-clutter
+rule gains a scoped exception: projectors ARE drawn during Show Method, because "project across from
+the previous view" is a construction beat — they are gone again the moment the method exits.
+**Status:** Superseded by ADR-085
+
+---
+
+## ADR-085: Show Method moves out of the Compare sheet into its own iframe-scoped full-screen takeover view
+
+**Date:** 2026-07-27
+**Decision:** Show Method is no longer an extension of the 2D Compare sheet. It becomes a dedicated
+full-viewport takeover, scoped to the sim's own iframe — `position: fixed; inset: 0` at
+`--z-overlay`, following the `.problem-library` precedent exactly — and NOT the browser Fullscreen
+API: the sim stays inside its `window.simAPI` sandbox boundary and never requests chrome outside the
+iframe. This SUPERSEDES ADR-084's container decision. ADR-084's pedagogical content is retained
+wholesale and re-hosted:
+
+- **Retained verbatim.** The headless per-Set projection pipeline (`projectSetPose` →
+  `buildEdgeMap` → `drawProjections` → harvest → `dispose()` in the same tick), the fixed 7-beat
+  template, the per-Set `z0`, the corner-label and axis-chain beats built from `planAnnotations`/
+  `chainPositions`, the n-Set side-by-side layout, and the "Set label only" caption. Verified
+  reusable without internal edits: `drawMethodSheet(ctx, w, h)` takes its surface as parameters and
+  reads no Compare DOM.
+- **Retained as sizing law, no longer as an extension of ADR-053/054.** Scale stays intrinsic-only
+  (`solidSpanUnits`/`E`/`GAP`/`showSideViewFlag`/Set count, never a live bbox) and the anchor stays
+  the nominal Set-row centre. Because the takeover owns its own surface, these formulas no longer
+  co-exist with the single-drawing path, so **ADR-053 and ADR-054 revert to governing the ordinary
+  Compare sheet alone**; their n-Set generalisations move here, unchanged in form.
+- **`methodSpread` retires.** The 0→1 spread tween existed only to morph one shared sheet between
+  1-wide and n-wide without a visible `scale` jump (ADR-084 bullet 3). A dedicated container has no
+  1-wide state to morph from: `nEff` is simply the Set count (2 or 3), `dx` is fixed, and the
+  delayed-collapse teardown retires with it. The entrance flourish reuses the Problem Library's
+  existing `libraryIn` slide-and-fade rather than bespoke logic.
+- **The sim loop pauses while the view is open.** `window.simAPI.pause()` on open / `resume()` on
+  close, matching the `.problem-library` contract — the 3D scene is fully covered, so rendering it
+  is wasted GPU and battery. The known consequence is accepted deliberately: `simAPI.pause()`
+  cancels the rAF that `anim.js`'s `tick()` rides, so no `anim.js` tween can run inside this view.
+  The one interaction that used one — Set-focus zoom — becomes an **instant snap**. Building a
+  second, independent rAF-driven animation path for a single interaction was rejected as worse than
+  the snap.
+- **Compare's coupling is removed entirely.** `enterWorkbench(keepFlattened)`,
+  `compare.show(keepFlattened)` and `simController.openCompare` are deleted; `enterWorkbench`'s
+  forced unflatten is unconditional again, restoring its ADR-037/080 invariant ("the left pane
+  always shows the 3D pictorial"). The `teardownShowMethod` unflatten-on-exit block is deleted too —
+  it existed only to undo the `keepFlattened` suspension, and outside Compare it would spring the
+  learner's own Step-6 flatten back to 3D unbidden. Show Method's pan/zoom/focus fork from
+  `comparePanX/Y`/`compareZoom`/`focusSet` into its own variables with their own reset, so a drag on
+  either surface can never re-frame the other.
+- **Chrome moves onto the sheet.** The `Set X of Y — <description>` title bar is REMOVED. Back /
+  Next / Exit method become a floating control bar, bottom-centre, overlaying the drawing; the
+  Set-1/2/3 focus chips a separate floating group, top-right. Focus stays purely visual and never
+  moves the sequence (ADR-084 Decision 7, unchanged). The Set-label text the removed bar carried
+  moves into the `announce()` string, so screen-reader parity survives its deletion.
+- **Abort-on-edit retires on the controller side, stays on the stepper side.** Under ADR-084 the
+  Step 1/2 drivers were re-parented into `#workbench-rail` and left fully live during the
+  walkthrough, which is why `methodController.js` had to bind its own rail listener. The takeover
+  never opens the split, so the rail is never built, the drivers stay in the covered wizard, and
+  that listener is deleted. `stepper.js`'s `sim.method.abort()` calls in `reflowFrom` and on Unfold
+  are KEPT as no-op invariant guards: the overlay blocks the pointer, but only the focus trap keeps
+  Tab out, and a trap gap must not leave an un-abortable edit path.
+- **The `foldProgress === 1` trigger gate is unchanged.** It was always a pedagogical sequencing
+  choice — build fold intuition live, first — not a consequence of needing the flattened sheet's
+  container. The container correction does not touch that reasoning.
+
+**Why:** ADR-084 put Show Method inside the Compare split because that is where the 2D sheet lived.
+Live testing the same day surfaced a container mismatch the design could only paper over: (a) the
+Step-6 trigger and the sheet it draws on can never be visible together, forcing `begin()` to open
+Compare itself; (b) that open forcibly unflattened the very state `methodCanRun()` requires, forcing
+a `keepFlattened` flag through four functions; (c) the split leaves all 8 geometry drivers live
+beside a walkthrough a single slider nudge invalidates, forcing a second abort listener; and (d)
+sharing the sheet forced a `methodSpread` morph tween purely to hide a scale jump. Every one is a
+symptom of borrowing a container built for a different job. A dedicated surface removes all four at
+once rather than adding a fifth compensation.
+**Alternatives rejected:** (a) *Keep it in Compare and fix the symptoms individually* — rejected,
+each fix threaded a new parameter or listener through code with no other reason to know Show Method
+exists. (b) *Browser Fullscreen API* — rejected, crosses the `window.simAPI` sandbox boundary the
+platform contract draws around the iframe. (c) *A new Step 7* — rejected, Show Method reviews Step
+6's answer, it is not a further construction step. (d) *Keep sharing pan/zoom/focus with Compare* —
+rejected, a drag on one surface would silently re-frame the other. (e) *A second rAF pump so tweens
+survive the pause* — rejected, a whole parallel animation path for one zoom interaction.
+**Consequences:** ADR-084 is Superseded. ADR-053/054 revert to governing only the ordinary
+single-drawing Compare sheet. ADR-056's analytic pinning rule still applies per Set. ADR-052's "no
+projectors on the sheet" de-clutter rule keeps ADR-084's scoped exception — projectors are a
+construction beat and exist only inside this view. No `anim.js` tween may be added to this view
+while the pause contract holds; any future motion here must be CSS or an instant state change.
+**Status:** Active
+
+## ADR-086: Platform fonts move from bundled local woff2 to Supabase Storage CDN
+
+**Date:** 2026-07-27
+**Decision:** Every module and topic's `@font-face` rule for Atkinson Hyperlegible (400/700) and
+IBM Plex Mono (400) now points at a public Supabase Storage bucket
+(`https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/…`)
+instead of a local `./assets/fonts/*.woff2` file. This **reverses** the local-bundled-font clause
+of RULES.md §2.15 / PLATFORM-RULES.md §1.15 (and the offline-capability rule they sat beside,
+§2.12/§1.12), which had mandated bundled woff2 + "never use a Google-Fonts CDN" specifically to
+guarantee full offline rendering after first load. The rule is not being re-argued — the web team
+directed the reversal to centralize font hosting in one Supabase-backed location instead of
+maintaining 13 byte-identical copies (39 files) scattered across every module/topic folder.
+
+**What changed:** the `@font-face` `src` in all 13 declaration sites (12 module/topic
+`index.html` files plus `Module1/src/shell.css`) now points at the CDN; each block is otherwise
+unchanged (family, weight, style, `font-display: swap`). All 39 local `.woff2` files and all 13
+`assets/fonts/` directories were deleted (each `assets/` folder held nothing else, so it was
+removed too where it went empty). The three font files themselves are unchanged — same subset,
+same bytes — only their hosting location moved.
+
+**Why:** web-team directive to centralize static asset hosting on Supabase Storage rather than
+duplicate the same three files in every module folder. One authoritative copy is easier to update
+(a subset/format change now ships from one place) and removes 39 duplicated binaries from the repo.
+
+**Consequences (tradeoff accepted):** the sim **no longer renders correct typography fully
+offline on first load** without network access to Supabase — this is the direct reversal of the
+old guarantee. `font-display: swap` means there is no hang or blank-text risk: the system-font
+fallback paints immediately and the real face swaps in once/if the CDN fetch resolves; on a
+network failure the fallback simply stays. A secondary effect: ~10 topics gate first paint on
+`document.fonts.ready` (e.g. `graphics_module_1_topic_3_points/main.js`, "*Gated on
+document.fonts.ready so the host never reveals us mid-FOUT*") — that promise now settles on a
+network round-trip instead of disk. It cannot hang (the promise settles on fetch failure too via
+`swap`), but a slow or absent connection now measurably delays first reveal where it previously
+never would. No JS was changed to compensate; this is accepted as part of the same tradeoff.
+Process note: the initial repo-wide grep for `@font-face`/`assets/fonts`/`.woff2` missed 5
+`CLAUDE.md` file-tree references to the old bundled-font layout — caught only by a follow-up full
+sweep after the first edit pass. Future doc-wide reversals of a platform-wide rule should budget
+for a second grep-and-fix pass before considering the doc sweep complete.
+**Status:** Active
+
+---
+
+## ADR-087: Show Method's beat template is rewritten to follow Method of Drawing.md's actual draw sequence — outline, then visible/hidden face, then visible/hidden generators, per view, axis last
+
+**Date:** 2026-07-27
+**Decision:** ADR-084's 7-beat template (0 XY/X1-Y1 · 1 true-shape view, all visible lines at once
+· 2 projectors · 3 the other view + side view, bundled · 4 axis + corner labels, bundled · 5 hidden
+dashes, all views at once · 6 dimensions) was audited against the authoritative textbook spec
+("Method of Drawing.md", Section 12.6) and found to diverge on every beat but the first and last.
+The spec's 5-step sequence (outline → visible base/face → hidden base/face → generators
+visible-then-hidden → axis, explicitly LAST) groups by **feature, then visibility**; the shipped
+template grouped by **visibility across a whole view**, which is the transpose and cannot be
+reached by reordering the existing 7 beats. Replaced with a **15-beat-per-Set** template, applied
+per view:
+
+`xy (sheet-wide, ADR-088) → outline(A) → visible face(A) → hidden face(A) → visible
+generators(A) → hidden generators(A) → projectors → outline(B) → visible face(B) → hidden
+face(B) → visible generators(B) → hidden generators(B) → axis (last, both views) → labels →
+dimensions`
+
+Two new edge classifiers were needed to make this representable, added in `meshAnalyzer.js` /
+`projectionDrawer.js` (shared with the live 3D pane, not method-only code):
+
+- **Outline** — the front/back straddle test (an edge is on the 2D outline iff its incident faces
+  include one facing the observer and one not, or it has only one incident face at all). This is
+  NOT `EdgeType.SILHOUETTE` (a purely 3D, orbit-invariant classification) — it is a new per-plane,
+  per-view test alongside the existing `visibleInHP/VP/PP`. Outline edges are a strict SUBSET of
+  each view's visible edges, so the outline beat and the later visible-face/generator beats
+  legitimately redraw the same lines — accepted deliberately, matching how a learner re-traces the
+  outline before adding detail, rather than suppressing the overlap.
+- **Base vs. generator** — every Module 2 solid is generated upright about local +Y (CLAUDE.md);
+  since each Show Method stage's pose matrix is rigid (translate + quaternion + unit scale, no
+  shear), an edge is classified by `|dot(normalize(p2−p1), worldAxis)|` against a tolerance:
+  ≈0 → base/cap edge, ≈1 (or any non-zero slant) → generator. `worldAxis` is `(0,1,0)` rotated by
+  the stage's own quaternion, so the test is correct for every stage without re-deriving per shape.
+
+**Why:** the whole point of Show Method is to teach the textbook's own drawing procedure; a beat
+template that groups by the wrong axis cannot demonstrate that procedure regardless of caption
+text. The spec's "outermost lines first, axis last" rule (Method of Drawing.md §12.6, restated as
+its own rule of thumb) is unambiguous and was being violated on 5 of 7 beats.
+**Alternatives rejected:** (a) *Keep 7 beats, reorder only* — rejected, the grouping axis itself is
+wrong (visibility-across-view vs. feature-then-visibility), no reorder of the existing beats
+reaches the spec sequence. (b) *Merge visible+hidden generators into one beat* (13/Set, 39 clicks)
+and (c) *also merge axis+labels* (12/Set, 36 clicks) — both considered to hold the per-Set click
+count down; rejected because the target sequence explicitly names "generators [visible/hidden
+split]" and folding labels back into the axis beat re-creates the exact divergence (corner labels
+welded to the axis beat) this ADR fixes. 15 beats/Set, mitigated by ADR-088's Skip-to-next-Set
+control, was accepted as the faithful reading.
+**Consequences:** Click cost per full walkthrough rises to `15 × Set count` (30 for a 2-Set
+problem, 45 for a 3-Set problem), up from `7 × Set count` under ADR-084. `METHOD_BEAT_COUNT`
+(`main.js`) and its hand-duplicated twin `BEAT_COUNT` (`methodController.js`, header note explains
+the duplication is deliberate) both become 15 in the same change — they must never drift, or
+`goNext`'s beat-boundary math desyncs from `drawMethodSheet`'s gates. The live 3D pane gains the
+same outline/base/generator classifiers (shared leaf modules) but its own rendering is
+UNCHANGED — colour and line width there still key off `hidden` only, the new `kind` tag is
+Show-Method-only consumption for now. Supersedes ADR-084's beat template (§3) specifically; ADR-084's
+other pedagogy (per-Set headless pipeline, n-Set side-by-side layout, "Set label only" caption)
+is untouched.
+**Status:** Active
+
+---
+
+## ADR-088: Show Method drops the Side (PP) view from its walkthrough; the XY reference line becomes one sheet-wide stroke instead of one per Set
+
+**Date:** 2026-07-27
+**Decision:** Two layout changes to the Show Method takeover (`drawMethodSheet`, `main.js`),
+independent of ADR-087's beat re-sequencing:
+
+1. **Side view removed from the replay.** `showSideViewFlag` — which gated the PP view, its
+   generators, and the X1-Y1 reference line inside the method's own sizing/draw functions
+   (`drawMethodSheet`, `setMethodFocus`) — is replaced by a Show-Method-local `false` at every one
+   of its 5 call sites in those two functions. `drawCompare()`'s own (unrelated) uses of the live
+   flag are untouched — the ordinary Compare sheet still shows the side view exactly as before.
+   The side view itself is NOT removed from the sim: Step 5 still reveals it live on the 3D pane;
+   only its replay inside the Show Method walkthrough is dropped. This shrinks the takeover's
+   nominal layout (`blockW` drops its `showSideViewFlag ? GAP + E : 0` term, roughly halving),
+   which — per ADR-053's intrinsic-only scale law, unchanged — makes every Set draw at roughly 2×
+   the on-screen size. `projectSet`'s per-Set PP harvest and `z0` computation are left in place
+   (harmless, still feed the live 3D pane's own projection); only the METHOD REPLAY's consumption
+   of them is dropped.
+2. **One sheet-wide XY line, not one per Set.** ADR-084's Consequences committed to "each Set draws
+   its own XY at sheetY=0 … offset by that Set's dx" — correct under the n-Set side-by-side layout,
+   but redundant: `drawMethodSheet`'s own `project()` maps sheet-y through an anchor at `y=0` for
+   every Set (`dx` only ever perturbs sheet-x), so every Set's XY line was already landing on the
+   identical screen row. The per-Set loop is replaced with one stroke computed once, before the
+   per-Set loop runs, spanning the full intrinsic row width
+   (`[blockLocalCenterX − blockW/2 … (n−1)(blockW+STAGE_GAP) + blockLocalCenterX + blockW/2]` —
+   `E`/`GAP`/Set-count only, no live bbox). This is STRICTLY TIGHTER than ADR-053's existing
+   invariant, not a new exception: the line's length no longer depends on which views have been
+   drawn so far, only on the same intrinsic constants the block layout itself already uses.
+   X1-Y1 needed no equivalent change — it retires along with the side view (point 1).
+
+**Why:** point 1 removes the last thing the Show Method surface drew that the spec (Method of
+Drawing.md) never asked for and that ADR-087's beat budget can't afford per-view. Point 2 corrects
+a redundant per-Set computation that was never actually producing per-Set output — the "own XY per
+Set" framing in ADR-084 assumed a visual outcome that the shared `anchorSY=0` anchor was already
+preventing.
+**Alternatives rejected:** (a) *Keep the side view, absorb it into ADR-087's per-view beat
+sequence* (adds a third view's worth of outline/face/generator beats — 15 beats/Set becomes ~21) —
+rejected as disproportionate for a view the spec's Section 12.5/12.6 change-of-position procedure
+doesn't itself dimension. (b) *Union-of-bboxes XY span instead of intrinsic* — legal under ADR-056
+(position analytic, length may track drawn content) but rejected as strictly worse: the intrinsic
+span is simpler, already-available, and doesn't grow/shrink beat-to-beat as views appear.
+**Consequences:** Marks ADR-084's Consequences sentence "each Set draws its own XY … offset by that
+Set's dx" (`DECISIONS.md`, ADR-084) and ADR-085's "retained verbatim" bullet's implicit inclusion
+of the per-Set X1-Y1 line as **superseded** for Show Method specifically — ADR-084's n-Set side-by-
+side layout itself (scale-lock, anchor, captions) is untouched. ADR-053/054's intrinsic-only law is
+unchanged and, per point 2, is now honoured by one more surface (the XY line) than before.
+**Status:** Active
+
+---
+
+## ADR-089: Show Method drops its dimensions beat and the "(N of 45)" step counter
+
+**Date:** 2026-07-28
+**Decision:** Two changes to the takeover, found while diagnosing a report that a live desktop
+session showed almost no solid geometry at beat 42/45 of a both-planes walkthrough — the actual
+root cause turned out to be that the session "verifying" ADR-087/088 as working had run inside an
+MCP headless tab (`document.hidden === true`, 0 native `requestAnimationFrame` callbacks measured
+in 600ms), so `queueMethodRedraw()`'s plain-rAF repaint had never actually executed; the "verified"
+report was never watching real output. Re-verifying with a synchronous frame-pump (`requestAnimationFrame`
+replaced with a manually-flushed queue) showed the beat pipeline itself — `projectSet`'s harvest,
+the beat gates in `drawMethodSheet` — drawing correctly. Two real defects surfaced alongside that
+false-confidence finding, fixed here:
+1. **Dimensions beat removed** (was beat 14/Set, `showDims`/`strokeMethodLines(...hpDimLines...)`
+   block in `drawMethodSheet`). Show Method is the construction-method walkthrough; BIS Type-B
+   dimensioning is a separate, already-shipped concern behind the live pane's own "Show dimensions"
+   toggle (ADR-041) — bundling it into the replay taught the wrong lesson (that dimensioning is
+   part of *drawing method*) and cost a beat on every Set. `projectSet`'s `hpDimLines/vpDimLines/
+   hpDimTris/vpDimTris/hpDimLabels/vpDimLabels` harvest, and the now-single-caller
+   `harvestTriGroup`/`harvestLabelGroup` helpers, are deleted with it — nothing else read them.
+   `METHOD_BEAT_COUNT` (`main.js`) and its hand-duplicated twin `BEAT_COUNT` (`methodController.js`)
+   both drop 15 → 14; ADR-087's other 13 beats and their gate thresholds are untouched (the removed
+   beat was strictly last).
+2. **Step counter text removed from the Next button.** `methodController.js`'s `renderProgress()`
+   set `nextBtn.textContent` to `` `Next step (${flatIndex()+1} of ${totalBeats()})` ``; now just
+   `'Next step'` (`'Done'` on the last beat, unchanged). Matches `RULES.md`'s platform-wide
+   step-counter-weight guidance — the count added noise without adding orientation the Set-N focus
+   chips don't already give.
+
+**Why:** both were in-scope, low-risk cleanups found in the same investigation, not separate asks
+requiring their own audit — the counter was pure display logic and the dimensions beat's removal
+doesn't change any other gate's numbering (it was already last).
+**Alternatives rejected:** *Keep the dimensions beat but gate it behind a per-Set toggle* —
+rejected as unnecessary complexity for content that already has a dedicated, discoverable control
+on the live pane.
+**Consequences:** Click budget per full walkthrough drops to `14 × Set count` (28/42 for 2-/3-Set
+problems, down from 30/45). See ADR-090 for the further, pose-dependent reduction from auto-skipping
+empty beats.
+**Status:** Active
+
+---
+
+## ADR-090: Show Method's Next/Back skip beats that add no mark to the sheet
+
+**Date:** 2026-07-28
+**Decision:** Same investigation as ADR-089 surfaced a second, independently real defect: for a
+pose where a given view has no edge of a particular hidden/generator combination (e.g. a prism
+square-on to a plane casts no dashed generator there), that beat's gate in `drawMethodSheet` passes
+but draws zero new segments — the repaint is a byte-for-byte repeat of the previous frame. Measured
+directly (pixel + draw-call diff across a full 45-beat walkthrough, pre-ADR-089): 3 of 45 beats
+were exactly identical to the one before. This is what "Next sometimes does nothing" was — not a
+stuck click or a desynced counter, a genuine no-op repaint the learner has no way to distinguish
+from a broken button.
+
+Fix: `projectSet()` (`main.js`) now computes a `contentBeats: boolean[14]` table per Set at
+`begin()` time — one entry per beat index, `true` iff that beat's own harvested array (the same
+`data.hp/vp/hpOutline/vpOutline` arrays `drawMethodSheet` itself reads, filtered by the same
+`hidden`/`kind` split as `strokeMethodLines`) is non-empty; beat 0 (the Set's caption reveal) is
+always `true`. Exposed read-only via `sim.method.hasContent(set, beat)`. `methodController.js`'s
+`goNext`/`goBack` loop past any beat this reports `false` for (both directions, for symmetry — a
+one-directional skip would make Back land back on the beat Next just skipped past, the same
+"nothing happened" complaint mirrored).
+**Why:** computing content-presence from the SAME harvested arrays the draw call reads (rather than
+e.g. re-simulating `drawMethodSheet`'s gate logic separately) is what keeps this from drifting out
+of sync with what the sheet actually draws — one data source, two consumers.
+**Alternatives rejected:** *Detect emptiness by diffing consecutive canvas frames at runtime* —
+rejected, requires a real paint to have already happened (expensive, and reintroduces exactly the
+document.hidden fragility this investigation started from) where the harvested-array check is free
+and available the instant `begin()` builds `methodSets`.
+**Consequences:** Click budget is now pose-dependent (≤ `14 × Set count`, less whenever a Set has
+no hidden geometry on some sub-beat). `sets()`'s existing `reached` semantics (ADR-084 Decision 7)
+are untouched — a Set is "reached" the moment its first beat draws, regardless of how many of its
+interior beats get skipped.
+**Status:** Active
+
+---
+
+## ADR-091: Show Method's lines stroke in one at a time, sequentially, per beat
+
+**Date:** 2026-07-28
+**Decision:** ADR-087/088 draw each beat's whole batch of lines in one shot — correct data, but it
+pops in as a static group rather than reading as construction. This was the actual pedagogical
+requirement from when the feature was first scoped: within a beat, each individual stroked line
+draws in over ~0.2-0.4s, one after another, before the beat is considered finished.
+
+`drawMethodSheet` (`main.js`) already iterates every beat's harvested segments as a flat sequence
+of atomic `moveTo→lineTo→stroke()` calls (`strokeMethodLines`'s own `k`-loop, the projector loop,
+`strokeAxisInto`'s two passes) — that iteration order IS the animation-unit granularity; no new
+data shape was needed; `strokeMethodLines` gained an optional `reveal: {index, t}` param (draw
+units `0..index-1` in full, unit `index` lerped from its start point by `t`, stop — omitted, this
+is exactly the old full-draw behaviour, so every non-animating call site is provably unchanged).
+
+Only ONE beat can ever be mid-reveal — the current frontier (`methodSet`, `methodBeat`); everything
+behind it already settled, everything ahead hasn't been reached — so a flat set of module vars
+(`methodAnimBeat/-Index/-UnitT`) carries the state, no per-beat map. `setMethodProgress` compares
+the new flat beat-index to the old: forward (Next) starts a fresh reveal (`startMethodBeatAnim`,
+one `tween()` spanning the whole beat linearly across units so each gets an equal slice, `easeDraw`
+reshaping each unit's own reveal — same curve `setProjectionsVisible`'s draw-on already uses);
+anything else (Back, skip, focus jump) snaps straight to fully-drawn, matching how those already
+behaved. Clicking Next again mid-reveal calls `stopMethodBeatAnim()` first — cancels the tween,
+sets `methodAnimBeat = -1` — so the in-flight beat's remaining units render in full on the very
+next paint, then the new beat's reveal starts; Next is never disabled while a beat animates.
+
+**Reused, not reinvented:** the tween/tick primitives are anim.js's existing shared ones (the same
+helper the live pane's Step 4/5/6 draw-on reveals already use). But `animate()`'s own `tickTweens`
+call is paused for Show Method's entire lifetime (ADR-085 pauses the sim loop — the 3D scene is
+fully covered) — reusing `active`'s shared Set is still safe (nothing else can be tweening while
+paused) but nothing would ever call `tick()` to drain it. `main.js` therefore pumps its own,
+independent `requestAnimationFrame` loop (`methodAnimFrame`) only while a beat is actually
+animating, started by `startMethodBeatAnim` and torn down by `stopMethodBeatAnim` (also called from
+`teardownShowMethod`, so Exit/Escape mid-reveal leaves nothing running).
+**Why:** an opacity-fade "draw-on" (the live pane's own cheaper substitute, see
+`setProjectionsVisible`'s header) was rejected here — Show Method draws on a plain Canvas2D sheet,
+where a true per-line length reveal is a lerp of two numbers, not the "per-segment dash trickery"
+LineSegments2/LineMaterial would need; there was no reason to take the cheaper, worse-reading
+option when the real one was this inexpensive.
+**Verification note:** this environment's MCP browser tab cannot render a genuinely-visible
+foreground tab (`document.hidden === true`, confirmed again on a fresh tab — see ADR-089); native
+`requestAnimationFrame` here fires once as an apparent input-driven catch-up frame and then goes
+silent, so real elapsed-time playback could not be observed end-to-end. What WAS verified natively
+(no synthetic pump): opening Show Method, a rapid 37-click Next walkthrough to "Done" with zero
+gaps between clicks (the most aggressive possible exercise of the cancel-and-restart path), and a
+5-click Back walk, all with zero console errors and correct button/state transitions throughout.
+The actual ~0.2-0.4s-per-line visual timing needs confirming in a real, foregrounded desktop
+browser tab — flagged explicitly rather than claimed.
+**Alternatives rejected:** *Group-opacity fade-in per beat* (matches the live pane's existing
+draw-on) — rejected, reads as a beat "appearing," not "being drawn," which is exactly what this ADR
+exists to fix. *A per-beat map of reveal state* — rejected, over-engineered: only the current
+frontier beat is ever reachable in a mid-reveal state by construction, so a single flat set of vars
+sufficed and is simpler to reason about than a Map that could only ever hold one entry.
+**Consequences:** a learner who waits watches each beat's lines draw in one at a time; a learner who
+clicks through quickly sees the same instant-advance experience as before (Next was never gated on
+animation completing). `methodBeatUnitCount`/`methodViewSplit` (`main.js`) are new pure helpers a
+third call site needed — `methodViewSplit` is shared with `drawMethodSheet`'s own viewA/viewB
+construction; `methodContentBeats` (ADR-090) keeps its own, pre-existing independent copy of the
+same split, left untouched rather than risking already-verified beat-skip logic for a style-only
+refactor.
+**Status:** Active — visual timing pending the user's own foregrounded-tab confirmation.
+
+## ADR-092: Show Method's cross-Set derivation lines merge into the existing "projectors" beat
+
+**Date:** 2026-07-28
+**Decision:** The audited plan for cross-Set projection/derivation lines (Sets 2/3 shown as
+*derived* from the previous Set, not appearing fully-formed) proposed a new beat inserted before
+each subsequent Set's own outline/face/generator sequence. Corrected before implementation: view A
+is already a direct rotated copy the moment it's traced, so there is nothing to derive before it —
+the real derivation moment is exactly where the existing beat-6 "projectors" beat already sits
+(after view A, before view B). Merged instead of adding a beat: `BEAT_COUNT`/`METHOD_BEAT_COUNT`
+and `methodController.js` are unchanged; Set 0's projectors beat is untouched (no previous Set to
+draw from), and Sets 1+ gain additional content in that SAME beat — the existing within-Set
+vertical projector line, plus (i>0) a new horizontal line from the previous Set's untouched-view
+point to this Set's own (`drawMethodSheet`, `main.js`).
+**Why:** which view is "active" (view A, just resolved) vs. "untouched" (view B, carried over) at
+each transition is already fully derivable from `methodViewSplit`'s existing `firstIsHP`/viewA/
+viewB split (built from `set.trueShape`, itself from `trueShapeForPlane`) — no new per-problem
+field was needed. And every Set's harvested data (`ann.labels`, world-space) is already retained
+for the walkthrough's entire lifetime (`methodSets = plans.map(projectSet)` at `begin()`), so the
+previous Set's points are already sitting in memory when the current Set's beat 6 runs — nothing
+to restructure. Merging into the existing beat was strictly smaller than a new one and needed
+neither change.
+**Correspondence guard:** the line-pairing assumes `set.ann.labels[k]` and `prevSet.ann.labels[k]`
+name the same vertex (same corner, same label order) across Sets — true because both are built by
+the same `planAnnotations` call against the same `currentMesh.geometry`, but asserted rather than
+assumed: a `console.warn` fires if the two Sets' label counts ever differ.
+**Alternatives rejected:** *A new beat before each Set's own sequence* (the original audited
+plan) — rejected once the merge was seen to need no new beat index, no `BEAT_COUNT` bump, and no
+`methodController.js` change, all of which the new-beat plan would have required. *Restructuring
+`methodSets` from `.map` to a loop* (considered mid-audit, in case draw-time needed the previous
+Set's data before it existed) — rejected/retracted: `.map` already builds every Set before any
+paint call runs, so the data is always available by the time beat 6 draws.
+**Consequences:** the derivation line is not guaranteed pixel-flat by construction — see ADR-093,
+which found (and fixed) that the both-planes Set2→Set3 transition initially drew visibly diagonal
+because of a pose-model property, not a bug in this beat's drawing code.
+**Status:** Active.
+
+## ADR-093: Show Method's both-planes Set 3 computes its pose sequentially, not as one combined Euler
+
+**Date:** 2026-07-28
+**Decision:** ADR-092's cross-Set derivation line drew visibly diagonal for the both-planes
+Set2→Set3 transition (verified on `sqpyr-both`: label heights diverged up to 0.866 units). Root
+cause, confirmed analytically before any code changed: `planMethodStages`' Set-3 pose used the
+combined-Euler shortcut `overrides: {}` → the SAME single Euler (`iShape.js` `applyShapeTransform`,
+order `'ZXY'`) the live solid uses, computed FROM THE ORIGINAL UPRIGHT SHAPE with both angles set
+at once. Because order `'ZXY'` applies the VP (Z) lean before the HP (X) tilt, adding the second
+angle re-derives the whole pose from scratch rather than building on Set 2's own — a genuine
+structural property of the "manual dual-angle decomposition" (self-flagged in that function's own
+comment as an accepted simplification), not floating-point noise.
+Added `projectSequentialBothPlanesPose` (`main.js`), used ONLY when `planMethodStages` attaches a
+new `sequential: {firstPlane, firstAngle, secondAngle}` marker to Set 3's plan (both-planes tier):
+it builds Set 2's pose the normal way (the same `applyShapeTransform` call everyone else uses,
+called here read-only), then yaws that quaternion about world-Y by the second angle — reproducing
+the real textbook auxiliary-view technique (tip to the first plane, THEN turn the already-tipped
+solid about the true vertical to bring it true to the second; turning is a yaw about world-up, not
+a second lean).
+**Why this is provably right, not just visually close:** a rotation about world Y can only ever mix
+a point's x/z — it leaves y (height) exactly alone, for every vertex, always (not just the axis).
+`computeSeating`'s re-seat is driven by `minY`, itself untouched by that same yaw. So Set 3's
+labeled vertices come out with world-Y bit-for-bit identical to Set 2's, which is exactly what a
+flat derivation line needs. Verified on both existing both-planes problems: `sqpyr-both` (equal
+30°/30° angles) — every label's height diff exactly `0`; `hexprism-both` (unequal 20°/30°,
+12 labels incl. top-hexagon primes) — every diff `~4.4e-16` (float epsilon). Screenshots of a live
+both-planes walkthrough confirm both the Set0→Set1 and Set1→Set2 (= UI "Set 2→Set 3") connector
+lines now draw fully horizontal.
+**Self-contained, as scoped:** `iShape.js`, `computeEffectiveAngles`, and the live solid's own pose
+(`rebuild()`) are untouched — `projectSequentialBothPlanesPose` only reads `currentShapeData`/
+`currentMesh.geometry` the same read-only way `projectSetPose`'s existing branch already does.
+**Alternatives rejected:** *Solve for the exact yaw angle that reproduces the target VP angle via
+auxiliary-view trigonometry* — rejected: only has a closed form for a vertex lying exactly on the
+solid's central axis (x₀=z₀=0), and no closed form in general (the derivation showed no real
+solution exists for some angle pairs under that model) — over-engineered for what this beat needs,
+which is height-preserving flatness, not a re-derivation of true-angle drafting trigonometry.
+Any yaw angle already preserves height exactly (proven above), so reusing the second stage's own
+angle magnitude keeps the label ("Axis X° to the HP and Y° to the VP") meaningful without solving
+anything new. *Reordering the live Euler to apply Z last* (`iShape.js` order change) — rejected:
+still a Z-axis operation, which mixes x/y regardless of ordering, so it would NOT have fixed
+flatness — the fix had to be a different axis (Y), not a different order of the same axes; also
+would have touched the live solid's protected rotation math, which was out of scope.
+**Consequences:** Set 3's rendered pose for both-planes problems is now geometrically distinct from
+"the live solid's exact final orientation" (the two are mathematically different compositions of
+the same two angles) — acceptable because Show Method is a construction-method walkthrough, not a
+byte-for-byte replay of the live pane's pose, and Set 3's own labeled angles are unchanged.
+**Status:** Active.
+
+---
+
+## ADR-094: Show Method's Next/Done boundary becomes content-aware; a left-active Set-N chip no longer strands new beats off-screen; the duplicated beat count is asserted at init; the Skip button's hide/disable actually match its own doc comment; every beat gets a plain-language caption
+
+**Date:** 2026-07-28
+**Decision:** A follow-up audit of ADR-089/ADR-090's "Next sometimes does nothing" fix found the
+fix was incomplete, plus a separate, unrelated cause of the same symptom, plus documentation that
+no longer matched the code it described. Five changes, all confined to `src/methodController.js`
++ `main.js` (Show Method has no clone anywhere else in the repo — confirmed by a repo-wide sweep —
+so none of this needs backporting):
+1. **Content-aware end-of-walkthrough** (`methodController.js`). ADR-090's `hasVisibleContent`
+   skip loop in `goNext`/`goBack` was still bounded by the positional `totalBeats() - 1` — if the
+   very last beat (13, labels) of the very last Set drew nothing for a given pose, the loop exited
+   there anyway (guard `flatIndex() < totalBeats() - 1`) and the click repainted an identical
+   frame, reproducing ADR-090's own defect at the one beat a learner is most likely to remember.
+   Worse, `renderProgress`'s `isLast` test was the same positional check, so "Done" could arrive a
+   full click late (relabel-then-exit, reading as two separate malfunctions). Added
+   `computeFinalIndex()`: scans backward from `totalBeats() - 1` once per run (`contentBeats` is
+   fixed at `begin()` time, so it can't change mid-run) for the true last content-bearing flat
+   index, using the exact same `hasVisibleContent` the skip loops already trust. `goNext`'s entry
+   guard/loop and `renderProgress`'s `isLast` now compare against this instead.
+2. **Focus-chip strand** (`methodController.js`). Independent of the above and not previously
+   documented as a defect: `focusSet` (main.js) is deliberately decoupled from walkthrough
+   progress (a Set-N chip only moves the camera, never `methodSet`/`methodBeat` — ADR-084
+   Decision 7), but nothing cleared it when Next/Back/Skip crossed into a *different* Set. A
+   student who zoomed into Set 2's chip and kept clicking Next would have every subsequent mark
+   drawn into Set 3 while the camera stayed locked on Set 2's block — Next visibly "doing
+   nothing" with none of ADR-090's beat-emptiness logic involved. `clearFocusChip()` now clears
+   the active chip's `is-active`/`aria-pressed` state and calls `sim.method.setFocus(null)`
+   (re-framing to the whole row) whenever `goNext`/`goBack` land in a different Set than they
+   started in, and unconditionally in `goSkipSet` (which always crosses a Set boundary). Chosen
+   over the alternative of re-targeting the chip to follow the walkthrough — clearing is less
+   surprising, and preserves Decision 7's "chips never move the sequence" by touching only
+   `setFocus`.
+3. **Runtime-asserted beat count** (`methodController.js`, `main.js`). `BEAT_COUNT`
+   (`methodController.js`) and `METHOD_BEAT_COUNT` (`main.js`) are hand-duplicated by design
+   (ADR-087) and have already moved once together (15 → 14, ADR-089) on a comment-only invariant
+   ("the two constants MUST move together"). If they ever drift, `main.js`'s `setMethodProgress`
+   clamp silently swallows the excess beat while this controller's own `flatIndex()` keeps
+   counting past it — reproducing "Next does nothing" wholesale, with no error anywhere, the
+   worst-case failure mode in the whole system. `main.js`'s `sim.method` surface now exposes
+   `beatCount: METHOD_BEAT_COUNT`; `initMethodController` compares it against its own `BEAT_COUNT`
+   at init and, on mismatch, logs a `console.error` naming both values and degrades to the same
+   no-op return the missing-markup guard already uses, rather than silently limping along.
+4. **Skip button hide/disable parity** (`methodController.js`, `index.html`). `index.html`'s own
+   comment on `#method-skip-set` said the button is "Hidden entirely on ... the walkthrough's last
+   Set" — `renderProgress` only ever set `.disabled`, never `.hidden`, leaving a visible, inert
+   button for the entire final Set (a third to a half of a full walkthrough). `renderProgress` now
+   sets both `skipBtn.hidden` and `skipBtn.disabled` from the same `noSetToSkipTo` condition; the
+   comment's stray "a Set's last beat" clause (never actually implemented) is dropped so the doc
+   describes only the one condition that is.
+5. **Per-beat captions** (`main.js`, `methodController.js`, `index.html`). Post-ADR-085/ADR-089
+   the only progress signal left was Set chips flipping enabled — inside a 14-beat Set there was
+   no way to tell what a beat had just drawn, and a skipped beat (ADR-090) was indistinguishable
+   from one that never existed, discarding real teaching content ("this view has no dashed
+   generators because the base sits square-on to the plane"). Added `methodBeatLabel(set, beat)`
+   (`main.js`, beside `methodContentBeats`, reusing its exact `firstIsHP` split so a beat's caption
+   never disagrees with its own content gate) returning plain English ("Outline of the top view",
+   "Hidden face lines — front view", "Projectors linking the two views") with beat 0 matching the
+   Set's own canvas caption verbatim. Exposed as `sim.method.beatLabel`. `methodController.js`'s
+   new `syncCaption()` pushes it into a new visible `#method-caption` pill (`index.html`, wrapped
+   with `.method-bar` inside a new `.method-controls` flex-column, `aria-hidden="true"`) AND the
+   platform's one `#sim-status` live region via the existing `sim.announce`, on every
+   Next/Back/Skip and once on `start()`.
+**Why:** all five were found in one investigation and are individually small, but bundled here
+rather than five ADRs because they share one root cause category — the gap between what ADR-089/
+ADR-090 intended ("every click visibly changes the sheet, orientation comes from chips not a
+counter") and what was actually wired.
+**Alternatives rejected:** *Numeric or tick-mark in-Set progress indicator* (would restore what
+ADR-089 Decision 2 deliberately removed, citing `RULES.md`'s step-counter-weight guidance; raised
+to the user as an explicit question before this pass began and confirmed rejected — captions
+carry the orientation load instead, no counter, no tick row). *Announce every auto-skipped beat
+individually* (cheaper than full captions, but leaves the beats a student does land on
+unlabelled — captions subsume this). *Give the projectors beat (6) its own content predicate
+independent of the labels beat (13)* — deferred; both currently gate on `hasLabels` and no shipped
+problem is confirmed to reach zero labels, so this is unconfirmed dead-code risk, not a live
+defect.
+**Consequences:** "Done" now always lands on a beat that actually drew something; a Set-N chip
+click can no longer strand the walkthrough off-screen; a `BEAT_COUNT`/`METHOD_BEAT_COUNT`
+mismatch now fails loudly at init instead of silently corrupting every subsequent click; the Skip
+button's visibility matches its own doc comment; every beat narrates itself in plain language with
+no step count reintroduced.
+**Status:** Active.
 
 ---
 

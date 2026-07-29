@@ -147,7 +147,8 @@ graphics_module_1_topic_6_projection_of_straight_lines/
 ├── meta.json             ← platform metadata (title = "Projection of Straight Lines")
 ├── CLAUDE.md             ← THIS file
 ├── CHANGELOG.md          ← this topic's change log
-├── assets/fonts/         ← bundled woff2 (byte-identical to the platform set)
+│                          (fonts: @font-face served from Supabase Storage CDN, ADR-086 —
+│                           no local assets/fonts/ anymore)
 └── src/
     ├── anim.js           ← tween/easing engine, byte-identical to the platform copy
     │  # pure data

@@ -276,6 +276,105 @@ function visibleInPP(faces) {
   return false;
 }
 
+/**
+ * Is this edge on the OUTLINE (silhouette boundary) of the HP (top) view — the ADR-087 "outermost
+ * boundary lines, drawn first" beat? Deliberately built as `visibleInHP(faces) &&` (straddle OR
+ * single-face) so **outline is a strict SUBSET of visible, by construction** — never a "hidden
+ * outline" edge. Straddling means at least one incident face faces up (`worldNormal.y > 0`) AND at
+ * least one faces down/edge-on (`<= 0`); a single-incident-face edge straddles trivially (there is
+ * nothing on its far side to contradict it).
+ *
+ * DIFFERENT from `EdgeType.SILHOUETTE` (meshAnalyzer's classification is 3D and orbit-invariant —
+ * "how many faces share this edge, at all") and from plain `visibleInHP` (outline is the narrower
+ * test: a visible internal crease on a convex solid, e.g. a pyramid's near-side base edge, is
+ * visible but not a boundary line). Because outline ⊆ visible, outline edges are redrawn again by
+ * the later visible-face / visible-generator beats — accepted deliberately (ADR-087): a learner
+ * re-traces the outline before adding interior detail, matching the textbook, rather than the code
+ * suppressing the overlap.
+ *
+ * @param {import('./meshAnalyzer.js').Face[]} faces Faces sharing the edge.
+ * @returns {boolean}
+ */
+function onOutlineHP(faces) {
+  if (!visibleInHP(faces)) return false;
+  if (faces.length === 1) return true;
+  let front = false, back = false;
+  for (const f of faces) { if (f.worldNormal.y > 0) front = true; else back = true; }
+  return front && back;
+}
+
+/**
+ * Is this edge on the OUTLINE of the VP (front) view? Same `visibleInVP(faces) &&` straddle test
+ * as {@link onOutlineHP}, against the VP observer axis (`worldNormal.x`) — see that function's
+ * header for the full rationale (outline ⊆ visible by construction, deliberate beat-1 redraw
+ * under ADR-087).
+ *
+ * @param {import('./meshAnalyzer.js').Face[]} faces Faces sharing the edge.
+ * @returns {boolean}
+ */
+function onOutlineVP(faces) {
+  if (!visibleInVP(faces)) return false;
+  if (faces.length === 1) return true;
+  let front = false, back = false;
+  for (const f of faces) { if (f.worldNormal.x > 0) front = true; else back = true; }
+  return front && back;
+}
+
+/**
+ * Is this edge on the OUTLINE of the PP (side) view? Same `visibleInPP(faces) &&` straddle test as
+ * {@link onOutlineHP}, against the PP observer axis (`worldNormal.z`) — see that function's header
+ * for the full rationale. Unused while ADR-088 keeps the side view out of the Show Method replay,
+ * but kept alongside its HP/VP siblings rather than special-cased away — `drawProjections`
+ * classifies all three planes uniformly, and a future consumer (the live 3D pane, or a restored
+ * side-view beat) gets it for free.
+ *
+ * @param {import('./meshAnalyzer.js').Face[]} faces Faces sharing the edge.
+ * @returns {boolean}
+ */
+function onOutlinePP(faces) {
+  if (!visibleInPP(faces)) return false;
+  if (faces.length === 1) return true;
+  let front = false, back = false;
+  for (const f of faces) { if (f.worldNormal.z > 0) front = true; else back = true; }
+  return front && back;
+}
+
+/**
+ * Axis-alignment threshold for the base/generator edge split (ADR-087). Compared against the
+ * ABSOLUTE VALUE of the dot product of a (unit) edge direction and the solid's (unit) axis
+ * direction — a base/cap edge is perpendicular to the axis (dot ≈ 0), a generator (a prism's
+ * lateral edge, a pyramid/cone's slant edge) is not. Same order of magnitude as
+ * {@link WELD_TOLERANCE}-style epsilons elsewhere in this codebase (meshAnalyzer.js `1e-3`): far
+ * below the smallest real slant angle on any generated solid, so it only ever absorbs float error
+ * from the matrix transform, never mis-splits a genuine edge.
+ * @type {number}
+ */
+const AXIS_ALIGN_EPS = 1e-3;
+
+/**
+ * Classify an edge as a solid's BASE/cap edge or a GENERATOR (longitudinal/slant edge) — the
+ * ADR-087 split `strokeMethodLines`'s beats key off, alongside the existing visible/hidden split.
+ * Every Module 2 solid is generated upright about its own LOCAL +Y axis (CLAUDE.md); `axisDir` is
+ * that axis rotated into WORLD space by the pose's own rotation (the caller's job — see
+ * `drawProjections`'s `options.axis`). Because a pose's transform is always rigid (rotation +
+ * translation, uniform scale), a base/cap edge — perpendicular to the local axis by construction —
+ * stays perpendicular to `axisDir` in world space, and a generator — which has a component along
+ * the axis — keeps a non-zero dot product regardless of the pose. A zero-length edge (should not
+ * occur; addSegment's own EPSILON guard drops it from the drawn batches downstream regardless)
+ * defaults to `'base'` rather than dividing by zero.
+ * @param {THREE.Vector3} p1 Edge start (world).
+ * @param {THREE.Vector3} p2 Edge end (world).
+ * @param {THREE.Vector3} axisDir Unit world-space solid axis.
+ * @returns {'base' | 'generator'}
+ */
+function edgeKindOf(p1, p2, axisDir) {
+  const dx = p2.x - p1.x, dy = p2.y - p1.y, dz = p2.z - p1.z;
+  const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  if (len < EPSILON) return 'base';
+  const dot = (dx * axisDir.x + dy * axisDir.y + dz * axisDir.z) / len;
+  return Math.abs(dot) > AXIS_ALIGN_EPS ? 'generator' : 'base';
+}
+
 // ============================================================================
 // Orthographic projection (handedness-safe — see header note 2)
 // ============================================================================
@@ -355,9 +454,12 @@ function addSegment(batch, a, b) {
  * @param {number}       linewidth Width in CSS pixels.
  * @param {boolean}      dashed   Dashed (true) or solid (false).
  * @param {THREE.Vector2} resolution Drawing-buffer size; required by LineMaterial.
+ * @param {'base' | 'generator' | 'outline' | undefined} [kind] ADR-087 edge-feature tag, stamped
+ *   onto `userData.kind` beside the existing `userData.hidden` — undefined for batches this
+ *   classification doesn't apply to (connectors, dimensions).
  * @returns {LineSegments2 | null}
  */
-function buildSegments(batch, color, linewidth, dashed, resolution) {
+function buildSegments(batch, color, linewidth, dashed, resolution, kind) {
   if (batch.positions.length === 0) return null;
 
   const geometry = new LineSegmentsGeometry();
@@ -399,6 +501,10 @@ function buildSegments(batch, color, linewidth, dashed, resolution) {
   // Compare canvas) can tell visible from occluded without relying on undocumented
   // LineMaterial getter behaviour.
   segments.userData.hidden = dashed;
+  // ADR-087: base/generator/outline tag, same reasoning as userData.hidden above — read back
+  // by harvestLineGroup (main.js) so Show Method's beat gates can filter without re-deriving
+  // face normals from data that's already been discarded by this point.
+  if (kind) segments.userData.kind = kind;
   return segments;
 }
 
@@ -457,6 +563,16 @@ function buildArrowMesh(positions, color) {
  *   hpDimensionGroup, built in the same upright X = 0 frame as vpGroup. Kept SEPARATE so the
  *   consumer parents it under the VP FOLD PIVOT — then the front-view dimensions fold down
  *   flat WITH the VP instead of standing upright after the flatten (the split's whole point).
+ * @property {THREE.Group} hpOutlineGroup ADR-087 — the HP view's outline-only edges (see
+ *   `onOutlineHP`), same style as `hpGroup`'s visible batch. A redundant COPY, not a subset
+ *   carved out of `hpGroup`: those edges are still present in `hpGroup` too (a beat-gated
+ *   consumer needs both "outline alone" and "every visible edge including the outline" as
+ *   independently selectable sets). NOT added to `group` or to `hpGroup` — the live 3D pane
+ *   has no use for a redundant duplicate layer and simply never reads this property; Show
+ *   Method's headless harvest is the only consumer. Held by `dispose()`/`setResolution()`
+ *   regardless of whether anything ever parents it.
+ * @property {THREE.Group} vpOutlineGroup Same as `hpOutlineGroup`, for the VP view.
+ * @property {THREE.Group} ppOutlineGroup Same as `hpOutlineGroup`, for the PP view.
  * @property {(width: number, height: number) => void} setResolution
  *   Push a new drawing-buffer size to every LineMaterial. Call once after
  *   creation and again on every resize, or line widths render wrong.
@@ -497,6 +613,13 @@ function buildArrowMesh(positions, color) {
  * @param {number} [options.z0=0] PP standoff (ppHingeGroup.position.z, owned by the
  *   consumer). Needed only to place the folded side-view flat connectors at z0 − x;
  *   harmless at 0 when no profile plane has been seated yet.
+ * @param {THREE.Vector3} [options.axis=(0,1,0)] ADR-087 — the solid's WORLD-space axis
+ *   direction (unit vector), used only to split each plane's visible/hidden batch further into
+ *   base/generator sub-batches (see `edgeKindOf`). Every Module 2 solid is generated upright
+ *   about LOCAL +Y (CLAUDE.md); pass local +Y rotated by the pose's own rotation — e.g.
+ *   `new THREE.Vector3(0, 1, 0).transformDirection(matrixWorld)` for the live mesh, or the same
+ *   against a headless stage's pose matrix. Defaults to world +Y (correct for an upright,
+ *   unrotated solid) so existing callers that never pass it still classify sensibly.
  * @returns {ProjectionResult}
  */
 export function drawProjections(edgeMap, options = {}) {
@@ -507,6 +630,7 @@ export function drawProjections(edgeMap, options = {}) {
     drawConnectors = true,
     drawDimensions = true,
     z0 = 0,
+    axis = new THREE.Vector3(0, 1, 0),
   } = options;
 
   const resolution = new THREE.Vector2(width, height);
@@ -520,14 +644,24 @@ export function drawProjections(edgeMap, options = {}) {
   const connectorColor = cssColor('--color-bench-grey');
   const inkColor = cssColor('--color-ink'); // dimension linework (Type B, Flat-Ink)
 
-  // Two batches per plane: visible (solid) and occluded (dashed). An edge lands
-  // in each plane's visible/occluded batch independently of the other two planes.
-  const hpVisible = newBatch();
-  const hpHidden = newBatch();
-  const vpVisible = newBatch();
-  const vpHidden = newBatch();
-  const ppVisible = newBatch();
-  const ppHidden = newBatch();
+  // ADR-087: FOUR batches per plane now, not two — visible/hidden (unchanged) crossed with
+  // base/generator (new, via edgeKindOf). Plus one more OUTLINE batch per plane (visible-only,
+  // a deliberate redundant copy — see onOutlineHP's header and hpOutlineGroup's JSDoc above).
+  const hpVisibleBase = newBatch();
+  const hpVisibleGenerator = newBatch();
+  const hpHiddenBase = newBatch();
+  const hpHiddenGenerator = newBatch();
+  const hpOutline = newBatch();
+  const vpVisibleBase = newBatch();
+  const vpVisibleGenerator = newBatch();
+  const vpHiddenBase = newBatch();
+  const vpHiddenGenerator = newBatch();
+  const vpOutline = newBatch();
+  const ppVisibleBase = newBatch();
+  const ppVisibleGenerator = newBatch();
+  const ppHiddenBase = newBatch();
+  const ppHiddenGenerator = newBatch();
+  const ppOutline = newBatch();
   const connectors = newBatch();
   const ppConnectors = newBatch();
   const flatConnectors = newBatch();
@@ -554,28 +688,36 @@ export function drawProjections(edgeMap, options = {}) {
     const vp1 = projectVP(edge.p1);
     const vp2 = projectVP(edge.p2);
 
+    // ADR-087: base-vs-generator is a single, plane-independent classification (it depends only
+    // on the edge's own 3D direction against the solid's axis, not on any observer), computed
+    // once and reused for all three planes below.
+    const kind = edgeKindOf(edge.p1, edge.p2, axis);
+
     // Decide solid vs dashed INDEPENDENTLY for each plane. A silhouette/boundary
     // edge (1 face) and a real internal crease run through the same convex normal
     // test; if drawHidden is off, an edge occluded in a given view is dropped from
     // that view only (it may still be visible — solid — in the other).
     if (visibleInHP(faces)) {
-      addSegment(hpVisible, hp1, hp2);
+      addSegment(kind === 'generator' ? hpVisibleGenerator : hpVisibleBase, hp1, hp2);
+      if (onOutlineHP(faces)) addSegment(hpOutline, hp1, hp2); // deliberate redundant copy
     } else if (drawHidden) {
-      addSegment(hpHidden, hp1, hp2);
+      addSegment(kind === 'generator' ? hpHiddenGenerator : hpHiddenBase, hp1, hp2);
     }
 
     if (visibleInVP(faces)) {
-      addSegment(vpVisible, vp1, vp2);
+      addSegment(kind === 'generator' ? vpVisibleGenerator : vpVisibleBase, vp1, vp2);
+      if (onOutlineVP(faces)) addSegment(vpOutline, vp1, vp2);
     } else if (drawHidden) {
-      addSegment(vpHidden, vp1, vp2);
+      addSegment(kind === 'generator' ? vpHiddenGenerator : vpHiddenBase, vp1, vp2);
     }
 
     const pp1 = projectPP(edge.p1);
     const pp2 = projectPP(edge.p2);
     if (visibleInPP(faces)) {
-      addSegment(ppVisible, pp1, pp2);
+      addSegment(kind === 'generator' ? ppVisibleGenerator : ppVisibleBase, pp1, pp2);
+      if (onOutlinePP(faces)) addSegment(ppOutline, pp1, pp2);
     } else if (drawHidden) {
-      addSegment(ppHidden, pp1, pp2);
+      addSegment(kind === 'generator' ? ppHiddenGenerator : ppHiddenBase, pp1, pp2);
     }
 
     registerVertex(uniqueVertices, edge.p1);
@@ -688,15 +830,35 @@ export function drawProjections(edgeMap, options = {}) {
   hpDimensionGroup.name = 'HP Dimensions';
   const vpDimensionGroup = new THREE.Group();
   vpDimensionGroup.name = 'VP Dimensions';
+  // ADR-087 — redundant-copy outline layers (see hpOutlineGroup's JSDoc above). NOT added to
+  // `group`/`hpGroup`/etc.; only Show Method's headless harvest reads these.
+  const hpOutlineGroup = new THREE.Group();
+  hpOutlineGroup.name = 'HP Outline';
+  const vpOutlineGroup = new THREE.Group();
+  vpOutlineGroup.name = 'VP Outline';
+  const ppOutlineGroup = new THREE.Group();
+  ppOutlineGroup.name = 'PP Outline';
 
-  // Per plane: visible = solid + full weight, occluded = dashed + lighter weight,
-  // both in the plane's own hue. VP visible is now SOLID (was wrongly dashed).
-  addIfPresent(hpGroup, buildSegments(hpVisible, hpColor, LINE_WIDTH_PX.visible, false, resolution));
-  addIfPresent(hpGroup, buildSegments(hpHidden, hpColor, LINE_WIDTH_PX.hidden, true, resolution));
-  addIfPresent(vpGroup, buildSegments(vpVisible, vpColor, LINE_WIDTH_PX.visible, false, resolution));
-  addIfPresent(vpGroup, buildSegments(vpHidden, vpColor, LINE_WIDTH_PX.hidden, true, resolution));
-  addIfPresent(ppGroup, buildSegments(ppVisible, ppColor, LINE_WIDTH_PX.visible, false, resolution));
-  addIfPresent(ppGroup, buildSegments(ppHidden, ppColor, LINE_WIDTH_PX.hidden, true, resolution));
+  // Per plane: visible = solid + full weight, occluded = dashed + lighter weight, both in the
+  // plane's own hue. VP visible is now SOLID (was wrongly dashed). ADR-087: each of visible/
+  // hidden now splits further into base/generator (4 children per plane instead of 2) — same
+  // pixels as before, just reorganized into more, smaller batches so a consumer can tell them
+  // apart; `kind` never affects colour or width.
+  addIfPresent(hpGroup, buildSegments(hpVisibleBase, hpColor, LINE_WIDTH_PX.visible, false, resolution, 'base'));
+  addIfPresent(hpGroup, buildSegments(hpVisibleGenerator, hpColor, LINE_WIDTH_PX.visible, false, resolution, 'generator'));
+  addIfPresent(hpGroup, buildSegments(hpHiddenBase, hpColor, LINE_WIDTH_PX.hidden, true, resolution, 'base'));
+  addIfPresent(hpGroup, buildSegments(hpHiddenGenerator, hpColor, LINE_WIDTH_PX.hidden, true, resolution, 'generator'));
+  addIfPresent(hpOutlineGroup, buildSegments(hpOutline, hpColor, LINE_WIDTH_PX.visible, false, resolution, 'outline'));
+  addIfPresent(vpGroup, buildSegments(vpVisibleBase, vpColor, LINE_WIDTH_PX.visible, false, resolution, 'base'));
+  addIfPresent(vpGroup, buildSegments(vpVisibleGenerator, vpColor, LINE_WIDTH_PX.visible, false, resolution, 'generator'));
+  addIfPresent(vpGroup, buildSegments(vpHiddenBase, vpColor, LINE_WIDTH_PX.hidden, true, resolution, 'base'));
+  addIfPresent(vpGroup, buildSegments(vpHiddenGenerator, vpColor, LINE_WIDTH_PX.hidden, true, resolution, 'generator'));
+  addIfPresent(vpOutlineGroup, buildSegments(vpOutline, vpColor, LINE_WIDTH_PX.visible, false, resolution, 'outline'));
+  addIfPresent(ppGroup, buildSegments(ppVisibleBase, ppColor, LINE_WIDTH_PX.visible, false, resolution, 'base'));
+  addIfPresent(ppGroup, buildSegments(ppVisibleGenerator, ppColor, LINE_WIDTH_PX.visible, false, resolution, 'generator'));
+  addIfPresent(ppGroup, buildSegments(ppHiddenBase, ppColor, LINE_WIDTH_PX.hidden, true, resolution, 'base'));
+  addIfPresent(ppGroup, buildSegments(ppHiddenGenerator, ppColor, LINE_WIDTH_PX.hidden, true, resolution, 'generator'));
+  addIfPresent(ppOutlineGroup, buildSegments(ppOutline, ppColor, LINE_WIDTH_PX.visible, false, resolution, 'outline'));
   addIfPresent(connectorGroup, buildSegments(connectors, connectorColor, LINE_WIDTH_PX.connector, true, resolution));
   addIfPresent(ppConnectorGroup, buildSegments(ppConnectors, connectorColor, LINE_WIDTH_PX.connector, true, resolution));
   addIfPresent(flatConnectorGroup, buildSegments(flatConnectors, connectorColor, LINE_WIDTH_PX.connector, true, resolution));
@@ -742,6 +904,9 @@ export function drawProjections(edgeMap, options = {}) {
     flatConnectorGroup,
     hpDimensionGroup,
     vpDimensionGroup,
+    hpOutlineGroup,
+    vpOutlineGroup,
+    ppOutlineGroup,
     setResolution(w, h) {
       resolution.set(w, h);
       const applyResolution = (root) => root.traverse((obj) => {
@@ -750,8 +915,9 @@ export function drawProjections(edgeMap, options = {}) {
       });
       // Walk every held sub-group: vpGroup, ppGroup and the two dimension groups get reparented
       // OUT of `group` into the fold pivot / view frame by the consumer, so `group.traverse`
-      // alone would miss them.
-      for (const sub of [group, ppGroup, ppConnectorGroup, flatConnectorGroup, hpDimensionGroup, vpDimensionGroup]) applyResolution(sub);
+      // alone would miss them. The three ADR-087 outline groups are never parented anywhere by
+      // anyone, but still hold LineMaterials that need the current resolution.
+      for (const sub of [group, ppGroup, ppConnectorGroup, flatConnectorGroup, hpDimensionGroup, vpDimensionGroup, hpOutlineGroup, vpOutlineGroup, ppOutlineGroup]) applyResolution(sub);
     },
     dispose() {
       // Full WebGL disposal contract (CLAUDE.md): geometry + material per object,
@@ -761,8 +927,10 @@ export function drawProjections(edgeMap, options = {}) {
       // the consumer (main.js flatten) reparents vpGroup and ppGroup OUT of `group`
       // into the fold pivot, so a `group.traverse` would miss them and leak their
       // LineMaterials. Walking the sub-groups directly disposes everything we
-      // created regardless of who currently parents it.
-      for (const sub of [hpGroup, vpGroup, ppGroup, connectorGroup, ppConnectorGroup, flatConnectorGroup, hpDimensionGroup, vpDimensionGroup]) {
+      // created regardless of who currently parents it. The three ADR-087 outline groups are
+      // NEVER parented anywhere (hpOutlineGroup's own JSDoc) — walking them directly is the
+      // only way they get disposed at all.
+      for (const sub of [hpGroup, vpGroup, ppGroup, connectorGroup, ppConnectorGroup, flatConnectorGroup, hpDimensionGroup, vpDimensionGroup, hpOutlineGroup, vpOutlineGroup, ppOutlineGroup]) {
         sub.traverse((obj) => {
           obj.geometry?.dispose();
           // Dispose ANY material — the LineMaterial of the projection/dimension lines OR

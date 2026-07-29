@@ -231,6 +231,18 @@ function markBooted() {
   });
 }
 
+/**
+ * Signal lesson completion to the host (ADR-078 addendum): the learner has reached this
+ * lesson's finished state, so the host can surface its "next topic / stay" overlay.
+ * Fires at most once per page load — the latch is deliberately NOT cleared by
+ * simAPI.reset(), so replaying a lesson never re-opens the host overlay.
+ */
+function markComplete() {
+  if (window.__simComplete) return;
+  window.__simComplete = true;
+  window.parent.postMessage({ type: 'sim:complete' }, '*');
+}
+
 // ============================================================================
 // Scene bootstrap
 // ============================================================================
@@ -1054,6 +1066,7 @@ const simController = {
   completeLesson() {
     showToast('Lesson complete — all four BIS line types shown.');
     announce('Lesson complete. All four BIS line types — A, E/F, G and B — are now shown on the part.');
+    markComplete();
   },
 
   /** Single reset path (RULES.md §2.9). */

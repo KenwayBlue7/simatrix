@@ -100,7 +100,8 @@ graphics_module_1_topic_5_projection_of_line_types/
 │                        (ADR-037), fold swoop, frameStep, Rotation Method, simAPI)
 ├── meta.json         ← platform metadata (title = "Projection of Straight Lines — Types of Lines")
 ├── CLAUDE.md · CHANGELOG.md
-├── assets/fonts/     ← bundled woff2 (byte-identical to the platform set)
+│                     (fonts: @font-face served from Supabase Storage CDN, ADR-086 —
+│                      no local assets/fonts/ anymore)
 └── src/
     ├── anim.js            ← tween/easing engine (byte-identical to the platform copy)
     │  # pure data

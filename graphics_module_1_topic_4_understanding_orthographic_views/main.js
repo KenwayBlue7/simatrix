@@ -361,6 +361,18 @@ function markBooted() {
   });
 }
 
+/**
+ * Signal lesson completion to the host (ADR-078 addendum): the learner has reached this
+ * lesson's finished state, so the host can surface its "next topic / stay" overlay.
+ * Fires at most once per page load — the latch is deliberately NOT cleared by
+ * simAPI.reset(), so replaying a lesson never re-opens the host overlay.
+ */
+function markComplete() {
+  if (window.__simComplete) return;
+  window.__simComplete = true;
+  window.parent.postMessage({ type: 'sim:complete' }, '*');
+}
+
 // ============================================================================
 // rebuild() — THE ONLY path for geometry changes (CLAUDE.md, non-negotiable).
 // ============================================================================
@@ -1070,6 +1082,7 @@ function renderStep(step, { animate = true } = {}) {
       lessonCompleteShown = true;
       showToast('Lesson complete');
       announce('Lesson complete.');
+      markComplete();
     }
   } else {
     lessonCompleteShown = false; // stepping back off 5 re-arms the toast for the next arrival

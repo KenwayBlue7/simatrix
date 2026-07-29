@@ -211,7 +211,10 @@ export function initStepper(sim) {
       sim.fold();
       const firstWin = !celebrated;
       celebrated = true;
-      if (firstWin) sim.showToast?.('Orthographic projection generated');
+      if (firstWin) {
+        sim.showToast?.('Orthographic projection generated');
+        sim.markComplete?.();
+      }
       sim.announce('Top view unfolded onto the vertical plane — the orthographic projection is complete.');
     }
     renderRail(); renderActions(); renderNav();

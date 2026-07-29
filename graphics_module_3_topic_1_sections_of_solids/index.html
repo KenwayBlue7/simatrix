@@ -68,27 +68,27 @@
 
   <style>
     /*
-      Bundled web fonts (DESIGN.md typography). Local subset woff2 in
-      ./assets/fonts/ — no runtime Google Fonts fetch, so the sim still works
-      offline after the initial load (relative paths per CLAUDE.md). Atkinson
-      Hyperlegible for UI/body (legibility-first, chosen for the struggling /
-      low-vision learner), IBM Plex Mono for numeric readouts (tabular figures).
-      font-display:swap paints immediately in the system fallback, then swaps in.
+      Web fonts served from Supabase Storage CDN (DESIGN.md typography / ADR-086 —
+      reverses the prior bundled-woff2/no-CDN rule). Atkinson Hyperlegible for UI/body
+      (legibility-first, chosen for the struggling / low-vision learner), IBM Plex Mono
+      for numeric readouts (tabular figures). font-display:swap paints immediately in
+      the system fallback, then swaps in once fetched — offline-first load no longer
+      holds for type.
     */
     @font-face {
       font-family: "Atkinson Hyperlegible";
-      font-style: normal; font-weight: 400; font-display: swap;
-      src: url("./assets/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+      font-weight: 400; font-style: normal; font-display: swap;
     }
     @font-face {
       font-family: "Atkinson Hyperlegible";
-      font-style: normal; font-weight: 700; font-display: swap;
-      src: url("./assets/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+      font-weight: 700; font-style: normal; font-display: swap;
     }
     @font-face {
       font-family: "IBM Plex Mono";
-      font-style: normal; font-weight: 400; font-display: swap;
-      src: url("./assets/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+      font-weight: 400; font-style: normal; font-display: swap;
     }
 
     /*

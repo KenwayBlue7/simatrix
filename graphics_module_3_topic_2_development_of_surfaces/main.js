@@ -404,6 +404,18 @@ function markBooted() {
   });
 }
 
+/**
+ * Signal lesson completion to the host (ADR-078 addendum): the learner has reached this
+ * lesson's finished state, so the host can surface its "next topic / stay" overlay.
+ * Fires at most once per page load — the latch is deliberately NOT cleared by
+ * simAPI.reset(), so replaying a lesson never re-opens the host overlay.
+ */
+function markComplete() {
+  if (window.__simComplete) return;
+  window.__simComplete = true;
+  window.parent.postMessage({ type: 'sim:complete' }, '*');
+}
+
 // ============================================================================
 // rebuild() — THE ONLY path for geometry changes (CLAUDE.md, non-negotiable).
 // ============================================================================
@@ -1147,6 +1159,9 @@ window.simAPI = {
 const simController = {
   /** ShapeType enum for the dock (uiManager depends only on this controller). */
   ShapeType,
+
+  /** Fire the once-per-load host completion signal (ADR-078 addendum). */
+  markComplete,
 
   /** Current on-screen state (null on the empty start). */
   state: () => currentShapeData,

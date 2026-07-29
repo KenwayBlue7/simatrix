@@ -174,7 +174,10 @@ export function initStepper(sim) {
     // The win toast fires exactly once per run-through, after the step renders.
     // The win is MERGED into the one step announcement below (never a second
     // racing #sim-status write; the toast itself is aria-hidden).
-    if (firstArrival) sim.showToast?.('Spatial Framework completed!');
+    if (firstArrival) {
+      sim.showToast?.('Spatial Framework completed!');
+      sim.markComplete?.();
+    }
     const winWord = firstArrival ? ' Spatial Framework completed!' : '';
     if (announce) sim.announce(`Step ${currentStep} of ${TOTAL}. ${meta.title}.${winWord}`);
   }

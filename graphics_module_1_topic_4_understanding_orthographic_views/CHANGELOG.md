@@ -5,6 +5,9 @@ Notable changes to this Engineering Graphics Module 1 topic (folder
 2026-07-13 as "Glass Box Visualizer"; renamed 2026-07-13, ADR-048). History before the scaffold
 below is the starter template's, carried over from the duplication.
 
+## 2026-07-28
+- Added: a new `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` once, fired on reaching Step 5 alongside the existing "Lesson complete" toast — the host's second sanctioned signal, for a "next topic / stay" overlay (ADR-078 addendum). (`main.js`.)
+
 ## 2026-07-24
 - Added: `markBooted()` now posts `{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` resolves — the host loading screen's boot-ready signal (ADR-078, narrows ADR-002). (`main.js`.)
 

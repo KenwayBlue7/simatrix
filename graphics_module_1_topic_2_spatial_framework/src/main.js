@@ -320,6 +320,18 @@ function markBooted() {
   });
 }
 
+/**
+ * Signal lesson completion to the host (ADR-078 addendum): the learner has reached this
+ * lesson's finished state, so the host can surface its "next topic / stay" overlay.
+ * Fires at most once per page load — the latch is deliberately NOT cleared by
+ * simAPI.reset(), so replaying a lesson never re-opens the host overlay.
+ */
+function markComplete() {
+  if (window.__simComplete) return;
+  window.__simComplete = true;
+  window.parent.postMessage({ type: 'sim:complete' }, '*');
+}
+
 // ============================================================================
 // Scene bootstrap
 // ============================================================================
@@ -510,6 +522,7 @@ function commit(patch) {
 const simController = {
   announce,
   showToast,
+  markComplete,
 
   /** Read-only snapshots — leaves never hold live references to the state. */
   getData: () => ({ ...currentData }),

@@ -209,7 +209,10 @@ export function initStepper(sim) {
     // below; the toast itself is aria-hidden, so no double narration).
     const firstWin = !celebrated;
     celebrated = true;
-    if (firstWin) sim.showToast?.('Projection of Points completed!');
+    if (firstWin) {
+      sim.showToast?.('Projection of Points completed!');
+      sim.markComplete?.();
+    }
     sim.announce(`Horizontal plane unfolded onto the vertical plane — the 2D drawing is complete.${firstWin ? ' Projection of Points completed!' : ''}`);
     renderRail(); renderActions(); renderNav();
   }, listen);

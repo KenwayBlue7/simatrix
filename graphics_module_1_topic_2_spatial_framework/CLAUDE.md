@@ -195,7 +195,8 @@ graphics_module_1_topic_2_spatial_framework/
 │                            separate dock — + the #term-pop singleton); self-starting
 ├── meta.json              ← platform metadata (done)
 ├── CLAUDE.md              ← THIS file
-├── assets/fonts/          ← bundled woff2 (done, byte-identical to the platform set)
+│                          (fonts: @font-face served from Supabase Storage CDN, ADR-086 —
+│                           no local assets/fonts/ anymore)
 └── src/
     ├── main.js            ← orchestrator: scene, OrbitControls, single rebuild() (leaf-owned
     │                         disposal contract), rAF loop (ticks anim.js), window.simAPI,

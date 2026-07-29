@@ -1,5 +1,8 @@
 # Changelog — Projection of Points
 
+## 2026-07-28
+- Added: a new `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` once, fired on the first fold alongside the existing "Projection of Points completed!" toast — the host's second sanctioned signal, for a "next topic / stay" overlay (ADR-078 addendum). (`main.js`, `src/stepper.js`.)
+
 ## 2026-07-27
 - Changed: the Problem Library overlay's title now centers in its header row (was hard-left) — a 44px spacer counterweights the close button so it stays corner-anchored (ADR-082). (`index.html`.)
 
