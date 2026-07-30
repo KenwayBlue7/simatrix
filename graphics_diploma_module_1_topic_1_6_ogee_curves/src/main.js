@@ -53,6 +53,7 @@ let activeHandle = null; // mountHandle() handle, disposed/remounted every rebui
 let paused = false;
 let lastFrameTime = 0;
 let rafId = null;
+let completeSent = false; // sim:complete postMessage latch — fires at most once per page load (ADR-081)
 
 // ============================================================================
 // DOM references
@@ -192,6 +193,11 @@ const simController = {
     stepper.goToGivenStep();
     announce(`${construction.label} selected for this problem. Adjust the given value to match, then continue.`);
   },
+  reportComplete() {
+    if (completeSent) return;
+    completeSent = true;
+    window.parent.postMessage({ type: 'sim:complete' }, '*'); // host signal (ADR-081), one-shot
+  },
 };
 
 // ============================================================================
@@ -266,6 +272,7 @@ function init() {
   setupVerifyActions();
   rafId = requestAnimationFrame(frame);
   window.__simBooted = true; // clears the boot watchdog fallback (index.html inline script)
+  window.parent.postMessage({ type: 'sim:ready' }, '*'); // host signal (ADR-081) — fires once, init() runs once
 }
 
 init();

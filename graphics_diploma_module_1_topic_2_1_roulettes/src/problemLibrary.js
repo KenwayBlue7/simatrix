@@ -54,6 +54,7 @@ export function initProblemLibrary(sim) {
 
   let activeProblemId = null;
   let revealedHints = 0;
+  let solvedFired = false; // sim:complete trigger latch — first problem solved this page load only
 
   function activeProblem() { return PROBLEMS.find((p) => p.id === activeProblemId) ?? null; }
 
@@ -124,6 +125,7 @@ export function initProblemLibrary(sim) {
     const ok = onConstruction && matches(problem.target, problem.tolerance, sim.getParams());
     status.textContent = ok ? '✓ Matches the stated problem' : 'Not yet — keep adjusting the sliders';
     status.classList.toggle('match-status--ok', ok);
+    if (ok && !solvedFired) { solvedFired = true; sim.reportComplete(); }
   }
 
   hintBtn?.addEventListener('click', () => {
