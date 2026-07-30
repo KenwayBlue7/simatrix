@@ -49,7 +49,7 @@ function roleColor(role) {
 }
 
 function roleWidth(role) {
-  return role === 'result' ? 1.4 : role === 'given' ? 1 : 0.6;
+  return role === 'result' ? 1.2 : role === 'given' ? 1 : 0.6;
 }
 
 function arcPathD(center, radius, startAngle, endAngle) {
@@ -197,7 +197,7 @@ function buildStepNode(step) {
 
   if (step.kind === 'point') {
     const group = el('g', {});
-    const r = step.role === 'result' ? 2.4 : 1.6;
+    const r = step.role === 'result' ? 1.7 : 1.1;
     const dot = el('circle', {
       cx: step.p.x, cy: step.p.y, r,
       fill: step.role === 'move' ? 'var(--color-paper)' : roleColor(step.role),

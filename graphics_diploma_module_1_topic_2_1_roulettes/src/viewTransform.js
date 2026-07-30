@@ -101,13 +101,46 @@ export function initViewTransform(svg, viewportEl) {
 
   let dragging = false;
   let lastClient = null;
+  // Multi-touch: a Map of pointerId -> last known {x,y}. Every touch contact reports
+  // button 0 (touch has no "right click"), so without this a second finger landing
+  // mid-pinch would be misread by the single-pointer logic above as just another drag
+  // starting, producing an erratic jump instead of a pinch-zoom — the actual bug behind
+  // "zoom/pan doesn't work right on touch screens."
+  const activePointers = new Map();
+  let pinchStartDist = null;
+  let pinchStartZoom = null;
+  const currentZoom = () => BASE_W / vw;
+
   viewportEl.addEventListener('pointerdown', (e) => {
     if (e.button !== 0) return;
-    dragging = true;
-    lastClient = { x: e.clientX, y: e.clientY };
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     viewportEl.setPointerCapture(e.pointerId);
+    if (activePointers.size === 1) {
+      dragging = true;
+      lastClient = { x: e.clientX, y: e.clientY };
+    } else if (activePointers.size === 2) {
+      dragging = false; // a second touch means pinch-zoom, not pan
+      const [a, b] = [...activePointers.values()];
+      pinchStartDist = Math.hypot(a.x - b.x, a.y - b.y);
+      pinchStartZoom = currentZoom();
+    }
   }, listen);
   viewportEl.addEventListener('pointermove', (e) => {
+    if (!activePointers.has(e.pointerId)) return;
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (activePointers.size >= 2) {
+      // Recompute the target zoom from the CURRENT two-finger distance ratio each frame
+      // (not an incremental per-frame multiplier), so drift never accumulates across a
+      // long pinch gesture.
+      const [a, b] = [...activePointers.values()];
+      const dist = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinchStartDist && dist > 0) {
+        const targetZoom = pinchStartZoom * (dist / pinchStartDist);
+        const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+        zoomAt(mid.x, mid.y, targetZoom / currentZoom());
+      }
+      return;
+    }
     if (!dragging || !lastClient) return;
     const rect = viewportEl.getBoundingClientRect();
     const dxUser = ((e.clientX - lastClient.x) / rect.width) * vw;
@@ -118,7 +151,20 @@ export function initViewTransform(svg, viewportEl) {
     clampPan();
     apply();
   }, listen);
-  const endDrag = () => { dragging = false; lastClient = null; };
+  const endDrag = (e) => {
+    if (e) activePointers.delete(e.pointerId);
+    if (activePointers.size < 2) { pinchStartDist = null; pinchStartZoom = null; }
+    if (activePointers.size === 1) {
+      // One finger still down after a pinch ends — resume single-finger pan from its
+      // current position, not a stale one, so it doesn't jump.
+      const [remaining] = activePointers.values();
+      dragging = true;
+      lastClient = { ...remaining };
+    } else {
+      dragging = false;
+      lastClient = null;
+    }
+  };
   viewportEl.addEventListener('pointerup', endDrag, listen);
   viewportEl.addEventListener('pointercancel', endDrag, listen);
   viewportEl.addEventListener('dblclick', resetView, listen);
