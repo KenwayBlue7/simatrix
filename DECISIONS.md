@@ -2859,6 +2859,13 @@ It continues to emit `sim:ready` only. `Module1/`, `Module2/` stay out of scope 
 ADR-078 deferred them originally.
 **Status:** Active
 
+**Note (2026-07-31):** The Diploma Engineering Graphics track (`feat/diplomaMod1`) independently
+arrived at this same `sim:ready`/`sim:complete` contract before this ADR reached that branch,
+recorded there as its own ADR-081 with a Diploma-only carve-out. That ADR is retired on merge —
+its decision was already made here, platform-wide, and this ADR's scope covers the Diploma track
+too. See ADR-095 (that track's renumbered founding decision) for where its independent version
+used to live.
+
 ---
 
 ## ADR-079: The Lines topics' 3D reference planes are OFFSET into the used quadrant, sized to the typed-field ceiling, overturning the earlier 60→24 `SHEET` shrink's stated rationale
@@ -3381,6 +3388,13 @@ Process note: the initial repo-wide grep for `@font-face`/`assets/fonts`/`.woff2
 sweep after the first edit pass. Future doc-wide reversals of a platform-wide rule should budget
 for a second grep-and-fix pass before considering the doc sweep complete.
 **Status:** Active
+
+**Note (2026-07-31):** The Diploma Engineering Graphics track (`feat/diplomaMod1`) independently
+arrived at the same shared-Supabase-host font migration before this ADR reached that branch,
+recorded there as its own ADR-082 with a Diploma-only carve-out. That ADR is retired on merge —
+its decision was already made here, platform-wide, and this ADR's scope covers the Diploma track
+too. See ADR-095 (that track's renumbered founding decision) for where its independent version
+used to live.
 
 ---
 
