@@ -1,0 +1,6 @@
+{
+  "title": "Helix",
+  "description": "A genuine 3D space curve — cylindrical helix, conical helix, and helical spring — built as two linked first-angle views (top and front), with a live right/left-hand toggle, then verified against two textbook problems.",
+  "difficulty": "intermediate",
+  "tags": ["diploma-engineering-graphics", "helix", "helical-spring", "first-angle-projection", "guided-stepper", "2d-svg"]
+}
