@@ -346,7 +346,13 @@ export const CONSTRUCTIONS = [
       if (a + b <= c || b + c <= a || c + a <= b) {
         return { steps: [], resultText: 'No triangle: each side must be shorter than the sum of the other two.', invalid: 'triangle-inequality' };
       }
-      const scale = Math.min(1.4, 205 / (a + b + c));
+      // No flat cap on scale (real feedback this session: a capped scale left small-side
+      // triangles drawing much smaller than large-side ones, since the cap only bound
+      // AWAY from the shrink-to-fit budget for big triangles — small triangles just sat
+      // at the flat cap instead of using the space available). Always fill the budget
+      // instead, regardless of the given mm values — the drawn triangle's own scaled
+      // perimeter is always exactly the 205-unit budget.
+      const scale = 205 / (a + b + c);
       const Y0 = 132;
       const A0 = { x: 72, y: Y0 };
       const B0 = { x: A0.x + c * scale, y: Y0 };
@@ -412,7 +418,10 @@ export const CONSTRUCTIONS = [
       const s = (a + b + c) / 2;
       const areaRaw = Math.sqrt(Math.max(s * (s - a) * (s - b) * (s - c), 1e-9));
       const Rraw = (a * b * c) / (4 * areaRaw);
-      const scale = Math.min(1.15, 150 / (a + b + c), 34 / Rraw);
+      // No flat cap here either, same reasoning as incircle-triangle above — just the two
+      // genuine budget constraints (perimeter, circumradius), so a small triangle fills
+      // the same drawn space a large one does instead of floating small on the flat cap.
+      const scale = Math.min(150 / (a + b + c), 34 / Rraw);
       const Y0 = 99;
       const A0 = { x: 130 - (c * scale) / 2, y: Y0 };
       const B0 = { x: 130 + (c * scale) / 2, y: Y0 };
@@ -471,7 +480,10 @@ export const CONSTRUCTIONS = [
       const nSpec = SUPERSCRIBE_N_CHOICES.find((c) => c.id === String(nId)) ?? SUPERSCRIBE_N_CHOICES[2];
       const n = nSpec.n;
       const r = diameter / 2;
-      const scale = Math.min(1.35, 56 / r);
+      // No flat cap — R (= r*scale = 56 always) fills the same 56-unit budget regardless
+      // of the given diameter, instead of small diameters sitting at a flat 1.35x that
+      // drew a visibly smaller circle than large diameters got.
+      const scale = 56 / r;
       const R = r * scale;
       const O = { x: 130, y: 94 };
       const steps = [
@@ -570,8 +582,11 @@ export const CONSTRUCTIONS = [
       const r = diameter / 2;
       // Both apex points sit at h = R*sqrt(3) ABOVE and BELOW centre O (the two arcs, each
       // of radius = the diameter itself, meet an equilateral-triangle apex away — a much
-      // longer reach than R alone) — cap against that reach, not the circle's own radius.
-      const scale = Math.min(1.35, 43 / r);
+      // longer reach than R alone) — budget against that reach, not the circle's own
+      // radius. No flat cap (R = r*scale = 43 always, regardless of the given diameter —
+      // this one was already effectively uncapped across its whole range; kept explicit
+      // for consistency with the other three constructions, not because it changes anything).
+      const scale = 43 / r;
       const R = r * scale;
       const O = { x: 130, y: 91 };
       const A = { x: O.x - R, y: O.y };
