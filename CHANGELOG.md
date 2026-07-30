@@ -3,7 +3,9 @@
 All notable changes at the Simatrix project root (spanning Module1, Module2, and the
 topic deploy copies). Per-module changelogs live inside each module folder.
 
-## 2026-07-28
+## 2026-07-30
+- Fixed: `.wizard-toggle` top offset reverted to `var(--space-3)` in 5 files (`Module1/src/shell.css`, `graphics_module_1_topic_1_foundations`, `graphics_module_1_topic_2_spatial_framework`, `graphics_module_1_topic_4_understanding_orthographic_views`, `graphics_module_2_topic_2_simple_positions`) — each had wrongly copied `.vp-cluster`'s `calc(44px + var(--space-5))` a11y clearance term, DESIGN.md §5.12's named regression, dropping the top-right chevron 68px down instead of the standard 44px inset.
+- Fixed: `.vp-cluster` top offset corrected to `calc(44px + var(--space-5))` in 2 files (`graphics_module_1_topic_5_projection_of_line_types`, `graphics_module_1_topic_6_projection_of_straight_lines`) — previously bare `44px`, skipping the a11y text-scaler header clearance and risking host-chrome collision. Two inverse backport errors from the same §5.12 regression, isolated per-file via audit; verified via computed-style checks across all 7 files post-fix.
 - Added: every shipped topic (9) + `template_starter` now posts a second sanctioned outbound message, `{ type: 'sim:complete' }`, once when the lesson reaches its own finished state, so the host site can surface a "next topic / stay" overlay — addendum to ADR-078, `markComplete()` sits beside `markBooted()`, byte-identical body across every topic (verified by hash), latched once per page load and deliberately not re-armed by `simAPI.reset()`. `graphics_module_2_topic_1_introduction` (a free-browse gallery with no stepper or "finished" state) is excluded and keeps `sim:ready` only. See `RULES.md` §2.10, `PLATFORM-RULES.md` §1.10, `ARCHITECTURE.md` §6.
 
 ## 2026-07-27

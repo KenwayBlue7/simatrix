@@ -480,7 +480,7 @@ select{
 /* Wizard collapse/expand chevron — top-right of the viewport, abutting the panel.
    44px hit target (DESIGN.md floor). z-index:30 keeps it above the viewport linework. */
 .wizard-toggle{
-  position:absolute;top:calc(44px + var(--space-5));right:var(--space-3);z-index:30;
+  position:absolute;top:var(--space-3);right:var(--space-3);z-index:30;
   width:44px;height:44px;display:grid;place-items:center;padding:0;
   color:var(--color-ink-secondary);background:var(--color-panel);
   border:1px solid var(--color-border);border-radius:var(--radius-sm);cursor:pointer;
