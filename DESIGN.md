@@ -486,7 +486,8 @@ SELECTOR::-webkit-scrollbar-thumb {
 collapsing the whole wizard column out of the layout so the viewport can go full-width.
 
 - **Position (load-bearing):** `top: var(--space-3); right: var(--space-3)` — the standard
-  top-corner inset, **not** the `.vp-cluster` top-left clearance (`calc(44px + var(--space-5))`).
+  top-corner inset, **not** the `.vp-cluster` top-left clearance (`calc(44px + var(--space-3))`,
+  52px — updated 2026-07-30, was `calc(44px + var(--space-5))`/68px).
   The two look similar but solve different problems: `.vp-cluster` sits one button-height down
   because it stacks *below* the top-left quick-view chips; `.wizard-toggle` has no button above it
   on the top-right, so it belongs at the plain `--space-3` inset. **Do not copy the `.vp-cluster`

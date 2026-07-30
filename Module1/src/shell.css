@@ -731,7 +731,7 @@ body.wizard-collapsed .wizard-toggle__icon{transform:rotate(180deg)}
 /* ---- Viewport cluster (Inc4): top-left stack of quick-view chips, the connector toggle,
    and the Compare chip. The engine reveals each per lesson; hidden ones collapse out. */
 .vp-cluster{
-  position:absolute;top:calc(44px + var(--space-5));left:var(--space-3);z-index:25; /* 44px = quick-view hit-target height, mirrors the button (Fix 2, supersedes the old 10% clearance); + --space-5 clears the host a11y text-scaler header */
+  position:absolute;top:calc(44px + var(--space-3));left:var(--space-3);z-index:25; /* 44px = quick-view hit-target height, mirrors the button (Fix 2, supersedes the old 10% clearance); + --space-5 clears the host a11y text-scaler header */
   display:flex;flex-direction:column;gap:var(--space-2);align-items:flex-start;
 }
 
