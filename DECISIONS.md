@@ -2818,6 +2818,129 @@ six-subtopic list for Topic 1 (1.1-1.6) is unaffected. Docs only — no topic fo
 
 ---
 
+## ADR-080: Helix (Diploma Module 1 Topic 2.3) is drawn as a first-angle top+front two-view construction, not a Three.js 3D orbit view
+
+**Date:** 2026-07-29
+**Decision:** Despite being a genuine 3D space curve, the cylindrical helix, conical helix, and
+helical spring (Topic 2.3) are built on the same 2D SVG orchestrator every other topic in this
+track uses — a linked top-view (circumferential position) + front-view (axial advance) pair,
+first-angle aligned per this platform's own convention (RULES.md §4's citation: "Top/Front/Side
+are cast to the object's top, back, and left respectively (first-angle)"), matching Example
+7.11's own textbook method exactly. The underlying point geometry is genuinely 3D-parametric
+(`x = r·cosθ, y = ±r·sinθ, z = pitch·θ/2π`, with `r` constant for the cylindrical case and
+linearly tapering for the conical case) — only the *rendering* is two orthographic projections of
+that curve, the same relationship every projection-drawing subject already has between a 3D
+object and its 2D sheet; it is not a flattened single-view stand-in.
+**Why:** This tests ADR-078's premise explicitly rather than silently assuming it still holds.
+ADR-078 chose the 2D SVG orchestrator for the whole Module because "none of its subtopics involve
+3D solid geometry" — true of how a helix is *drawn* in this construction, but not fully true of
+what a helix *is* (a genuine 3D space curve), so the premise deserved a real check at the one
+topic that stresses it, not a silent pass-through. The two-view method is not a compromise forced
+by that constraint: it is the source textbook's own correct, standard technique for teaching this
+exact curve, and matches what "Engineering Graphics" as a discipline actually teaches — reading
+and producing linked orthographic views of a 3D form, not orbiting a live 3D model of it.
+**Alternatives rejected:** *A true 3D Three.js orbit-camera view on Module 2's orchestrator* —
+rejected: would be the only Three.js dependency anywhere in the Diploma track (a CDN import map,
+the full disposal-contract/rebuild pipeline, WebGL context management, keyboard-operable orbit
+controls — none of which the other fifteen topics in this track need), requires its own RULES
+§1.11/ADR-025 template-choice ADR, and would likely still need the *same* 2D top+front
+construction built alongside it to actually teach Example 7.11's drawing procedure — an addition
+to the 2D build's scope, not a replacement for it.
+**Consequences:** Invokes ADR-078 (not superseded) — the Module's 2D-orchestrator choice stands,
+now on record as having been re-examined at its hardest test case rather than merely inherited by
+topic-numbering momentum. `constructions.js`'s helix math is shared 3D-parametric geometry
+projected into two SVG panes by one shared layout function, not duplicated per-view logic.
+**Status:** Active.
+
+---
+
+## ADR-081: Diploma track adds `sim:ready`/`sim:complete` via `postMessage`, amending ADR-002's ban for this track only
+
+**Date:** 2026-07-30
+**Decision:** All 9 Diploma Engineering Graphics Module 1 topics (`graphics_diploma_module_1_topic_1_1`
+through `2_3`) now send two additional one-way host signals from `src/main.js`:
+`window.parent.postMessage({ type: 'sim:ready' }, '*')`, fired exactly once at the end of `init()`
+(the same point `window.__simBooted` is set — this track has no async WebGL/asset load, so DOM-ready
+after the first synchronous `rebuild()` **is** the "first interactive frame" milestone), and
+`window.parent.postMessage({ type: 'sim:complete' }, '*')`, fired once via a new `simController.
+reportComplete()` that `problemLibrary.js` calls the first time its self-check status flips to
+"✓ Matches the stated problem" (`ok === true`) — this track's 4-step wizard (Choose/Given/Construct/
+Verify) has no discrete "step-6 win toast"; the Problem Library's tolerant self-check is this
+codebase's actual "did the meaningful thing" moment, so that is the equivalent hook, not the Verify
+step's static reveal. Both calls carry no payload beyond `{ type }`; target origin is left `'*'`
+per the host spec (no sensitive data in the payload). A `completeSent` module-level latch in
+`main.js` (checked inside `reportComplete()`) plus a `solvedFired` latch in `problemLibrary.js`
+(gates the call site) together guarantee `sim:complete` fires at most once per page load and never
+re-fires on Reset/replay or re-loading a different problem — resetting either latch was deliberately
+left out.
+**Why:** The host platform's iframe embedding needs an async readiness/completion signal that a
+synchronous global (`window.simAPI`) cannot provide — the host doesn't call into the sim to ask
+"are you done," the sim has to tell it. This is a genuine host requirement, not a stylistic
+preference, and it directly conflicts with **ADR-002**'s explicit, "verified by search," repo-wide
+ban on `postMessage`/`window.parent`/`window.top`. Rather than silently violate that ban or silently
+ignore the host's requirement, this ADR records the conflict and resolves it narrowly: ADR-002's
+`window.simAPI` contract (`pause`/`resume`/`reset`) is unchanged and still the *only* way the host
+calls **into** a sim; this ADR adds a second, one-directional channel **out** of the sim, and scopes
+the exception to the Diploma track only.
+**Alternatives rejected:** *Repo-wide amendment of ADR-002* — not chosen; the host requirement
+(`instructionSim.md`) was handed down for this track's build and there is no confirmed request to
+retrofit the original KTU B.Tech modules (`graphics_module_*`), so widening the exception beyond
+what was asked would be scope creep the other 15+ topics don't need yet. *Silently adding
+`postMessage` without amending RULES.md/PLATFORM-RULES.md* — rejected: would leave the docs
+contradicting the code, and a future contributor reading RULES §2.10 would have no idea the ban has
+a carve-out. *Extending `window.simAPI` with a sim-side setter the host polls* — not chosen: the
+host's own spec is one-way `postMessage`, not a poll; matching the actual spec was simpler than
+inventing an equivalent-but-different contract.
+**Consequences:** Easier: the host can now detect sim readiness and lesson completion without
+polling or guessing. Harder: `RULES.md` §2.10 and `PLATFORM-RULES.md` §1.10 ("NEVER add
+`postMessage`... anywhere") are no longer true repo-wide — both now carry an explicit Diploma-track
+carve-out pointing back here, so a topic outside `graphics_diploma_module_1_*` adding `postMessage`
+is still a violation unless a future ADR extends this one. The one-shot latch discipline
+(`completeSent`/`solvedFired`) is new, unenforced-by-tooling state that any future edit to
+`main.js`/`problemLibrary.js` in these 9 topics must preserve by hand (RULES §1.4's manual-copy
+discipline — no shared library to fix once).
+**Status:** Active.
+
+---
+
+## ADR-082: Diploma track fetches its two web fonts from a shared platform host, amending ADR-002/RULES §2.12/§2.15's local-bundle mandate for this track only
+
+**Date:** 2026-07-30
+**Decision:** All 9 Diploma Engineering Graphics Module 1 topics' `index.html` now load Atkinson
+Hyperlegible (400/700) and IBM Plex Mono (400) via `@font-face` `src: url(...)` pointing at
+`https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/...woff2`
+instead of a locally bundled copy in `./assets/fonts/`. That local `assets/fonts/` directory (three
+`.woff2` files per topic) has been deleted from all 9 topics — nothing else lived in `assets/`, so
+the directory itself is gone too. Font family names, weights, and styles are byte-identical to
+before; only the `src` URL and file location changed.
+**Why:** A shared, platform-hosted font bucket instead of nine duplicate local copies of the same
+two font families — this is the platform owner's own infrastructure, not a third-party CDN, and
+the exact families/weights are unchanged. Same shape of conflict as ADR-081: the change directly
+contradicts **RULES.md §2.15**'s explicit "DO bundle fonts as local `woff2`... never use a
+[remote] CDN" and **§2.12**'s "NEVER make a runtime network call beyond the one-time [library] CDN
+fetch" (this track has no library CDN fetch at all, so its previous state was genuinely
+zero-runtime-network-calls — this ADR ends that). Flagged plainly rather than silently applied;
+proceeded once directed, given the fully-specified CSS and explicit deletion instruction left no
+ambiguity about intent.
+**Alternatives rejected:** *Keep local bundles, skip the change* — not chosen, contradicts the
+explicit instruction. *Repo-wide font-host migration* — not chosen here: only the Diploma track's
+9 topics were named; the original KTU B.Tech modules (`graphics_module_*`) keep local bundles
+until a separate request extends this. *Add the remote `@font-face` but keep the local files as a
+fallback* — not chosen: the instruction was explicit about removing `assets/fonts/`, and a
+silent dual-source font stack would be an unrequested addition, not a fix.
+**Consequences:** Easier: one shared font source across the platform instead of N duplicated
+copies; smaller per-sim payload (three fewer `.woff2` files each). Harder: these 9 topics now
+depend on an external host being reachable — the "works fully offline once loaded" guarantee
+(ADR-001, the offline-capability comment that sat directly above the old `@font-face` block) no
+longer holds for text rendering in the platform's chosen typefaces; if the Supabase bucket is ever
+unreachable, these sims fall back to system fonts rather than failing, but no longer render in the
+platform's typography. `RULES.md` §2.12/§2.15 and `PLATFORM-RULES.md` §1.12/§1.15 now carry an
+explicit Diploma-track carve-out pointing back here, alongside ADR-081's `postMessage` carve-out —
+two independent exceptions to the same "no runtime network calls" rule, both scoped identically.
+**Status:** Active.
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*

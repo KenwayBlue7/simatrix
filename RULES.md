@@ -142,8 +142,12 @@ Every rule is formatted:
 > **§2.9 ❌ NEVER** create a second reset path — the in-sim Reset button must route through
 > `simAPI.reset()`. *(ADR-002, CLAUDE.md)*
 
-> **§2.10 ❌ NEVER** add `postMessage`, `window.parent`, or `window.top` usage anywhere. The
-> host↔sim surface is `window.simAPI` + `meta.json` only. *(ADR-002, ARCHITECTURE.md §6)*
+> **§2.10 ❌ NEVER** add `postMessage`, `window.parent`, or `window.top` usage anywhere **outside
+> the Diploma track**. The host↔sim surface is `window.simAPI` + `meta.json` only. *(ADR-002,
+> ARCHITECTURE.md §6)* **Exception:** `graphics_diploma_module_1_topic_*` sends exactly two
+> one-shot, payload-less signals — `{ type: 'sim:ready' }` once from `init()`, `{ type:
+> 'sim:complete' }` once via `simController.reportComplete()` — and nothing else. `window.simAPI`
+> stays the only path *into* the sim. *(ADR-081)*
 
 > **§2.11 ✅ DO** ship a `meta.json` at the root with all four fields — `title`, `description`,
 > `difficulty`, `tags`. Uploads missing any field are rejected. *(ADR-002, CLAUDE.md)*
@@ -152,7 +156,9 @@ Every rule is formatted:
 > exactly: `beginner`, `intermediate`, or `advanced` (all lowercase). *(PLATFORM-RULES.md §1.11a)*
 
 > **§2.12 ❌ NEVER** make a runtime network call beyond the one-time Three.js CDN fetch; the sim must
-> work fully offline once loaded. *(ADR-002, CLAUDE.md)*
+> work fully offline once loaded. *(ADR-002, CLAUDE.md)* **Exception:** the Diploma track's font
+> fetch below (§2.15) and its two `postMessage` signals (§2.10) — both scoped to
+> `graphics_diploma_module_1_topic_*` only. *(ADR-081, ADR-082)*
 
 > **§2.13 ✅ DO** render only a dismissible "Best experienced on desktop" banner below 768px — never
 > block, redirect, or disable the sim. *(CLAUDE.md)*
@@ -160,7 +166,11 @@ Every rule is formatted:
 > **§2.14 ✅ DO** make the sim self-starting on page load; there is no external `init()` call. *(CLAUDE.md)*
 
 > **§2.15 ✅ DO** bundle fonts as local `woff2` (Atkinson Hyperlegible + IBM Plex Mono) loaded via
-> `@font-face`; **never** use a Google-Fonts CDN. *(ARCHITECTURE.md §7, CLAUDE.md)*
+> `@font-face`; **never** use a Google-Fonts CDN. *(ARCHITECTURE.md §7, CLAUDE.md)* **Exception:**
+> `graphics_diploma_module_1_topic_*` loads both fonts via `@font-face` from the platform's own
+> shared Supabase font host instead of a local copy — still not Google Fonts, and still the same
+> two font families, just fetched from a shared bucket rather than duplicated per-sim. No local
+> `assets/fonts/` in these 9 topics. *(ADR-082)*
 
 > **§2.16 ✅ DO** keep a packaged Module 2 payload ≤ 10 MB — prefer `.glb` over `.gltf+bin`, `.webp`
 > over `.png`/`.jpg`, and skip HDR environments. *(CLAUDE.md)*
@@ -699,7 +709,7 @@ Every rule is formatted:
 - ❌ Use the UMD global, `@latest`, or unpinned `three`. *(§2.2)*
 - ❌ Write extensionless or absolute-path imports. *(§2.4, §2.5)*
 - ❌ Open the sim from `file://` or assume port 80 works. *(§2.6)*
-- ❌ Add `postMessage`/`window.parent`/`window.top`, a second reset path, or any non-CDN network call. *(§2.9, §2.10, §2.12)*
+- ❌ Add `postMessage`/`window.parent`/`window.top` outside the Diploma track's two exempted signals, a second reset path, or any non-CDN network call. *(§2.9, §2.10, §2.12)*
 - ❌ Install puppeteer/playwright, or verify against a hand-typed replica instead of the shipped module. *(§2.17, §2.19)*
 - ❌ Add `three-mesh-bvh` via npm/a bundler, or pin it to `@latest` instead of the shared import map. *(§2.20)*
 
