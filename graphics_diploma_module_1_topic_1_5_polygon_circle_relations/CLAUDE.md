@@ -1,9 +1,9 @@
 # CLAUDE.md — Simatrix · Diploma Engineering Graphics, Module 1 Topic 1.5: Polygon-Circle Relations
 
 > **Syllabus track:** "Diploma Engineering Graphics" **[PLACEHOLDER — exact syllabus/issuing-body
-> name not yet confirmed; see `../DECISIONS.md` ADR-078]**, distinct from this repo's original
+> name not yet confirmed; see `../DECISIONS.md` ADR-095]**, distinct from this repo's original
 > (KTU B.Tech) Engineering Graphics syllabus. This is that track's Module 1, fifth topic —
-> subtopic 1.5 in ADR-078's provisional numbering. Namespaced
+> subtopic 1.5 in ADR-095's provisional numbering. Namespaced
 > `graphics_diploma_module_1_topic_1_<N>_<slug>` to avoid colliding with the existing
 > `graphics_module_1_topic_*` folders, which belong to the original syllabus's own Module 1.
 > **Do not confuse the two Module 1s or port content between them without a reason.**
@@ -26,11 +26,11 @@ already generic.
 
 ## Project-wide documentation (read before cross-module tasks)
 
-Per **ADR-078**, this syllabus track **shares this repo's root docs and ADR sequence** — it is
+Per **ADR-095**, this syllabus track **shares this repo's root docs and ADR sequence** — it is
 **not** a Case-C fork. Before starting any task that touches shared behavior, UI patterns, or
 cross-module consistency, read:
 - `../ARCHITECTURE.md` — system map, component breakdown, data flow
-- `../DECISIONS.md`    — why key decisions were made (ADR log; recorded under ADR-078)
+- `../DECISIONS.md`    — why key decisions were made (ADR log; recorded under ADR-095)
 - `../RULES.md`        — what you must and must not do (enforcement)
 - `../DESIGN.md`       — color tokens, typography, component standards
 - `../PRODUCT.md`      — who it's for, features, accessibility commitments
@@ -48,7 +48,7 @@ Simatrix website (navbar, module browser, account UI, marketing chrome, login) i
 
 ---
 
-## Architecture — 2D SVG orchestrator (ADR-078, invoked-by ADR-025)
+## Architecture — 2D SVG orchestrator (ADR-095, invoked-by ADR-025)
 
 Same discipline as Topics 1.1-1.4: one orchestrator (`src/main.js`) owning state and a single
 `rebuild()` funnel, single-purpose leaf modules that never import each other, inline SVG (no
@@ -135,7 +135,7 @@ graphics_diploma_module_1_topic_1_5_polygon_circle_relations/
 ├── meta.json
 ├── CLAUDE.md                ← this file
 ├── DESIGN.md                  ← local appendix: construction-line tokens (reused) + n-switcher (new)
-                                  (no local assets/fonts/ — fonts load from the shared platform host, ADR-082)
+                                  (no local assets/fonts/ — fonts load from the shared platform host, ADR-086)
 └── src/
     ├── anim.js                    ← tween/easing engine (byte-copy — renderer-agnostic)
     ├── viewTransform.js             ← pan/zoom + ensureVisible() over the SVG viewBox (byte-copy)
@@ -163,7 +163,7 @@ graphics_diploma_module_1_topic_1_5_polygon_circle_relations/
 ---
 
 *Diploma Engineering Graphics [placeholder name] · Module 1 Topic 1.5 — Polygon-Circle Relations ·
-2D SVG orchestrator (ADR-078) · scaffold duplicated from Topic 1.1 · no build tools.*
+2D SVG orchestrator (ADR-095) · scaffold duplicated from Topic 1.1 · no build tools.*
 
 ## Session Digest Protocol
 At the end of every session (or when asked), produce a digest in this format:

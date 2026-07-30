@@ -11,7 +11,7 @@
 
 ## 1. Subject
 
-Per ADR-080, this topic draws a genuinely 3D curve as two linked 2D orthographic views (first-
+Per ADR-097, this topic draws a genuinely 3D curve as two linked 2D orthographic views (first-
 angle: front view above, top view below — RULES.md §4's citation), not a 3D scene. There is no
 camera, no orbit — the "3D-ness" lives in the geometry (`constructions.js`'s real `x,y,z` points),
 not the rendering.

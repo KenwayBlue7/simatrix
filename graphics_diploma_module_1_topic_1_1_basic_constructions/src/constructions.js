@@ -7,7 +7,7 @@
 //
 // Coordinate system: a fixed 200x140 drawing area (SVG viewBox units), origin top-left,
 // y increases downward. Every construction places its own "given" element inside that
-// area; there is no camera and nothing to orbit (ADR-078 — this topic has no 3D content).
+// area; there is no camera and nothing to orbit (ADR-095 — this topic has no 3D content).
 //
 // Every step in a recipe carries a `role`:
 //   'given'  — the construction's starting element(s), stated by the problem

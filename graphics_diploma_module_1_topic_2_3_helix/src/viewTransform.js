@@ -11,7 +11,7 @@
 
 // This topic's canvas is 220x280, TALLER than Topic 2.1/2.2's 240x190 — this is the first
 // topic in the track to draw TWO stacked orthographic views (front view above, top view
-// below, first-angle — ADR-080) in one viewport instead of one, so it needs vertical room
+// below, first-angle — ADR-097) in one viewport instead of one, so it needs vertical room
 // Topic 2.1/2.2's single-view canvases never had to budget for.
 const BASE_W = 220;
 const BASE_H = 280;

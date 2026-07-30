@@ -1,7 +1,7 @@
 # CLAUDE.md — Simatrix · Diploma Engineering Graphics, Module 1 Topic 1.1: Basic Constructions
 
 > **Syllabus track:** "Diploma Engineering Graphics" **[PLACEHOLDER — exact syllabus/issuing-body
-> name not yet confirmed; see `../DECISIONS.md` ADR-078]**, distinct from this repo's original
+> name not yet confirmed; see `../DECISIONS.md` ADR-095]**, distinct from this repo's original
 > (KTU B.Tech) Engineering Graphics syllabus. This is that track's first module and first topic.
 > Namespaced `graphics_diploma_module_1_topic_1_<N>_<slug>` to avoid colliding with the existing
 > `graphics_module_1_topic_*` folders, which belong to the original syllabus's own Module 1
@@ -17,13 +17,13 @@ set (RULES.md §1.4's manual-copy discipline, no shared library).
 
 ## Project-wide documentation (read before cross-module tasks)
 
-Per **ADR-078**, this syllabus track **shares this repo's root docs and ADR sequence** — it is
+Per **ADR-095**, this syllabus track **shares this repo's root docs and ADR sequence** — it is
 **not** a Case-C fork (MODULE-STARTER.md §5.4's "own local DECISIONS.md at ADR-001" does not
 apply here). Before starting any task that touches shared behavior, UI patterns, or cross-module
 consistency, read:
 - `../ARCHITECTURE.md` — system map, component breakdown, data flow
 - `../DECISIONS.md`    — why key decisions were made (ADR log; this topic's own decisions are
-  recorded there under ADR-078 and any later ADRs, not a local file)
+  recorded there under ADR-095 and any later ADRs, not a local file)
 - `../RULES.md`        — what you must and must not do (enforcement)
 - `../DESIGN.md`       — color tokens, typography, component standards
 - `../PRODUCT.md`      — who it's for, features, accessibility commitments
@@ -40,9 +40,9 @@ Simatrix website (navbar, module browser, account UI, marketing chrome, login) i
 
 ---
 
-## Architecture — 2D SVG orchestrator (ADR-078, invoked-by ADR-025)
+## Architecture — 2D SVG orchestrator (ADR-095, invoked-by ADR-025)
 
-Per **ADR-078**, this topic reuses the *discipline* of Module 2's orchestrator pattern (ADR-007) —
+Per **ADR-095**, this topic reuses the *discipline* of Module 2's orchestrator pattern (ADR-007) —
 one orchestrator owning state and a single `rebuild()` funnel, single-purpose leaf modules that
 never import each other — but the render target is **inline SVG, not Three.js**. No prior ADR
 tested this substrate; the following are this topic's own re-expressions, not literal ports:
@@ -102,7 +102,7 @@ graphics_diploma_module_1_topic_1_1_basic_constructions/
 ├── meta.json
 ├── CLAUDE.md                ← this file
 ├── DESIGN.md                  ← local appendix: this topic's construction-line color tokens
-                                  (no local assets/fonts/ — fonts load from the shared platform host, ADR-082)
+                                  (no local assets/fonts/ — fonts load from the shared platform host, ADR-086)
 └── src/
     ├── anim.js                    ← tween/easing engine (byte-copy — renderer-agnostic)
     ├── stepper.js                   ← guided-step controller (4-step shape + picker step)
@@ -129,7 +129,7 @@ graphics_diploma_module_1_topic_1_1_basic_constructions/
 ---
 
 *Diploma Engineering Graphics [placeholder name] · Module 1 Topic 1.1 — Basic Constructions ·
-2D SVG orchestrator (ADR-078) · reference scaffold for Topics 1.2–1.6 · no build tools.*
+2D SVG orchestrator (ADR-095) · reference scaffold for Topics 1.2–1.6 · no build tools.*
 
 ## Session Digest Protocol
 At the end of every session (or when asked), produce a digest in this format:

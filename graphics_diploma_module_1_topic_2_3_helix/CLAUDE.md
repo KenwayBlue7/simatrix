@@ -1,8 +1,8 @@
 # CLAUDE.md — Simatrix · Diploma Engineering Graphics, Module 1 Topic 2.3: Helix
 
 > **Syllabus track:** "Diploma Engineering Graphics" **[PLACEHOLDER — exact syllabus/issuing-body
-> name not yet confirmed; see `../DECISIONS.md` ADR-078]**. This is that track's Module 1, Topic
-> 2 ("Miscellaneous Curves", ADR-079) — subtopic 2.3, the third and LAST of three (2.1 Roulettes,
+> name not yet confirmed; see `../DECISIONS.md` ADR-095]**. This is that track's Module 1, Topic
+> 2 ("Miscellaneous Curves", ADR-096) — subtopic 2.3, the third and LAST of three (2.1 Roulettes,
 > 2.2 Spiral Curves, both built). Namespaced `graphics_diploma_module_1_topic_2_3_helix`.
 
 Three helix constructions — cylindrical helix, conical helix, helical spring — sharing one 3D
@@ -12,10 +12,10 @@ assumed (see the EXTRACTED/INFERRED table below).
 
 ## Project-wide documentation (read before cross-module tasks)
 
-Per **ADR-078**, this syllabus track **shares this repo's root docs and ADR sequence**. Before
+Per **ADR-095**, this syllabus track **shares this repo's root docs and ADR sequence**. Before
 starting any task that touches shared behavior, UI patterns, or cross-module consistency, read:
 - `../ARCHITECTURE.md` — system map, component breakdown, data flow
-- `../DECISIONS.md`    — ADR log; this topic's own decisions recorded under ADR-078/079/**080**
+- `../DECISIONS.md`    — ADR log; this topic's own decisions recorded under ADR-095/079/**080**
 - `../RULES.md`        — what you must and must not do (enforcement)
 - `../DESIGN.md`       — color tokens, typography, component standards
 - `../PRODUCT.md`      — who it's for, features, accessibility commitments
@@ -29,10 +29,10 @@ Simatrix website (navbar, module browser, account UI, marketing chrome, login) i
 
 ---
 
-## ADR-080: 2D two-view construction, not a 3D orbit scene — read this before touching the geometry
+## ADR-097: 2D two-view construction, not a 3D orbit scene — read this before touching the geometry
 
 A helix is a genuine 3D space curve. This topic stays on the Diploma track's 2D SVG orchestrator
-anyway — **ADR-080** records the full reasoning (weighed explicitly, not defaulted into): the
+anyway — **ADR-097** records the full reasoning (weighed explicitly, not defaulted into): the
 underlying math in `constructions.js` is honestly 3D (`spacePoint(theta, cfg)` returns real
 `{x, y, z}`), and only the *rendering* is two first-angle orthographic projections of that curve —
 exactly Example 7.11's own textbook method, not a compromise forced by staying 2D. A Three.js 3D
@@ -42,7 +42,7 @@ this same 2D construction built alongside it to actually teach the drawing proce
 
 **If you are extending this topic (a fourth construction, a new view), do not silently reach for
 Three.js** — that decision has already been made and recorded; revisiting it needs a new ADR of
-its own, the same way ADR-080 amended ADR-078's premise rather than silently overriding it.
+its own, the same way ADR-097 amended ADR-095's premise rather than silently overriding it.
 
 ## The two-view layout — one shared scale, deterministic not sampled
 
@@ -128,7 +128,7 @@ Audited file-by-file before building, not assumed:
 | `src/terms.js` (data) | INFERRED | New `TERMS`: helix, pitch, lead, right-hand, first-angle |
 | `meta.json`, `index.html` (picker/copy) | INFERRED (new) | Topic-specific; viewBox `220×280`; 3-item picker; `#hand-toggle` markup |
 | `DESIGN.md` (appendix) | EXTRACTED (§2 tokens from 2.1, §4 toggle from 1.2/2.2, byte-for-byte) + INFERRED (§3, new) | Hidden-line convention is new |
-| `../DECISIONS.md` ADR-080 | INFERRED (new) | The 2D-vs-3D architecture decision, recorded explicitly per the CONTEXT's mandatory decision gate |
+| `../DECISIONS.md` ADR-097 | INFERRED (new) | The 2D-vs-3D architecture decision, recorded explicitly per the CONTEXT's mandatory decision gate |
 
 ### Cross-topic note for the eventual 2.1-2.3 cleanup pass
 
@@ -161,7 +161,7 @@ graphics_diploma_module_1_topic_2_3_helix/
 ├── meta.json
 ├── CLAUDE.md                ← this file
 ├── DESIGN.md                  ← local appendix: tokens/toggle (reused) + hidden-line convention (new)
-                                  (no local assets/fonts/ — fonts load from the shared platform host, ADR-082)
+                                  (no local assets/fonts/ — fonts load from the shared platform host, ADR-086)
 └── src/
     ├── anim.js                    ← tween/easing engine (byte-copy)
     ├── viewTransform.js             ← pan/zoom over the SVG viewBox (220×280)
@@ -189,7 +189,7 @@ graphics_diploma_module_1_topic_2_3_helix/
 ---
 
 *Diploma Engineering Graphics [placeholder name] · Module 1 Topic 2.3 — Helix · LAST topic in the
-Misc Curves set (ADR-079) · 2D SVG orchestrator, 3D math (ADR-078/ADR-080) · scaffold duplicated
+Misc Curves set (ADR-096) · 2D SVG orchestrator, 3D math (ADR-095/ADR-097) · scaffold duplicated
 from Topic 2.1 · no build tools.*
 
 ## Session Digest Protocol

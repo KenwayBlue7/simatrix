@@ -9,8 +9,8 @@
   <meta name="description" content="Inscribe and circumscribe a circle about a triangle, then superscribe and inscribe a regular polygon about/in a circle — two mirrored pairs of constructions, animated step by step, then set up as a textbook problem to verify." />
 
   <!--
-    See ../CLAUDE.md and ../DECISIONS.md ADR-078. This topic loads NO CDN module and
-    needs NO import map (ADR-078's INFERRED simplification): the viewport is inline SVG,
+    See ../CLAUDE.md and ../DECISIONS.md ADR-095. This topic loads NO CDN module and
+    needs NO import map (ADR-095's INFERRED simplification): the viewport is inline SVG,
     not Three.js, so there is nothing to pin or fetch beyond this page and the bundled
     fonts. The guided-step wizard (src/stepper.js), the construction geometry
     (src/constructions.js), and its SVG renderer (src/renderConstruction.js) are wired
@@ -46,7 +46,7 @@
 
   <style>
     /*
-      Bundled web fonts (DESIGN.md typography). Shared platform font host (ADR-082, amends
+      Bundled web fonts (DESIGN.md typography). Shared platform font host (ADR-086, amends
       RULES.md §2.12/§2.15's local-only mandate for this track) — Atkinson Hyperlegible
       (UI/body), IBM Plex Mono (numbers).
     */
@@ -626,7 +626,7 @@
         <p class="card__lead" id="step-lead"></p>
 
         <!-- Step 1 — the picker. Orient: one decision, no wall of controls. Two mirrored
-             pairs (this topic's own audit, ADR-078): incircle/circumcircle share the same
+             pairs (this topic's own audit, ADR-095): incircle/circumcircle share the same
              triangle; superscribe/inscribe share the same circle. -->
         <div class="step-panel" data-step="1">
           <p class="card__lead">

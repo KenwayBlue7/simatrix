@@ -9,8 +9,8 @@
   <meta name="description" content="Regular pentagon, hexagon, and a general n-sided polygon, each buildable by 2-3 classical methods via a live method switcher, animated step by step, then set up as a textbook problem to verify." />
 
   <!--
-    See ../CLAUDE.md and ../DECISIONS.md ADR-078. This topic loads NO CDN module and
-    needs NO import map (ADR-078's INFERRED simplification): the viewport is inline SVG,
+    See ../CLAUDE.md and ../DECISIONS.md ADR-095. This topic loads NO CDN module and
+    needs NO import map (ADR-095's INFERRED simplification): the viewport is inline SVG,
     not Three.js, so there is nothing to pin or fetch beyond this page and the bundled
     fonts. The guided-step wizard (src/stepper.js), the construction geometry
     (src/constructions.js), and its SVG renderer (src/renderConstruction.js) are wired
@@ -46,7 +46,7 @@
 
   <style>
     /*
-      Bundled web fonts (DESIGN.md typography). Shared platform font host (ADR-082, amends
+      Bundled web fonts (DESIGN.md typography). Shared platform font host (ADR-086, amends
       RULES.md §2.12/§2.15's local-only mandate for this track) — Atkinson Hyperlegible
       (UI/body), IBM Plex Mono (numbers).
     */

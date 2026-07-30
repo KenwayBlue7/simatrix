@@ -1,10 +1,10 @@
 # CLAUDE.md — Simatrix · Diploma Engineering Graphics, Module 1 Topic 2.2: Spiral Curves
 
 > **Syllabus track:** "Diploma Engineering Graphics" **[PLACEHOLDER — exact syllabus/issuing-body
-> name not yet confirmed; see `../DECISIONS.md` ADR-078]**. This is that track's Module 1, Topic
-> 2 ("Miscellaneous Curves", ADR-079) — subtopic 2.2, the second of three (2.1 Roulettes, built;
+> name not yet confirmed; see `../DECISIONS.md` ADR-095]**. This is that track's Module 1, Topic
+> 2 ("Miscellaneous Curves", ADR-096) — subtopic 2.2, the second of three (2.1 Roulettes, built;
 > 2.3 Helix, not yet built). Namespaced `graphics_diploma_module_1_topic_2_2_spiral_curves` (the
-> repeated `1` is deliberate: module 1, subtopic 2.2 — ADR-078's own note on this pattern).
+> repeated `1` is deliberate: module 1, subtopic 2.2 — ADR-095's own note on this pattern).
 
 One construction — the spiral engine — covering two growth laws via a toggle: the Archimedean
 spiral (radius grows by a fixed amount per radian) and the logarithmic/equiangular spiral (radius
@@ -14,10 +14,10 @@ assumed (see the EXTRACTED/INFERRED table below).
 
 ## Project-wide documentation (read before cross-module tasks)
 
-Per **ADR-078**, this syllabus track **shares this repo's root docs and ADR sequence**. Before
+Per **ADR-095**, this syllabus track **shares this repo's root docs and ADR sequence**. Before
 starting any task that touches shared behavior, UI patterns, or cross-module consistency, read:
 - `../ARCHITECTURE.md` — system map, component breakdown, data flow
-- `../DECISIONS.md`    — ADR log; this topic's own decisions recorded under ADR-078/ADR-079
+- `../DECISIONS.md`    — ADR log; this topic's own decisions recorded under ADR-095/ADR-096
 - `../RULES.md`        — what you must and must not do (enforcement)
 - `../DESIGN.md`       — color tokens, typography, component standards
 - `../PRODUCT.md`      — who it's for, features, accessibility commitments
@@ -127,7 +127,7 @@ graphics_diploma_module_1_topic_2_2_spiral_curves/
 ├── meta.json
 ├── CLAUDE.md                ← this file
 ├── DESIGN.md                  ← local appendix: tokens (reused) + toggle (reused) + tangent visual (new)
-                                  (no local assets/fonts/ — fonts load from the shared platform host, ADR-082)
+                                  (no local assets/fonts/ — fonts load from the shared platform host, ADR-086)
 └── src/
     ├── anim.js                    ← tween/easing engine (byte-copy)
     ├── viewTransform.js             ← pan/zoom over the SVG viewBox (byte-copy, 240×190)
@@ -155,7 +155,7 @@ graphics_diploma_module_1_topic_2_2_spiral_curves/
 ---
 
 *Diploma Engineering Graphics [placeholder name] · Module 1 Topic 2.2 — Spiral Curves ·
-2D SVG orchestrator (ADR-078/ADR-079) · scaffold duplicated from Topic 2.1 · no build tools.*
+2D SVG orchestrator (ADR-095/ADR-096) · scaffold duplicated from Topic 2.1 · no build tools.*
 
 ## Session Digest Protocol
 At the end of every session (or when asked), produce a digest in this format:

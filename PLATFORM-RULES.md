@@ -64,12 +64,13 @@ terms of Engineering Graphics' own files, modules, or lessons was left out entir
 > **§1.9 ❌ NEVER** create a second reset path — any in-sim Reset control must route through
 > `simAPI.reset()`. *(ADR-002, CLAUDE.md)*
 
-> **§1.10 ❌ NEVER** add `postMessage`, `window.parent`, or `window.top` usage anywhere **outside
-> the Diploma track**. The host↔sim surface is `window.simAPI` + `meta.json` only. *(ADR-002,
-> ARCHITECTURE.md §6)* **Exception:** `graphics_diploma_module_1_topic_*` sends exactly two
-> one-shot, payload-less signals — `{ type: 'sim:ready' }` once from `init()`, `{ type:
-> 'sim:complete' }` once via `simController.reportComplete()` — and nothing else. `window.simAPI`
-> stays the only path *into* the sim. *(ADR-081)*
+> **§1.10 ❌ NEVER** add `postMessage`, `window.parent`, or `window.top` usage anywhere **except**
+> the two sanctioned outbound messages: `window.parent.postMessage({ type: 'sim:ready' }, '*')`
+> fired once from `markBooted()`, and `window.parent.postMessage({ type: 'sim:complete' }, '*')`
+> fired once from `markComplete()` when the lesson reaches its finished state. The host↔sim surface
+> is `window.simAPI` + `meta.json` for control, plus those two outbound signals — nothing else, and
+> no inbound `message` listener; `window.simAPI` stays the only path *into* the sim. *(ADR-002,
+> ADR-078, ARCHITECTURE.md §6)*
 
 > **§1.11 ✅ DO** ship a `meta.json` at the sim's root with all four fields — `title`,
 > `description`, `difficulty`, `tags`. Uploads missing any field are rejected. *(ADR-002, CLAUDE.md)*
@@ -79,9 +80,9 @@ terms of Engineering Graphics' own files, modules, or lessons was left out entir
 > 2026-07-02 — affected all meta.json files at initial discovery)*
 
 > **§1.12 ❌ NEVER** make a runtime network call beyond the one-time, pinned-version CDN fetch for
-> whatever library you depend on; the sim must work fully offline once loaded. *(ADR-002, CLAUDE.md)*
-> **Exception:** the Diploma track's font fetch below (§1.15) and its two `postMessage` signals
-> (§1.10) — both scoped to `graphics_diploma_module_1_topic_*` only. *(ADR-081, ADR-082)*
+> whatever library you depend on, and the font fetch from Supabase Storage (§1.15); the sim must
+> work fully offline once those load. *(ADR-002, ADR-086, CLAUDE.md)*
+> Note: since ADR-086, first-load typography is no longer guaranteed offline — see §1.15.
 
 > **§1.13 ✅ DO** render only a dismissible "Best experienced on desktop" banner below 768px — never
 > block, redirect, or disable the sim. *(CLAUDE.md)*
@@ -89,14 +90,14 @@ terms of Engineering Graphics' own files, modules, or lessons was left out entir
 > **§1.14 ✅ DO** make the sim self-starting on page load; there is no external `init()` call.
 > *(CLAUDE.md)*
 
-> **§1.15 ✅ DO** bundle fonts as local `woff2` (Atkinson Hyperlegible + IBM Plex Mono) loaded via
-> `@font-face`; **never** use a Google-Fonts CDN. *(ARCHITECTURE.md §7, CLAUDE.md)*
+> **§1.15 ✅ DO** load fonts (Atkinson Hyperlegible + IBM Plex Mono) via `@font-face` pointed at
+> the Supabase Storage CDN (ADR-086, reverses the prior "bundle local woff2, never CDN" rule);
+> **never** point at a Google-Fonts CDN or any other third-party font host. *(ARCHITECTURE.md §7,
+> DESIGN.md §3.1, ADR-086)*
 > Reason: these two fonts are the platform's own shared typography, defined in the root design
-> system — not something each subject module chooses independently.
-> **Exception:** `graphics_diploma_module_1_topic_*` fetches both fonts via `@font-face` from the
-> platform's own shared Supabase font host instead of bundling a local copy — same two families,
-> not Google Fonts, just a shared bucket instead of per-sim duplication. No local `assets/fonts/`
-> in these 9 topics. *(ADR-082)*
+> system — not something each subject module chooses independently; Supabase Storage is only
+> *where* the bytes are served from now, centrally, instead of each module carrying its own
+> bundled copy. No local `assets/fonts/` anywhere in the repo.
 
 ---
 
@@ -280,9 +281,9 @@ terms of Engineering Graphics' own files, modules, or lessons was left out entir
 - ❌ Use a UMD global, `@latest`, or an unpinned external library. *(§1.2)*
 - ❌ Write extensionless or absolute-path imports. *(§1.4, §1.5)*
 - ❌ Open the sim from `file://` or assume port 80 works. *(§1.6)*
-- ❌ Add `postMessage`/`window.parent`/`window.top` outside the Diploma track's two exempted
-  signals, a second reset path, or any network call beyond the one-time pinned CDN fetch. *(§1.9,
-  §1.10, §1.12)*
+- ❌ Add `postMessage`/`window.parent`/`window.top` beyond the two sanctioned outbound signals
+  (`sim:ready` boot, `sim:complete` lesson-finish), a second reset path, or any network call
+  beyond the one-time pinned CDN fetch. *(§1.9, §1.10, §1.12)*
 
 **UI / visual**
 - ❌ Hard-code a hex in JS or component CSS. *(§2.1)*

@@ -5,7 +5,7 @@
 // Layering (CLAUDE.md): leaf module, imports nothing. main.js calls build(params) for the
 // active construction and hands the recipe to renderConstruction.js.
 //
-// ADR-080: a helix is a genuine 3D space curve, but this topic stays on the Diploma
+// ADR-097: a helix is a genuine 3D space curve, but this topic stays on the Diploma
 // track's 2D SVG orchestrator — every point is computed in real 3D (x, y, z), then
 // projected into TWO linked orthographic views (front view above, top view below,
 // first-angle — RULES.md §4's citation), exactly Example 7.11's own construction method.
@@ -43,7 +43,7 @@ const dim = (a, b, text, role, offset = 10) => ({ kind: 'dim', role, a, b, text,
 
 // ----------------------------------------------------------------------------
 // The shared 3D generator — cylindrical and conical helix are ONE function, differing
-// only in whether the radius is constant or linearly tapers with height (ADR-080's own
+// only in whether the radius is constant or linearly tapers with height (ADR-097's own
 // "the math stays 3D" point). The helical spring reuses the cylindrical case for its
 // centerline.
 // ----------------------------------------------------------------------------
@@ -90,7 +90,7 @@ const PAD = 16;
 /**
  * @param {number} maxRadius  the largest radius anything drawn ever reaches (base radius
  *   for a cone, mean+wire radius for a spring) — exact, not sampled/estimated, since every
- *   construction's true extent is directly one of its own given parameters (ADR-080).
+ *   construction's true extent is directly one of its own given parameters (ADR-097).
  * @param {number} heightSpan  the largest axial z anything drawn ever reaches
  */
 function fitTwoView(maxRadius, heightSpan, cap = 1.3) {
@@ -306,7 +306,7 @@ function buildSpring(params) {
   const cfg = { kind: 'cylindrical', r: R, pitch, hand };
 
   // Layout must contain the wire's own thickness — the offset curves reach w beyond the
-  // bare centreline's own extent on every axis (ADR-080/Topic 2.2's "include everything
+  // bare centreline's own extent on every axis (ADR-097/Topic 2.2's "include everything
   // you'll draw in the SAME bbox that derives scale" discipline).
   const { toFront, toTop, scale } = fitTwoView(R + w, heightSpan + w);
   const givenSteps = [

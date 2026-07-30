@@ -1,6 +1,6 @@
 // Orchestrator — Diploma Engineering Graphics, Module 1 Topic 1.6: Ogee Curves.
 //
-// No Three.js, no CDN import map (ADR-078): the viewport is inline SVG. Owns `state`
+// No Three.js, no CDN import map (ADR-095): the viewport is inline SVG. Owns `state`
 // (which construction is active, its given params, and how much of it has been drawn), the
 // single rebuild() pipeline, window.simAPI, and the boot watchdog.
 //
@@ -14,7 +14,7 @@
 // through the normal rebuild()/sync() funnel, no special-casing needed.
 //
 // rebuild()'s shape (re-expressed from ADR-004's 3D-solid pipeline for a 2D SVG
-// substrate, per ADR-078's own "no prior ADR tested this" admission):
+// substrate, per ADR-095's own "no prior ADR tested this" admission):
 //   dispose previous construction's SVG children -> resolve the active construction's
 //   given parameters -> compute construction geometry as plain data (constructions.js)
 //   -> render the GIVEN elements into #given-layer -> mount the draggable handle (if any)
@@ -53,7 +53,7 @@ let activeHandle = null; // mountHandle() handle, disposed/remounted every rebui
 let paused = false;
 let lastFrameTime = 0;
 let rafId = null;
-let completeSent = false; // sim:complete postMessage latch — fires at most once per page load (ADR-081)
+let completeSent = false; // sim:complete postMessage latch — fires at most once per page load (ADR-078)
 
 // ============================================================================
 // DOM references
@@ -196,7 +196,7 @@ const simController = {
   reportComplete() {
     if (completeSent) return;
     completeSent = true;
-    window.parent.postMessage({ type: 'sim:complete' }, '*'); // host signal (ADR-081), one-shot
+    window.parent.postMessage({ type: 'sim:complete' }, '*'); // host signal (ADR-078), one-shot
   },
 };
 
@@ -272,7 +272,7 @@ function init() {
   setupVerifyActions();
   rafId = requestAnimationFrame(frame);
   window.__simBooted = true; // clears the boot watchdog fallback (index.html inline script)
-  window.parent.postMessage({ type: 'sim:ready' }, '*'); // host signal (ADR-081) — fires once, init() runs once
+  window.parent.postMessage({ type: 'sim:ready' }, '*'); // host signal (ADR-078) — fires once, init() runs once
 }
 
 init();
