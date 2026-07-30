@@ -84,6 +84,49 @@ C:\xampp\htdocs\Simatrix\
 │                                              meshAnalyzer.js. Teaches line types on an
 │                                              orbitable 3D bearing block. (ADR-029.)
 │
+├── graphics_module_1_topic_1_1_dimensioning\  MODULE-1 SUBJECT ("Dimensioning" — BIS
+│                                              dimensioning practice, Chapter 4 of the
+│                                              prescribed textbook / Dimensions.pdf), built on
+│                                              MODULE 2's orchestrator pattern. BUILT & SHIPPED
+│                                              (2026-07-26); its 3-D inspection reuses
+│                                              Foundations' meshAnalyzer + lineDrawer for LIVE
+│                                              camera-dependent edge classification while the
+│                                              front elevation keeps its authored linework
+│                                              (ADR-081); curriculum-audited and remediated
+│                                              (2026-07-27 — see CURRICULUM-AUDIT.md in the
+│                                              topic, its standing academic checklist; the
+│                                              production/authoring workflow is the one item
+│                                              deliberately deferred, ADR-080). Sits immediately
+│                                              after Topic 1
+│                                              (Foundations): that topic teaches what the LINES
+│                                              mean, this one how a drawing states SIZE and
+│                                              LOCATION. One machined subject throughout — the
+│                                              Guide Plate, a 200x100x30 stepped plate carrying a
+│                                              shoulder, an R15 fillet, an R12 corner, a 10x45
+│                                              chamfer, an R220 crowned step face, a bore
+│                                              chamfered 3x45 at its mouth, a hole countersunk on
+│                                              the FAR
+│                                              face (the drawing's one hidden outline, by
+│                                              design), a square hole, a slot, a spherical
+│                                              seat and a cylindrical spigot whose axis lies IN
+│                                              the drawing plane (so the elevation shows it as a
+│                                              rectangle), all as real geometry. Six guided steps:
+│                                              the elements of a dimension, the correct/violation
+│                                              rule flips, Method-1 vs Method-2 under a
+│                                              turn-the-drawing slider, the five arrangements
+│                                              with a before/after split, the shape symbols, and
+│                                              a mistake hunt over the finished drawing. Leaves:
+│                                              dimensionData (pure geometry data), dimensionRig
+│                                              (the manifold solid + its line alphabet),
+│                                              dimensionDraw (the declarative BIS dimension
+│                                              renderer), dimensionLabels (CSS2D values, drags,
+│                                              review markers), dimensionUI (the stepper), plus
+│                                              five pure-data catalogues. NOTE: a single
+│                                              ORTHOGRAPHIC camera — no perspective camera, no
+│                                              projection morph — and NO occlusion raycaster or
+│                                              three-mesh-bvh; the linework is authored, so
+│                                              nothing is camera-dependent. (ADR-078, ADR-079.)
+│
 ├── graphics_module_1_topic_2_spatial_framework\ MODULE-1 SUBJECT ("Spatial Framework" —
 │                                              Quadrants + First-angle combined into one
 │                                              topic), built on MODULE 2's orchestrator
@@ -204,6 +247,33 @@ C:\xampp\htdocs\Simatrix\
 │                                              self-check via the non-rebuild
 │                                              commitStringPath() overlay commit (ADR-070). See
 │                                              root DECISIONS.md ADR-064..070.
+│
+├── graphics_module_3_topic_2_2_conic_sections\  MODULE-3 SUBJECT (Conic Sections), built on
+│                                              MODULE 2's orchestrator pattern per ADR-033.
+│                                              BUILT (2026-07-29), feature-complete: teaches
+│                                              textbook Chapter 6 in SIX guided steps — the
+│                                              double cone, its six section planes, the conic as
+│                                              a locus, the nomenclature, the eccentricity
+│                                              construction, and the other eleven constructions.
+│                                              Scaffolded from the SIBLING topic above rather
+│                                              than template_starter/, with every shared engine
+│                                              file re-copied from Module2/ and md5-verified
+│                                              (ADR-082); it carries ONLY cone.js of the five
+│                                              generators. A new pure leaf src/conicEngine.js
+│                                              (ADR-084) owns all plane-curve mathematics and the
+│                                              Canvas2D sheet: one focal-polar model for all
+│                                              three curves, four sheet modes, twelve
+│                                              constructions, one renderer over a typed display
+│                                              list; sheet state is stored in MILLIMETRES, not
+│                                              world units (ADR-083). src/conicData.js is the
+│                                              pure catalogue (the six planes + their rules,
+│                                              classifySection() judged against the LIVE
+│                                              generator angle, the method table). Topic-1's
+│                                              sectionCut.js is ported verbatim but used as a
+│                                              CURVE EXTRACTOR — the cone is never cut away
+│                                              (ADR-085). The problem library ships all fifteen
+│                                              chapter exercises verbatim and stamps NOTHING on
+│                                              load. See root DECISIONS.md ADR-082..085.
 │
 └── (src_csharp\)                              Old C# Unity prototype. NOT documented
                                                here. (Not present in the working tree

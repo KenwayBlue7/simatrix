@@ -2743,6 +2743,399 @@ learner's pan/zoom. `compareSheet.js` in both topics stays byte-parity (as it wa
 
 ---
 
+## ADR-078: Module 1 Topic 1.1 (Dimensioning) runs on ONE orthographic camera with authored linework — no perspective camera, no projection morph, no occlusion raycaster — and its pure-data catalogues are sibling-importable
+
+**Date:** 2026-07-26
+**Decision:** `graphics_module_1_topic_1_1_dimensioning` adopts the standalone orchestrator pattern
+of its sibling `graphics_module_1_topic_1_foundations` (ADR-007 / ADR-029 / ADR-033) — thin `main.js`,
+pure leaves in a star, single `rebuild()`, full disposal contract, `window.simAPI`, CSS2D labels,
+guided stepper — but departs from it in three places, deliberately:
+
+1. **One `OrthographicCamera`, and no second camera.** There is no `PerspectiveCamera` in the scene
+   and therefore no `projectionMorphK` blend. Orbit stays live on the parallel camera; the "Front
+   view", "3-D view" and "Turn over" chips are azimuth/elevation tweens of that one camera.
+2. **No occlusion raycaster and no `three-mesh-bvh`.** The Type A linework is authored from the very
+   outline the solid is extruded from, and the drawing's single genuinely hidden outline — a
+   countersink deliberately machined on the FAR face — is authored dashed. No edge classification is
+   camera-dependent, so nothing is re-run on orbit.
+3. **The topic's pure-data modules are the sibling-importable exception.** `dimensionData.js`,
+   `dimensionSteps.js`, `dimensionRules.js`, `dimensionSymbols.js`, `dimensionExamples.js` and
+   `dimensionAnimations.js` hold plain objects and pure functions — no DOM, no Three.js objects, no
+   behaviour — and any leaf may import them. The BEHAVIOURAL leaves (`dimensionRig`, `dimensionDraw`,
+   `dimensionLabels`, `dimensionUI`) still never import one another.
+
+Two supporting mechanics fall out of it and are recorded here so they are not "tidied away": the
+solid is **opaque** by default with an explicit render order `solid (0) → hidden dashed (1) → visible
+wide (2) → dimension apparatus (3)`, the hidden batch running `depthTest: false`; and the dimension
+apparatus is **declarative** — a step hands `main.js` a list of specs plus a per-spec reveal
+progress, and one `redraw()` turns them into linework and CSS2D values. Geometry still changes only
+inside `rebuild()`.
+
+**Why:**
+1. This topic *is* a drawing. A dimension states a true length, and under perspective every value on
+   screen would be a lie about its own line. RULES.md §5.18's dual-camera morph exists to smooth the
+   hand-off *between* a perspective view and an ortho quick-view; with no perspective camera there is
+   no hand-off to smooth, so obeying §5.18 here would mean **adding** a camera the lesson must never
+   use. (Contrast Topic 1, whose pictorial IS the subject.)
+2. ADR-029/ADR-030's raycaster is load-bearing for Topic 1 *because* its lesson is the
+   visible-to-hidden swap under orbit. Here the lesson is the dimension apparatus. Carrying the
+   raycaster would buy nothing and re-import the ADR-029 performance class of problem; the ONE hidden
+   outline the syllabus needs (§4.6 rule 5, "dimensions are to be given from visible outlines rather
+   than from hidden lines") is instead designed into the part, which is both cheaper and
+   pedagogically sharper — the student can see exactly which line the rule is about.
+3. Six catalogues of textbook content cannot all hang off the orchestrator without `main.js` becoming
+   a content file. §3.6's stated exception is "pure math/pure data may be shared" (`genericSolid.js`);
+   these modules are the same category, and keeping the behavioural leaves strictly
+   non-cross-importing preserves what the rule is actually protecting.
+
+**Alternatives rejected:** *(a)* Add a perspective camera + `projectionMorphK` for §5.18 literal
+compliance — rejected: it adds a projection the topic must never teach in, purely to satisfy a rule
+whose precondition (two cameras) it would itself create. *(b)* Copy Topic 1's raycaster + BVH —
+rejected: no camera-dependent decision exists to make, and it would tie a second topic to the ADR-030
+dependency for nothing. *(c)* Draw the hidden countersink as a decorative dashed circle with no
+geometry behind it — rejected: the 3-D view would expose the lie the moment a learner orbits, and
+this whole topic is about drawings telling the truth. *(d)* Put every catalogue behind the
+orchestrator — rejected: `main.js` stops being an orchestrator.
+
+> **⚠️ POINT 2 SUPERSEDED BY ADR-081 (2026-07-27).** The topic now DOES carry the occlusion
+> raycaster and `three-mesh-bvh` — but only for the 3-D inspection, which did not exist when this
+> ADR was written. Point 2's reasoning held while the topic had a single fixed elevation and
+> nothing camera-dependent; once the learner can turn the part, "what can I see from here?" is a
+> live question. **Points 1 and 3 stand unchanged**: still one orthographic camera, still no
+> projection morph, still sibling-importable pure-data catalogues. The FRONT ELEVATION still
+> draws the authored linework, exactly as described below.
+
+**Consequences:** The topic ships no `three-mesh-bvh` in its import map (RULES.md §2.20 does not
+apply to it). Anyone porting from Topic 1 must NOT carry this decision back — Topic 1's raycaster is
+protected by ADR-029's Phase-3 reversal note. The opaque-solid + render-order arrangement is the only
+thing keeping the hidden linework visible; making the solid transparent by default would push it into
+Three.js's late transparent pass and silently erase the drawing's one Type E/F line. The topic also
+ADDS two viewport encodings (`--color-flag-wrong`, `--color-flag-right`) under RULES.md §4.16 — a
+dimensioning lesson must be able to mark a stroke wrong inside the viewport, where the accent blue is
+forbidden (§4.5) — and never uses them alone (a cross/tick marker and a written rule always accompany
+them, Two-Cue Rule §4.6).
+**Status:** Active.
+
+---
+
+## ADR-079: The Dimensioning topic's arrowhead proportions follow the textbook's Figs. 4.5–4.6 and §4.5, not the platform's 3:1 default
+
+**Date:** 2026-07-26
+**Decision:** In `graphics_module_1_topic_1_1_dimensioning`, the five termination styles are drawn to
+the proportions its own master reference gives: **open** head with an included angle of about 15° and
+a length of 4 mm, drawn with a THICK line (§4.5 item 2, the textbook's own suggestion for class
+work); **closed** and **closed-and-filled** heads 3.5 mm long by 1.75 mm wide (Fig. 4.6's "3 to 4" by
+"1.5 to 2"); **oblique** strokes at 45° (Fig. 4.5b); and **dots** of 1.5 mm (§4.5 item 2). The default
+termination for the whole topic is the OPEN head, again per §4.5. RULES.md §6.19's platform default —
+a strict 3:1 length:width head, filled on the Points Compare sheet and an open chevron in
+`Module2/src/projectionDrawer.js` — does **not** apply to this topic's linework.
+
+**Why:** §6.19 exists so that dimensions *incidental* to another lesson look consistent across the
+platform. Here the arrowhead is not incidental: Step 2 puts the five styles on a selector and states
+their proportions as the lesson content, and a student can hold the book beside the screen. A 3:1
+head is outside the band Fig. 4.6 actually prints (3–4 long by 1.5–2 wide is between 1.5:1 and
+2.7:1), so rendering 3:1 while the card quotes the book would make the simulation contradict its own
+source of truth — the one thing this topic may never do.
+**Alternatives rejected:** *(a)* Draw 3:1 and quote 3:1 in the copy — rejected: it misquotes the
+textbook. *(b)* Draw 3:1 and quote the book — rejected: the drawing and the card would disagree in
+front of the student. *(c)* Change §6.19 platform-wide — rejected: the other consumers (Points'
+Canvas2D Compare sheet, Module 2's `projectionDrawer.js`) are settled under ADR-041/ADR-016 and have
+no reason to move; a scoped exception is the smaller, honest change.
+**Consequences:** Terminations in this topic will not match Module 2's or Points' pixel-for-pixel.
+That is intended and must not be "fixed" (RULES.md §8.6). §6.19 is amended with an explicit
+carve-out; if a future topic also teaches termination geometry, it should cite this ADR rather than
+re-argue it.
+**Status:** Active.
+
+---
+
+## ADR-080: A figure the subject cannot show is a figure the topic does not teach — the Dimensioning plate carries three features that exist only to make one; and a permission is never rendered as a violation
+
+**Date:** 2026-07-27
+**Decision:** Following the curriculum audit of `graphics_module_1_topic_1_1_dimensioning`
+(`CURRICULUM-AUDIT.md`, which stays in the topic as its standing academic checklist), three
+decisions were taken and are recorded here so none of them is later "simplified" away:
+
+1. **Three features were added to the Guide Plate purely so that three of the chapter's figures
+   have something real to be drawn on.** A **cylindrical spigot** ø28 × 26 stands off the right
+   end face with its axis lying IN the drawing plane, so the front elevation shows it as a
+   RECTANGLE — the entire subject of Fig. 4.21, and a case a flat plate has no other way to
+   present. The step's top face is **crowned to R220**, a radius whose centre falls 166 mm below
+   the plate and therefore off the sheet, which is what Fig. 4.22's large-radius cases are
+   about. The bore's front mouth carries a **3 × 45° internal chamfer** (Fig. 4.26c), which is
+   why the bore now reads as two concentric circles in the front view. All three are real
+   manifold geometry, like everything else on the part.
+2. **A rule card that shows something the chapter ALLOWS presents two lawful drawings, not a
+   correct one and a violation.** Fig. 4.2 — "projection lines may be drawn as an extension of a
+   centre line or outline of the object" — is a permission. The rule catalogue gained a
+   `permission` flag that relabels the switch and suppresses the wrong-flag styling.
+3. **Step 1 owns how a dimension is DRAWN; Step 2 owns where its parts may GO.** The termination
+   selector, the included-angle slider, the Figs. 4.7–4.8 space study and the Fig. 4.4 leader
+   heads all live in Step 1.
+
+**Why:**
+1. The audit's sharpest finding was not that anything was wrong, but that seventeen of
+   forty-four figures had nothing on the sheet they could be demonstrated on. The topic's own
+   founding constraint is ONE subject for all six steps — never switch objects — so the only
+   honest way to close that gap was to give the subject the features. The alternative, a side
+   diagram per missing figure, would have made the topic exactly the slideshow it was built not
+   to be. The crown is deliberately shallow (≈3.7 mm of rise over an 80 mm chord) so it meets
+   the R15 fillet at about 10°, under `dimensionRig.js`'s `CORNER_DEG` threshold, and the
+   junction stays smooth instead of sprouting a spurious edge.
+2. Rendering Fig. 4.2's alternative in `--color-flag-wrong` would teach the opposite of what the
+   chapter says, in the one channel a student trusts most — the colour. The topic already
+   distinguishes "wrong" from "different" everywhere else; a permission has to be able to say
+   "both of these are correct" without borrowing the vocabulary of error.
+3. Step 2 had accumulated three unrelated control clusters (seven rule cards, five terminations,
+   a drag task) while Step 1 had one button and a row of chips. The split above is §4.1's own —
+   the section names the termination and the leader as ELEMENTS, then states the rules about
+   them separately — so it costs nothing in fidelity and fixes the load imbalance the audit
+   measured.
+
+**Alternatives rejected:** *(a)* Illustrate the missing figures on separate diagrams beside the
+plate — rejected: it breaks the one-subject rule that makes every rule in the topic legible
+against geometry the student already understands. *(b)* Leave Figs. 4.21/4.22/4.26c uncovered and
+note the gap — rejected: the textbook is the syllabus, and "the model cannot show it" is not a
+reason a student is excused from it. *(c)* Show Fig. 4.2 as a violation for switch symmetry —
+rejected: it inverts the chapter. *(d)* Add a seventh step for the drawing mechanics — rejected:
+the six-step flow is fixed, and §4.1 already groups these under the elements.
+
+**Consequences:** `SHEET_MM.xMax` and `LANE.right1` both moved out to clear the spigot, so any
+future dimension parked on the right must respect the new lane. The three added features are
+load-bearing for Figs. 4.21, 4.22 and 4.26c and for two of Step 6's twelve faults; removing one
+silently deletes a piece of the syllabus, which is why `CLAUDE.md` marks them. This ADR does NOT
+cover the production/authoring workflow the audit identifies as the chapter's terminal objective:
+that is deliberately postponed, because it needs an authoring surface, lane snapping and a
+validation engine — a different interaction architecture from this topic's declarative spec
+pipeline — and a half-built version would be worse than an honest absence.
+**Status:** Active.
+
+---
+
+## ADR-081: The Dimensioning topic's 3-D inspection is classified LIVE by Foundations' raycaster; the front elevation keeps its authored linework (supersedes ADR-078 point 2)
+
+**Date:** 2026-07-27
+**Decision:** `graphics_module_1_topic_1_1_dimensioning` now carries the occlusion raycaster and
+`three-mesh-bvh`, reusing the sibling Foundations topic's stack **verbatim** — `meshAnalyzer.js`
+copied byte-for-byte, `lineDrawer.js` copied with only its header and group name retargeted, the
+same global `computeBoundsTree` / `acceleratedRaycast` prototype patch, and the same
+rAF-throttled `reclassify(camera)` in the render loop. The topic runs **two** linework systems
+and swaps between them on the named camera pose:
+
+- **FRONT ELEVATION → the authored linework, unchanged.** A drawing is a fixed, agreed
+  projection. Which of its lines are dashed is a draughting decision the whole lesson rests on —
+  Step 2's "measure from visible outlines" rule argues about one specific dashed circle — and it
+  must not shift under the learner.
+- **ANY OTHER DIRECTION → the live classifier.** Silhouettes appear and vanish under the orbit,
+  and an edge that passes behind the boss goes dashed for exactly the stretch that is buried.
+- **"Reveal hidden lines"** takes the solid's MATERIAL off while the mesh stays in the scene, so
+  the raycaster (which reads geometry, never material) keeps classifying and the buried edges come
+  out dashed. Same mechanism as Foundations' X-ray; the chip is disabled in the elevation, where
+  there is nothing to reveal.
+
+**Why:** ADR-078 point 2 argued that nothing in this topic was camera-dependent, so the raycaster
+would buy nothing. That was true of a topic with one fixed elevation. It stopped being true the
+moment the 3-D view became an *inspection*: static dashed lines that do not move when the part
+does are not a simplification, they are wrong — they tell the learner a back-face feature is
+hidden from a direction it is plainly visible from. The authored set is still right for the
+elevation and still cheaper there, so neither system replaces the other; the pose decides.
+
+Reuse rather than re-implementation is the point. Foundations' classifier is the reviewed
+reference for this exact problem (ADR-029, and the Phase-3 reversal note that says never to drop
+it), it already handles the hard cases — welded topology, silhouette seams on curved surfaces,
+per-sub-segment partial occlusion, flush-seam suppression — and a learner moving between the two
+topics should meet one behaviour, not two.
+
+**Alternatives rejected:** *(a)* Classify everywhere, including the elevation — rejected: the
+drawing's dashed lines would become an emergent property of the camera rather than a stated
+convention, and the countersink Step 2 argues about could silently change. *(b)* Keep the authored
+linework in 3-D and accept that it is stale — rejected: that is the defect. *(c)* Write a lighter
+classifier for this topic — rejected: two implementations of one idea, and the light one would be
+the one that gets the curved-surface silhouettes wrong.
+
+**Consequences:** The topic now pins `three-mesh-bvh` in its import map (RULES.md §2.20 applies to
+it after all — the note in ADR-078's consequences is superseded). `meshAnalyzer.js` is a third
+verbatim copy and must stay byte-identical to Foundations'. The BVH is built once per `rebuild()`
+and **freed with `disposeBoundsTree()` before the geometry** (ADR-004). Because the classifier
+welds and raycasts in WORLD space, the sheet must be square-on and centred while it is live:
+entering a dynamic view drops the Step-3 turn and the two-sheet compare, both of which are
+flat-drawing devices, and returning to the front restores the turn. Measured on the Guide Plate:
+**≈5.3 ms per pass, 1222 rays over 4641 edges** — comfortably inside a frame, and the pass is
+gated on `lineDrawer.group.visible`, so the elevation costs nothing at all.
+**Status:** Active. Supersedes ADR-078 point 2 only.
+
+---
+
+## ADR-082: Module-3 Topic 2.2 (Conic Sections) is cut from its SIBLING topic, not from `template_starter/`
+
+**Date:** 2026-07-29
+**Decision:** `graphics_module_3_topic_2_2_conic_sections` was scaffolded by duplicating
+`graphics_module_3_topic_2_development_of_surfaces` — then immediately re-copying every shared
+engine file from `Module2/src/` and verifying each by `md5sum` — rather than duplicating
+`template_starter/` as MODULE-STARTER §3.2 prescribes.
+**Why:** The template carries the platform skeleton but NOT the Module-3 layer this topic needs:
+`problemLibrary.js` and the active-problem/library markup were deliberately stripped from it, and
+its Compare card ships as unwired CSS + markup scaffolding. Cutting from the template would have
+meant re-deriving that layer from the two Module-3 topics anyway, by hand, with a real chance of
+subtle divergence in exactly the chrome the topic was required to keep identical. Cutting from the
+sibling starts at parity and makes the delta reviewable. The hazard MODULE-STARTER §9 warns about —
+"the topics are already scoped-down and some carry stale shared files" — was neutralised directly:
+`anim.js`, `cone.js`, `iShape.js` and `shapeData.js` were re-copied from the master and confirmed
+byte-identical by `md5sum`, and `sectionCut.js` was re-copied from topic 1.
+**Alternatives rejected:** *(a)* Duplicate `template_starter/` and port the library layer by hand —
+rejected as above: the same code, arrived at less reliably. *(b)* Duplicate `Module2/` (the
+"legitimate shortcut" §2 allows) — rejected: this topic uses one generator out of five and none of
+the projection stack, so it would be mostly deletion, and it would still not carry the Module-3
+Compare wiring. *(c)* Extend the sibling topic in place — rejected outright: a topic is a catalogue
+entry, and conic sections is not development of surfaces.
+**Consequences:** The three Module-3 topics now share their chrome by descent, so a fix to the
+wizard / Compare / library chrome still has to be re-copied by hand to all three (ARCHITECTURE.md
+§9.2 — unchanged, only wider). MODULE-STARTER §3.2 should be read as "duplicate the boilerplate, OR
+the nearest sibling if it carries a layer the boilerplate lacks — then re-copy every shared file
+from the master and verify it." The verification step is the part that is not optional.
+**Status:** Active
+
+---
+
+## ADR-083: The Conic Sections drawing sheet stores MILLIMETRES; the 3D scene keeps world units
+
+**Date:** 2026-07-29
+**Decision:** `ConicState` (eccentricity, focus-to-directrix distance, and every construction
+dimension) is stored in millimetres and degrees. The 3D cone and its cutting plane keep the
+platform's world units (ADR-018's `1 unit = 10 mm`); `src/uiManager.js` converts at the control,
+and `src/conicEngine.js` never converts at all.
+**Why:** The sheet is a plane construction that never enters the 3D scene — no camera, no mesh, no
+shared geometry — while every quantity it draws is quoted in millimetres by the chapter it teaches
+("FA = 50 mm", "major axis 150 mm", "asymptotes at 75°"). Storing world units would have left the
+data layer, the dock, the self-check targets and the textbook statement all disagreeing about the
+same number with a ×10 in between: the class of mistake ADR-018 exists to prevent, only inverted.
+Keeping the 3D half in world units keeps `cone.js`, `shapeData.js` and `sectionCut.js`
+byte-identical to their masters.
+**Alternatives rejected:** *(a)* World units everywhere, with the dock showing mm — rejected: the
+Problem Library's targets would then read `5.0` where the exercise says `50 mm`, and every future
+author would have to remember the factor. *(b)* Millimetres everywhere, converting the cone —
+rejected: it would fork the shared geometry files, the one thing RULES.md §1.3 forbids.
+**Consequences:** The topic has two unit systems, each stated in exactly one place (`conicData.js`'s
+header, and the dock's slider table where the `scale` column converts). The Compare sheet's fixed
+intrinsic frame (ADR-053) is therefore a px-per-**mm** scale with no `WORLD_TO_MM` factor, unlike
+the sibling topics'. Any future control that drives BOTH halves must state which side it is in.
+**Status:** Active
+
+---
+
+## ADR-084: The conic curves are drawn by a pure `conicEngine.js` leaf, from ONE focal-polar model, as a display list
+
+**Date:** 2026-07-29
+**Decision:** All plane-curve mathematics and all Canvas2D drawing for the Compare sheet live in
+one pure leaf, `src/conicEngine.js` (the ADR-066 pattern). Inside it: a single conic model derived
+from the focal polar r = e·FA ÷ (1 + e·cos θ) serves all three curves; each of the four sheet modes
+and each of the eleven constructions returns a **display list** of typed primitives plus an
+analytic bbox; and one `drawSheet()` renders them in drafting order — construction linework thin,
+the finished curve heavy, the marked apparatus on top.
+**Why:** The chapter draws the same three curves twelve different ways. Written directly that is
+twelve drawing routines, each free to disagree about line weight, label placement, and what counts
+as construction versus answer — the drift the Two-Weight Rule forbids. A display list makes a new
+construction a new *layout function*, never a new drawing path. Deriving every named quantity
+(vertex, centre, second focus and directrix, semi-latus rectum, asymptotes, both axes) from one
+equation removes the other failure mode: three curve implementations that are each subtly right and
+mutually inconsistent. And because the leaf imports nothing and touches no DOM, every layout is
+testable from Node — which is how all twelve were proved (see Consequences).
+**Alternatives rejected:** *(a)* Immediate-mode drawing per method — rejected as above. *(b)* Three
+curve classes (Ellipse / Parabola / Hyperbola) — rejected: §6.3's whole point is that they are one
+family separated only by e; three classes would bury it. *(c)* A curve/geometry library — rejected
+by the no-build, no-npm contract (ADR-001), and it would make the constructions unprovable: the
+point of the offset method is that the offsets ARE the squares, not that a library produced a
+parabola.
+**Consequences:** A Node oracle asserts that every plotted construction point satisfies its own
+conic — PF = e·PQ for the locus, x²/a² + y²/b² = 1 for the ellipse methods, a zero discriminant for
+the tangent method's envelope, and a constant sum / difference / product for the arc, foci and
+asymptote methods — to ~1e-14. Two real errors were caught by it and fixed: the focal polar's θ = 0
+was aiming AWAY from the directrix (putting the vertex on the far side and breaking PF = e·PQ for
+every point), and Fig. 6.20's joins were paired to the wrong edges (V₁ to the ordinate edge instead
+of the top edge), which drew a plausible curve that was not the given hyperbola. Re-run the oracle
+after touching any layout.
+**Status:** Active
+
+---
+
+## ADR-085: In Conic Sections the section clipper EXTRACTS the curve; the cone is never cut away
+
+**Date:** 2026-07-29
+**Decision:** `sectionCut.js` (ADR-058) is ported verbatim into the Conic Sections topic, but its
+sliced solid is discarded: the topic keeps the double cone whole, draws the clipper's ordered
+boundary loop on it as a fat `Line2` in the section colour, and lifts the clipper's cap triangles
+out as the section face. The cone turns translucent only while a section is on.
+**Why:** Topic 1 (Sections of Solids) teaches the SOLID left after a cut, so removing the discarded
+half is its lesson. This topic teaches the CURVE, and removing material works against it: a
+hyperbola exists because the plane meets both nappes, and the kept half-space always discards one
+of them — the learner would watch half the subject vanish at the moment it became relevant. The
+chapter's own pictorials (Fig. 6.2 a–f) show the section on an intact cone, which is exactly what
+this produces. The clipper is still the right tool: its `loops` output is already welded and
+ordered on meshAnalyzer's 1e-3 lattice, so the curve needs no reconstruction.
+**Alternatives rejected:** *(a)* Truncate like topic 1 — rejected as above; it also makes the
+rectangular hyperbola (which needs both nappes, on the same side of the axis) undrawable. *(b)* Cut
+each nappe with an opposite-facing plane so both survive — rejected: two contradictory planes on
+screen, and the caps would face the wrong way. *(c)* Intersect analytically without the clipper —
+rejected: a second implementation of a solved problem, and it would not weld.
+**Consequences:** The topic pays for one clip per nappe per rebuild and disposes the sliced geometry
+by hand, pre-scene, so the rebuild disposal contract never sees it. `sim.hasCut()` reports whether a
+section was found at all, which is the Problem Library's cuts-the-solid guard here as in both
+siblings. A contributor who reads topic 1 first will find this surprising — it is stated in the
+topic's CLAUDE.md and README as well as here.
+**Status:** Active
+
+---
+
+## ADR-086: Conic Sections is sequenced as a lesson, not exposed as a parameter set — observe, then experiment, then name
+
+**Date:** 2026-07-30
+**Decision:** The topic's six steps were re-cut into a story — meet the cone · cut it · six cuts,
+six curves · why they differ · how it is drawn · your turn — and every control was moved to the
+step whose question it answers, or removed. Concretely:
+- The section plane is switched **on by Step 2 itself** (`setStage`), so the on/off toggle is gone;
+  stepping back to Step 1 takes the plane away again.
+- Step 2 reports the cut in **plain words with no name** ("a closed oval — longer one way than the
+  other, but it still closes up"). The engineering name and the textbook rule arrive in Step 3, on
+  the six "show me" chips that travel the plane to each named cut.
+- Step 4 opens the drawing sheet **after** swinging the camera round to look at the cut square-on,
+  so the learner sees the 3D slice become the 2D curve. Its one driver is the ratio PF ÷ PQ; the
+  §6.2/§6.4/§6.8 vocabulary is behind a "label the engineering names" toggle, off by default.
+- Step 5 **plays the construction** stage by stage (`BUILD_STAGES`, gated in the engine by
+  `conicState.buildStage`) instead of presenting it finished. The other eleven methods sit behind
+  one select, with only the dimensions that method is given.
+- Step 6 is a **predict-and-verify drill**: the sim deals a cut the learner did not choose, keeps
+  its name back, and marks their answer against the same `classifySection()` the earlier steps
+  report with.
+- Retired from the dock: the curve select (derived from e), the focus-to-directrix slider (fixed at
+  the chapter's own 50 mm), and the plane on/off toggle. Every remaining control earns its place in
+  exactly one step.
+**Why:** The first build was complete and wrong-shaped: it showed a first-year every engineering
+parameter of the chapter at once — twelve constructions, three dimension fields, an eccentricity, a
+focal distance, a curve picker — and read as CAD software with a syllabus attached. PRODUCT.md's
+arc is Orient → Intuition → Problem-solving, and its persona is the struggling first-year; a panel
+that offers eleven methods before the learner knows why a parabola differs from an ellipse inverts
+that. The chapter itself teaches in this order (the cone, then the cuts, then the locus, then the
+constructions), so following it costs nothing architecturally and is what the material already
+assumes.
+**Alternatives rejected:** *(a)* Keep every control visible and improve the copy — rejected: the
+copy was not the load; sixteen live controls across six panels was. *(b)* Split into more steps so
+each holds fewer controls — rejected: six steps is the brief and the sibling topics' shape, and the
+problem is disclosure, not step count. *(c)* Add a "beginner mode" toggle over the existing panel —
+rejected: two UIs to maintain, and the learner who most needs the simple one is the least likely to
+find the switch.
+**Consequences:** The dock is now stage-aware — `sim.stage()` decides what a readout may say, which
+means the step change itself is a state change and `setStage` must fire the state bus (it does).
+`ConicSection` entries carry three descriptions of one idea (`seen` plain, `name`, `rule` formal),
+so a future contributor adding a cut must supply all three. Teaching demonstrations that MOVE the
+plane (Step 3's chips, Step 6's deal) are sanctioned; this does **not** loosen ADR-063, whose ban on
+a "parallel to a generator" preset governs the Problem Library's checked targets — the learner still
+sweeps the tilt by hand in Step 2 and predicts with no chips to lean on in Step 6. Labels on the
+sheet are suppressed below ~1.3 px per millimetre, because at compact card size a 12 px caption is
+nine millimetres of "drawing" and the annotation becomes the figure.
+**Status:** Active
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*

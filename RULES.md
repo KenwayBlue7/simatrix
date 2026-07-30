@@ -111,6 +111,21 @@ Every rule is formatted:
 > the "Project-wide documentation" block). **❌ NEVER** create a local `DESIGN.md`/`PRODUCT.md` copy
 > inside a new topic folder — a copy is an immediate drift point. *(ADR-028, ADR-022, ADR-023)*
 
+> **§1.15 ✅ DO** scaffold a new topic from `template_starter/` (MODULE-STARTER §3.2) — OR from the
+> nearest SIBLING topic when the boilerplate lacks a layer the new topic needs (the Module-3
+> Problem Library + wired Compare card). Either way, **re-copy every shared engine file from
+> `Module2/src/`** (and any ported leaf from its origin topic) and **verify byte-identity with
+> `md5sum` before writing a line of topic code**. *(ADR-082)*
+> Reason: cutting from a sibling starts at chrome parity and makes the delta reviewable; the
+> md5 check is what neutralises the "topics carry stale shared files" hazard (§1.8) that makes
+> sibling-cutting dangerous in the first place.
+
+> **§1.16 ❌ NEVER** carry a shared engine file a topic does not import ("it might be useful
+> later"). Omit it, and say in the topic's `CLAUDE.md` which shared files it does carry. *(ADR-082)*
+> Reason: an unused copy is a drift surface (§1.4 obliges you to re-copy fixes into it) with no
+> upside — `graphics_module_3_topic_2_2_conic_sections` carries only `cone.js` of the five
+> generators for exactly this reason.
+
 ---
 
 ## Section 2 — Platform & Runtime Rules
@@ -210,6 +225,15 @@ Every rule is formatted:
 > **§3.6 ❌ NEVER** let leaf modules import each other. Only `genericSolid.js` (pure math) may be
 > imported by sibling shape files. *(ADR-007, CLAUDE.md)*
 > Reason: the no-cross-import rule keeps the dependency graph a star around the orchestrator.
+
+> **§3.6a ✅ DO** treat a topic's **pure-data catalogue** modules — plain objects and pure functions,
+> no DOM, no Three.js objects, no behaviour — as the same sibling-importable category as
+> `genericSolid.js`, and say so in the topic's `CLAUDE.md`. **❌ NEVER** extend that licence to a
+> BEHAVIOURAL leaf (a rig, a renderer, a label layer, a stepper): those still never import one
+> another. *(ADR-078, extends ADR-007)*
+> Reason: a content-heavy topic (`graphics_module_1_topic_1_1_dimensioning` carries six textbook
+> catalogues) cannot hang every table off the orchestrator without turning `main.js` into a content
+> file — but the thing §3.6 protects is the behaviour graph, not the constants.
 
 > **§3.7 ✅ DO** make every shape generator follow the `iShape.js` contract and rotate via the shared
 > `applyShapeTransform()`. *(ADR-007, ADR-005)*
@@ -327,6 +351,18 @@ Every rule is formatted:
 > CSS-positioned overlays (e.g. CSS2D labels) that sit in true logical px. *(ADR-074)*
 > Reason: bug silent on every DPR-1 dev display — verify any future two-pass topic at a non-1.0
 > DPR. Retired alongside §3.33 — no topic currently has a scissor pass to misconvert.
+
+> **§3.34 ✅ DO** treat `sectionCut.js`'s ordered `loops` output as a first-class result: a topic
+> may use the clipper purely to EXTRACT the section curve (drawing the loop on an intact solid and
+> lifting the cap out as the section face) and discard the sliced geometry. **❌ NEVER** assume a
+> topic that imports `sectionCut.js` truncates its solid — check what it does with the result.
+> *(ADR-085, ADR-058)*
+> Reason: Sections of Solids teaches the solid left after the cut; Conic Sections teaches the
+> curve, and truncating there would discard the very nappe a hyperbola needs.
+
+> **§3.35 ✅ DO** dispose a clipper result the scene never receives BY HAND, immediately, at the
+> call site — the `rebuild()` disposal contract (§3.3) can only free what is parented into
+> `shapeGroup`. *(ADR-085, ADR-004)*
 
 ---
 
@@ -478,9 +514,26 @@ Every rule is formatted:
 > Reason: the reserved wizard otherwise cramps each pane and gates the live controls (and any
 > construction launcher) away from the dual view.
 
+> **§5.16a ✅ DO** dock ONLY the value drivers of the pane the rail serves — the sibling
+> Module-3 topic docks two groups (`['shape', 'section']`), and Conic Sections docks two
+> (`['cone', 'section']`). **❌ NEVER** dock a topic's whole control set: `#workbench-rail` is a
+> single wrapping row on the split grid's `auto` row, sized by its content against the viewport's
+> `minmax(0, 1fr)` row, so every extra group is taken directly out of the 3D pane's height.
+> *(ADR-021, ADR-037; regression fixed 2026-07-29)*
+> Reason: docking all six step groups in `graphics_module_3_topic_2_2_conic_sections` drove the
+> rail to **1340 px**, starving the viewport row to **2 px** — the renderer, the drawing sheet and
+> the rail toggle all collapsed with it. A control the split cannot show is reached by leaving the
+> split, exactly as the sibling topics do.
+
 > **§5.17 ❌ NEVER** mirror/duplicate the driver or construction-launcher controls into the rail, or
 > give the docked rail a shadow — **re-parent** the existing nodes (one source of truth) and
 > separate the rail with a hairline only (Flat-Ink). *(ADR-021, ADR-037)*
+
+> **§5.18 SCOPE (ADR-078):** this rule binds a topic that HAS both cameras. A topic whose subject is
+> a measured drawing may run on a **single orthographic camera** with no perspective camera at all
+> (`graphics_module_1_topic_1_1_dimensioning`) — there is then no hand-off to morph, and adding a
+> perspective camera merely to satisfy the rule would introduce a projection the lesson must never
+> teach in. **❌ NEVER** read §5.18 as "every topic needs a perspective camera."
 
 > **§5.18 ✅ DO** move between the 3D perspective view and a flat orthographic quick-view (Top / Front /
 > Side) with the **`projectionMorphK` dual-camera matrix morph** — element-wise lerp the ortho camera's
@@ -601,6 +654,14 @@ Every rule is formatted:
 > Compare sheet; use the **OPEN 3:1 chevron** in `Module2/src/projectionDrawer.js` (a filled head
 > needs a `Mesh` and breaks its single-`LineSegments2` disposal contract). Dimension linework reads
 > `--color-ink`; CSS2D labels read `--font-mono` / `--text-xs`. *(ADR-041, ADR-016)*
+>
+> **Carve-out (ADR-079):** this rule governs dimensions that are *incidental* to another lesson.
+> `graphics_module_1_topic_1_1_dimensioning` **teaches** termination geometry, so it draws the five
+> styles to its own master reference instead — open head at ≈15° included angle and 3–4 mm long drawn
+> thick (the textbook's class-work default, §4.5 item 2); closed / closed-and-filled heads 3–4 long ×
+> 1.5–2 wide (Fig. 4.6); oblique strokes at 45°; dots ≈1.5 mm. **❌ NEVER** "fix" that topic's heads
+> back to 3:1 — 3:1 sits outside the band its own figure prints, so the drawing would contradict the
+> card quoting it.
 
 > **§6.20 ✅ DO** treat `projectionDrawer.js`'s `dimensionGroup` like `ppGroup` — the consumer parents
 > and step-gates it (it is NOT added to the returned `group`), and it is reached by held reference in
@@ -616,6 +677,48 @@ Every rule is formatted:
 > **§6.22 ❌ NEVER** encode a syllabus exclusion as a never-enabled tier or as authoring
 > discipline ("just don't author them") — both vanish silently when tiers are reshuffled.
 > *(ADR-062, ADR-069)*
+
+> **§6.23 ✅ DO** keep the platform's `1 world unit = 10 mm` (§6.8) for anything that enters the 3D
+> scene. A topic whose 2D construction NEVER enters the scene **may** store its sheet state in
+> millimetres instead (`graphics_module_3_topic_2_2_conic_sections`) — but then **❌ NEVER** convert
+> inside the pure engine leaf: convert once, at the control, and state each bag's unit in exactly
+> one place. *(ADR-083, ADR-018)*
+> Reason: the chapter quotes millimetres, so storing world units would leave the data layer, the
+> dock, the self-check targets and the textbook statement disagreeing by a factor of ten; but a
+> conversion buried in the engine puts the same factor somewhere no author will look.
+
+> **§6.24 ✅ DO** build a multi-construction drawing engine as ONE pure leaf where each layout
+> returns a **display list** of typed primitives plus its own analytic bbox, rendered by a SINGLE
+> renderer. **❌ NEVER** give a construction its own drawing path. *(ADR-084, ADR-066)*
+> Reason: twelve immediate-mode routines are twelve chances for the thin-construction /
+> heavy-answer line vocabulary to drift.
+
+> **§6.25 ✅ DO** prove every construction with a Node oracle before shipping it — each plotted
+> point must satisfy its own curve (PF = e·PQ, `x²/a² ± y²/b² = 1`, a zero discriminant for an
+> envelope, a constant sum / difference / product). Re-run it after touching a layout. *(ADR-084,
+> ADR-019)*
+> Reason: a wrong construction still draws a plausible curve — both defects found this way were
+> invisible on screen.
+
+> **§6.26 ✅ DO** put a control in the ONE guided step whose question it answers, and hide it
+> everywhere else. **❌ NEVER** show a learner the whole parameter set of a topic at once because
+> every parameter is real. *(ADR-086, PRODUCT.md §1/§2)*
+> Reason: the persona is the struggling first-year. A panel offering eleven construction methods
+> before the learner knows why a parabola differs from an ellipse is CAD software with a syllabus
+> attached — the failure the Conic Sections redesign was written to undo.
+
+> **§6.27 ✅ DO** report a phenomenon in plain words BEFORE naming it, and keep the textbook
+> statement for the step that introduces the name. **❌ NEVER** open with the formal definition.
+> *(ADR-086)*
+> Reason: "a closed oval that still closes up" is something a learner can check against the screen;
+> "a section plane inclined to the axis and cutting all the generators" is something they can only
+> take on trust. A data-layer entry that names a phenomenon should therefore carry BOTH forms —
+> `ConicSection`'s `seen` / `name` / `rule` triple is the pattern.
+
+> **§6.28 ✅ DO** let a teaching step MOVE the model for the learner (a guided tour that travels the
+> cutting plane, a construction that plays stage by stage), and narrate what changed. **❌ NEVER**
+> let that shortcut reach an assessed answer — the Problem Library's checked targets stay
+> hand-dialled. *(ADR-086, scoping ADR-063)*
 
 ---
 
@@ -713,6 +816,7 @@ Every rule is formatted:
 - ❌ Re-add the `AxesHelper`, add PBR, or cast shadows on geometry. *(§3.24, §3.25)*
 - ❌ Ship a non-manifold solid (overlapping/duplicate extrusions), or keep a zero-area triangle in `meshAnalyzer.js`. *(§3.29, §3.30)*
 - ❌ Debounce the on-orbit hidden-line recompute (rAF-throttle it), or leave a stale/undisposed `three-mesh-bvh`. *(§3.32, §3.31)*
+- ❌ Assume a topic importing `sectionCut.js` truncates its solid, or leave a discarded clipper result undisposed. *(§3.34, §3.35)*
 - ❌ Pass device-px scissor/viewport regions straight to `setViewport`/`setScissor` — convert to logical px first. *(§3.33, §3.33a)*
 
 **UI / visual**
@@ -728,6 +832,7 @@ Every rule is formatted:
 - ❌ Use a per-frame exponential camera follow, or run tight-fit and push-back in one rebuild. *(§5.2, §5.3)*
 - ❌ Reintroduce the persistent dual-pane PiP/`swap()`, or show a snapshot in the Compare card. *(§5.11, §5.14)*
 - ❌ Put a CSS `transform` on `#sim-viewport`/`#canvas-area`/`body`. *(§5.13)*
+- ❌ Dock a topic's whole control set into `#workbench-rail` — it is sized against the viewport's row, so extra groups eat the 3D pane. *(§5.16a)*
 - ❌ Mirror the workbench rail controls instead of re-parenting, or give the docked rail a shadow. *(§5.17)*
 - ❌ Hard-swap perspective↔orthographic cameras in one frame instead of the `projectionMorphK` morph. *(§5.18)*
 
@@ -738,10 +843,15 @@ Every rule is formatted:
 - ❌ Revert the Lines sim to six fixed cases, or rename "line AB"/"end A"/"Point P". *(§6.13, §6.15)*
 - ❌ "Fix" 2D projectors to dashed, dots to crosses, or 3D projectors to solid. *(§6.18)*
 
-**Cross-module / docs**
+- ❌ Show every parameter of a topic at once, or name a phenomenon before the learner has seen it. *(§6.26, §6.27)*
+- ❌ Convert units inside a pure engine leaf, or leave a state bag's unit unstated. *(§6.23)*
+- ❌ Give one construction its own drawing path, or ship a construction no oracle has proved. *(§6.24, §6.25)*
+
+**Cross-module / docs****Cross-module / docs**
 - ❌ Fix a shared file directly in a topic folder, or infer the master from a `topic_N` number. *(§1.3, §1.7)*
 - ❌ Ship an `index.html` `<title>` that disagrees with `meta.json.title`. *(§1.12)*
 - ❌ Use a capitalised difficulty value in meta.json ("Intermediate" not "intermediate"). *(§2.11a)*
+- ❌ Cut a new topic from a sibling without re-copying and md5-verifying every shared file, or carry a shared file the topic never imports. *(§1.15, §1.16)*
 - ❌ Copy `iShape.js` verbatim as if it were byte-identical — it is an adapt file. *(§1.13)*
 - ❌ Reintroduce a per-topic `DESIGN.md`/`PRODUCT.md` instead of consuming the root copies. *(§1.14)*
 - ❌ Conflate Module 1's stub `uiManager.js` with Module 2's controller. *(§7.6)*
