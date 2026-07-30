@@ -110,7 +110,7 @@ graphics_diploma_module_1_topic_1_2_tangent_arcs/
 ├── meta.json
 ├── CLAUDE.md                ← this file
 ├── DESIGN.md                  ← local appendix: construction-line tokens (reused) + toggle note (new)
-├── assets/fonts/                ← bundled woff2 (byte-identical to the platform set)
+                                  (no local assets/fonts/ — fonts load from the shared platform host, ADR-082)
 └── src/
     ├── anim.js                    ← tween/easing engine (byte-copy — renderer-agnostic)
     ├── viewTransform.js             ← pan/zoom over the SVG viewBox (byte-copy)

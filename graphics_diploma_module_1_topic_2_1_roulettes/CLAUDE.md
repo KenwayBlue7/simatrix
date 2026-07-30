@@ -134,7 +134,7 @@ graphics_diploma_module_1_topic_2_1_roulettes/
 ├── meta.json
 ├── CLAUDE.md                ← this file
 ├── DESIGN.md                  ← local appendix: construction-line tokens (reused) + curve visual (new)
-├── assets/fonts/                ← bundled woff2 (byte-identical to the platform set)
+                                  (no local assets/fonts/ — fonts load from the shared platform host, ADR-082)
 └── src/
     ├── anim.js                    ← tween/easing engine (byte-copy)
     ├── viewTransform.js             ← pan/zoom over the SVG viewBox (BASE_W/H raised to 240×190)
