@@ -16,7 +16,24 @@
 //
 // Layering (CLAUDE.md): pure data, imports nothing. Consumed by problemLibrary.js.
 
-export const TIERS = ['practice', 'challenge'];
+export const TIERS = Object.freeze([
+  { id: 'practice', label: 'Practice', blurb: '' },
+  { id: 'challenge', label: 'Challenge', blurb: '' },
+]);
+
+/** The single clone-scope switch — every tier this build ships is enabled. */
+export const ENABLED_TIERS = Object.freeze(['practice', 'challenge']);
+
+/** Human labels for every self-check target field. */
+export const FIELD_LABELS = Object.freeze({
+  offset: 'vertical offset',
+  distance: 'horizontal distance',
+  reversalPos: 'reversal point position',
+  angle: 'angle between lines',
+  len1: 'length of first line',
+  distance2: 'distance to second point',
+  radius1: 'radius at first end',
+});
 
 export const PROBLEMS = [
   {
@@ -73,5 +90,15 @@ export const PROBLEMS = [
   },
 ];
 
-export const groupByTier = () =>
-  Object.fromEntries(TIERS.map((t) => [t, PROBLEMS.filter((p) => p.tier === t)]));
+/** Problems whose tier is enabled for this build. */
+export function enabledProblems() {
+  return PROBLEMS.filter((p) => ENABLED_TIERS.includes(p.tier));
+}
+
+/** Group a problem list by tier, in TIERS display order. */
+export function groupByTier(list) {
+  return TIERS
+    .filter((tier) => ENABLED_TIERS.includes(tier.id))
+    .map((tier) => ({ tier, problems: list.filter((p) => p.tier === tier.id) }))
+    .filter((g) => g.problems.length > 0);
+}
