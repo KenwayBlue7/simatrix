@@ -64,6 +64,7 @@ const TOTAL = STEPS.length;
  *   unflatten: () => void,
  *   completeAndNext: () => void,
  *   isProblemActive: () => boolean,
+ *   markComplete: () => void,
  * }} sim
  * @returns {{ sync: () => void, reset: () => void, dispose: () => void }}
  */
@@ -86,6 +87,7 @@ export function initStepper(sim) {
 
   const btnBack = $('btn-back');
   const btnNext = $('btn-next');
+  const btnFinish = $('btn-finish');
 
   const btnAdd = $('btn-add');
   const btnLabel = $('btn-label');
@@ -177,14 +179,14 @@ export function initStepper(sim) {
       btnDimensions.textContent = state.dimensions ? 'Hide dimensions' : 'Show dimensions';
       btnDimensions.setAttribute('aria-pressed', String(state.dimensions));
     }
-    // "Complete & next problem" (Feature 1) appears only once the drawing is flattened —
-    // the payoff moment. Label adapts to whether a textbook problem is loaded (free-play
-    // gets "Pick a problem", which still opens the library to choose a challenge).
+    // "Try another problem" (Feature 1) appears only once the drawing is flattened.
+    // Renamed off "Complete..." wording (Finish-button pilot) so it stops reading as
+    // the lesson-completion action now that #btn-finish owns that signal — this stays
+    // the repeatable practice-loop action, same label in both problem and free-play
+    // modes (still opens the library to choose a challenge either way).
     if (btnCompleteNext) {
       btnCompleteNext.hidden = !state.flattened;
-      btnCompleteNext.textContent = sim.isProblemActive?.()
-        ? 'Complete & next problem'
-        : 'Pick a problem';
+      btnCompleteNext.textContent = 'Try another problem';
     }
   }
 
@@ -194,6 +196,14 @@ export function initStepper(sim) {
     if (btnNext) {
       btnNext.hidden = currentStep >= TOTAL; // terminal step: no Next
       btnNext.disabled = !canAdvance(currentStep);
+    }
+    // Finish lesson: takes over the footer's primary nav slot exactly when Next
+    // vacates it (terminal step), same mutual-exclusivity idiom as #btn-flatten/
+    // #btn-unfold. Enabled on state.flattened — the same signal isComplete(6)
+    // already uses, no new completion concept invented.
+    if (btnFinish) {
+      btnFinish.hidden = currentStep < TOTAL;
+      btnFinish.disabled = !state.flattened;
     }
   }
 
@@ -337,10 +347,19 @@ export function initStepper(sim) {
     renderRail(); renderActions(); renderNav();
   }, listen);
 
-  // Step 6 — complete & move on (Feature 1). completeAndNext celebrates, clears any active
-  // problem, resets through the single path, and opens the Problem Library. The reset
-  // re-renders this chrome via reset()→goToStep(1), so no manual re-render is needed here.
+  // Step 6 — try another problem (Feature 1). completeAndNext clears any active problem,
+  // resets through the single path, and opens the Problem Library. The reset re-renders
+  // this chrome via reset()→goToStep(1), so no manual re-render is needed here.
   btnCompleteNext?.addEventListener('click', () => sim.completeAndNext(), listen);
+
+  // Finish lesson: posts sim:complete to the host (no latch — every click reposts,
+  // ADR-078 addendum revised). Button stays as-is afterward (no disable/relabel,
+  // locked decision) — announce() is the only feedback, same pattern as the
+  // Problem Library's exit flow.
+  btnFinish?.addEventListener('click', () => {
+    sim.markComplete?.();
+    sim.announce?.('Lesson marked complete.');
+  }, listen);
 
   // Navigation.
   btnNext?.addEventListener('click', () => { if (canAdvance(currentStep)) goToStep(currentStep + 1); }, listen);

@@ -678,7 +678,9 @@ function showContextLostNotice(on) {
 /**
  * Signal a successful boot to the index.html watchdog: clear its timeout and hide
  * any fallback a slow load may have surfaced. A late-but-successful boot therefore
- * self-heals (the fallback disappears the moment the sim is live).
+ * self-heals (the fallback disappears the moment the sim is live). Also posts the
+ * platform's sim:ready signal (ADR-078) — genuinely single-fire since init() itself
+ * only ever runs once (self-start, no external init() call, CLAUDE.md).
  */
 function markBooted() {
   window.__simBooted = true;
@@ -688,6 +690,17 @@ function markBooted() {
   }
   const fallback = document.getElementById('sim-fallback');
   if (fallback) fallback.hidden = true;
+  window.parent.postMessage({ type: 'sim:ready' }, '*');
+}
+
+/**
+ * Signal lesson completion to the host (ADR-078 addendum, revised): the learner
+ * clicked "Finish lesson" at the flattened Step 6. Fires on every call, no latch —
+ * the host confirmed it supports repeated sim:complete triggers, so replaying the
+ * signal (e.g. after "Try another problem" then re-flattening) is expected, not a bug.
+ */
+function markComplete() {
+  window.parent.postMessage({ type: 'sim:complete' }, '*');
 }
 
 // ============================================================================
@@ -4388,6 +4401,7 @@ const simController = {
 
   announce,
   flowNote,
+  markComplete,
 
   /** Flash an ad-hoc contextual chip (the floating-cue system) over the viewport — replays
    *  each call, unlike the first-seen spotlights. The Problem Library uses it for per-load
