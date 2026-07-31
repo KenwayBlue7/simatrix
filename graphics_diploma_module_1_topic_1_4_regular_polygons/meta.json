@@ -1,0 +1,6 @@
+{
+  "title": "Regular Polygons",
+  "description": "Regular pentagon, hexagon, and a general n-sided polygon, each buildable by 2-3 classical methods on the same side length via a live method switcher — pentagon by 54° angle, two circles and an arc, or three arcs; hexagon by 60° lines or compass alone; any polygon from 3 to 12 sides by semicircle division or perpendicular bisector — animated step by step, then set up as a textbook problem to verify.",
+  "difficulty": "intermediate",
+  "tags": ["diploma-engineering-graphics", "geometrical-constructions", "regular-polygons", "method-switcher", "guided-stepper", "2d-svg"]
+}

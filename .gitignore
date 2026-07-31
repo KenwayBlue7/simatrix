@@ -15,5 +15,5 @@ desktop.ini
 
 /.obsidian
 
-# Generated knowledge graph (graphify)
+# graphify knowledge-graph output (regenerable via `graphify update .`)
 /graphify-out/

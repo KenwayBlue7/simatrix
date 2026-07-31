@@ -1,0 +1,661 @@
+// Pure geometry for the twelve roulette/involute curves. NO DOM here — every function
+// returns plain data (points, line segments, arc definitions, and — new this topic — a
+// sampled polyline for the traced curve itself). renderConstruction.js is the only file
+// that turns this into SVG.
+//
+// Layering (CLAUDE.md): leaf module, imports nothing. main.js calls build(params) for the
+// active construction and hands the recipe to renderConstruction.js.
+//
+// Coordinate system: a fixed 240x190 drawing area (SVG viewBox units), origin top-left, y
+// increases downward — bigger than Topic 1.1's 200x140 family default because the
+// epicycloid/hypocycloid constructions carry a base circle up to 100mm radius plus the
+// rolling circle's own extent (INFERRED, this topic's own DESIGN.md documents the size).
+// Every construction computes its own geometry in a LOCAL MATH FRAME (origin at the most
+// natural centre for that curve family, y increases UPWARD like a textbook figure), then
+// fitTransform() maps that frame into SVG space once, so every point — curve samples,
+// base line/circle, rolling circle, tangent/normal — scales and centres together and
+// nothing is fit against a stale, partially-computed bounding box (the bug class Topic
+// 1.6 hit and fixed: compute the FULL bounding box first, derive scale from that, only
+// then place anything).
+//
+// Every step in a recipe carries a `role`:
+//   'given'  — the construction's starting element(s): the base line/circle and the
+//              rolling circle at its start position
+//   'move'   — an auxiliary construction line/arc, drawn WHILE building (never the answer)
+//   'result' — the traced curve itself, and the tangent/normal built from it
+// renderConstruction.js maps role -> the DESIGN.md §2 construction-line token, same as
+// every other topic in this track.
+//
+// ----------------------------------------------------------------------------
+// THE GENERATOR SHAPE (see this topic's CLAUDE.md for the full reasoning) — two shared
+// closed-form functions, not eleven/twelve hardcoded curves:
+//
+//   Generator A — `rollingCurvePoint()` / `contactPoint()`: the roulette family (cycloid,
+//   superior/inferior trochoid, epicycloid, superior/inferior epitrochoid, hypocycloid,
+//   superior/inferior hypotrochoid — 9 of the 12 picker entries). These are one equation
+//   family — a point at signed distance `offset` from a circle of radius `rollRadius`
+//   rolling without slipping on either a straight line or a fixed circle of radius
+//   `baseRadius` — differing only in those three inputs plus which side of the base
+//   circle it rolls on. Hardcoding nine near-identical trig blocks would be pure
+//   duplication (RULES §1.3/§1.4's shared-logic-drifts-if-copied concern, INFERRED to
+//   apply within a single topic's own file, not just across topic folders).
+//
+//   Generator B — `involuteCirclePoint()` / `involutePolygonArcs()`: involute of a circle
+//   and involute of a polygon (3 of the 12). Deliberately NOT unified with Generator A —
+//   an involute is a taut string unwinding, not a circle rolling on a base; the polygon
+//   case isn't a smooth parametric at all, it's a chain of compass arcs of growing radius
+//   (Example 7.7's own method), so it reuses the EXISTING `arc` step primitive with no new
+//   geometry engine.
+//
+// Both generators share the classical fact that the NORMAL to any roulette at its traced
+// point always passes through the curve's instantaneous point of contact with the base —
+// `contactPoint()` / `involuteContactPoint()` below — so tangent/normal construction is
+// also one shared routine (`tangentNormalSteps()`), not reimplemented per curve.
+// ----------------------------------------------------------------------------
+
+const deg2rad = (d) => (d * Math.PI) / 180;
+
+function dist(a, b) {
+  return Math.hypot(b.x - a.x, b.y - a.y);
+}
+
+function angleOf(a, b) {
+  return Math.atan2(b.y - a.y, b.x - a.x);
+}
+
+function pointAt(center, r, angleRad) {
+  return { x: center.x + r * Math.cos(angleRad), y: center.y + r * Math.sin(angleRad) };
+}
+
+// ----------------------------------------------------------------------------
+// Step builders — each returns a plain object renderConstruction.js knows how to draw
+// ----------------------------------------------------------------------------
+
+const P = (p, role, label) => ({ kind: 'point', role, p, label });
+const L = (a, b, role, label) => ({ kind: 'line', role, a, b, label });
+const CIRC = (center, radius, role) => ({ kind: 'circle', role, center, radius });
+/** New this topic: a sampled polyline — the only primitive that can draw a roulette,
+ *  since a cycloid/epicycloid/involute is not a compass-constructible line/arc/circle. */
+const CURVE = (points, role) => ({ kind: 'curve', role, points });
+const arcMark = (center, radius, aimPoint, spanDeg = 60) => {
+  const a = angleOf(center, aimPoint);
+  const half = deg2rad(spanDeg / 2);
+  return { kind: 'arc', role: 'move', center, radius, startAngle: a - half, endAngle: a + half };
+};
+const dim = (a, b, text, role, offset = 10) => ({ kind: 'dim', role, a, b, text, offset });
+
+// ----------------------------------------------------------------------------
+// Generator A — the rolling-curve family
+// ----------------------------------------------------------------------------
+
+/** @typedef {{rollRadius:number, offset:number, baseType:'line'|'outside-circle'|'inside-circle', baseRadius?:number}} RollCfg */
+
+/** The traced point at roll angle `theta` (radians), in the local math frame. */
+function rollingCurvePoint(theta, cfg) {
+  const { rollRadius: r, offset: d, baseType, baseRadius: R } = cfg;
+  if (baseType === 'line') {
+    return { x: r * theta - d * Math.sin(theta), y: r - d * Math.cos(theta) };
+  }
+  if (baseType === 'outside-circle') {
+    const k = (R + r) / r;
+    return {
+      x: (R + r) * Math.cos(theta) - d * Math.cos(k * theta),
+      y: (R + r) * Math.sin(theta) - d * Math.sin(k * theta),
+    };
+  }
+  // 'inside-circle'
+  const k = (R - r) / r;
+  return {
+    x: (R - r) * Math.cos(theta) + d * Math.cos(k * theta),
+    y: (R - r) * Math.sin(theta) - d * Math.sin(k * theta),
+  };
+}
+
+/** The rolling circle's own centre at roll angle `theta` — local math frame. */
+function rollingCircleCenter(theta, cfg) {
+  const { rollRadius: r, baseType, baseRadius: R } = cfg;
+  if (baseType === 'line') return { x: r * theta, y: r };
+  if (baseType === 'outside-circle') return { x: (R + r) * Math.cos(theta), y: (R + r) * Math.sin(theta) };
+  return { x: (R - r) * Math.cos(theta), y: (R - r) * Math.sin(theta) };
+}
+
+/** The instantaneous point of contact between the rolling circle and the base, at `theta`
+ *  — the point every roulette's normal passes through (the shared classical fact this
+ *  topic's tangent/normal construction is built on). */
+function contactPoint(theta, cfg) {
+  const { rollRadius: r, baseType, baseRadius: R } = cfg;
+  if (baseType === 'line') return { x: r * theta, y: 0 };
+  return { x: R * Math.cos(theta), y: R * Math.sin(theta) };
+}
+
+function sampleRollingCurve(cfg, thetaMax, n = 160) {
+  const pts = [];
+  for (let i = 0; i <= n; i++) pts.push(rollingCurvePoint((thetaMax * i) / n, cfg));
+  return pts;
+}
+
+function sampleCircle(center, radius, n = 32) {
+  const pts = [];
+  for (let i = 0; i <= n; i++) pts.push(pointAt(center, radius, (2 * Math.PI * i) / n));
+  return pts;
+}
+
+// ----------------------------------------------------------------------------
+// Generator B — involute of a circle / a regular polygon
+// ----------------------------------------------------------------------------
+
+/** Point on the involute of a circle of radius `r`, string unwound through `theta` radians. */
+function involuteCirclePoint(theta, r) {
+  return { x: r * (Math.cos(theta) + theta * Math.sin(theta)), y: r * (Math.sin(theta) - theta * Math.cos(theta)) };
+}
+
+/** The point of tangency on the circle (where the taut string currently leaves it) — the
+ *  involute's own instantaneous contact point, same role as contactPoint() above. */
+function involuteContactPoint(theta, r) {
+  return { x: r * Math.cos(theta), y: r * Math.sin(theta) };
+}
+
+function sampleInvoluteCircle(r, thetaMax, n = 160) {
+  const pts = [];
+  for (let i = 0; i <= n; i++) pts.push(involuteCirclePoint((thetaMax * i) / n, r));
+  return pts;
+}
+
+/**
+ * Involute of a regular n-gon of side `side` (Example 7.7's method): n circular arcs of
+ * radii side, 2*side, ..., n*side, each centred at a successive polygon vertex and swept
+ * through the polygon's exterior angle (360/n degrees), chained end to start. Returns the
+ * n arc steps plus the polygon's own vertex points — no smooth-curve engine needed, this
+ * is fully compass-constructible with the existing `arc` primitive.
+ */
+function involutePolygonArcs(side, n) {
+  const extAngle = (2 * Math.PI) / n;
+  // Regular n-gon vertices, local frame, centred roughly under its own involute sweep.
+  const verts = [];
+  for (let i = 0; i < n; i++) verts.push(pointAt({ x: 0, y: 0 }, side / (2 * Math.sin(Math.PI / n)), (2 * Math.PI * i) / n - Math.PI / 2));
+
+  const arcs = [];
+  let current = verts[1]; // string starts flush along the edge V0->V1, free end at V1
+  for (let i = 0; i < n; i++) {
+    const center = verts[i];
+    const radius = (i + 1) * side;
+    const startAngle = angleOf(center, current);
+    const endAngle = startAngle - extAngle; // spiral outward, consistent winding
+    const next = pointAt(center, radius, endAngle);
+    arcs.push({ kind: 'arc', role: i < n - 1 ? 'move' : 'result', center, radius, startAngle: Math.min(startAngle, endAngle), endAngle: Math.max(startAngle, endAngle) });
+    current = next;
+  }
+  return { arcs, verts, endPoint: current };
+}
+
+// ----------------------------------------------------------------------------
+// Coordinate fitting — local math frame (y-up) -> SVG space (y-down), one shared helper
+// ----------------------------------------------------------------------------
+
+function boundsOfPoints(pts) {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const p of pts) {
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.y < minY) minY = p.y;
+    if (p.y > maxY) maxY = p.y;
+  }
+  return { minX, maxX, minY, maxY };
+}
+
+const PAD = 16; // svg units reserved for dim marks/labels beyond the geometry's own bbox
+
+/** Fit a local math-frame bounding box into an SVG-space budget rect, once — every point
+ *  in the recipe is transformed through the SAME toSvg(), so nothing can be scaled or
+ *  centred independently of anything else (the class of bug Topic 1.6 hit and fixed). */
+function fitTransform(bbox, budget, cap = 1.3) {
+  const bw = Math.max(budget.w - PAD * 2, 1);
+  const bh = Math.max(budget.h - PAD * 2, 1);
+  const spanX = Math.max(bbox.maxX - bbox.minX, 1e-6);
+  const spanY = Math.max(bbox.maxY - bbox.minY, 1e-6);
+  const scale = Math.min(cap, bw / spanX, bh / spanY);
+  const drawnW = spanX * scale;
+  const drawnH = spanY * scale;
+  const originX = budget.x + PAD + (bw - drawnW) / 2 - bbox.minX * scale;
+  const originY = budget.y + PAD + (bh - drawnH) / 2 + bbox.maxY * scale;
+  return { toSvg: (p) => ({ x: originX + p.x * scale, y: originY - p.y * scale }), scale };
+}
+
+const CANVAS = { w: 240, h: 190 };
+const ROULETTE_BUDGET = { x: 10, y: 16, w: 220, h: 150 };
+const INVOLUTE_BUDGET = { x: 20, y: 20, w: 200, h: 140 };
+
+// ----------------------------------------------------------------------------
+// Shared tangent/normal construction — the classical fact that a roulette's normal at any
+// point passes through the curve's instantaneous contact point with its base.
+// ----------------------------------------------------------------------------
+
+/**
+ * @param {{x:number,y:number}} M  the traced point (local frame)
+ * @param {{x:number,y:number}} C  the instantaneous contact point (local frame)
+ * @param {number} reach  how far the drawn tangent/normal segments extend past M/C
+ * @param {boolean} showClassicalArc  Example 7.1's own method: an arc of radius |M-rolling
+ *   centre| from M, cutting the rolling circle's centre-locus — only meaningful (and only
+ *   equal to the rolling-circle radius) for the on-rim cycloid case; trochoid/epicycloid/
+ *   involute points skip the auxiliary arc and use the same MC normal fact directly.
+ * @param {{x:number,y:number}} [rollCentre]  required when showClassicalArc is true
+ */
+function tangentNormalSteps(M, C, reach, showClassicalArc, rollCentre) {
+  const steps = [];
+  if (showClassicalArc && rollCentre) {
+    const r = dist(M, rollCentre);
+    steps.push(arcMark(M, r, rollCentre, 50));
+    steps.push(P(rollCentre, 'move', 'N'));
+    // N dropped perpendicular to the base lands exactly on the contact point C (for the
+    // line-base cycloid, C's x already equals N's x — this is that same drop, not a
+    // separately-derived point) — Example 7.1's literal NC construction line.
+    steps.push(L(rollCentre, C, 'move'));
+  }
+  const normalAngle = angleOf(C, M);
+  const nEnd = pointAt(M, reach * 0.4, normalAngle);
+  steps.push(L(C, nEnd, 'result'), P(C, 'result', 'C'));
+  const tangentAngle = normalAngle + Math.PI / 2;
+  const t1 = pointAt(M, reach, tangentAngle);
+  const t2 = pointAt(M, reach, tangentAngle + Math.PI);
+  steps.push(L(t1, t2, 'result'), P(M, 'result', 'M'));
+  return steps;
+}
+
+// ----------------------------------------------------------------------------
+// Roulette-family construction builder — shared by all 9 cycloid/trochoid/epi/hypo entries
+// ----------------------------------------------------------------------------
+
+/**
+ * @param {RollCfg} cfg
+ * @param {number} thetaDeg
+ * @param {{givenLabel:string, givenText:string, classicalCycloidArc?:boolean, curveName:string}} opts
+ */
+function buildRollingCurve(cfg, thetaDeg, opts) {
+  const thetaMax = 2 * Math.PI;
+  const clampedDeg = Math.max(0, Math.min(360, thetaDeg));
+  const { rollRadius: r, baseType, baseRadius: R } = cfg;
+
+  const fullPts = sampleRollingCurve(cfg, thetaMax, 160);
+  const safetyPts = baseType === 'line'
+    ? [...sampleCircle(rollingCircleCenter(0, cfg), r, 16), { x: 0, y: 0 }]
+    : [...sampleCircle({ x: 0, y: 0 }, R, 24), ...sampleCircle(rollingCircleCenter(0, cfg), r, 16)];
+  const bbox = boundsOfPoints([...fullPts, ...safetyPts]);
+  // theta-INDEPENDENT scale/origin (derived from the full-range curve, never the current
+  // scrub position) — so scrubbing or animating theta never rescales/recentres the
+  // drawing out from under the student; only how much of the curve exists changes.
+  const { toSvg, scale } = fitTransform(bbox, ROULETTE_BUDGET);
+  const tsv = (p) => toSvg(p);
+  const line = (a, b, role, label) => L(tsv(a), tsv(b), role, label);
+  const point = (p, role, label) => P(tsv(p), role, label);
+  const circ = (center, radius, role) => CIRC(tsv(center), radius * scale, role);
+  const curve = (pts, role) => CURVE(pts.map(tsv), role);
+
+  const givenSteps = [];
+  if (baseType === 'line') {
+    givenSteps.push(line({ x: bbox.minX, y: 0 }, { x: bbox.maxX, y: 0 }, 'given'));
+    givenSteps.push(circ(rollingCircleCenter(0, cfg), r, 'given'));
+    givenSteps.push(point(rollingCircleCenter(0, cfg), 'given', 'O'));
+    givenSteps.push(dim(tsv({ x: 0, y: 0 }), tsv({ x: 2 * r, y: 0 }), opts.givenText, 'given', -14));
+  } else {
+    givenSteps.push(circ({ x: 0, y: 0 }, R, 'given'));
+    givenSteps.push(point({ x: 0, y: 0 }, 'given', 'O'));
+    givenSteps.push(circ(rollingCircleCenter(0, cfg), r, 'given'));
+    givenSteps.push(dim(tsv({ x: 0, y: 0 }), tsv({ x: R, y: 0 }), `R ${R} mm`, 'given', 14));
+  }
+
+  /** The "how it got there" phase: the rolling circle AT this instant, a spoke from its
+   *  centre to the traced point (the visual that reads as ROTATION, not just sliding —
+   *  as the circle rolls, M sweeps around the centre at its own rate, so the spoke's
+   *  angle changing is exactly what a viewer needs to see to read "rolling"), and the
+   *  curve traced so far. main.js's play() calls this at many intermediate angles to
+   *  animate the roll; build() below also calls it once at the final angle for the
+   *  static Given/Verify views. */
+  function rollStepsAt(atDeg) {
+    const at = deg2rad(Math.max(0, Math.min(360, atDeg)));
+    const steps = [];
+    const tracedPts = sampleRollingCurve(cfg, at, Math.max(8, Math.round(160 * (at / thetaMax))));
+    if (tracedPts.length >= 2) steps.push(curve(tracedPts, 'result'));
+    const rollCentreNow = rollingCircleCenter(at, cfg);
+    const M = rollingCurvePoint(at, cfg);
+    steps.push(circ(rollCentreNow, r, 'move'));
+    steps.push(point(rollCentreNow, 'move'));
+    steps.push(line(rollCentreNow, M, 'move')); // the rotation spoke
+    steps.push(point(M, 'move'));
+    return steps;
+  }
+
+  /** The tangent/normal construction, built once at the roll's final angle — shown only
+   *  after the roll finishes (main.js sequences this as a distinct second phase, so the
+   *  student sees "curve traced" then "now here's why the normal lands there," not both
+   *  happening at once). */
+  function tangentStepsAt(atDeg) {
+    const at = deg2rad(Math.max(0, Math.min(360, atDeg)));
+    const M = rollingCurvePoint(at, cfg);
+    const rollCentreNow = rollingCircleCenter(at, cfg);
+    const contact = contactPoint(at, cfg);
+    const reachSvg = r * 0.7 * scale;
+    return tangentNormalSteps(tsv(M), tsv(contact), reachSvg, !!opts.classicalCycloidArc, tsv(rollCentreNow));
+  }
+
+  const steps = [...givenSteps, ...rollStepsAt(clampedDeg), ...tangentStepsAt(clampedDeg)];
+  const thetaTurns = (clampedDeg / 360).toFixed(2);
+  return {
+    steps,
+    resultText: `${opts.curveName} traced through ${clampedDeg.toFixed(0)}° (${thetaTurns} rev) — normal at M passes through the contact point C.`,
+    animateRoll: { toDeg: clampedDeg, givenSteps, rollStepsAt, tangentStepsAt },
+  };
+}
+
+// ----------------------------------------------------------------------------
+// The twelve constructions
+// ----------------------------------------------------------------------------
+
+/** @typedef {{key:string,label:string,unit:string,min:number,max:number,step:number,default:number}} ParamSpec */
+
+/**
+ * @typedef {Object} ConstructionDef
+ * @property {string} id
+ * @property {string} label
+ * @property {string} shortLabel
+ * @property {string} principle
+ * @property {ParamSpec[]} given
+ * @property {(params:Record<string,number>) => {steps:Array, resultText:string, invalid?:string}} build
+ */
+
+const THETA_PARAM = { key: 'theta', label: 'Roll angle', unit: '°', min: 0, max: 360, step: 5, default: 360 };
+
+/** @type {ConstructionDef[]} */
+export const CONSTRUCTIONS = [
+  {
+    id: 'cycloid',
+    label: 'Cycloid',
+    shortLabel: 'Cycloid',
+    principle: 'A point fixed on the rim of a circle rolling without slipping along a straight line traces a cycloid; because the circle pivots about its point of contact at every instant, the normal to the curve at any point always passes through that contact point.',
+    given: [
+      { key: 'diameter', label: 'Rolling circle diameter', unit: 'mm', min: 40, max: 70, step: 5, default: 50 },
+      THETA_PARAM,
+    ],
+    build({ diameter, theta }) {
+      const r = diameter / 2;
+      return buildRollingCurve(
+        { rollRadius: r, offset: r, baseType: 'line' },
+        theta,
+        { givenText: `⌀ ${diameter} mm`, classicalCycloidArc: true, curveName: 'Cycloid' },
+      );
+    },
+  },
+
+  {
+    id: 'superior-trochoid',
+    label: 'Superior Trochoid',
+    shortLabel: 'Superior Trochoid',
+    principle: 'A point beyond the rim of a rolling circle (e.g. a flanged wheel) traces a superior trochoid — a looped curve, since the point briefly moves backward relative to the roll direction.',
+    given: [
+      { key: 'diameter', label: 'Rolling circle diameter', unit: 'mm', min: 40, max: 70, step: 5, default: 50 },
+      { key: 'offsetBeyond', label: 'Point distance beyond rim', unit: 'mm', min: 2, max: 20, step: 1, default: 10 },
+      THETA_PARAM,
+    ],
+    build({ diameter, offsetBeyond, theta }) {
+      const r = diameter / 2;
+      return buildRollingCurve(
+        { rollRadius: r, offset: r + offsetBeyond, baseType: 'line' },
+        theta,
+        { givenText: `⌀ ${diameter} mm, +${offsetBeyond} mm`, curveName: 'Superior trochoid' },
+      );
+    },
+  },
+
+  {
+    id: 'inferior-trochoid',
+    label: 'Inferior Trochoid',
+    shortLabel: 'Inferior Trochoid',
+    principle: 'A point inside the rim of a rolling circle traces an inferior trochoid — a wavy curve that never loops, since the point never reverses direction.',
+    given: [
+      { key: 'diameter', label: 'Rolling circle diameter', unit: 'mm', min: 40, max: 70, step: 5, default: 50 },
+      { key: 'insetWithin', label: 'Point distance inside rim', unit: 'mm', min: 2, max: 15, step: 1, default: 8 },
+      THETA_PARAM,
+    ],
+    build({ diameter, insetWithin, theta }) {
+      const r = diameter / 2;
+      return buildRollingCurve(
+        { rollRadius: r, offset: r - insetWithin, baseType: 'line' },
+        theta,
+        { givenText: `⌀ ${diameter} mm, −${insetWithin} mm`, curveName: 'Inferior trochoid' },
+      );
+    },
+  },
+
+  {
+    id: 'epicycloid',
+    label: 'Epicycloid',
+    shortLabel: 'Epicycloid',
+    principle: 'A point on the rim of a circle rolling outside a fixed circle traces an epicycloid; the same instantaneous-contact-point fact gives the normal at any point.',
+    given: [
+      { key: 'genDiameter', label: 'Generating circle diameter', unit: 'mm', min: 30, max: 60, step: 5, default: 50 },
+      { key: 'baseRadius', label: 'Base circle radius', unit: 'mm', min: 60, max: 150, step: 5, default: 100 },
+      THETA_PARAM,
+    ],
+    build({ genDiameter, baseRadius, theta }) {
+      const r = genDiameter / 2;
+      return buildRollingCurve(
+        { rollRadius: r, offset: r, baseType: 'outside-circle', baseRadius },
+        theta,
+        { curveName: 'Epicycloid' },
+      );
+    },
+  },
+
+  {
+    id: 'superior-epitrochoid',
+    label: 'Superior Epitrochoid',
+    shortLabel: 'Superior Epitrochoid',
+    principle: 'The base of the epicycloid family becomes an arc instead of a straight line; a point beyond the rolling circle’s rim still traces a looped curve, now curved around the base circle.',
+    given: [
+      { key: 'genDiameter', label: 'Generating circle diameter', unit: 'mm', min: 30, max: 60, step: 5, default: 50 },
+      { key: 'baseRadius', label: 'Base circle radius', unit: 'mm', min: 60, max: 150, step: 5, default: 100 },
+      { key: 'offsetBeyond', label: 'Point distance beyond rim', unit: 'mm', min: 2, max: 20, step: 1, default: 10 },
+      THETA_PARAM,
+    ],
+    build({ genDiameter, baseRadius, offsetBeyond, theta }) {
+      const r = genDiameter / 2;
+      return buildRollingCurve(
+        { rollRadius: r, offset: r + offsetBeyond, baseType: 'outside-circle', baseRadius },
+        theta,
+        { curveName: 'Superior epitrochoid' },
+      );
+    },
+  },
+
+  {
+    id: 'inferior-epitrochoid',
+    label: 'Inferior Epitrochoid',
+    shortLabel: 'Inferior Epitrochoid',
+    principle: 'The base of the epicycloid family becomes an arc instead of a straight line; a point inside the rolling circle’s rim traces a wavy, non-looping curve around the base circle.',
+    given: [
+      { key: 'genDiameter', label: 'Generating circle diameter', unit: 'mm', min: 30, max: 60, step: 5, default: 50 },
+      { key: 'baseRadius', label: 'Base circle radius', unit: 'mm', min: 60, max: 150, step: 5, default: 100 },
+      { key: 'insetWithin', label: 'Point distance inside rim', unit: 'mm', min: 2, max: 12, step: 1, default: 6 },
+      THETA_PARAM,
+    ],
+    build({ genDiameter, baseRadius, insetWithin, theta }) {
+      const r = genDiameter / 2;
+      return buildRollingCurve(
+        { rollRadius: r, offset: r - insetWithin, baseType: 'outside-circle', baseRadius },
+        theta,
+        { curveName: 'Inferior epitrochoid' },
+      );
+    },
+  },
+
+  {
+    id: 'hypocycloid',
+    label: 'Hypocycloid',
+    shortLabel: 'Hypocycloid',
+    principle: 'A point on the rim of a circle rolling inside a fixed circle traces a hypocycloid; the same instantaneous-contact-point fact gives the normal at any point.',
+    given: [
+      { key: 'genDiameter', label: 'Generating circle diameter', unit: 'mm', min: 30, max: 60, step: 5, default: 50 },
+      { key: 'baseRadius', label: 'Base circle radius', unit: 'mm', min: 60, max: 150, step: 5, default: 100 },
+      THETA_PARAM,
+    ],
+    build({ genDiameter, baseRadius, theta }) {
+      const r = genDiameter / 2;
+      return buildRollingCurve(
+        { rollRadius: r, offset: r, baseType: 'inside-circle', baseRadius },
+        theta,
+        { curveName: 'Hypocycloid' },
+      );
+    },
+  },
+
+  {
+    id: 'superior-hypotrochoid',
+    label: 'Superior Hypotrochoid',
+    shortLabel: 'Superior Hypotrochoid',
+    principle: 'A point beyond the rim of a circle rolling inside a fixed circle traces a looped curve — the hypocycloid family’s equivalent of the superior trochoid.',
+    given: [
+      { key: 'genDiameter', label: 'Generating circle diameter', unit: 'mm', min: 30, max: 60, step: 5, default: 50 },
+      { key: 'baseRadius', label: 'Base circle radius', unit: 'mm', min: 60, max: 150, step: 5, default: 100 },
+      { key: 'offsetBeyond', label: 'Point distance beyond rim', unit: 'mm', min: 2, max: 20, step: 1, default: 10 },
+      THETA_PARAM,
+    ],
+    build({ genDiameter, baseRadius, offsetBeyond, theta }) {
+      const r = genDiameter / 2;
+      return buildRollingCurve(
+        { rollRadius: r, offset: r + offsetBeyond, baseType: 'inside-circle', baseRadius },
+        theta,
+        { curveName: 'Superior hypotrochoid' },
+      );
+    },
+  },
+
+  {
+    id: 'inferior-hypotrochoid',
+    label: 'Inferior Hypotrochoid',
+    shortLabel: 'Inferior Hypotrochoid',
+    principle: 'A point inside the rim of a circle rolling inside a fixed circle traces a wavy, non-looping curve — the hypocycloid family’s equivalent of the inferior trochoid.',
+    given: [
+      { key: 'genDiameter', label: 'Generating circle diameter', unit: 'mm', min: 30, max: 60, step: 5, default: 50 },
+      { key: 'baseRadius', label: 'Base circle radius', unit: 'mm', min: 60, max: 150, step: 5, default: 100 },
+      { key: 'insetWithin', label: 'Point distance inside rim', unit: 'mm', min: 2, max: 12, step: 1, default: 6 },
+      THETA_PARAM,
+    ],
+    build({ genDiameter, baseRadius, insetWithin, theta }) {
+      const r = genDiameter / 2;
+      return buildRollingCurve(
+        { rollRadius: r, offset: r - insetWithin, baseType: 'inside-circle', baseRadius },
+        theta,
+        { curveName: 'Inferior hypotrochoid' },
+      );
+    },
+  },
+
+  {
+    id: 'involute-circle',
+    label: 'Involute of a Circle',
+    shortLabel: 'Involute (Circle)',
+    principle: 'A point on a taut string unwound from a circle traces its involute; the string is always tangent to the circle, so the string itself IS the normal to the curve at the traced point.',
+    given: [
+      { key: 'diameter', label: 'Circle diameter', unit: 'mm', min: 30, max: 60, step: 5, default: 40 },
+      THETA_PARAM,
+    ],
+    build({ diameter, theta }) {
+      const r = diameter / 2;
+      const thetaMax = 2 * Math.PI;
+      const clampedDeg = Math.max(0, Math.min(360, theta));
+      const fullPts = sampleInvoluteCircle(r, thetaMax, 160);
+      const bbox = boundsOfPoints([...fullPts, ...sampleCircle({ x: 0, y: 0 }, r, 24)]);
+      const { toSvg, scale } = fitTransform(bbox, INVOLUTE_BUDGET);
+      const tsv = toSvg;
+
+      const givenSteps = [
+        CIRC(tsv({ x: 0, y: 0 }), r * scale, 'given'),
+        P(tsv({ x: 0, y: 0 }), 'given', 'O'),
+        dim(tsv({ x: -r, y: 0 }), tsv({ x: r, y: 0 }), `⌀ ${diameter} mm`, 'given', -14),
+      ];
+
+      /** The "how it got there" phase: the traced string OC itself, rotating and
+       *  lengthening as it unwinds — that IS the rolling motion for an involute, so no
+       *  separate spoke is needed the way the roulette family's rollStepsAt() adds one. */
+      function rollStepsAt(atDeg) {
+        const at = deg2rad(Math.max(0, Math.min(360, atDeg)));
+        const steps = [];
+        const tracedPts = sampleInvoluteCircle(r, at, Math.max(8, Math.round(160 * (at / thetaMax))));
+        if (tracedPts.length >= 2) steps.push(CURVE(tracedPts.map(tsv), 'result'));
+        const M = involuteCirclePoint(at, r);
+        const C = involuteContactPoint(at, r);
+        steps.push(L(tsv(C), tsv(M), 'move'));
+        steps.push(P(tsv(M), 'move'));
+        return steps;
+      }
+
+      function tangentStepsAt(atDeg) {
+        const at = deg2rad(Math.max(0, Math.min(360, atDeg)));
+        const M = involuteCirclePoint(at, r);
+        const C = involuteContactPoint(at, r);
+        const reachSvg = r * 0.7 * scale;
+        return tangentNormalSteps(tsv(M), tsv(C), reachSvg, false);
+      }
+
+      const steps = [...givenSteps, ...rollStepsAt(clampedDeg), ...tangentStepsAt(clampedDeg)];
+      return {
+        steps,
+        resultText: `Involute traced through ${clampedDeg.toFixed(0)}° of unwind — the string OC is both the tangent-defining radius and the normal at M.`,
+        animateRoll: { toDeg: clampedDeg, givenSteps, rollStepsAt, tangentStepsAt },
+      };
+    },
+  },
+
+  {
+    id: 'involute-triangle',
+    label: 'Involute of a Triangle',
+    shortLabel: 'Involute (Triangle)',
+    principle: 'Unwinding a taut string from a polygon happens one straight side at a time — each side sweeps a circular arc whose radius grows by that side’s length, centred on the vertex just left behind.',
+    given: [{ key: 'side', label: 'Triangle side', unit: 'mm', min: 15, max: 40, step: 5, default: 20 }],
+    build({ side }) {
+      const { arcs, verts, endPoint } = involutePolygonArcs(side, 3);
+      const bbox = boundsOfPoints([...verts, endPoint, ...arcs.flatMap((a) => sampleCircle(a.center, a.radius, 24))]);
+      const { toSvg, scale } = fitTransform(bbox, INVOLUTE_BUDGET);
+      const tsv = toSvg;
+      const labels = ['A', 'B', 'C'];
+      const steps = [];
+      for (let i = 0; i < verts.length; i++) {
+        steps.push(P(tsv(verts[i]), 'given', labels[i]));
+        steps.push(L(tsv(verts[i]), tsv(verts[(i + 1) % verts.length]), 'given'));
+      }
+      for (const a of arcs) {
+        steps.push({ kind: 'arc', role: a.role, center: tsv(a.center), radius: a.radius * scale, startAngle: a.startAngle, endAngle: a.endAngle });
+      }
+      steps.push(P(tsv(endPoint), 'result', 'P'));
+      return { steps, resultText: `Involute of an equilateral triangle, side ${side} mm — 3 arcs of radius ${side}, ${2 * side}, ${3 * side} mm.` };
+    },
+  },
+
+  {
+    id: 'involute-square',
+    label: 'Involute of a Square',
+    shortLabel: 'Involute (Square)',
+    principle: 'The same one-side-at-a-time unwinding as the triangle, now around a fourth vertex — four arcs of radius side, 2×side, 3×side, 4×side.',
+    given: [{ key: 'side', label: 'Square side', unit: 'mm', min: 15, max: 30, step: 5, default: 15 }],
+    build({ side }) {
+      const { arcs, verts, endPoint } = involutePolygonArcs(side, 4);
+      const bbox = boundsOfPoints([...verts, endPoint, ...arcs.flatMap((a) => sampleCircle(a.center, a.radius, 24))]);
+      const { toSvg, scale } = fitTransform(bbox, INVOLUTE_BUDGET);
+      const tsv = toSvg;
+      const labels = ['A', 'B', 'C', 'D'];
+      const steps = [];
+      for (let i = 0; i < verts.length; i++) {
+        steps.push(P(tsv(verts[i]), 'given', labels[i]));
+        steps.push(L(tsv(verts[i]), tsv(verts[(i + 1) % verts.length]), 'given'));
+      }
+      for (const a of arcs) {
+        steps.push({ kind: 'arc', role: a.role, center: tsv(a.center), radius: a.radius * scale, startAngle: a.startAngle, endAngle: a.endAngle });
+      }
+      steps.push(P(tsv(endPoint), 'result', 'P'));
+      return { steps, resultText: `Involute of a square, side ${side} mm — 4 arcs of radius ${side}, ${2 * side}, ${3 * side}, ${4 * side} mm.` };
+    },
+  },
+];
+
+export const findConstruction = (id) => CONSTRUCTIONS.find((c) => c.id === id) ?? CONSTRUCTIONS[0];
+
+export const __internal = { CANVAS };

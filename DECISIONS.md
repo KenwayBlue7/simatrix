@@ -3802,6 +3802,117 @@ no step count reintroduced.
 
 ---
 
+## ADR-095: A new curriculum track ("Diploma Engineering Graphics") shares this repo's root docs; its Module 1 ("Geometrical Constructions") is namespaced `graphics_diploma_module_1_topic_1_<N>_<slug>` on a 2D SVG/Canvas orchestrator
+
+**Date:** 2026-07-26
+**Decision:** A new curriculum track — **"Diploma Engineering Graphics" [PLACEHOLDER — confirm
+exact syllabus/issuing-body name before this track's first topic ships]** — shares this repo's
+existing root docs (`ARCHITECTURE.md`, `DECISIONS.md`, `RULES.md`, `PRODUCT.md`, `DESIGN.md`) and
+continues the same ADR sequence rather than forking Case-C-style. Its Module 1, "Geometrical
+Constructions," is namespaced `graphics_diploma_module_1_topic_1_<N>_<slug>` to avoid colliding with
+the current syllabus's existing Module 1 (`graphics_module_1_topic_*` — foundations: planes, line
+types, dimensioning, quadrants, first-angle, points, lines). The numbering scheme (module.subtopic,
+e.g. `topic_1_1` = subtopic "1.1") is **final**; the six provisional subtopics — 1.1
+`basic_constructions`, 1.2 `tangent_arcs`, 1.3 `tangent_lines`, 1.4 `regular_polygons`, 1.5
+`polygon_circle_relations`, 1.6 `ogee_curves` — and their final count remain **provisional pending
+topic-level scoping**. None of these subtopics involve 3D solid geometry, so this Module adopts
+Module 2's orchestrator discipline (single `main.js`, no-cross-import leaves, one `rebuild()` funnel,
+`window.simAPI`) over a 2D SVG/Canvas renderer instead of Three.js.
+**Why:** RULES.md §1.11 (sourced from ADR-025) requires a subject that fits neither the Module 2
+(3D) nor Module 1 (2D-from-3D projection) template cleanly to get its own ADR before work starts —
+compass-and-straightedge plane-geometry construction is flat 2D from the outset, not a projection of
+3D geometry, so it fits neither. A repo-wide check for "syllabus"/"diploma"/"curriculum" found no
+prior second-track concept: every existing "syllabus" reference (RULES.md §6.21/§6.22, the Module 3
+problem-exclusion ADRs) is a problem-set rule *inside* the single track this repo already ships —
+`Module1/CLAUDE.md` names it explicitly ("Simatrix Engineering Graphics Platform · KTU B.Tech
+Syllabus"). Diploma Engineering Graphics is genuinely new territory, not an extension of that track.
+Reusing the orchestrator *pattern* rather than Module 1's shared-`engine.js` pattern is grounded in
+ADR-007's own text: the orchestrator (one `main.js` owning state/`rebuild()`, leaves that don't
+cross-import) is a structural/organizational discipline, not something ADR-007 or ADR-033 ties to
+Three.js specifically — every existing instance happens to render 3D, but nothing in either ADR
+requires it to.
+**Alternatives rejected:** (a) *Reusing `module_1` unprefixed* — rejected: direct folder-name
+collision with the current syllabus's existing Module 1. (b) *Forking into Case-C-style own root
+docs (a new local `DECISIONS.md` starting at ADR-001, per MODULE-STARTER.md §5.4)* — rejected: the
+explicit choice here is to share root docs and continue this ADR sequence — same discipline
+(Engineering Graphics), a different syllabus track, not a foreign discipline in the Case C sense.
+(c) *Treating this as a lesson-add to the current syllabus's existing Module 1* — rejected: a
+different syllabus entirely, with its own sequencing and numbering, not an extension of the current
+one.
+**Consequences:** Cite ADR-025 as **invoked by** (not superseded) — its Module-1-vs-Module-2
+heuristic is unchanged; this adds a third case alongside it, for a 2D-non-solids subject outside the
+current syllabus. The repeated `<M>` in `graphics_diploma_module_<M>_topic_<M>_<N>_<slug>` is
+**deliberate, not a typo** — it encodes the source syllabus's own decimal module.subtopic numbering
+(e.g. "1.4" → `topic_1_4`); a future contributor must not "fix" it to `topic_<N>` alone. Descriptively
+only: MODULE-STARTER.md's Case A/B/C table (Section 2) has no row for "same discipline, different
+syllabus track, shared root docs" — this ADR is the first instance of that pattern; a future ADR may
+formalize a Case D. Future module numbering for this track, if it grows beyond Module 1, is left
+fully open pending a future ADR if/when that happens. The exact syllabus/issuing-body name remains an
+**open placeholder until confirmed** — see the Decision field.
+**Status:** Active.
+
+---
+
+## ADR-096: "Misc Curves" (Roulettes / Spiral Curves / Helix) is Diploma Module 1 Topic 2, not a new module
+
+**Date:** 2026-07-28
+**Decision:** Misc Curves — roulettes, spiral curves, helix — is **Diploma Module 1, Topic 2**, sitting
+beside Topic 1 ("Geometrical Constructions", ADR-095) inside the same module. Namespaced per ADR-095's
+established `graphics_diploma_module_<M>_topic_<M>_<N>_<slug>` convention:
+`graphics_diploma_module_1_topic_2_1_roulettes`, `graphics_diploma_module_1_topic_2_2_spiral_curves`,
+`graphics_diploma_module_1_topic_2_3_helix`.
+**Why:** These three curve families belong to the same course module as Geometrical Constructions in
+the source syllabus — the module boundary is the syllabus's own, not this repo's to redraw. The topic
+index (`topic_2_*` vs. `topic_1_*`) is sufficient to disambiguate them without minting a new module
+number.
+**Alternatives rejected:** *New Module 2 for this track* — rejected as premature: nothing yet confirms
+the source syllabus actually draws a module boundary here rather than a topic boundary within Module 1;
+inventing a second module number ahead of that confirmation risks the same kind of renumbering churn
+ADR-095 was written to avoid.
+**Consequences:** Invokes ADR-095, does not supersede it — resolves ADR-095's own open note ("future
+module numbering for this track... left fully open pending a future ADR") by settling that this
+particular growth (Misc Curves) stays inside Module 1 as Topic 2, not a new module. ADR-095's provisional
+six-subtopic list for Topic 1 (1.1-1.6) is unaffected. Docs only — no topic folders created yet.
+**Status:** Active.
+
+---
+
+## ADR-097: Helix (Diploma Module 1 Topic 2.3) is drawn as a first-angle top+front two-view construction, not a Three.js 3D orbit view
+
+**Date:** 2026-07-29
+**Decision:** Despite being a genuine 3D space curve, the cylindrical helix, conical helix, and
+helical spring (Topic 2.3) are built on the same 2D SVG orchestrator every other topic in this
+track uses — a linked top-view (circumferential position) + front-view (axial advance) pair,
+first-angle aligned per this platform's own convention (RULES.md §4's citation: "Top/Front/Side
+are cast to the object's top, back, and left respectively (first-angle)"), matching Example
+7.11's own textbook method exactly. The underlying point geometry is genuinely 3D-parametric
+(`x = r·cosθ, y = ±r·sinθ, z = pitch·θ/2π`, with `r` constant for the cylindrical case and
+linearly tapering for the conical case) — only the *rendering* is two orthographic projections of
+that curve, the same relationship every projection-drawing subject already has between a 3D
+object and its 2D sheet; it is not a flattened single-view stand-in.
+**Why:** This tests ADR-095's premise explicitly rather than silently assuming it still holds.
+ADR-095 chose the 2D SVG orchestrator for the whole Module because "none of its subtopics involve
+3D solid geometry" — true of how a helix is *drawn* in this construction, but not fully true of
+what a helix *is* (a genuine 3D space curve), so the premise deserved a real check at the one
+topic that stresses it, not a silent pass-through. The two-view method is not a compromise forced
+by that constraint: it is the source textbook's own correct, standard technique for teaching this
+exact curve, and matches what "Engineering Graphics" as a discipline actually teaches — reading
+and producing linked orthographic views of a 3D form, not orbiting a live 3D model of it.
+**Alternatives rejected:** *A true 3D Three.js orbit-camera view on Module 2's orchestrator* —
+rejected: would be the only Three.js dependency anywhere in the Diploma track (a CDN import map,
+the full disposal-contract/rebuild pipeline, WebGL context management, keyboard-operable orbit
+controls — none of which the other fifteen topics in this track need), requires its own RULES
+§1.11/ADR-025 template-choice ADR, and would likely still need the *same* 2D top+front
+construction built alongside it to actually teach Example 7.11's drawing procedure — an addition
+to the 2D build's scope, not a replacement for it.
+**Consequences:** Invokes ADR-095 (not superseded) — the Module's 2D-orchestrator choice stands,
+now on record as having been re-examined at its hardest test case rather than merely inherited by
+topic-numbering momentum. `constructions.js`'s helix math is shared 3D-parametric geometry
+projected into two SVG panes by one shared layout function, not duplicated per-view logic.
+**Status:** Active.
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*

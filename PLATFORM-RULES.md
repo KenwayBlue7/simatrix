@@ -69,7 +69,8 @@ terms of Engineering Graphics' own files, modules, or lessons was left out entir
 > fired once from `markBooted()`, and `window.parent.postMessage({ type: 'sim:complete' }, '*')`
 > fired once from `markComplete()` when the lesson reaches its finished state. The host↔sim surface
 > is `window.simAPI` + `meta.json` for control, plus those two outbound signals — nothing else, and
-> no inbound `message` listener. *(ADR-002, ADR-078, ARCHITECTURE.md §6)*
+> no inbound `message` listener; `window.simAPI` stays the only path *into* the sim. *(ADR-002,
+> ADR-078, ARCHITECTURE.md §6)*
 
 > **§1.11 ✅ DO** ship a `meta.json` at the sim's root with all four fields — `title`,
 > `description`, `difficulty`, `tags`. Uploads missing any field are rejected. *(ADR-002, CLAUDE.md)*
@@ -95,7 +96,8 @@ terms of Engineering Graphics' own files, modules, or lessons was left out entir
 > DESIGN.md §3.1, ADR-086)*
 > Reason: these two fonts are the platform's own shared typography — the design system still
 > defines *what* they are and how they're used; Supabase Storage is only *where* the bytes are
-> served from now, centrally, instead of each module carrying its own bundled copy.
+> served from now, centrally, instead of each module carrying its own bundled copy. No local
+> `assets/fonts/` anywhere in the repo.
 
 ---
 

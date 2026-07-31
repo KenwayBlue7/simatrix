@@ -147,7 +147,8 @@ Every rule is formatted:
 > fired once from `markBooted()`, and `window.parent.postMessage({ type: 'sim:complete' }, '*')`
 > fired once from `markComplete()` when the lesson reaches its finished state. The host↔sim surface
 > is `window.simAPI` + `meta.json` for control, plus those two outbound signals — nothing else, and
-> no inbound `message` listener. *(ADR-002, ADR-078, ARCHITECTURE.md §6)*
+> no inbound `message` listener; `window.simAPI` stays the only path *into* the sim. *(ADR-002,
+> ADR-078, ARCHITECTURE.md §6)*
 
 > **§2.11 ✅ DO** ship a `meta.json` at the root with all four fields — `title`, `description`,
 > `difficulty`, `tags`. Uploads missing any field are rejected. *(ADR-002, CLAUDE.md)*
@@ -169,10 +170,13 @@ Every rule is formatted:
 > the Supabase Storage CDN (ADR-086, reverses the prior "bundle local woff2, never CDN" rule);
 > **never** point at a Google-Fonts CDN or any other third-party font host. *(ARCHITECTURE.md §7,
 > DESIGN.md §3.1, ADR-086)*
-> Reason: web-team directive to centralize font hosting instead of duplicating the same three
-> files in every module/topic's `assets/fonts/`. Tradeoff: first-load typography now depends on
-> reaching Supabase; `font-display: swap` keeps the fallback safe (system font, no hang) but the
-> sim's typography is no longer guaranteed correct fully offline on first load (§2.12).
+> Reason: these two fonts are the platform's own shared typography, defined in the root design
+> system — not something each subject module chooses independently. Practically: web-team
+> directive to centralize font hosting instead of duplicating the same three files in every
+> module/topic's `assets/fonts/`. Tradeoff: first-load typography now depends on reaching
+> Supabase; `font-display: swap` keeps the fallback safe (system font, no hang) but the sim's
+> typography is no longer guaranteed correct fully offline on first load (§2.12). No local
+> `assets/fonts/` anywhere in the repo.
 
 > **§2.16 ✅ DO** keep a packaged Module 2 payload ≤ 10 MB — prefer `.glb` over `.gltf+bin`, `.webp`
 > over `.png`/`.jpg`, and skip HDR environments. *(CLAUDE.md)*
