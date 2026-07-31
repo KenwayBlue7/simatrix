@@ -16,7 +16,7 @@
 // Layering (CLAUDE.md): imports the pure data problems.js + the injected sim controller.
 // Never reaches into constructions.js or renderConstruction.js directly.
 
-import { PROBLEMS, groupByTier } from './problems.js';
+import { PROBLEMS, enabledProblems, groupByTier } from './problems.js';
 
 /** @param {Record<string,number|string>} target @param {Record<string,number>} tolerance
  *  @param {Record<string,number|string>} params */
@@ -27,8 +27,6 @@ function matches(target, tolerance, params) {
     return Math.abs((params[key] ?? NaN) - target[key]) <= tol;
   });
 }
-
-const TIER_LABEL = { practice: 'Practice', challenge: 'Challenge' };
 
 /**
  * @param {{
@@ -58,7 +56,7 @@ export function initProblemLibrary(sim) {
   const exitBtn = $('exit-problem');
 
   const ready = overlay && list && header && statement;
-  if (!ready) return { open: () => {}, close: () => {}, sync: () => {}, dispose: () => ac.abort() };
+  if (!ready) return { open: () => {}, exit: () => {}, isActive: () => false, sync: () => {}, dispose: () => ac.abort() };
 
   let activeProblemId = null;
   let revealedHints = 0;
@@ -69,13 +67,12 @@ export function initProblemLibrary(sim) {
   // --- Full-viewport picker -------------------------------------------------
   function renderList() {
     list.innerHTML = '';
-    for (const [tier, problems] of Object.entries(groupByTier())) {
-      if (problems.length === 0) continue;
+    for (const { tier, problems } of groupByTier(enabledProblems())) {
       const group = document.createElement('div');
       group.className = 'problem-group';
       const heading = document.createElement('h2');
       heading.className = 'problem-group__title';
-      heading.textContent = TIER_LABEL[tier] ?? tier;
+      heading.textContent = tier.label;
       group.appendChild(heading);
 
       const grid = document.createElement('div');
@@ -150,12 +147,13 @@ export function initProblemLibrary(sim) {
     toggleBtn.textContent = collapsed ? 'Show text' : 'Hide text';
   }, listen);
 
-  exitBtn?.addEventListener('click', () => {
+  function exitProblem() {
     activeProblemId = null;
     revealedHints = 0;
     renderActive();
     sim.announce('Problem exited. Your construction is unchanged.');
-  }, listen);
+  }
+  exitBtn?.addEventListener('click', exitProblem, listen);
 
   // --- Overlay open/close + focus trap ---------------------------------------
   let lastFocused = null;
@@ -196,5 +194,5 @@ export function initProblemLibrary(sim) {
   }
 
   renderActive();
-  return { open, close, sync, dispose: () => ac.abort() };
+  return { open, exit: exitProblem, isActive: () => activeProblemId !== null, sync, dispose: () => ac.abort() };
 }
