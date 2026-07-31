@@ -145,9 +145,11 @@ Every rule is formatted:
 > **§2.10 ❌ NEVER** add `postMessage`, `window.parent`, or `window.top` usage anywhere **except**
 > the two sanctioned outbound messages: `window.parent.postMessage({ type: 'sim:ready' }, '*')`
 > fired once from `markBooted()`, and `window.parent.postMessage({ type: 'sim:complete' }, '*')`
-> fired once from `markComplete()` when the lesson reaches its finished state. The host↔sim surface
-> is `window.simAPI` + `meta.json` for control, plus those two outbound signals — nothing else, and
-> no inbound `message` listener. *(ADR-002, ADR-078, ARCHITECTURE.md §6)*
+> fired from `markComplete()` when the lesson reaches its finished state. `sim:ready` stays strictly
+> one-shot; `sim:complete` may fire more than once per page load (host-confirmed to support repeated
+> triggers) — no latch is required, though a topic may still keep one. The host↔sim surface is
+> `window.simAPI` + `meta.json` for control, plus those two outbound signals — nothing else, and no
+> inbound `message` listener. *(ADR-002, ADR-078, ARCHITECTURE.md §6)*
 
 > **§2.11 ✅ DO** ship a `meta.json` at the root with all four fields — `title`, `description`,
 > `difficulty`, `tags`. Uploads missing any field are rejected. *(ADR-002, CLAUDE.md)*

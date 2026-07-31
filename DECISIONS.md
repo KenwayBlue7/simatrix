@@ -2829,7 +2829,9 @@ visit, but the outbound signal to the host is a one-time event, because a host o
 reopen mid-session would be a worse experience than one that never returns after the first win.
 The payload stays bare (`{ type: 'sim:complete' }`, no topic id or metadata) to preserve
 `sim:ready`'s byte-parity property — the host already knows which iframe it loaded and can
-attribute the event itself.
+attribute the event itself. *(Revised 2026-07-31 for Module 2 specifically — see the addendum
+below; this paragraph remains accurate for the other 9 topics + `template_starter` until they
+migrate.)*
 
 **Call-site placement varies by topic, same as `markBooted()`'s per-topic call site does** — each
 topic hooks its own existing notion of "finished" rather than a uniform signal, on the reasoning
@@ -2849,14 +2851,52 @@ the last step" click-through:
 - Several topics' "Complete & next problem" button (`completeAndNext()`) was deliberately **not**
   used as the hook — that action calls `simAPI.reset()` in the same click, which would fight the
   "never re-arm" rule above; the fold/flatten/dimension-reveal moment that precedes it is the real
-  finish line.
+  finish line. *(The "never re-arm" rule itself is struck by the 2026-07-31 addendum below; this
+  bullet documents why the original 9-topic pass made this call under the old constraint.)*
 
 **Excluded: `graphics_module_2_topic_1_introduction`.** This topic is a free-browse anatomy
 gallery with no stepper, no steps, and no progress tracking (`src/gallery.js` tracks no
 visited/viewed set) — there is no "finished" state to hook without inventing a completion rule
 (e.g. "all 11 solids viewed"), which is a product decision, not something this pass should assume.
-It continues to emit `sim:ready` only. `Module1/`, `Module2/` stay out of scope for the same reason
-ADR-078 deferred them originally.
+It continues to emit `sim:ready` only. `Module1/` stays out of scope for the same reason ADR-078
+deferred it originally. `Module2/` is no longer out of scope — see the 2026-07-31 addendum below,
+which is where it picked up both signals.
+
+**Addendum (2026-07-31): `sim:complete` becomes re-fireable — the "never re-arm" rule above is
+struck.** Host-side confirmed (Abhiram) the platform now supports repeated `sim:complete` triggers,
+not just a first-arrival latch — the practical driver was Module 2's "Finish lesson" button pilot
+(a new footer-nav button replacing the terminal step's `Next` slot, calling `markComplete()` on
+click instead of an auto-detected payoff moment), which needs every click to notify the host,
+including a second visit after "Try another problem" resets the bench and the learner re-flattens.
+`markComplete()` drops the `window.__simComplete` guard entirely:
+```js
+function markComplete() {
+  window.parent.postMessage({ type: 'sim:complete' }, '*');
+}
+```
+Fires on every call, full stop — no per-page-load ceiling, no reset-immunity clause to reason
+about. **`sim:ready` is unaffected by this addendum** — `markBooted()` keeps its existing one-shot
+shape; it was never a per-click signal, and `init()` itself only runs once (self-start, no external
+`init()` call, CLAUDE.md), so there was never a latch to remove there.
+
+This also **retires** the "replaying a finished lesson never re-opens the host overlay" design
+intent the 2026-07-28 text above asserted as settled — the host can now re-open it, by design, on
+every fire — and the reasoning that excluded `completeAndNext()` as a hook because it "would fight
+the never re-arm rule": that specific constraint no longer exists, though `completeAndNext()`
+remains a poor hook on its own terms (it resets the bench synchronously, still a confusing moment
+to also fire a lesson-complete signal from). Module 2's pilot uses a dedicated `#btn-finish`
+instead, not `completeAndNext()`.
+
+**Pilot, not yet platform-wide.** `Module2/` — previously out of scope entirely for both signals —
+is the first and only place any of this has shipped: a `markBooted()`/`sim:ready` catch-up, plus
+the button-driven, latchless `markComplete()` above. The existing 9 auto-firing topics +
+`template_starter` still carry the **old**, latched `markComplete()` body quoted in the 2026-07-28
+addendum above; migrating them to the button-driven, latchless pattern is separately tracked work,
+not yet started. Until that rollout lands, the platform genuinely has two live `sim:complete`
+shapes in the field at once — Module 2's (button-triggered, re-fireable) and the 9 topics' +
+`template_starter`'s (auto-triggered, one-shot). Read the "fires once" language in the 2026-07-28
+addendum above as historical for those 9 + `template_starter` until they migrate, not as the
+current platform-wide contract.
 **Status:** Active
 
 ---

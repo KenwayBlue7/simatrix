@@ -2,6 +2,12 @@
 
 All notable changes to Module 2 (Orthographic Projection of Solids).
 
+## 2026-07-31
+- Added: `markBooted()` now posts the platform's `sim:ready` signal (ADR-078) — Module 2 was one of two legacy monoliths left out of that pass originally; it's caught up now. (`main.js`.)
+- Added: "Finish lesson" button pilot — `#btn-finish` takes over the footer nav's primary slot at Step 6 exactly when `#btn-next` vacates it (same mutual-exclusivity idiom as `#btn-flatten`/`#btn-unfold`), enabled once flattened. Click posts `sim:complete` and announces "Lesson marked complete." — fixes the gap where a learner who skips a topic's auto-detected payoff moment never completes. Module 2 is the pilot; rollout to the other 18 topics is separate, not-yet-started work. (`main.js`, `src/stepper.js`, `index.html`.)
+- Changed: `sim:complete` (`markComplete()`) drops its one-shot `window.__simComplete` latch — fires on every call now. Host-side confirmed to support repeated triggers; this is a platform-wide policy change (ADR-078 addendum, revised), not Module-2-specific, though Module 2 is the only place it has shipped so far. (`main.js`, `DECISIONS.md`, `RULES.md`, `PLATFORM-RULES.md`.)
+- Changed: "Complete & next problem" demoted from `btn--primary` to plain `.btn--block` and relabeled "Try another problem" — Finish lesson is now Step 6's one loud action (DESIGN.md §5.1); stays the same repeatable practice-loop action underneath (exits the active problem, resets the bench, reopens the Problem Library) — no behaviour change, styling and label only. (`index.html`, `src/stepper.js`.)
+
 ## 2026-07-28
 - Fixed: a follow-up audit found ADR-090's "Next sometimes does nothing" fix was incomplete — the skip loop was still bounded by a positional last-index, so a pose whose final beat drew nothing could still repaint an identical frame on the last click, and "Done" could arrive a click late. `goNext`/`renderProgress` now compare against a content-aware `computeFinalIndex()` instead (ADR-094). (`src/methodController.js`, `DECISIONS.md`.)
 - Fixed: a Set-N focus chip left zoomed in made Next/Back draw beyond the visible viewport once the walkthrough crossed into a different Set — the button worked, the sheet just changed off-screen, an independent cause of the same "Next did nothing" symptom untouched by ADR-090. The active chip and camera now clear back to the whole row whenever progress moves into a new Set (ADR-094). (`src/methodController.js`.)
