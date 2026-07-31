@@ -5,6 +5,11 @@ All notable changes to Module 3 · Topic 1 (Sections of Solids).
 (This topic's own history starts fresh from the scaffold date below — `template_starter/`'s prior
 build history belongs to the template, not this topic, per MODULE-STARTER §3.2 convention.)
 
+## 2026-07-31
+- Added: "Finish lesson" button (Module 2 Finish-button pilot rollout) — `#btn-finish` takes over the footer's primary slot at the terminal step 5 "The true shape" exactly when `#btn-next` vacates it. Click posts `sim:complete` and announces "Lesson marked complete." (`main.js`, `src/stepper.js`, `index.html`.)
+- Changed: `sim:complete` (`markComplete()`) drops its one-shot `window.__simComplete` latch — fires on every "Finish lesson" click now, replacing the old auto-fire on first terminal-step arrival. (`main.js`, `src/stepper.js`.)
+- Changed: `#btn-complete-next` demoted off "Complete & next problem"/"Pick a problem" wording to a single "Try another problem" label — Finish lesson now owns the completion signal, so this stays the repeatable practice-loop action only, same label in both problem and free-play modes. (`src/stepper.js`, `index.html`.)
+
 ## 2026-07-28
 - Added: a new `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` once, fired on first arrival at the terminal step (step 5, "The true shape") — the host's second sanctioned signal, for a "next topic / stay" overlay (ADR-078 addendum). (`main.js`, `src/stepper.js`.)
 

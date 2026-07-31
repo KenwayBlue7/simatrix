@@ -2044,6 +2044,14 @@
         </div>
         <button id="btn-back" class="btn btn--nav" type="button" hidden>Back</button>
         <button id="btn-next" class="btn btn--primary btn--nav" type="button">Next</button>
+        <!-- Finish-button pattern (ADR-078 addendum, revised): takes over #btn-next's footer
+             slot at the terminal step (stepper.js hides one exactly when the other shows).
+             Fires sim:complete — no latch, every click reposts. Own element, own listener: NOT
+             a relabel of #btn-next. UNGATED here (no `disabled` attribute) because this starter
+             has no domain state to gate on; a real topic built from this template should decide
+             its OWN gate condition rather than copying this ungated form by default — see
+             MODULE-STARTER.md's Finish-button section. -->
+        <button id="btn-finish" class="btn btn--primary btn--nav" type="button" hidden>Finish lesson</button>
       </footer>
     </section>
     </div>

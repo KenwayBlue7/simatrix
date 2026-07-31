@@ -2281,6 +2281,12 @@
         </div>
         <button id="btn-back" class="btn btn--nav" type="button" hidden>Back</button>
         <button id="btn-next" class="btn btn--primary btn--nav" type="button">Next</button>
+        <!-- Finish-button pilot: Step 6's footer primary once flattened, replacing #btn-next's
+             slot (stepper.js hides one exactly when the other shows — same idiom as
+             #btn-flatten/#btn-unfold). Fires sim:complete (ADR-078 addendum, revised — no latch,
+             every click reposts). Own element, own listener: NOT a relabel of #btn-next, since
+             #btn-next's click handler advances the wizard, an unrelated action. -->
+        <button id="btn-finish" class="btn btn--primary btn--nav" type="button" hidden disabled>Finish lesson</button>
       </footer>
     </section>
     </div>

@@ -1,5 +1,9 @@
 # Changelog — Projection of Straight Lines
 
+## 2026-07-31
+- Added: "Finish lesson" button (Module 2 Finish-button pilot rollout) — `#btn-finish` takes over the footer's primary slot at the terminal Step 5 "Traces" exactly when `#btn-next` vacates it. Click posts `sim:complete` and announces "Lesson marked complete." (`main.js`, `src/stepper.js`, `index.html`.)
+- Changed: `sim:complete` (`markComplete()`) drops its one-shot `window.__simComplete` latch — fires on every "Finish lesson" click now. **Behavior change**: the old auto-fire sat at Step 4's fold ("Generate Orthographic Projections"); completion now requires reaching the terminal Step 5 "Traces" instead, matching Module 2 parity (confirmed change — Traces is real content, not an epilogue). The fold's own "Orthographic projection generated" toast is unchanged, still fires once on first fold. (`main.js`, `src/stepper.js`.)
+
 ## 2026-07-28
 - Added: a new `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` once, fired on first fold alongside the existing "Orthographic projection generated" toast — the host's second sanctioned signal, for a "next topic / stay" overlay (ADR-078 addendum). (`main.js`, `src/stepper.js`.)
 

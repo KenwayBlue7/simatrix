@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-31
+- Added: "Finish lesson" button (Module 2 Finish-button pilot rollout) — `#btn-finish` takes over the footer's primary slot at Step 4 exactly when `#btn-next` vacates it. Gated on `state.dimensions` (the Step-4 dimensions reveal — the lesson's real content payoff, not mere step arrival). Click posts `sim:complete` and announces "Lesson marked complete." (`src/main.js`, `src/stepper.js`, `index.html`.)
+- Changed: `sim:complete` (`markComplete()`) drops its one-shot `window.__simComplete` latch — fires on every "Finish lesson" click now, replacing the old auto-fire from `completeLesson()` on dimensions reveal. `completeLesson()` keeps its toast + narration as a standalone content-milestone celebration, decoupled from the host signal. (`src/main.js`, `src/stepper.js`.)
+
 ## 2026-07-28
 - Added: a new `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` once, called from `completeLesson()` when the Step-4 dimensions are revealed — the host's second sanctioned signal, for a "next topic / stay" overlay (ADR-078 addendum). (`src/main.js`.)
 

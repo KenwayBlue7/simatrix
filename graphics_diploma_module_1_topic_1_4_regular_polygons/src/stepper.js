@@ -26,6 +26,8 @@ const TOTAL = STEPS.length;
  *   getConstructionLabel: () => string | null,
  *   hasConstruction: () => boolean,
  *   onEnterConstructStep: () => void,
+ *   hasSolvedProblem: () => boolean,
+ *   markComplete: () => void,
  * }} sim
  * @returns {{ sync: () => void, reset: () => void, restart: () => void, dispose: () => void }}
  */
@@ -44,6 +46,7 @@ export function initStepper(sim) {
   const elLead = $('step-lead');
   const btnBack = $('btn-back');
   const btnNext = $('btn-next');
+  const btnFinish = $('btn-finish');
   const pickerButtons = [...document.querySelectorAll('.construction-picker__item')];
 
   if (elTotal) elTotal.textContent = String(TOTAL);
@@ -83,6 +86,13 @@ export function initStepper(sim) {
       // there is nothing to move on to otherwise).
       btnNext.disabled = currentStep === 1 && !sim.hasConstruction();
     }
+    // Finish lesson: takes over the footer's primary slot exactly when Next vacates
+    // it (terminal step). Gated on a solved Problem Library problem — this track's
+    // real completion signal, not mere arrival at Verify (which costs 3 clicks).
+    if (btnFinish) {
+      btnFinish.hidden = currentStep < TOTAL;
+      btnFinish.disabled = !sim.hasSolvedProblem();
+    }
   }
 
   function goToStep(n, { announce = true } = {}) {
@@ -111,6 +121,13 @@ export function initStepper(sim) {
 
   btnNext?.addEventListener('click', () => { if (currentStep < TOTAL) goToStep(currentStep + 1); }, listen);
   btnBack?.addEventListener('click', () => goToStep(currentStep - 1), listen);
+  // Finish lesson: posts sim:complete to the host (no latch — every click reposts,
+  // ADR-078 addendum revised). Button stays as-is afterward (no disable/relabel,
+  // locked decision) — announce() is the only feedback.
+  btnFinish?.addEventListener('click', () => {
+    sim.markComplete?.();
+    sim.announce?.('Lesson marked complete.');
+  }, listen);
 
   for (const item of railItems) {
     const btn = item.querySelector('.rail__btn');

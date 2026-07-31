@@ -2829,9 +2829,9 @@ visit, but the outbound signal to the host is a one-time event, because a host o
 reopen mid-session would be a worse experience than one that never returns after the first win.
 The payload stays bare (`{ type: 'sim:complete' }`, no topic id or metadata) to preserve
 `sim:ready`'s byte-parity property — the host already knows which iframe it loaded and can
-attribute the event itself. *(Revised 2026-07-31 for Module 2 specifically — see the addendum
-below; this paragraph remains accurate for the other 9 topics + `template_starter` until they
-migrate.)*
+attribute the event itself. *(Revised 2026-07-31 for Module 2 specifically, then platform-wide the
+same day — see the addenda below. This paragraph is historical: it describes the retired latched
+shape, now migrated everywhere.)*
 
 **Call-site placement varies by topic, same as `markBooted()`'s per-topic call site does** — each
 topic hooks its own existing notion of "finished" rather than a uniform signal, on the reasoning
@@ -2887,16 +2887,42 @@ remains a poor hook on its own terms (it resets the bench synchronously, still a
 to also fire a lesson-complete signal from). Module 2's pilot uses a dedicated `#btn-finish`
 instead, not `completeAndNext()`.
 
-**Pilot, not yet platform-wide.** `Module2/` — previously out of scope entirely for both signals —
-is the first and only place any of this has shipped: a `markBooted()`/`sim:ready` catch-up, plus
-the button-driven, latchless `markComplete()` above. The existing 9 auto-firing topics +
-`template_starter` still carry the **old**, latched `markComplete()` body quoted in the 2026-07-28
-addendum above; migrating them to the button-driven, latchless pattern is separately tracked work,
-not yet started. Until that rollout lands, the platform genuinely has two live `sim:complete`
-shapes in the field at once — Module 2's (button-triggered, re-fireable) and the 9 topics' +
-`template_starter`'s (auto-triggered, one-shot). Read the "fires once" language in the 2026-07-28
-addendum above as historical for those 9 + `template_starter` until they migrate, not as the
-current platform-wide contract.
+**Pilot, then rolled out.** `Module2/` shipped the button-driven, latchless `markComplete()` first
+(a `markBooted()`/`sim:ready` catch-up alongside it). The same day, the pattern rolled out to 7 of
+the 9 KTU auto-firing topics (`graphics_module_1_topic_2_spatial_framework`,
+`graphics_module_1_topic_3_points`, `graphics_module_1_topic_5_projection_of_line_types`,
+`graphics_module_1_topic_6_projection_of_straight_lines`,
+`graphics_module_2_topic_2_simple_positions`, `graphics_module_3_topic_1_sections_of_solids`,
+`graphics_module_3_topic_2_development_of_surfaces`) and, separately, to all 9 Diploma Engineering
+Graphics topics (see the Diploma paragraph below — a gated variant, not a straight port).
+`template_starter` carried the **old**, latched `markComplete()` body quoted in the 2026-07-28
+addendum above for the rest of that day; it migrated too, later the same day — see the final
+2026-07-31 addendum below, which closes out the rollout entirely.
+
+**2026-07-31, migration completed for the last 2 shipped-topic stragglers.**
+`graphics_module_1_topic_1_foundations` and `graphics_module_1_topic_4_understanding_orthographic_views`
+both migrated to the button-driven, latchless pattern, closing out the rollout across every shipped
+topic (the scaffold, `template_starter`, followed the same day — see the final addendum below):
+- `graphics_module_1_topic_1_foundations` follows the standard footer-nav placement (`#btn-finish`
+  takes `#btn-next`'s slot at terminal Step 4), gated on `state.dimensions` — the Step-4 dimensions
+  reveal is the lesson's real content payoff, not mere step arrival, same reasoning as `points`'
+  `isFolded()` gate.
+- `graphics_module_1_topic_4_understanding_orthographic_views` **deviates from the standard
+  placement**: `#btn-finish` lives in `#workbench-rail` beside "Back to Step 4" and the
+  Fold/Unfold toggle, not the footer nav, because `body.compare-split #wizard { display: none; }`
+  hides the entire wizard (including the footer) for all of Step 5 — the rail is the only surface
+  reachable there. It is **ungated**: this stepper's Next has no per-step completion gate at all
+  (unlike `points`/Diploma), and Step 5's own arrival already auto-drives the box-unfold, the
+  topic's real payoff, so there is no separate in-step action left to gate on. The old
+  arrival-triggered "Lesson complete" toast and its `lessonCompleteShown` re-arm-on-step-back latch
+  are retired along with the auto-fire — the host signal is now solely the button's job, matching
+  Module 2 (no separate arrival celebration). The Fold/Unfold toggle also lost its accent-fill-when-
+  -pressed styling (now plain paper/bordered in both states) so "Finish lesson" is the rail's one
+  accent-filled action; its toggle behaviour and label-swap were already correct pre-existing code,
+  untouched by this pass.
+
+`template_starter` migrated the same day (see the final addendum below) — nothing in the field
+still carries the old auto-triggered, one-shot `markComplete()` shape.
 **Status:** Active
 
 **Note (2026-07-31):** The Diploma Engineering Graphics track (`feat/diplomaMod1`) independently
@@ -2905,6 +2931,51 @@ recorded there as its own ADR-081 with a Diploma-only carve-out. That ADR is ret
 its decision was already made here, platform-wide, and this ADR's scope covers the Diploma track
 too. See ADR-095 (that track's renumbered founding decision) for where its independent version
 used to live.
+
+**Diploma rollout (2026-07-31, Phase C — completes the migration for this track):** all 9 Diploma
+topics (`graphics_diploma_module_1_topic_1_1_basic_constructions` through `_1_6_ogee_curves`,
+`_2_1_roulettes` through `_2_3_helix`) replaced their passive auto-fire (`problemLibrary.js`
+detecting a self-check match and calling `main.js`'s one-shot `reportComplete()`/`completeSent`)
+with the same `#btn-finish` pattern — but **gated**, not ungated like
+`graphics_module_1_topic_2_spatial_framework` / `graphics_module_3_topic_1_sections_of_solids` /
+`graphics_module_3_topic_2_development_of_surfaces` above. Diploma's 4-step wizard makes the
+terminal step ("Verify") cheap to reach — pick a construction, click Next three times, nothing
+solved — so `#btn-finish` stays `disabled` until a Problem Library problem has matched at least
+once (`main.js`'s `solvedAny` flag, exposed as `hasSolvedProblem()`; `problemLibrary.js`'s
+`solvedFired` latch now calls `sim.onProblemSolved()` instead of firing the host signal directly).
+This preserves the completion meaning the deleted auto-fire actually had, rather than degrading it
+to mere step-arrival. `solvedAny` is deliberately not cleared by `simAPI.reset()` — the same
+reset-immunity the retired `completeSent` latch carried.
+
+**Addendum (2026-07-31): `template_starter` migrates — rollout is now 100% complete platform-wide.**
+The scaffold was the last file anywhere still carrying the retired auto-fire/latch shape (it was
+deliberately deferred at the top of this rollout, on the reasoning that "a starter template has no
+stepper of its own to hook a Finish button into until a real topic is cut from it" — but it *does*
+ship its own 3-step placeholder stepper for demo purposes, and that stepper was still calling the
+old `markComplete()` shape on first arrival at its terminal step, so it was carrying the exact bug
+a topic cloned from it would have inherited). Fixed to match every other migrated topic:
+`markComplete()` in `main.js` drops the `window.__simComplete` guard (one-line latchless body,
+byte-identical in shape to `Module2/`'s); `stepper.js` removes the `firstArrival`/`visited.has(TOTAL)`
+auto-fire check from `goToStep()` entirely and instead wires a `#btn-finish` click listener (added
+to the `sim` JSDoc typedef, which had never declared `markComplete` despite calling it); `index.html`
+gains the `#btn-finish` button in `.card__nav`, after `#btn-next`.
+**Ungated**, matching `graphics_module_1_topic_4_understanding_orthographic_views`'s precedent, not
+Module 2's/Foundations'/Diploma's gated forms — the starter has no domain state to gate on, the same
+reasoning that made it ungated in the first place, not an oversight this time.
+**New this pass:** `MODULE-STARTER.md` gains a §3.11 documenting the whole pattern for anyone
+building a new topic from this template — what `#btn-finish` is, that `markComplete()` is latchless
+by platform rule (citing this ADR), and, most importantly, that a new topic should **decide its own
+gate condition** rather than reflexively copying the starter's ungated form, citing `state.flattened`/
+`state.dimensions`/`isFolded()`/`hasSolvedProblem()` as gated precedents and
+`understanding_orthographic_views` as the deliberate ungated one. This closes the one remaining gap
+the rollout kept flagging: the pattern existed everywhere in shipped code but nowhere in the
+building-a-new-topic playbook, so a topic cut from the template before this pass would have silently
+regressed to the retired shape with no rule telling its author otherwise.
+Verified via CDP: page loads clean (zero console errors), `#btn-next`/`#btn-finish` are mutually
+exclusive at the terminal step (arrival alone fires nothing), and two `#btn-finish` clicks produce
+two `sim:complete` messages (latchless, not two-then-silence).
+**Status:** Active — the Finish-button migration is complete across every file in the repo that
+carries a stepper; there is no remaining "old pattern" instance to track.
 
 ---
 

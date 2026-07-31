@@ -249,7 +249,7 @@ topic-specific parts — what "adapt" concretely means is taken from how topic 2
 | `src/problems.js` | The **`ENABLED_TIERS` flag** — the single switch that scopes a clone (ADR-009, RULES.md §1.6). **Concretely:** Module 2 = `['base','corner-edge','one-plane','both-planes']`; topic 2 narrowed it to `['base','corner-edge','axis-vp']`. Set yours to the tiers your topic can actually solve; add/curate `PROBLEMS` to match (keep textbook wording verbatim — RULES.md §6.7). |
 | `src/iShape.js` | The shape-generator contract + `applyShapeTransform()`. **⚠️ This is NOT a copy-identical file** — Module 2's is larger (it imports THREE and carries the inclination / VP-lay-down composition) and the two topics share an older, smaller version. Adapt the transform to the poses your topic actually uses; keep the explicit **`ZXY` Euler order** and re-derive every sign visually (ADR-005, RULES.md §3.8–§3.10). |
 | `src/uiManager.js` | The parameter dock. Remove sliders/toggles for fields you deleted, and remove the matching mutual-exclusion wiring (e.g. topic 2 dropped the inclination toggles, ADR-008 consequence). |
-| `src/stepper.js` | The Guided Stepper sequence — the steps your topic teaches, gated one behind the next. |
+| `src/stepper.js` | The Guided Stepper sequence — the steps your topic teaches, gated one behind the next. Also owns `#btn-finish`'s show/hide + gate — see §3.11 before you ship the terminal step. |
 | `src/problemLibrary.js` | Ships as a generic, empty-bodied stub in `template_starter/` (RULES.md §6.24–§6.26, ADR-083) — start there and fill in `evaluate()` against your own `problems.js` `target` shape. If an existing sibling topic's self-check already matches the shape you need (pose-based vs section/cut-based), copying its `problemLibrary.js` instead of the bare stub is a legitimate shortcut. Keep it ±0.5-tolerant and **never auto-fill** (ADR-015, RULES.md §6.1–§6.2). |
 | `src/projectionDrawer.js` | Only if your topic changes how projections are drawn. (Topic 2's differs slightly; keep the ADR-016 line conventions — RULES.md §6.16–§6.18.) |
 | `src/terms.js` | The inline glossary entries for your topic's vocabulary. |
@@ -328,6 +328,39 @@ Module 2 and how heavily it is adapted (RULES.md §8.3). If it introduced or div
 shared/identical file, update **§7** (shared) accordingly. Add a dated entry to the root
 `CHANGELOG.md` (RULES.md §8.2), and if you made any non-obvious two-option decision, add an ADR to
 `DECISIONS.md` (RULES.md §8.1).
+
+### 3.11 The Finish-button pattern (lesson completion)
+
+`template_starter/` already ships the platform's one sanctioned lesson-completion signal, wired and
+working — you do not build this from scratch, but you **do** need to make one decision before you
+ship: whether your topic's Finish button needs a gate.
+
+- **What it is.** A `#btn-finish` button (`"Finish lesson"`) that fires
+  `window.parent.postMessage({ type: 'sim:complete' }, '*')` via `markComplete()` in `main.js`, so
+  the host can surface its "next topic / stay" overlay (ADR-078 addendum, revised). **It is
+  latchless** — every click reposts, with no per-page-load ceiling. (An earlier revision latched it
+  behind a one-shot `window.__simComplete` flag; that was retired platform-wide once the host
+  confirmed it tolerates repeated triggers — do not reintroduce a latch.)
+- **Where it lives.** In the footer nav (`.card__nav`), immediately after `#btn-next`, and the two
+  are **mutually exclusive**: `stepper.js`'s `renderNav()` hides `#btn-next` and shows `#btn-finish`
+  in the same breath, exactly when `currentStep` reaches the terminal step — the same
+  hide-one-show-the-other idiom used elsewhere for paired states (e.g. `#btn-flatten`/`#btn-unfold`).
+  It is its own element with its own click listener; never a relabel of `#btn-next`'s handler.
+- **Decide your own gate — don't just copy the ungated form.** `template_starter/`'s own copy ships
+  **ungated** (`hidden` only, no `disabled`) because the starter has no domain state to gate on. A
+  real topic usually *does* have one, and should gate `#btn-finish.disabled` on whatever signal
+  already means "the learner actually did the thing," not mere arrival at the last step (which can
+  cost as little as repeatedly clicking Next). Reuse a signal your stepper already tracks — don't
+  invent a new completion concept:
+  - `state.flattened` (Module 2 — gated on the drawing being folded flat)
+  - `state.dimensions` (Module 1 Foundations — gated on the BIS dimensions reveal)
+  - `sim.isFolded()` (several Module 1 topics — gated on the fold/unfold state)
+  - `sim.hasSolvedProblem()` (the Diploma constructions family — gated on a solved Problem Library
+    problem, since arriving at the verify step costs only a few clicks)
+  - **Ungated is a legitimate choice too**, not just the starter's fallback — `graphics_module_1_topic_4_understanding_orthographic_views` ships `#btn-finish` with no gate at all (it lives in the
+    Compare workbench rail, reachable only once the full step flow is already behind the learner, so
+    arrival itself is a meaningful enough signal). The point is to make this choice deliberately, the
+    way that topic did, not by default because copying the starter was easier.
 
 ---
 

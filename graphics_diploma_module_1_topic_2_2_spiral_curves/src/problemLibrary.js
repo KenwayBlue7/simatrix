@@ -34,6 +34,7 @@ function matches(target, tolerance, params) {
  *   getParams: () => Record<string, number>,
  *   loadProblem: (constructionId: string) => void,
  *   announce: (msg: string) => void,
+ *   onProblemSolved: () => void,
  * }} sim
  */
 export function initProblemLibrary(sim) {
@@ -60,7 +61,7 @@ export function initProblemLibrary(sim) {
 
   let activeProblemId = null;
   let revealedHints = 0;
-  let solvedFired = false; // sim:complete trigger latch — first problem solved this page load only
+  let solvedFired = false; // one-shot notify to main.js the first time a problem matches
 
   function activeProblem() { return PROBLEMS.find((p) => p.id === activeProblemId) ?? null; }
 
@@ -130,7 +131,7 @@ export function initProblemLibrary(sim) {
     const ok = onConstruction && matches(problem.target, problem.tolerance, sim.getParams());
     status.textContent = ok ? '✓ Matches the stated problem' : 'Not yet — keep adjusting the sliders';
     status.classList.toggle('match-status--ok', ok);
-    if (ok && !solvedFired) { solvedFired = true; sim.reportComplete(); }
+    if (ok && !solvedFired) { solvedFired = true; sim.onProblemSolved(); }
   }
 
   hintBtn?.addEventListener('click', () => {

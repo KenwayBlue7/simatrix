@@ -2160,9 +2160,10 @@
             <p class="dock__note">The floating sheet is an <strong>auxiliary view</strong>: a drawing plane held parallel to the cutting plane itself. On it the section appears at full size &mdash; the <strong>true shape</strong> &mdash; with none of the foreshortening the ordinary views suffer.</p>
             <button id="btn-face-section" class="btn btn--primary" type="button">Face the section</button>
             <p class="dock__note">Compare it with the hatched apparent shape in the views &mdash; same figure, different sizes. Only the auxiliary view reports the section&rsquo;s real measurements.</p>
-            <!-- The terminal-step payoff CTA (stepper.js shows it on Step 5 and adapts the
-                 label to whether a textbook problem is loaded; click → sim.completeAndNext()). -->
-            <button id="btn-complete-next" class="btn btn--primary btn--block" type="button" hidden>Complete &amp; next problem</button>
+            <!-- "Try another problem" (Finish-button pilot — renamed off "Complete..." wording
+                 since #btn-finish now owns lesson completion): the repeatable practice-loop
+                 button, shown by stepper.js on Step 5; click → sim.completeAndNext(). -->
+            <button id="btn-complete-next" class="btn btn--primary btn--block" type="button" hidden>Try another problem</button>
           </div>
         </section>
       </div>
@@ -2185,6 +2186,11 @@
         </div>
         <button id="btn-back" class="btn btn--nav" type="button" hidden>Back</button>
         <button id="btn-next" class="btn btn--primary btn--nav" type="button">Next</button>
+        <!-- Finish-button pilot: takes over the footer's primary slot once Next hides at
+             the terminal step (stepper.js). Fires sim:complete (ADR-078 addendum, revised
+             — no latch, every click reposts). Own element, own listener: NOT a relabel of
+             #btn-next, whose click handler advances the wizard, an unrelated action. -->
+        <button id="btn-finish" class="btn btn--primary btn--nav" type="button" hidden disabled>Finish lesson</button>
       </footer>
     </section>
     </div>

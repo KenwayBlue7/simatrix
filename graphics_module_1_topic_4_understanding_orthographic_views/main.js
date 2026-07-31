@@ -157,11 +157,6 @@ let viewByPlane = { hp: null, vp: null, pp: null };
 /** The guided step currently rendered (renderStep). Governs per-layer visibility + the fold/split. */
 let currentStep = 1;
 
-/** Guards the Step-5 completion toast so it fires once per arrival, not on every rebuild-driven
- *  re-render of the same step (renderStep also re-runs at animate:false on every rebuild). Reset
- *  whenever the learner steps back below 5, so returning to Step 5 shows it again. */
-let lessonCompleteShown = false;
-
 /** Holds all per-frame domain geometry. rebuild()'s disposal contract DEEP-traverses this
  *  group, so children may be nested Groups (the glass box, the solid, the projectors, the
  *  Observer are each a sub-group) — every descendant geometry/material is still freed. */
@@ -362,14 +357,11 @@ function markBooted() {
 }
 
 /**
- * Signal lesson completion to the host (ADR-078 addendum): the learner has reached this
- * lesson's finished state, so the host can surface its "next topic / stay" overlay.
- * Fires at most once per page load — the latch is deliberately NOT cleared by
- * simAPI.reset(), so replaying a lesson never re-opens the host overlay.
+ * Signal lesson completion to the host (ADR-078 addendum, revised 2026-07-31): fired by the
+ * "Finish lesson" button in the workbench rail. Latchless — every click reposts, no per-page-load
+ * ceiling, since the host is confirmed to support repeated triggers.
  */
 function markComplete() {
-  if (window.__simComplete) return;
-  window.__simComplete = true;
   window.parent.postMessage({ type: 'sim:complete' }, '*');
 }
 
@@ -643,9 +635,10 @@ function syncUnfoldBtn() {
   if (label) label.textContent = isUnfolded ? 'Fold Glass Box' : 'Unfold Glass Box';
 }
 
-/** Wire the docked Unfold/Fold toggle in the workbench rail (ADR-037), plus the Step-5-only
- *  "Back to Step 4" escape hatch (ADR-047) — the wizard (and its own Back button) is hidden while
- *  the Compare split is open, so the rail is the only surface reachable from there. */
+/** Wire the docked Unfold/Fold toggle in the workbench rail (ADR-037), the Step-5-only
+ *  "Back to Step 4" escape hatch (ADR-047), and the "Finish lesson" button — the wizard (and its
+ *  own Back/Next) is hidden while the Compare split is open, so the rail is the only surface
+ *  reachable from there. */
 function setupWorkbenchRail() {
   unfoldBtn = document.getElementById('unfold-toggle');
   if (unfoldBtn) {
@@ -653,6 +646,13 @@ function setupWorkbenchRail() {
     syncUnfoldBtn();
   }
   document.getElementById('rail-back')?.addEventListener('click', () => stepper?.back());
+  // Finish lesson: posts sim:complete to the host (no latch — every click reposts, ADR-078
+  // addendum revised). Lives beside the fold toggle rather than a footer nav slot, since the
+  // wizard/footer is hidden for the whole of Step 5 (see class comment above).
+  document.getElementById('btn-finish')?.addEventListener('click', () => {
+    markComplete();
+    announce('Lesson marked complete.');
+  });
 }
 
 // ============================================================================
@@ -1078,14 +1078,7 @@ function renderStep(step, { animate = true } = {}) {
 
   if (currentStep >= 5) {
     if (!document.body.classList.contains('compare-split')) enterCompareSplit();
-    if (!lessonCompleteShown) {
-      lessonCompleteShown = true;
-      showToast('Lesson complete');
-      announce('Lesson complete.');
-      markComplete();
-    }
   } else {
-    lessonCompleteShown = false; // stepping back off 5 re-arms the toast for the next arrival
     if (document.body.classList.contains('compare-split')) exitCompareSplit();
   }
 }

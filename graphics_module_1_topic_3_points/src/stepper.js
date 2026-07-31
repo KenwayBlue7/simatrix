@@ -60,6 +60,7 @@ export function initStepper(sim) {
 
   const btnBack = $('btn-back');
   const btnNext = $('btn-next');
+  const btnFinish = $('btn-finish');
 
   const btnFold = $('btn-fold');
   const btnUnfold = $('btn-unfold');
@@ -129,14 +130,13 @@ export function initStepper(sim) {
     if (btnUnfold) btnUnfold.hidden = !folded;
     if (doneFold) doneFold.hidden = !folded;
     // "Complete & next problem" (Module 2 payoff pattern) appears only once the drawing is
-    // folded flat — the lesson's finish line, on the terminal step. Its label adapts to
-    // whether a textbook problem is loaded; in free-play it reads "Pick a problem" (which
-    // still opens the Problem Library to choose a challenge).
+    // "Try another problem" (Finish-button pilot): renamed off "Complete..." wording so
+    // it stops reading as the lesson-completion action now that #btn-finish owns that
+    // signal — this stays the repeatable practice-loop action, same label in both problem
+    // and free-play modes (still opens the Problem Library to choose a challenge either way).
     if (btnCompleteNext) {
       btnCompleteNext.hidden = !folded;
-      btnCompleteNext.textContent = sim.isProblemActive?.()
-        ? 'Complete & next problem'
-        : 'Pick a problem';
+      btnCompleteNext.textContent = 'Try another problem';
     }
   }
 
@@ -146,6 +146,13 @@ export function initStepper(sim) {
     if (btnNext) {
       btnNext.hidden = currentStep >= TOTAL; // terminal step: no Next
       btnNext.disabled = !canAdvance(currentStep);
+    }
+    // Finish lesson: takes over the footer's primary slot exactly when Next vacates
+    // it (terminal step). Enabled on sim.isFolded() — the same signal the terminal
+    // step's own `done` gate already uses, no new completion concept invented.
+    if (btnFinish) {
+      btnFinish.hidden = currentStep < TOTAL;
+      btnFinish.disabled = !sim.isFolded();
     }
   }
 
@@ -201,17 +208,18 @@ export function initStepper(sim) {
   // Wiring
   // ----------------------------------------------------------------------------
 
-  // Step 5 — the fold (rabatment). Reversible; completing it is the lesson's win.
+  // Step 5 — the fold (rabatment). Reversible; completing it unlocks Finish lesson.
   btnFold?.addEventListener('click', () => {
     sim.fold();
-    // The win fires exactly once per run-through, on the FIRST fold — the moment
-    // the finished first-angle drawing exists (merged into the one announcement
-    // below; the toast itself is aria-hidden, so no double narration).
+    // The win toast fires exactly once per run-through, on the FIRST fold — the moment
+    // the finished first-angle drawing exists (merged into the one announcement below;
+    // the toast itself is aria-hidden, so no double narration). Lesson completion itself
+    // is now the learner's own "Finish lesson" click (Finish-button pilot, ADR-078
+    // addendum revised) — this toast is just the fold celebration.
     const firstWin = !celebrated;
     celebrated = true;
     if (firstWin) {
       sim.showToast?.('Projection of Points completed!');
-      sim.markComplete?.();
     }
     sim.announce(`Horizontal plane unfolded onto the vertical plane — the 2D drawing is complete.${firstWin ? ' Projection of Points completed!' : ''}`);
     renderRail(); renderActions(); renderNav();
@@ -227,6 +235,15 @@ export function initStepper(sim) {
   // learner picks their next challenge. In free-play (no problem loaded) it just opens the
   // library. The button only exists once folded (renderActions), so this is a terminal-step win.
   btnCompleteNext?.addEventListener('click', () => sim.completeAndNext?.(), listen);
+
+  // Finish lesson: posts sim:complete to the host (no latch — every click reposts,
+  // ADR-078 addendum revised). Button stays as-is afterward (no disable/relabel,
+  // locked decision) — announce() is the only feedback, same pattern as the
+  // Problem Library's exit flow.
+  btnFinish?.addEventListener('click', () => {
+    sim.markComplete?.();
+    sim.announce?.('Lesson marked complete.');
+  }, listen);
 
   // Navigation.
   btnNext?.addEventListener('click', () => { if (canAdvance(currentStep)) goToStep(currentStep + 1); }, listen);

@@ -2180,11 +2180,12 @@
               <svg class="done-badge__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
               Unfolded — the 2D drawing is complete.
             </span>
-            <!-- "Complete & next problem" (Module 2 payoff pattern): the primary next-challenge
+            <!-- "Try another problem" (Finish-button pilot — renamed off "Complete..." wording
+                 since #btn-finish now owns lesson completion): the repeatable practice-loop
                  button, revealed by stepper.js only once the drawing is folded flat. Routes
                  through simController.completeAndNext() → clears the active problem, resets, and
-                 reopens the Problem Library. Labelled "Pick a problem" in free-play. -->
-            <button id="btn-complete-next" class="btn btn--primary btn--block" type="button" hidden>Complete &amp; next problem</button>
+                 reopens the Problem Library (same label in free-play too). -->
+            <button id="btn-complete-next" class="btn btn--primary btn--block" type="button" hidden>Try another problem</button>
           </div>
         </div>
       </div>
@@ -2207,6 +2208,11 @@
         </div>
         <button id="btn-back" class="btn btn--nav" type="button" hidden>Back</button>
         <button id="btn-next" class="btn btn--primary btn--nav" type="button">Next</button>
+        <!-- Finish-button pilot: takes over the footer's primary slot once Next hides at
+             the terminal step (stepper.js). Fires sim:complete (ADR-078 addendum, revised
+             — no latch, every click reposts). Own element, own listener: NOT a relabel of
+             #btn-next, whose click handler advances the wizard, an unrelated action. -->
+        <button id="btn-finish" class="btn btn--primary btn--nav" type="button" hidden disabled>Finish lesson</button>
       </footer>
     </section>
     </div>

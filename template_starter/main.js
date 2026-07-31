@@ -174,14 +174,11 @@ function markBooted() {
 }
 
 /**
- * Signal lesson completion to the host (ADR-078 addendum): the learner has reached this
- * lesson's finished state, so the host can surface its "next topic / stay" overlay.
- * Fires at most once per page load — the latch is deliberately NOT cleared by
- * simAPI.reset(), so replaying a lesson never re-opens the host overlay.
+ * Signal lesson completion to the host (ADR-078 addendum, revised): fired by the
+ * "Finish lesson" button (see stepper.js). Latchless — every click reposts, no
+ * per-page-load ceiling, since the host is confirmed to support repeated triggers.
  */
 function markComplete() {
-  if (window.__simComplete) return;
-  window.__simComplete = true;
   window.parent.postMessage({ type: 'sim:complete' }, '*');
 }
 

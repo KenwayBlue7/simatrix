@@ -252,14 +252,12 @@ function markBooted() {
 }
 
 /**
- * Signal lesson completion to the host (ADR-078 addendum): the learner has reached this
- * lesson's finished state, so the host can surface its "next topic / stay" overlay.
- * Fires at most once per page load — the latch is deliberately NOT cleared by
- * simAPI.reset(), so replaying a lesson never re-opens the host overlay.
+ * Signal lesson completion to the host (ADR-078 addendum, revised): the learner
+ * clicked "Finish lesson" at the terminal step. Fires on every call, no latch —
+ * the host confirmed it supports repeated sim:complete triggers, so replaying the
+ * signal is expected, not a bug.
  */
 function markComplete() {
-  if (window.__simComplete) return;
-  window.__simComplete = true;
   window.parent.postMessage({ type: 'sim:complete' }, '*');
 }
 

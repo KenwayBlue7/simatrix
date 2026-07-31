@@ -51,6 +51,7 @@ export function initStepper(sim) {
 
   const btnBack = $('btn-back');
   const btnNext = $('btn-next');
+  const btnFinish = $('btn-finish');
 
   const btnFold = $('btn-fold');
   const btnUnfold = $('btn-unfold');
@@ -131,6 +132,9 @@ export function initStepper(sim) {
       btnNext.hidden = currentStep >= TOTAL; // terminal step: no Next
       btnNext.disabled = !canAdvance(currentStep);
     }
+    // Finish lesson: takes over the footer's primary slot exactly when Next vacates
+    // it (terminal step "Standard" has no gate, so it's enabled as soon as reached).
+    if (btnFinish) btnFinish.hidden = currentStep < TOTAL;
   }
 
   /** Show one step (progressive disclosure): card copy, panel, rail, view flags. */
@@ -173,10 +177,11 @@ export function initStepper(sim) {
 
     // The win toast fires exactly once per run-through, after the step renders.
     // The win is MERGED into the one step announcement below (never a second
-    // racing #sim-status write; the toast itself is aria-hidden).
+    // racing #sim-status write; the toast itself is aria-hidden). Lesson completion
+    // itself is now the learner's own "Finish lesson" click (Finish-button pilot,
+    // ADR-078 addendum revised) — this toast is just the arrival celebration.
     if (firstArrival) {
       sim.showToast?.('Spatial Framework completed!');
-      sim.markComplete?.();
     }
     const winWord = firstArrival ? ' Spatial Framework completed!' : '';
     if (announce) sim.announce(`Step ${currentStep} of ${TOTAL}. ${meta.title}.${winWord}`);
@@ -205,6 +210,14 @@ export function initStepper(sim) {
     sim.unfold();
     sim.announce('Unfolded back to the 3D corner.');
     renderRail(); renderActions(); renderNav();
+  }, listen);
+
+  // Finish lesson: posts sim:complete to the host (no latch — every click reposts,
+  // ADR-078 addendum revised). Button stays as-is afterward (no disable/relabel,
+  // locked decision) — announce() is the only feedback.
+  btnFinish?.addEventListener('click', () => {
+    sim.markComplete?.();
+    sim.announce?.('Lesson marked complete.');
   }, listen);
 
   // Navigation.

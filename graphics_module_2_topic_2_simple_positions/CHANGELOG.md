@@ -2,6 +2,10 @@
 
 All notable changes to Module 2 · Topic 2 (Simple Positions).
 
+## 2026-07-31
+- Added: "Finish lesson" button (Module 2 Finish-button pilot rollout — this topic is the exact twin of the pilot's own Step 6 "Flatten") — `#btn-finish` takes over the footer's primary slot at the terminal step exactly when `#btn-next` vacates it, enabled once flattened. Click posts `sim:complete` and announces "Lesson marked complete." (`main.js`, `src/stepper.js`, `index.html`.)
+- Changed: `sim:complete` (`markComplete()`) drops its one-shot `window.__simComplete` latch — fires on every "Finish lesson" click now, replacing the old auto-fire on flatten. (`main.js`, `src/stepper.js`.)
+
 ## 2026-07-28
 - Added: a new `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` once, fired on the first flatten (step 6) — the host's second sanctioned signal, for a "next topic / stay" overlay (ADR-078 addendum). (`main.js`, `src/stepper.js`.)
 

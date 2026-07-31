@@ -3,6 +3,10 @@
 Notable changes to this template. (Module 2's history was intentionally not carried over —
 this changelog starts fresh, per MODULE-STARTER §3.2.)
 
+## 2026-07-31
+- Fixed: retired the auto-fired, one-shot `markComplete()` shape (last file in the repo still carrying it) in favor of the platform-wide button-driven, latchless "Finish lesson" pattern. `main.js`'s `markComplete()` drops the `window.__simComplete` guard down to a one-line latchless post. `stepper.js` removes the `firstArrival`/`visited.has(TOTAL)` auto-fire from `goToStep()` and instead wires a new `#btn-finish` click listener (`markComplete()` + an announce), and adds the missing `markComplete` entry to the `sim` JSDoc typedef. Ungated — matches `graphics_module_1_topic_4_understanding_orthographic_views`'s ungated precedent, since this starter has no domain state to gate on; a real topic cut from this template should decide its own gate (see root `MODULE-STARTER.md` §3.11, added alongside this fix). (`main.js`, `src/stepper.js`.)
+- Added: `#btn-finish` button in `.card__nav`, after `#btn-next` — same mutual-exclusivity idiom as every other migrated topic (`stepper.js`'s `renderNav()` hides one exactly when it shows the other). (`index.html`.)
+
 ## 2026-07-28
 - Added: a new `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` once, fired on first arrival at the terminal step (step 3) — the host's second sanctioned outbound signal, for a "next topic / stay" overlay (ADR-078 addendum), so every future topic minted from this template inherits it. (`main.js`, `src/stepper.js`.)
 

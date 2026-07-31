@@ -605,16 +605,11 @@
     /* A per-step reveal used `hidden`; in the rail every driver is live. */
     #workbench-rail .field[hidden] { display: block !important; }
 
-    /* ---- Unfold/Fold toggle (the cinematic box unfold). A .btn that latches to the accent fill
-       when pressed (unfolded), so its state reads at a glance next to the drawing. The label +
-       icon are set by main.js (driveFold / syncUnfoldBtn). */
+    /* ---- Unfold/Fold toggle (the cinematic box unfold). Plain paper/bordered fill in both
+       states (Finish lesson is the rail's one accent-filled action now) — the label + icon are
+       set by main.js (driveFold / syncUnfoldBtn); aria-pressed still carries the state for AT. */
     .unfold-toggle { display: inline-flex; align-items: center; gap: var(--space-2); }
     .unfold-toggle__icon { flex: none; width: 18px; height: 18px; }
-    #unfold-toggle[aria-pressed="true"] {
-      color: var(--color-paper);
-      background: var(--color-accent);
-      border-color: var(--color-accent);
-    }
     #unfold-toggle[aria-pressed="true"]:active {
       background: var(--color-accent-strong);
       border-color: var(--color-accent-strong);
@@ -1826,6 +1821,11 @@
       </svg>
       <span class="unfold-toggle__text">Unfold Glass Box</span>
     </button>
+    <!-- Finish lesson: posts sim:complete to the host (ADR-078 addendum, revised — latchless,
+         every click reposts). Lives here rather than the footer nav because the wizard/footer
+         is CSS-hidden for all of Step 5 (body.compare-split #wizard), so this rail is the only
+         reachable surface. Wired in main.js's setupWorkbenchRail(). -->
+    <button id="btn-finish" class="btn btn--primary" type="button">Finish lesson</button>
   </div>
 
   <!-- Live region: main.js + stepper.js narrate step + mode changes for screen readers. -->

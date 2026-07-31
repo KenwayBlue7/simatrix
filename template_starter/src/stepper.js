@@ -19,7 +19,8 @@ const STEPS = [
 const TOTAL = STEPS.length;
 
 /**
- * @param {{ announce?: (msg: string) => void }} sim  The injected controller (main.js).
+ * @param {{ announce?: (msg: string) => void, markComplete?: () => void }} sim  The injected
+ *   controller (main.js).
  * @returns {{ sync: () => void, reset: () => void, dispose: () => void }}
  */
 export function initStepper(sim) {
@@ -39,6 +40,7 @@ export function initStepper(sim) {
   const elLead = $('step-lead');
   const btnBack = $('btn-back');
   const btnNext = $('btn-next');
+  const btnFinish = $('btn-finish');
 
   if (elTotal) elTotal.textContent = String(TOTAL);
 
@@ -73,16 +75,18 @@ export function initStepper(sim) {
     if (elCurrent) elCurrent.textContent = String(currentStep);
     if (btnBack) btnBack.hidden = currentStep === 1;
     if (btnNext) btnNext.hidden = currentStep >= TOTAL; // terminal step has no Next
+    // Finish lesson: takes over the footer's primary nav slot exactly when Next vacates it
+    // (terminal step), same mutual-exclusivity idiom as #btn-flatten/#btn-unfold elsewhere.
+    // Ungated here — this starter has no domain state to gate on. A real topic built from
+    // this template should decide its OWN gate condition (see MODULE-STARTER.md) rather than
+    // copying this ungated form by default.
+    if (btnFinish) btnFinish.hidden = currentStep < TOTAL;
   }
 
   /** Show one step's panel (progressive disclosure) and update card copy + chrome. */
   function goToStep(n, { announce = true } = {}) {
     currentStep = Math.min(Math.max(n, 1), TOTAL);
-    // First arrival at the terminal step = the lesson-complete signal (ADR-078 addendum).
-    // Computed BEFORE `visited` absorbs this visit; reset() re-arms it by clearing `visited`.
-    const firstArrival = currentStep === TOTAL && !visited.has(TOTAL);
     visited.add(currentStep);
-    if (firstArrival) sim.markComplete?.();
 
     const meta = STEPS[currentStep - 1];
     if (elTitle) elTitle.textContent = meta.title;
@@ -99,6 +103,14 @@ export function initStepper(sim) {
     renderNav();
     if (announce) sim.announce?.(`Step ${currentStep} of ${TOTAL}. ${meta.title}.`);
   }
+
+  // Finish lesson: posts sim:complete to the host (no latch — every click reposts, ADR-078
+  // addendum revised). Button stays as-is afterward (no disable/relabel) — announce() is the
+  // only feedback, same pattern as every other migrated topic.
+  btnFinish?.addEventListener('click', () => {
+    sim.markComplete?.();
+    sim.announce?.('Lesson marked complete.');
+  }, listen);
 
   btnNext?.addEventListener('click', () => { if (currentStep < TOTAL) goToStep(currentStep + 1); }, listen);
   btnBack?.addEventListener('click', () => goToStep(currentStep - 1), listen);

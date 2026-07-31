@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-07-31
+- Added: "Finish lesson" button (Module 2 Finish-button pilot rollout) — `#btn-finish` takes over the footer's primary slot at Step 5 "Standard" exactly when `#btn-next` vacates it. Click posts `sim:complete` and announces "Lesson marked complete." (`main.js`, `src/stepper.js`, `index.html`.)
+- Changed: `sim:complete` (`markComplete()`) drops its one-shot `window.__simComplete` latch — fires on every "Finish lesson" click now, replacing the old auto-fire on first terminal-step arrival (the arrival toast itself is unchanged, still one-shot). (`main.js`, `src/stepper.js`.)
+
 ## 2026-07-28
 - Added: a new `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` once, fired on first arrival at the terminal step (step 5) alongside the existing "Spatial Framework completed!" toast — the host's second sanctioned signal, for a "next topic / stay" overlay (ADR-078 addendum). (`src/main.js`, `src/stepper.js`.)
 

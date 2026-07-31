@@ -1062,8 +1062,11 @@
           </div>
           <button id="btn-back" class="btn btn--nav" type="button" hidden>Back</button>
           <button id="btn-next" class="btn btn--primary btn--nav" type="button">Next</button>
-          <!-- Terminal step has no "Next" and no inline completion note: the success toast
-               (fired once by simController.completeLesson) is the sole completion feedback. -->
+          <!-- Finish-button pilot: Step 4's footer primary once dimensions are revealed,
+               replacing #btn-next's slot (stepper.js hides one exactly when the other shows).
+               Fires sim:complete (ADR-078 addendum, revised — no latch, every click reposts).
+               Own element, own listener: NOT a relabel of #btn-next. -->
+          <button id="btn-finish" class="btn btn--primary btn--nav" type="button" hidden disabled>Finish lesson</button>
         </footer>
       </section>
     </div>

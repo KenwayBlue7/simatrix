@@ -39,6 +39,7 @@ export function initStepper(sim) {
   const elLead = $('step-lead');
   const btnBack = $('btn-back');
   const btnNext = $('btn-next');
+  const btnFinish = $('btn-finish');
   const btnCompleteNext = $('btn-complete-next');
 
   if (elTotal) elTotal.textContent = String(TOTAL);
@@ -74,25 +75,23 @@ export function initStepper(sim) {
     if (elCurrent) elCurrent.textContent = String(currentStep);
     if (btnBack) btnBack.hidden = currentStep === 1;
     if (btnNext) btnNext.hidden = currentStep >= TOTAL; // terminal step has no Next
-    // "Complete & next problem" replaces Next on the terminal step — the payoff moment.
-    // Label adapts to whether a textbook problem is loaded (free-play gets "Pick a
-    // problem", which still opens the library to choose a challenge).
+    // Finish lesson: takes over the footer's primary slot exactly when Next vacates
+    // it (terminal step has no gate, so it's enabled as soon as reached).
+    if (btnFinish) btnFinish.hidden = currentStep < TOTAL;
+    // "Try another problem" (Finish-button pilot): renamed off "Complete..." wording so
+    // it stops reading as the lesson-completion action now that #btn-finish owns that
+    // signal — this stays the repeatable practice-loop action, same label in both problem
+    // and free-play modes (still opens the library to choose a challenge either way).
     if (btnCompleteNext) {
       btnCompleteNext.hidden = currentStep !== TOTAL;
-      btnCompleteNext.textContent = sim.isProblemActive?.()
-        ? 'Complete & next problem'
-        : 'Pick a problem';
+      btnCompleteNext.textContent = 'Try another problem';
     }
   }
 
   /** Show one step's panel (progressive disclosure) and update card copy + chrome. */
   function goToStep(n, { announce = true } = {}) {
     currentStep = Math.min(Math.max(n, 1), TOTAL);
-    // First arrival at the terminal step = the lesson-complete signal (ADR-078 addendum).
-    // Computed BEFORE `visited` absorbs this visit.
-    const firstArrival = currentStep === TOTAL && !visited.has(TOTAL);
     visited.add(currentStep);
-    if (firstArrival) sim.markComplete?.();
 
     const meta = STEPS[currentStep - 1];
     if (elTitle) elTitle.textContent = meta.title;
@@ -112,6 +111,15 @@ export function initStepper(sim) {
 
   btnNext?.addEventListener('click', () => { if (currentStep < TOTAL) goToStep(currentStep + 1); }, listen);
   btnBack?.addEventListener('click', () => goToStep(currentStep - 1), listen);
+  // Finish lesson: posts sim:complete to the host (no latch — every click reposts,
+  // ADR-078 addendum revised). Button stays as-is afterward (no disable/relabel,
+  // locked decision) — announce() is the only feedback.
+  btnFinish?.addEventListener('click', () => {
+    sim.markComplete?.();
+    sim.announce?.('Lesson marked complete.');
+  }, listen);
+  // "Try another problem" — completeAndNext (main.js) clears any active problem, resets
+  // through the single path, and opens the Problem Library.
   btnCompleteNext?.addEventListener('click', () => sim.completeAndNext?.(), listen);
 
   // Rail jump — the current step or any already-visited step is a clickable shortcut.

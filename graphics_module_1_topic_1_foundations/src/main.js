@@ -232,14 +232,11 @@ function markBooted() {
 }
 
 /**
- * Signal lesson completion to the host (ADR-078 addendum): the learner has reached this
- * lesson's finished state, so the host can surface its "next topic / stay" overlay.
- * Fires at most once per page load — the latch is deliberately NOT cleared by
- * simAPI.reset(), so replaying a lesson never re-opens the host overlay.
+ * Signal lesson completion to the host (ADR-078 addendum, revised 2026-07-31): fired by the
+ * "Finish lesson" button. Latchless — every click reposts, no per-page-load ceiling, since the
+ * host is confirmed to support repeated triggers.
  */
 function markComplete() {
-  if (window.__simComplete) return;
-  window.__simComplete = true;
   window.parent.postMessage({ type: 'sim:complete' }, '*');
 }
 
@@ -1061,17 +1058,19 @@ const simController = {
    *  `restoreView` here is the hoisted module function (no recursion); no-op unless zoomed. */
   restoreView() { restoreView(); },
 
-  /** Step 4 terminal: calm success toast + narration. Leaves the finished four-type
-   *  drawing on screen (no reset) so the learner can keep exploring it. */
+  /** Step 4 terminal: calm success toast + narration for the content milestone (all four BIS
+   *  line types now shown). Leaves the finished drawing on screen (no reset) so the learner can
+   *  keep exploring it. Decoupled from the host signal — "Finish lesson" (stepper.js) fires
+   *  markComplete() on its own click, not as a side effect of this milestone. */
   completeLesson() {
     showToast('Lesson complete — all four BIS line types shown.');
     announce('Lesson complete. All four BIS line types — A, E/F, G and B — are now shown on the part.');
-    markComplete();
   },
 
   /** Single reset path (RULES.md §2.9). */
   reset() { window.simAPI.reset(); },
 
+  markComplete,
   announce,
 };
 

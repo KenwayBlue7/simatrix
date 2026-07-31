@@ -435,7 +435,9 @@
     .card__nav-next { display: flex; align-items: center; gap: var(--space-2); }
     .card__nav #btn-next { margin-left: auto; }
     #reset-control { margin-right: auto; }
-    .card__nav.is-reset-armed #btn-back, .card__nav.is-reset-armed #btn-next { display: none; }
+    .card__nav.is-reset-armed #btn-back,
+    .card__nav.is-reset-armed #btn-next,
+    .card__nav.is-reset-armed #btn-finish { display: none; }
     .reset-confirm { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1) var(--space-2); font-size: var(--text-sm); animation: resetConfirmIn var(--dur-fast) var(--ease-standard); }
     .reset-confirm[hidden] { display: none; }
     .reset-confirm__prompt { color: var(--color-ink); }
@@ -703,6 +705,13 @@
           <div class="card__nav-next">
             <button type="button" class="btn" id="btn-back" hidden>Back</button>
             <button type="button" class="btn btn--primary" id="btn-next" disabled>Next</button>
+            <!-- Finish-button pilot (Phase C): takes over the footer's primary slot once Next
+                 hides at the terminal step 4 "Verify" (stepper.js). Enabled only once a Problem
+                 Library problem has matched — this track's real payoff, and what the deleted
+                 auto-fire used to detect. Fires sim:complete (ADR-078 addendum, revised — no
+                 latch, every click reposts). Own element, own listener: NOT a relabel of
+                 #btn-next, whose click handler advances the wizard, an unrelated action. -->
+            <button type="button" class="btn btn--primary" id="btn-finish" hidden disabled>Finish lesson</button>
           </div>
         </div>
       </section>

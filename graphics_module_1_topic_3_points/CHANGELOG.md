@@ -1,5 +1,10 @@
 # Changelog — Projection of Points
 
+## 2026-07-31
+- Added: "Finish lesson" button (Module 2 Finish-button pilot rollout) — `#btn-finish` takes over the footer's primary slot at the terminal Step 5 "Unfold" exactly when `#btn-next` vacates it, enabled once folded. Click posts `sim:complete` and announces "Lesson marked complete." (`main.js`, `src/stepper.js`, `index.html`.)
+- Changed: `sim:complete` (`markComplete()`) drops its one-shot `window.__simComplete` latch — fires on every "Finish lesson" click now, replacing the old auto-fire on first fold (the fold's own toast is unchanged, still one-shot). (`main.js`, `src/stepper.js`.)
+- Changed: `#btn-complete-next` demoted off "Complete & next problem"/"Pick a problem" wording to a single "Try another problem" label — Finish lesson now owns the completion signal, so this stays the repeatable practice-loop action only, same label in both problem and free-play modes. (`src/stepper.js`, `index.html`.)
+
 ## 2026-07-28
 - Added: a new `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` once, fired on the first fold alongside the existing "Projection of Points completed!" toast — the host's second sanctioned signal, for a "next topic / stay" overlay (ADR-078 addendum). (`main.js`, `src/stepper.js`.)
 

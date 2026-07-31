@@ -2,6 +2,10 @@
 
 All notable changes to this topic. Format loosely follows Keep a Changelog.
 
+## [0.1.24] — 2026-07-31 — Finish lesson button (Module 2 pilot rollout)
+- Added: `#btn-finish` takes over the footer's primary slot at the terminal step exactly when `#btn-next` vacates it (no gate — this topic's terminal step has none of its own). Click posts `sim:complete` and announces "Lesson marked complete." (`main.js`, `src/stepper.js`, `index.html`.)
+- Changed: `sim:complete` (`markComplete()`) drops its one-shot `window.__simComplete` latch — fires on every "Finish lesson" click now, replacing the old auto-fire on first terminal-step arrival. (`main.js`, `src/stepper.js`.)
+
 ## [0.1.23] — 2026-07-28 — Host lesson-complete signal
 
 ### Added

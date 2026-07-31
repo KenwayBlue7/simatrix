@@ -46,7 +46,7 @@ let activePlay = null; // playSteps() handle, so a replay can cancel an in-fligh
 let paused = false;
 let lastFrameTime = 0;
 let rafId = null;
-let completeSent = false; // sim:complete postMessage latch — fires at most once per page load (ADR-078)
+let solvedAny = false; // a Problem Library problem has matched this page load — gates #btn-finish
 
 // ============================================================================
 // DOM references
@@ -206,6 +206,8 @@ const simController = {
     uiManager.sync({ rebuildFields: true });
     viewTransform.resetView();
     announce('Reset. Choose a curve to begin.');
+    // solvedAny is deliberately NOT cleared here — #btn-finish's gate is page-load
+    // scoped, not session-scoped, same reset-immunity the retired completeSent latch had.
   },
   flowNote,
   getResultText: () => lastRecipe?.resultText ?? '',
@@ -223,10 +225,14 @@ const simController = {
     stepper.goToGivenStep();
     announce(`${construction.label} selected for this problem. Adjust the given values to match, then continue.`);
   },
-  reportComplete() {
-    if (completeSent) return;
-    completeSent = true;
-    window.parent.postMessage({ type: 'sim:complete' }, '*'); // host signal (ADR-078), one-shot
+  hasSolvedProblem: () => solvedAny,
+  onProblemSolved() {
+    solvedAny = true;
+    stepper.sync(); // re-render the footer so #btn-finish enables at the Verify step
+  },
+  markComplete() {
+    // Host signal (ADR-078 addendum, revised): no latch — every Finish click reposts.
+    window.parent.postMessage({ type: 'sim:complete' }, '*');
   },
 };
 

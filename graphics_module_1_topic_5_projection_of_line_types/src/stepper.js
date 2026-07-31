@@ -53,6 +53,7 @@ export function initStepper(sim) {
 
   const btnBack = $('btn-back');
   const btnNext = $('btn-next');
+  const btnFinish = $('btn-finish');
   const btnFold = $('btn-fold');
   const doneFold = $('done-fold');
 
@@ -103,6 +104,9 @@ export function initStepper(sim) {
     if (elCurrent) elCurrent.textContent = String(currentStep);
     if (btnBack) btnBack.hidden = currentStep === 1;
     if (btnNext) btnNext.hidden = currentStep >= TOTAL; // terminal step: no Next
+    // Finish lesson: takes over the footer's primary slot exactly when Next vacates
+    // it (terminal step has no gate, so it's enabled as soon as reached).
+    if (btnFinish) btnFinish.hidden = currentStep < TOTAL;
   }
 
   /** Show one step (progressive disclosure): card copy, the meaningful controls, rail, and hand the
@@ -110,11 +114,7 @@ export function initStepper(sim) {
    *  camera). */
   function goToStep(n, { announce = true } = {}) {
     currentStep = Math.min(Math.max(n, 1), TOTAL);
-    // First arrival at the terminal step = the lesson-complete signal (ADR-078 addendum).
-    // Computed BEFORE highestVisited absorbs this visit.
-    const firstArrival = currentStep === TOTAL && highestVisited < TOTAL;
     highestVisited = Math.max(highestVisited, currentStep);
-    if (firstArrival) sim.markComplete?.();
 
     const meta = STEPS[currentStep - 1];
 
@@ -162,6 +162,14 @@ export function initStepper(sim) {
       sim.announce('The horizontal plane folds down — both views now lie flat on one orthographic sheet.');
     }
     renderRail(); renderActions(); renderNav();
+  }, listen);
+
+  // Finish lesson: posts sim:complete to the host (no latch — every click reposts,
+  // ADR-078 addendum revised). Button stays as-is afterward (no disable/relabel,
+  // locked decision) — announce() is the only feedback.
+  btnFinish?.addEventListener('click', () => {
+    sim.markComplete?.();
+    sim.announce?.('Lesson marked complete.');
   }, listen);
 
   btnNext?.addEventListener('click', () => { if (currentStep < TOTAL) goToStep(currentStep + 1); }, listen);

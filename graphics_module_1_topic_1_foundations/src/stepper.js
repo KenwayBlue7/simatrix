@@ -31,6 +31,7 @@ const TOTAL = STEPS.length;
  *   completeLesson: () => void,
  *   reset: () => void,
  *   announce: (msg: string) => void,
+ *   markComplete: () => void,
  * }} sim
  * @returns {{ sync: () => void, reset: () => void, dimensionsRevealed: () => void, dispose: () => void }}
  */
@@ -53,6 +54,7 @@ export function initStepper(sim) {
 
   const btnBack = $('btn-back');
   const btnNext = $('btn-next');
+  const btnFinish = $('btn-finish');
   const btnReset = $('btn-reset');
 
   const btnHidden = $('btn-hidden');
@@ -170,6 +172,14 @@ export function initStepper(sim) {
       btnNext.hidden = onLast; // terminal step: no Next (completion is signalled by the toast)
       btnNext.disabled = !canAdvance(currentStep);
     }
+    // Finish lesson: takes over the footer's primary nav slot exactly when Next vacates it
+    // (terminal step), same mutual-exclusivity idiom as Module2's #btn-finish. Enabled once the
+    // Step-4 dimensions are revealed — the same signal state.completed/onDimensionsShown already
+    // gates on, no new completion concept invented.
+    if (btnFinish) {
+      btnFinish.hidden = !onLast;
+      btnFinish.disabled = !state.dimensions;
+    }
   }
 
   /** Show one step's panel (progressive disclosure) and update card copy + chrome. */
@@ -286,6 +296,14 @@ export function initStepper(sim) {
 
   // Reset routes through the single simAPI.reset() path (RULES.md §2.9).
   btnReset?.addEventListener('click', () => sim.reset(), listen);
+
+  // Finish lesson: posts sim:complete to the host (no latch — every click reposts, ADR-078
+  // addendum revised). Button stays as-is afterward (no disable/relabel) — announce() is the
+  // only feedback, same pattern as Module2.
+  btnFinish?.addEventListener('click', () => {
+    sim.markComplete?.();
+    sim.announce?.('Lesson marked complete.');
+  }, listen);
 
   // Navigation.
   btnNext?.addEventListener('click', () => { if (canAdvance(currentStep)) goToStep(currentStep + 1); }, listen);

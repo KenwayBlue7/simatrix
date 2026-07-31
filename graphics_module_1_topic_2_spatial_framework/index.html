@@ -862,7 +862,8 @@
        wipe progress. Back / Next step aside while armed; only "Yes" resets. */
     #reset-control { margin-right: auto; } /* ghost Reset pinned left of Back / Next */
     .card__nav.is-reset-armed #btn-back,
-    .card__nav.is-reset-armed #btn-next { display: none; }
+    .card__nav.is-reset-armed #btn-next,
+    .card__nav.is-reset-armed #btn-finish { display: none; }
     .reset-confirm {
       display: flex;
       align-items: center;
@@ -1118,6 +1119,11 @@
         </div>
         <button type="button" class="btn" id="btn-back" hidden>Back</button>
         <button type="button" class="btn btn--primary" id="btn-next">Next</button>
+        <!-- Finish-button pilot: takes over the footer's primary slot once Next hides at
+             the terminal step (stepper.js). Fires sim:complete (ADR-078 addendum, revised
+             — no latch, every click reposts). Own element, own listener: NOT a relabel of
+             #btn-next, whose click handler advances the wizard, an unrelated action. -->
+        <button type="button" class="btn btn--primary" id="btn-finish" hidden disabled>Finish lesson</button>
       </div>
     </section>
     </div>

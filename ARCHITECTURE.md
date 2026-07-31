@@ -419,17 +419,31 @@ into the orchestrator directly.
   guessing; cloning `template_starter/main.js`'s `markBooted()` verbatim is the
   required starting point.
 
-  **Mandatory completion signal (ADR-078 addendum):** a sibling `markComplete()`,
-  called once when the lesson reaches its own finished state (the trigger point is
-  topic-specific — a stepper's terminal-step arrival, a fold, a flatten — but the
-  emitted function body is byte-identical across every topic, the same pattern as
-  `markBooted()`), posts `{ type: 'sim:complete' }` to `window.parent` so the host
-  can surface its "next topic / stay" overlay. It is latched on `window.__simComplete`
-  and, unlike the in-sim celebration UI it often rides alongside, is **not** re-armed
-  by `simAPI.reset()` — a replayed lesson never re-fires the outbound message. One
-  topic, `graphics_module_2_topic_1_introduction`, omits `markComplete()` entirely —
-  it is a free-browse anatomy gallery with no steps and no "finished" state to hook
-  (a deliberate exclusion, not an oversight; see the ADR-078 addendum).
+  **Completion signal (ADR-078 addendum, revised 2026-07-31):** a sibling
+  `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` so the host can
+  surface its "next topic / stay" overlay. Every shipped topic — Module 2, all 9 KTU
+  stepper topics (including the last 2 stragglers, `graphics_module_1_topic_1_foundations`
+  and `graphics_module_1_topic_4_understanding_orthographic_views`, migrated 2026-07-31),
+  and all 9 Diploma Engineering Graphics topics — is now on the **button-driven,
+  latchless** shape: a `#btn-finish` (taking over the footer nav's primary slot once a
+  stepper's terminal step is reached) calls `markComplete()` on every click, no latch,
+  so a replayed lesson re-fires the signal each time. Most topics gate `#btn-finish` on
+  a domain milestone rather than mere step-arrival — `graphics_module_1_topic_1_foundations`
+  on `state.dimensions` (the Step-4 dimensions reveal), the Diploma topics on a solved
+  Problem Library problem (their terminal step is cheap to reach on its own). A minority
+  are deliberately ungated where the terminal step's own arrival already is the payoff —
+  `graphics_module_1_topic_4_understanding_orthographic_views` is one, and additionally
+  **deviates on placement**: its `#btn-finish` lives in `#workbench-rail` beside the
+  Fold/Unfold toggle, not the footer, because the footer (`#wizard`) is CSS-hidden for
+  the whole of its Step 5 Compare split. `template_starter` migrated too (2026-07-31,
+  closing out the rollout): its own copy is deliberately **ungated** (no domain state
+  to gate on in a bare scaffold), matching `understanding_orthographic_views`'
+  ungated precedent rather than the gated forms — see `MODULE-STARTER.md` §3.11 for
+  the guidance a new topic cut from the template should follow to pick its own gate.
+  There is no remaining topic on the old auto-triggered/latched shape.
+  One topic, `graphics_module_2_topic_1_introduction`, omits `markComplete()` entirely —
+  it is a free-browse anatomy gallery with no steps and no "finished" state to hook (a
+  deliberate exclusion, not an oversight; see the ADR-078 addendum).
   `main.js` as an ES module. (Note: Module 2 keeps its CSS *inline* here, unlike
   Module 1 — see §8.)
 
@@ -609,13 +623,19 @@ deliberate, narrow exception: a single outbound boot-ready signal (ADR-078).
   `window.parent.postMessage({ type: 'sim:ready' }, '*')` after `document.fonts.ready`
   resolves, so the host's loading screen can close exactly when the scene is
   displayable rather than guessing from the iframe's `load` event (ADR-078).
-- **The sim announces its own lesson completion.** `markComplete()` — called once,
-  when the topic-specific "finished" trigger fires — posts
+- **The sim announces its own lesson completion.** `markComplete()` posts
   `window.parent.postMessage({ type: 'sim:complete' }, '*')`, so the host can surface
-  its "next topic / stay" overlay (ADR-078 addendum). These are the sim's **only two**
-  outbound messages; it never listens for inbound `message` events. One topic
-  (`graphics_module_2_topic_1_introduction`, a free-browse gallery with no "finished"
-  state) emits `sim:ready` only.
+  its "next topic / stay" overlay (ADR-078 addendum, revised 2026-07-31). Every shipped
+  topic fires it from a `#btn-finish` click, latchless (re-fires every click) — the
+  footer nav for most, `#workbench-rail` for
+  `graphics_module_1_topic_4_understanding_orthographic_views` (its footer is CSS-hidden
+  at the terminal step); the 9 Diploma topics additionally gate that button on a solved
+  Problem Library problem. `template_starter` migrated too (2026-07-31), ungated like
+  `understanding_orthographic_views` — no topic remains on the old auto-fired, latched
+  shape.
+  These are the sim's **only two** outbound messages; it never listens for inbound
+  `message` events. One topic (`graphics_module_2_topic_1_introduction`, a free-browse
+  gallery with no "finished" state) emits `sim:ready` only.
 - The sim makes **no runtime network calls** beyond the initial Three.js CDN fetch,
   assumes **no same-origin access**, and uses only **relative asset paths**, so it can
   be served from any URL prefix the host chooses.

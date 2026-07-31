@@ -5,6 +5,11 @@ Notable changes to this Engineering Graphics Module 1 topic (folder
 2026-07-13 as "Glass Box Visualizer"; renamed 2026-07-13, ADR-048). History before the scaffold
 below is the starter template's, carried over from the duplication.
 
+## 2026-07-31
+- Added: "Finish lesson" button (Module 2 Finish-button pilot rollout) — deliberately placed in `#workbench-rail` beside "Back to Step 4" and the fold toggle, NOT the footer nav (the footer/`#wizard` is CSS-hidden for the whole of Step 5's Compare split, so the rail is the only reachable surface there). Ungated — Step 5's own arrival already auto-drives the box-unfold, the topic's real payoff, and this stepper's Next has no per-step gate to hook. Click posts `sim:complete` and announces "Lesson marked complete." (`main.js`, `index.html`.)
+- Changed: `sim:complete` (`markComplete()`) drops its one-shot `window.__simComplete` latch — fires on every "Finish lesson" click now, replacing the old auto-fire on first arrival at Step 5. The arrival toast ("Lesson complete") and its `lessonCompleteShown` re-arm-on-step-back latch are removed entirely — the host signal is now solely the button's job, matching Module 2 (no separate arrival celebration). (`main.js`.)
+- Changed: `#unfold-toggle` ("Fold/Unfold Glass Box") loses its accent-fill-when-pressed styling — stays plain paper/bordered in both states now that "Finish lesson" is the rail's one accent-filled action. Toggle behaviour and label-swap logic were already correct pre-existing code; only the CSS changed. (`index.html`.)
+
 ## 2026-07-28
 - Added: a new `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` once, fired on reaching Step 5 alongside the existing "Lesson complete" toast — the host's second sanctioned signal, for a "next topic / stay" overlay (ADR-078 addendum). (`main.js`.)
 
