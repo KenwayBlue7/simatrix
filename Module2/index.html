@@ -2472,10 +2472,12 @@
                walkthrough itself is running (its own controls live in #method-view, see
                index.html's .method-view/.method-bar/.set-chips markup near #problem-library). -->
           <button id="btn-show-method" class="btn btn--block" type="button" hidden disabled>Show Method</button>
-          <!-- Feature 1: appears once flattened. Celebrates, clears the active problem,
-               resets through the single path, and opens the Problem Library (stepper.js
-               wires it via simController.completeAndNext). Label adapts in free-play. -->
-          <button id="btn-complete-next" class="btn btn--primary btn--block" type="button" hidden>Complete &amp; next problem</button>
+          <!-- Feature 1: appears once flattened. Clears the active problem, resets through
+               the single path, and opens the Problem Library (stepper.js wires it via
+               simController.completeAndNext). Plain-weight (not primary) since Finish lesson
+               (footer nav) is now Step 6's one loud action — this stays the repeatable
+               practice-loop action, same visual weight as Dimensions/Show Method. -->
+          <button id="btn-complete-next" class="btn btn--block" type="button" hidden>Try another problem</button>
         </section>
       </div>
       </div><!-- /.card__scroll -->
@@ -2497,6 +2499,12 @@
         </div>
         <button id="btn-back" class="btn btn--nav" type="button" hidden>Back</button>
         <button id="btn-next" class="btn btn--primary btn--nav" type="button">Next</button>
+        <!-- Finish-button pilot: Step 6's footer primary once flattened, replacing #btn-next's
+             slot (stepper.js hides one exactly when the other shows — same idiom as
+             #btn-flatten/#btn-unfold). Fires sim:complete (ADR-078 addendum, revised — no latch,
+             every click reposts). Own element, own listener: NOT a relabel of #btn-next, since
+             #btn-next's click handler advances the wizard, an unrelated action. -->
+        <button id="btn-finish" class="btn btn--primary btn--nav" type="button" hidden disabled>Finish lesson</button>
       </footer>
     </section>
     </div>
