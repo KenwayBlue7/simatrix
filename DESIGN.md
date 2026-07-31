@@ -494,6 +494,10 @@ collapsing the whole wizard column out of the layout so the viewport can go full
   offset onto this control** — that was a shipped regression (fixed 2026-07-16) that also silently
   collided with the compact Compare card, whose own top (`calc(var(--space-3) + 44px +
   var(--space-2))`) is derived *assuming* the toggle sits at the shallow `--space-3` inset.
+- **Topics with no `.vp-cluster`/wizard:** `graphics_module_2_topic_1_introduction` (anatomy
+  gallery, no button cluster to sit below) applies the same `calc(44px + var(--space-3))`/52px
+  top clearance directly as its `#shape-rail` sidebar's top padding, for the same host-chrome
+  reason — added 2026-07-30.
 - **Shape:** 44px square, `--color-panel` fill, hairline border, `--radius-sm` corners, a centred
   20px chevron icon.
 - **Press/hover/focus:** `scale(0.97)` on `:active` (§5.1's shared press language); hover deepens to
