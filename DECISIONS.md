@@ -5137,6 +5137,87 @@ by ADR-106, the clone by ADR-107, Glass Box by ADR-108, Sections of Solids here)
 
 ---
 
+## ADR-110: Projection of Straight Lines — Art 10-8 Method II added; traces fixed for θ+φ=90°
+
+**Date:** 2026-08-04
+**Decision:** `graphics_module_1_topic_6_projection_of_straight_lines/src/sheet2DLayout.js`'s
+`computeTraces()` implemented only Art 10-10 Method I (extend a view to xy, drop a projector,
+extend the other view to meet it). When both projections are perpendicular to xy — θ+φ=90°, Art
+10-7's profile-plane case, reachable from the sliders and not merely a boundary curiosity — Method
+I's `xAtY`/`yAtX` helpers return `null` (the view has no finite slope), and the code silently fell
+back to the endpoint's OWN coordinate as the trace. That fallback is *correct* for the true
+point-view cases (line ⟂ HP or ⟂ VP, Art 10-9 fig. 10-21 — the trace really does coincide with the
+point view) but *wrong* for θ+φ=90°: Traces.pdf p.212 Art 10-11 states outright that "it is not
+possible to find the traces by the first method" there and requires Method II. A 45°/45°, 18mm/18mm
+line (both traces analytically ON xy) was rendering HT and VT 18mm off — a silent, plausible-looking
+wrong answer, exactly the failure mode §2.19a (added by ADR-105, same session block) now names.
+
+Added `trapezoid()` and `methodII()` (Art 10-8 Method II — True Length.pdf figs. 10-18/10-19: erect
+perpendiculars on one view equal to the OTHER view's signed offset from xy, join the far ends; that
+join is the True Length, at the plane inclination the other view lies on) as pure exports on
+`sheet2DLayout.js`. `computeTraces()` now branches three ways: point-view → trace coincides with
+the projection (unchanged, made explicit rather than an accidental null-fallback); θ+φ=90° →
+Method II, each trapezoid produced against its own view locates that view's trace (Art 10-10 Method
+II / fig. 10-25, fig. 10-26); otherwise → Method I, unchanged. `traces.js` gained a matching Method
+II animation branch (perpendiculars → hypotenuse → produced-to-trace, in place of Method I's
+extend-to-xy choreography, since there is no h/v foot to find here). `trueLength.js`'s
+`createTrueLength()` gained a `method: 'I'|'II'` parameter, defaulting to 'I' (the existing
+12-phase rotating-line construction, unchanged); `main.js`'s True-Length launcher now auto-selects
+`'II'` from `computeTraces(layout2D(r)).method`, so the Traces and True-Length launchers never
+disagree about which method a given line requires.
+
+Offsets in `trapezoid()` are signed (not `Math.abs`), so problem 10-7 / fig. 10-30's
+opposite-sides-of-xy case falls out with no extra branch. Verified algebraically before writing
+any construction code (§2.19a): `trapezoid(...).tl` reduces to `√(len²+Δoff²)` which is exactly
+`TL` by the Pythagorean relation `lineData.js` already uses to derive `fvLen`/`tvLen` from `TL`,
+`θ`, `φ`; `.angle` reduces to the same `atan2` expression `lineData.js` uses for `theta`/`phi`; and
+reflecting the trapezoid (`side: -1`) provably cannot move where it meets its view, since a
+reflection fixes every point of the view line pointwise. All three claims, plus the traced
+θ+φ=90° regression case (asserting the new HT/VT are NOT at the old wrong position) and all 12
+shipped Problem Library entries, are asserted by a scratch analytic Node script importing the
+shipped `lineData.js`/`sheet2DLayout.js` directly (ADR-019: verify the real artifact) — 59/59
+passed, plus a 16-assertion pass proving the True-Length Method II angle ARC itself sweeps the
+exact `resolved.theta`/`resolved.phi`, not merely that `trapezoid()` computed the right number.
+Runtime-smoke-tested (stubbed THREE/DOM) that `createTraces()`/`createTrueLength()` build and
+`animate(0..1)` without throwing across the full case matrix (both perpXY configurations, both
+point-view cases, ordinary Method I, the θ=φ=0 default). Headless-verified per ADR-019 (Chrome via
+CDP, no puppeteer): sim boots clean, zero console errors/exceptions, both construction launchers
+click through the θ+φ=90° case without throwing, and `renderer.info.memory.{geometries,textures}`
+stays flat (`16/0`) across 50 real-slider-driven rebuilds cycling five cases including two
+perpXY configurations — confirming the new Method II geometry is disposed by the existing
+`compareSheet.clearConstruction()` contract (ADR-004) with no added leak. (First attempt at this
+memory check read `renderer.info.memory` synchronously inside a tight 50-iteration loop with no
+`requestAnimationFrame` yield, so Three's WebGLGeometries bookkeeping — which only updates inside
+an actual `render()` call — never ran; every sample silently read pre-loop state. Caught by cross-
+checking against a separate sanity pass showing genuine non-zero geometry/render-call counts, and
+fixed by awaiting two rAF ticks between commits — a concrete instance of §2.19a's own warning
+about a check that looks like it passed for the wrong reason.)
+**Why:** Correctness against the cited textbook (N.D. Bhatt, *Engineering Drawing*, Ch. 10) is this
+module's whole contract (CLAUDE.md's opening line). θ+φ=90° is a named, examinable case (Art 10-7),
+not an edge case to leave broken.
+**Alternatives rejected:** Guard-and-suppress (detect θ+φ≈90° and simply hide the trace with a "not
+computable" note) — rejected; the textbook gives a real method, and hiding a required construction
+teaches an omission the source material doesn't have. Extending `sheet2DLayout.js`'s existing
+null-fallback with a manual epsilon-nudge to avoid the `NaN`/coincidence-with-endpoint case —
+rejected; it would still be Method I algebra applied where Art 10-11 says Method I algebra does not
+apply, producing a different but equally fabricated number.
+**Consequences:** Easier: `trueLength.js` and `traces.js` now share one geometric primitive
+(`methodII()`) for both the True-Length recovery and the trace construction, so a future fix to one
+automatically benefits the other. Harder: `sheet2DLayout.js`'s public surface grew
+(`trapezoid`/`methodII`/`meet` now exported); RULES.md §3.6 named only `genericSolid.js` as the
+cross-topic shared-pure exception and did not name `sheet2DLayout.js` at all even though three
+Lines leaves already imported it before this change — noted, not newly created, by this ADR; a
+RULES.md update naming the Lines-family exception explicitly is a good follow-up but out of scope
+here (this ADR only adds functions to an already-shared file, it doesn't create the sharing
+pattern). F3 (a line lying wholly IN the HP or VP reports "no trace" instead of Art 10-9's
+"trace coincides with the line," reachable by the shipped `ln-incl-vp-2` problem) and F4 (no
+on-screen "NO TRACE" callout matching figs. 10-20/10-21, where Method I legitimately has none) were
+identified in the same audit but are explicitly OUT of this ADR's scope — real audit findings F1/F2/F5
+only. Not implemented.
+**Status:** Active
+
+---
+
 ## ADR-111: Show Method's on-sheet ghost extends to Set1→Set2 (a TILT, front view) — ADR-101/104's exclusion was over-broad, not wrong about the risk
 
 **Date:** 2026-08-04

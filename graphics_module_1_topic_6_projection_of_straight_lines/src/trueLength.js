@@ -14,7 +14,7 @@
 // Layering (ADR-007 / §3.6): leaf module — imports only the pure-math sheet2DLayout.js.
 
 import * as THREE from 'three';
-import { layout2D } from './sheet2DLayout.js';
+import { layout2D, methodII, meet } from './sheet2DLayout.js';
 import { addLabel } from './labels.js';
 import { PLACEMENT, bisectorAnchor } from './labelPlacement.js';
 
@@ -22,6 +22,9 @@ const P2 = PLACEMENT.sheet2D; // marker letter · angle-bisector radius · TL-va
 
 const TL_N = 12;
 const DURATION = 9000;
+const DURATION_FLAT = 400; // both views already TL (θ=φ=0 default) — nothing to rotate through
+const TL2_N = 8;
+const DURATION2 = 6000;
 
 const rootStyle = () => getComputedStyle(document.documentElement);
 const cssColor = (name, fallback) => new THREE.Color(rootStyle().getPropertyValue(name).trim() || fallback);
@@ -31,8 +34,11 @@ const lc = (x, a, b) => clamp01((x - a) / (b - a));
 const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 const lerp2 = (P, Q, t) => [P[0] + (Q[0] - P[0]) * t, P[1] + (Q[1] - P[1]) * t];
 
-/** @param {{ resolved:object }} o  @returns {{ group, animate:(p:number)=>void, duration:number }} */
-export function createTrueLength({ resolved }) {
+/** @param {{ resolved:object, method?:'I'|'II' }} o  @returns {{ group, animate:(p:number)=>void, duration:number }}
+ *  `method` defaults to 'I' (the rotating-line construction). Art 10-11 (Traces.pdf p.212):
+ *  when both projections are ⟂ xy (θ+φ=90°) there is no rotation locus to swing through, so the
+ *  caller should pass `method: 'II'` — main.js selects it from `computeTraces(...).method`. */
+export function createTrueLength({ resolved, method = 'I' }) {
   const group = new THREE.Group();
   const COL = {
     hp: cssColor('--color-hp-line', '#007f7c').getHex(),
@@ -71,7 +77,76 @@ export function createTrueLength({ resolved }) {
   }
 
   const L = layout2D(resolved);
-  const { A1, B1, A2, B2 } = L;
+  const { A1, B1, A2, B2, fvTrue, tvTrue } = L;
+
+  if (method === 'II') {
+    // Art 10-8 Method II (True Length.pdf figs. 10-18/10-19), the Art 10-11 fallback: raise a
+    // trapezoid on each view (perpendiculars equal to the OTHER view's signed offsets from xy),
+    // join the far ends — that join is the True Length, at the true inclination with the plane
+    // the other view lies on. Part A = the top-view trapezoid → TL & θ (marker b₁′); Part B = the
+    // front-view trapezoid → TL & φ (marker b₁) — same labelling convention as Method I above.
+    const M = methodII(L);
+
+    function buildTrapezoid(P, Q, trap, markerLabel) {
+      if (!trap) return null;
+      const perpP = conLine(COL.construct, true);
+      const perpQ = conLine(COL.construct, true);
+      const hyp = conLine(COL.tlg, false);
+      const apex = meet(P, Q, trap.P1, trap.Q1); // null when the hypotenuse is parallel (angle 0)
+      const arc = conLine(COL.tlg, false);
+      const mk = marker(trap.Q1[0], trap.Q1[1], COL.tlg, markerLabel);
+      return { P, Q, trap, perpP, perpQ, hyp, apex, arc, mk };
+    }
+
+    const tvRig = buildTrapezoid(A2, B2, M.tv, 'b₁′');
+    const fvRig = buildTrapezoid(A1, B1, M.fv, 'b₁');
+
+    // α/β (Inclined_to_Both.pdf Art 10-5, fig. 10-13): the ORIGINAL view segment's own angle
+    // with xy — always ≥ θ/φ, drawn at the same end each view already anchors on (A2/A1).
+    const alphaArc = conLine(COL.tlg, false);
+    const betaArc = conLine(COL.tlg, false);
+    const alphaDir = Math.atan2(B1[1] - A1[1], B1[0] - A1[0]);
+    const betaDir = Math.atan2(B2[1] - A2[1], B2[0] - A2[0]);
+
+    const tlLift = P2.tlValueLift;
+    const midTV = tvRig ? [(tvRig.trap.P1[0] + tvRig.trap.Q1[0]) / 2, (tvRig.trap.P1[1] + tvRig.trap.Q1[1]) / 2] : [0, 0];
+    const midFV = fvRig ? [(fvRig.trap.P1[0] + fvRig.trap.Q1[0]) / 2, (fvRig.trap.P1[1] + fvRig.trap.Q1[1]) / 2] : [0, 0];
+    const thLbl = addLabel(group, `θ=${Math.round(resolved.theta)}°`, [midTV[0], midTV[1] - tlLift, 0], { color: '--tl-green', size: '11px' });
+    const tlLblA = addLabel(group, `TL ${Math.round(resolved.tl)}`, [midTV[0], midTV[1] - tlLift * 2, 0], { color: '--tl-green', mono: true, size: '10px' });
+    const phLbl = addLabel(group, `φ=${Math.round(resolved.phi)}°`, [midFV[0], midFV[1] + tlLift, 0], { color: '--tl-green', size: '11px' });
+    const tlLblB = addLabel(group, `TL ${Math.round(resolved.tl)}`, [midFV[0], midFV[1] + tlLift * 2, 0], { color: '--tl-green', mono: true, size: '10px' });
+    const betaLbl = addLabel(group, `β=${Math.round(resolved.beta)}°`, [midTV[0], midTV[1] - tlLift * 3, 0], { color: '--tl-green', size: '11px' });
+    const alphaLbl = addLabel(group, `α=${Math.round(resolved.alpha)}°`, [midFV[0], midFV[1] + tlLift * 3, 0], { color: '--tl-green', size: '11px' });
+    [thLbl, tlLblA, phLbl, tlLblB, betaLbl, alphaLbl].forEach((l) => setOp(l, 0));
+
+    function runRig(rig, PA, PB, H, ARC, LBL) {
+      if (!rig) return;
+      setSeg(rig.perpP, rig.P, lerp2(rig.P, rig.trap.P1, easeOut(lc(G, PA[0], PA[1])))); setOp(rig.perpP, G > PA[0] ? 1 : 0);
+      setSeg(rig.perpQ, rig.Q, lerp2(rig.Q, rig.trap.Q1, easeOut(lc(G, PB[0], PB[1])))); setOp(rig.perpQ, G > PB[0] ? 1 : 0);
+      setSeg(rig.hyp, rig.trap.P1, lerp2(rig.trap.P1, rig.trap.Q1, easeOut(lc(G, H[0], H[1])))); setOp(rig.hyp, G >= H[0] ? 1 : 0);
+      setOp(rig.mk, lc(G, H[1] - 0.1, H[1] + 0.1));
+      if (rig.apex) {
+        const a0 = Math.atan2(rig.P[1] - rig.apex[1], rig.P[0] - rig.apex[0]);
+        const a1 = Math.atan2(rig.trap.P1[1] - rig.apex[1], rig.trap.P1[0] - rig.apex[0]);
+        setArc(rig.arc, rig.apex[0], rig.apex[1], 0.8, a0, a1); setOp(rig.arc, lc(G, ARC[0], ARC[1]));
+      }
+      setOp(LBL[0], lc(G, ARC[0], ARC[1])); setOp(LBL[1], lc(G, H[1] - 0.1, H[1] + 0.3));
+    }
+
+    let G = 0;
+    function animate(p) {
+      G = p * TL2_N;
+      runRig(tvRig, [0, 1], [1, 2], [2, 3], [3, 3.6], [thLbl, tlLblA]);
+      setArc(betaArc, A2[0], A2[1], 1.1, 0, betaDir); setOp(betaArc, lc(G, 3, 3.6));
+      setOp(betaLbl, lc(G, 3.2, 3.8));
+      runRig(fvRig, [4, 5], [5, 6], [6, 7], [7, 7.6], [phLbl, tlLblB]);
+      setArc(alphaArc, A1[0], A1[1], 1.1, 0, alphaDir); setOp(alphaArc, lc(G, 7, 7.6));
+      setOp(alphaLbl, lc(G, 7.2, 7.8));
+    }
+    animate(0);
+    return { group, animate, duration: DURATION2 };
+  }
+
   const pivotIsA = A1[0] <= B1[0];
   const fvPiv = pivotIsA ? A1 : B1, fvOth = pivotIsA ? B1 : A1;
   const tvPiv = pivotIsA ? A2 : B2, tvOth = pivotIsA ? B2 : A2;
@@ -101,6 +176,10 @@ export function createTrueLength({ resolved }) {
   const markB = marker(bTLB[0], bTLB[1], COL.tlg, 'b₁');
   const tlB = conLine(COL.tlg, false);
   const phiB = conLine(COL.tlg, false);
+  // α/β (Inclined_to_Both.pdf Art 10-5, fig. 10-13): the ORIGINAL (unrotated) view's own angle
+  // with xy, always ≥ θ/φ — same pivots θ/φ land on (fvPiv/tvPiv), so all four sit side by side.
+  const alphaArc = conLine(COL.tlg, false);
+  const betaArc = conLine(COL.tlg, false);
 
   // CSS2D construction labels (θ / φ true angles + the recovered True-Length value), driven by
   // the animation windows below. b₁ / b₁′ ride their markers (marker() adds them).
@@ -109,7 +188,10 @@ export function createTrueLength({ resolved }) {
   const tlLblA = addLabel(group, `TL ${Math.round(resolved.tl)}`, [(fvPiv[0] + bTLA[0]) / 2, (fvPiv[1] + bTLA[1]) / 2 + tlLift, 0], { color: '--tl-green', mono: true, size: '10px' });
   const phLbl = addLabel(group, `φ=${Math.round(resolved.phi)}°`, bisectorAnchor(tvPiv, dirB / 2, R), { color: '--tl-green', size: '11px' });
   const tlLblB = addLabel(group, `TL ${Math.round(resolved.tl)}`, [(tvPiv[0] + bTLB[0]) / 2, (tvPiv[1] + bTLB[1]) / 2 - tlLift, 0], { color: '--tl-green', mono: true, size: '10px' });
-  [thLbl, tlLblA, phLbl, tlLblB].forEach((l) => setOp(l, 0));
+  const R2 = { x: R.x * 1.4, y: R.y * 1.4 }; // wider elliptical radius so α/β labels clear θ/φ's
+  const alphaLbl = addLabel(group, `α=${Math.round(resolved.alpha)}°`, bisectorAnchor(fvPiv, startB / 2, R2), { color: '--tl-green', size: '11px' });
+  const betaLbl = addLabel(group, `β=${Math.round(resolved.beta)}°`, bisectorAnchor(tvPiv, startA / 2, R2), { color: '--tl-green', size: '11px' });
+  [thLbl, tlLblA, phLbl, tlLblB, alphaLbl, betaLbl].forEach((l) => setOp(l, 0));
 
   const aidsA = [rotTV, arcA, projA, fvLoc], aidsB = [rotFV, arcB, projB, tvLoc];
 
@@ -125,6 +207,8 @@ export function createTrueLength({ resolved }) {
     { const t = easeOut(lc(G, 4, 5)); setSeg(tlA, fvPiv, lerp2(fvPiv, bTLA, t)); setOp(tlA, G >= 4 ? 1 : 0); }
     setArc(thetaA, fvPiv[0], fvPiv[1], 0.8, 0, dirA); setOp(thetaA, lc(G, 5, 5.4));
     setOp(tlLblA, lc(G, 4.3, 4.9)); setOp(thLbl, lc(G, 5, 5.6));
+    setArc(alphaArc, fvPiv[0], fvPiv[1], 1.1, 0, startB); setOp(alphaArc, lc(G, 5.1, 5.5));
+    setOp(alphaLbl, lc(G, 5.3, 5.9));
     // ---- Part B ----
     { const t = easeOut(lc(G, 6, 7)), ang = startB + (0 - startB) * t;
       setSeg(rotFV, fvPiv, [fvPiv[0] + Math.cos(ang) * Lelev, fvPiv[1] + Math.sin(ang) * Lelev]); setOp(rotFV, G >= 6 ? 1 : 0); }
@@ -135,11 +219,13 @@ export function createTrueLength({ resolved }) {
     { const t = easeOut(lc(G, 10, 11)); setSeg(tlB, tvPiv, lerp2(tvPiv, bTLB, t)); setOp(tlB, G >= 10 ? 1 : 0); }
     setArc(phiB, tvPiv[0], tvPiv[1], 0.8, 0, dirB); setOp(phiB, lc(G, 11, 11.4));
     setOp(tlLblB, lc(G, 10.3, 10.9)); setOp(phLbl, lc(G, 11, 11.6));
+    setArc(betaArc, tvPiv[0], tvPiv[1], 1.1, 0, startA); setOp(betaArc, lc(G, 11.1, 11.5));
+    setOp(betaLbl, lc(G, 11.3, 11.9));
     // Part B started → dim the Part A aids so the sheet stays readable.
     if (G >= 6) aidsA.forEach((o) => setOp(o, 0.18));
     if (G < 6) { aidsB.forEach((o) => setOp(o, 0)); setOp(markB, 0); setOp(tlB, 0); setOp(phiB, 0); setOp(tlLblB, 0); setOp(phLbl, 0); }
   }
 
   animate(0);
-  return { group, animate, duration: DURATION };
+  return { group, animate, duration: (fvTrue && tvTrue) ? DURATION_FLAT : DURATION };
 }
