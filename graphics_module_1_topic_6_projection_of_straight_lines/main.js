@@ -798,6 +798,7 @@ const simController = {
   getData: () => ({ ...currentData }),
   getView: () => ({ ...currentView, folded }),
   isFolded: () => folded,
+  isValid: () => resolveLine(currentData).valid, // θ+φ≤90° (lineData.js:50) — the ONE source of truth
   commit,
 
   /** The stepper pushes each step's viewport flags through here — the ONE channel the

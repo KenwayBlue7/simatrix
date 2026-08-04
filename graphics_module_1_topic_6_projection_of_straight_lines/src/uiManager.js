@@ -20,6 +20,7 @@
 /**
  * @typedef {Object} SimController  Injected by main.js.
  * @property {() => {TL:number, aHP:number, aVP:number, theta:number, phi:number}} getData
+ * @property {() => boolean} isValid  θ+φ≤90° (lineData.resolveLine `valid`), the ONE source of truth.
  * @property {(partial:object) => void} commit   Merge params into the data and rebuild().
  * @property {() => void} reset                   Route through simAPI.reset() (the ONE reset path).
  * @property {(message:string) => void} announce  Narrate to the live region.
@@ -162,7 +163,7 @@ export function initUIManager(sim) {
     for (const cfg of DRIVERS) setPair(cfg, data[cfg.key]);
     // θ + φ must stay ≤ 90° for a real line (lineData.resolveLine `valid` flag).
     if (noteValid) {
-      const invalid = (data.theta + data.phi) > 90;
+      const invalid = !sim.isValid();
       noteValid.hidden = !invalid;
       noteValid.textContent = invalid ? 'θ + φ must stay ≤ 90° for a real line. Reduce one angle.' : '';
     }

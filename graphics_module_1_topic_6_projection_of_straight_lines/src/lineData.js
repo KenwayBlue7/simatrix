@@ -34,6 +34,7 @@ const DEG = Math.PI / 180, deg = r => r * 180 / Math.PI;
  */
 export function resolveLine(data) {
   const TL = data.TL, th = data.theta * DEG, ph = data.phi * DEG;
+  const eps = 1e-6;
   let dx, dy, dz, valid = true;
 
   switch (data.case) {
@@ -47,7 +48,9 @@ export function resolveLine(data) {
       // whatever is left over. Physically valid only while sin²θ + sin²φ ≤ 1.
       dy = TL*Math.sin(th); dz = TL*Math.sin(ph);
       const lat2 = TL*TL - dy*dy - dz*dz;
-      valid = lat2 >= 0;
+      valid = lat2 >= -eps * TL * TL; // fp tolerance: sin²θ+sin²φ can overshoot 1 by ~1e-13 at
+                                       // the exact θ+φ=90° boundary (e.g. 75/15) — a real trig
+                                       // identity, not an invalid line; don't flag it as one.
       dx = Math.sqrt(Math.max(0, lat2));
       break;
     }
@@ -64,7 +67,6 @@ export function resolveLine(data) {
   const tvLen = Math.hypot(dx, dz);           // top view length   (HP: x,z)
   const theta = deg(Math.atan2(Math.abs(dy), hRun));                 // true incl. with HP
   const phi   = deg(Math.atan2(Math.abs(dz), Math.hypot(dx, dy)));   // true incl. with VP
-  const eps = 1e-6;
   const alpha = deg(Math.atan2(Math.abs(dy), Math.abs(dx) + eps));   // apparent FV angle to XY
   const beta  = deg(Math.atan2(Math.abs(dz), Math.abs(dx) + eps));   // apparent TV angle to XY
 
