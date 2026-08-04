@@ -14,7 +14,7 @@
 // Layering (ADR-007 / §3.6): leaf module — imports only the pure-math sheet2DLayout.js.
 
 import * as THREE from 'three';
-import { layout2D } from './sheet2DLayout.js';
+import { layout2D, methodII, meet } from './sheet2DLayout.js';
 import { addLabel } from './labels.js';
 import { PLACEMENT, bisectorAnchor } from './labelPlacement.js';
 
@@ -22,6 +22,8 @@ const P2 = PLACEMENT.sheet2D; // marker letter · angle-bisector radius · TL-va
 
 const TL_N = 12;
 const DURATION = 9000;
+const TL2_N = 8;
+const DURATION2 = 6000;
 
 const rootStyle = () => getComputedStyle(document.documentElement);
 const cssColor = (name, fallback) => new THREE.Color(rootStyle().getPropertyValue(name).trim() || fallback);
@@ -31,8 +33,11 @@ const lc = (x, a, b) => clamp01((x - a) / (b - a));
 const easeOut = (t) => 1 - Math.pow(1 - t, 3);
 const lerp2 = (P, Q, t) => [P[0] + (Q[0] - P[0]) * t, P[1] + (Q[1] - P[1]) * t];
 
-/** @param {{ resolved:object }} o  @returns {{ group, animate:(p:number)=>void, duration:number }} */
-export function createTrueLength({ resolved }) {
+/** @param {{ resolved:object, method?:'I'|'II' }} o  @returns {{ group, animate:(p:number)=>void, duration:number }}
+ *  `method` defaults to 'I' (the rotating-line construction). Art 10-11 (Traces.pdf p.212):
+ *  when both projections are ⟂ xy (θ+φ=90°) there is no rotation locus to swing through, so the
+ *  caller should pass `method: 'II'` — main.js selects it from `computeTraces(...).method`. */
+export function createTrueLength({ resolved, method = 'I' }) {
   const group = new THREE.Group();
   const COL = {
     hp: cssColor('--color-hp-line', '#007f7c').getHex(),
@@ -72,6 +77,62 @@ export function createTrueLength({ resolved }) {
 
   const L = layout2D(resolved);
   const { A1, B1, A2, B2 } = L;
+
+  if (method === 'II') {
+    // Art 10-8 Method II (True Length.pdf figs. 10-18/10-19), the Art 10-11 fallback: raise a
+    // trapezoid on each view (perpendiculars equal to the OTHER view's signed offsets from xy),
+    // join the far ends — that join is the True Length, at the true inclination with the plane
+    // the other view lies on. Part A = the top-view trapezoid → TL & θ (marker b₁′); Part B = the
+    // front-view trapezoid → TL & φ (marker b₁) — same labelling convention as Method I above.
+    const M = methodII(L);
+
+    function buildTrapezoid(P, Q, trap, markerLabel) {
+      if (!trap) return null;
+      const perpP = conLine(COL.construct, true);
+      const perpQ = conLine(COL.construct, true);
+      const hyp = conLine(COL.tlg, false);
+      const apex = meet(P, Q, trap.P1, trap.Q1); // null when the hypotenuse is parallel (angle 0)
+      const arc = conLine(COL.tlg, false);
+      const mk = marker(trap.Q1[0], trap.Q1[1], COL.tlg, markerLabel);
+      return { P, Q, trap, perpP, perpQ, hyp, apex, arc, mk };
+    }
+
+    const tvRig = buildTrapezoid(A2, B2, M.tv, 'b₁′');
+    const fvRig = buildTrapezoid(A1, B1, M.fv, 'b₁');
+
+    const tlLift = P2.tlValueLift;
+    const midTV = tvRig ? [(tvRig.trap.P1[0] + tvRig.trap.Q1[0]) / 2, (tvRig.trap.P1[1] + tvRig.trap.Q1[1]) / 2] : [0, 0];
+    const midFV = fvRig ? [(fvRig.trap.P1[0] + fvRig.trap.Q1[0]) / 2, (fvRig.trap.P1[1] + fvRig.trap.Q1[1]) / 2] : [0, 0];
+    const thLbl = addLabel(group, `θ=${Math.round(resolved.theta)}°`, [midTV[0], midTV[1] - tlLift, 0], { color: '--tl-green', size: '11px' });
+    const tlLblA = addLabel(group, `TL ${Math.round(resolved.tl)}`, [midTV[0], midTV[1] - tlLift * 2, 0], { color: '--tl-green', mono: true, size: '10px' });
+    const phLbl = addLabel(group, `φ=${Math.round(resolved.phi)}°`, [midFV[0], midFV[1] + tlLift, 0], { color: '--tl-green', size: '11px' });
+    const tlLblB = addLabel(group, `TL ${Math.round(resolved.tl)}`, [midFV[0], midFV[1] + tlLift * 2, 0], { color: '--tl-green', mono: true, size: '10px' });
+    [thLbl, tlLblA, phLbl, tlLblB].forEach((l) => setOp(l, 0));
+
+    function runRig(rig, PA, PB, H, ARC, LBL) {
+      if (!rig) return;
+      setSeg(rig.perpP, rig.P, lerp2(rig.P, rig.trap.P1, easeOut(lc(G, PA[0], PA[1])))); setOp(rig.perpP, G > PA[0] ? 1 : 0);
+      setSeg(rig.perpQ, rig.Q, lerp2(rig.Q, rig.trap.Q1, easeOut(lc(G, PB[0], PB[1])))); setOp(rig.perpQ, G > PB[0] ? 1 : 0);
+      setSeg(rig.hyp, rig.trap.P1, lerp2(rig.trap.P1, rig.trap.Q1, easeOut(lc(G, H[0], H[1])))); setOp(rig.hyp, G >= H[0] ? 1 : 0);
+      setOp(rig.mk, lc(G, H[1] - 0.1, H[1] + 0.1));
+      if (rig.apex) {
+        const a0 = Math.atan2(rig.P[1] - rig.apex[1], rig.P[0] - rig.apex[0]);
+        const a1 = Math.atan2(rig.trap.P1[1] - rig.apex[1], rig.trap.P1[0] - rig.apex[0]);
+        setArc(rig.arc, rig.apex[0], rig.apex[1], 0.8, a0, a1); setOp(rig.arc, lc(G, ARC[0], ARC[1]));
+      }
+      setOp(LBL[0], lc(G, ARC[0], ARC[1])); setOp(LBL[1], lc(G, H[1] - 0.1, H[1] + 0.3));
+    }
+
+    let G = 0;
+    function animate(p) {
+      G = p * TL2_N;
+      runRig(tvRig, [0, 1], [1, 2], [2, 3], [3, 3.6], [thLbl, tlLblA]);
+      runRig(fvRig, [4, 5], [5, 6], [6, 7], [7, 7.6], [phLbl, tlLblB]);
+    }
+    animate(0);
+    return { group, animate, duration: DURATION2 };
+  }
+
   const pivotIsA = A1[0] <= B1[0];
   const fvPiv = pivotIsA ? A1 : B1, fvOth = pivotIsA ? B1 : A1;
   const tvPiv = pivotIsA ? A2 : B2, tvOth = pivotIsA ? B2 : A2;

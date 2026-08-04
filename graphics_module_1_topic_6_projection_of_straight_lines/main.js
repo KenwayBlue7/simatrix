@@ -38,6 +38,7 @@ import { initOnboarding } from './src/onboarding.js';
 import { createCompareSheet } from './src/compareSheet.js';
 import { createTraces } from './src/traces.js';
 import { createTrueLength } from './src/trueLength.js';
+import { layout2D, computeTraces } from './src/sheet2DLayout.js';
 import { initProblemLibrary } from './src/problemLibrary.js';
 import { PROBLEMS as LINE_PROBLEMS, TIERS as LINE_TIERS, FIELD_LABELS as LINE_FIELD_LABELS } from './src/lineProblems.js';
 
@@ -1253,7 +1254,13 @@ function enterCon(mode, build, btnId) {
   runCon(conLeaf.duration);
 }
 const enterTrace = () => enterCon('trace', (r) => createTraces({ resolved: r }), 'btn-traces');
-const enterTL = () => enterCon('tl', (r) => createTrueLength({ resolved: r }), 'btn-tl');
+// Art 10-11 (Traces.pdf p.212): projections ⟂ xy (θ+φ=90°) has no rotation locus for Method I —
+// route to trueLength.js's Method II trapezoid construction instead (mirrors computeTraces()'s
+// own method choice, so the True-Length launcher and the Traces launcher never disagree).
+const enterTL = () => enterCon('tl', (r) => createTrueLength({
+  resolved: r,
+  method: computeTraces(layout2D(r)).method === 'II' ? 'II' : 'I',
+}), 'btn-tl');
 
 /** Each launcher does double duty: first click builds + plays the construction; a click
  *  while it's already active replays the same animation from t=0 (the old separate
