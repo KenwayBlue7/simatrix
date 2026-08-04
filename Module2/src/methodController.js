@@ -301,10 +301,11 @@ export function initMethodController(sim) {
     sim.method.setProgress(curSet, curBeat);
     renderProgress();
     syncCaption();
-    // ADR-105: the Set 2 -> Set 3 turn is this click, not a separate "Watch the turn" button —
-    // curBeat===0 is always true on a set crossing (beat 0 is hardcoded content-bearing, see
-    // hasVisibleContent), and canTilt() is only true for the both-planes tier's Set 3, so this
-    // fires exactly once per forward crossing into that Set. sim.method.playTilt() is idempotent
+    // ADR-105/-110: the Set-to-Set ghost (turn OR tilt) is this click, not a separate "Watch the
+    // turn" button — curBeat===0 is always true on a set crossing (beat 0 is hardcoded
+    // content-bearing, see hasVisibleContent), and canTilt() is only true when the JUST-ENTERED
+    // Set is ghost-eligible, so this fires exactly once per forward crossing into such a Set.
+    // sim.method.playTilt() is idempotent
     // and self-gating (startMethodTilt no-ops with a false return otherwise) — called AFTER
     // syncCaption() so the tilt's own announce() (turning..., then landed) is what's actually
     // read out, not immediately overwritten by it. Deliberately not wired into goSkipSet (Skip

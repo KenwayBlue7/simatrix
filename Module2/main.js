@@ -2554,13 +2554,16 @@ let methodAnimLastT = 0;
 
 // ---- Show Method Set-to-Set ghost (supersedes ADR-101's screen-anchored 3D pictorial — see
 // DECISIONS.md). Both reference textbooks draw this transition as a pure 2D operation: whichever
-// view carried the true angle in Set 2 is bodily copied and turned about its axis foot to land on
-// Set 3's own position — never a pictorial of the solid. This does exactly that: a rigid
-// rotate+translate of Set 2's own already-harvested top-view lines, landing pixel-exact on Set 3's
-// start because Set 3's pose IS Set 2's pose yawed about world-Y (ADR-093) and the top view drops
-// Y. A motion cue between two already-drawn Sets, never a beat of its own (METHOD_BEAT_COUNT stays
-// 14 — ADR-094's assert is untouched). Rides the exact same private rAF pump ADR-091 already stood
-// up (methodAnimFrame/queueMethodRedraw below), not a second loop — no buildEdgeMap/
+// view carried the true angle is bodily copied and turned/tilted about its axis foot to land on
+// the next Set's own position — never a pictorial of the solid. This does exactly that: a rigid
+// rotate+translate of the previous Set's own already-harvested true-shape-view lines. Two
+// eligible kinds (ADR-104 TURN, ADR-110 TILT — methodStepIsXTilt/startMethodTilt pick which):
+// TURN lands pixel-exact on the top view because Set 3's pose IS Set 2's pose yawed about world-Y
+// (ADR-093, which drops Y); TILT lands pixel-exact on the FRONT view because that step's pose
+// delta IS a pure world-X rotation (ADR-110, which drops X). A motion cue between two
+// already-drawn Sets, never a beat of its own (METHOD_BEAT_COUNT stays 14 — ADR-094's assert is
+// untouched). Rides the exact same private rAF pump ADR-091 already stood up
+// (methodAnimFrame/queueMethodRedraw below), not a second loop — no buildEdgeMap/
 // drawProjections, no allocation, no disposal; drawMethodGhost re-flattens the harvested `data`
 // arrays both Sets already carry. ----
 const METHOD_TILT_DURATION_MS = 900;  // motion phase — rotate+translate, easeFold
@@ -2578,7 +2581,7 @@ let methodTiltHandle = null;    // the live tween handle, so a snap-finish can c
  *  anchored inset ignored methodPanX/Y/methodZoom entirely). `vertexIsFirst`: which end of
  *  `ann.axis` is the turning pivot, decided once against Set 3 (see startMethodTilt) and reused by
  *  INDEX on Set 2 — both Sets harvest from one shared geometry, so index correspondence holds. */
-let methodGhost = null; // { fromIndex, vertexIsFirst, turnDeg } | null
+let methodGhost = null; // { fromIndex, vertexIsFirst, turnDeg, kind: 'turn'|'tilt' } | null
 
 /** One atomic stroked line ("moveTo→lineTo→stroke") per k-step — the animation-unit granularity;
  *  matches strokeMethodLines'/the projector-loop's/strokeAxisInto's own iteration exactly, so an
@@ -2634,6 +2637,36 @@ function methodArcEligible(set) {
   }
   if (spec.kind === 'both') return firstIsHP;
   return false;
+}
+
+/** ADR-110 — is `from → to` a pure world-X-axis rotation, i.e. a Set1→Set2-style TILT eligible
+ *  for the SAME rigid-2D-motion ghost treatment ADR-104 gave the both-planes Set2→Set3 TURN, but
+ *  riding the FRONT view instead of the top view.
+ *
+ *  Every Set's rotation is `R = Rz(-V)·Rx(H)·Ry(θ)` (iShape.js, order 'ZXY'). Set 1 always has
+ *  every mode forced off (planMethodStages), so `R_from = Ry(θ_from)` — NOT the identity, but
+ *  exactly the right-hand factor of `R_to`. So `ΔR = R_to · R_from⁻¹ = Rz(-V_to)·Rx(H_to)·Ry(θ_to
+ *  - θ_from)`, which collapses to a pure `Rx` (a TILT) iff `V_to ≈ 0` AND `θ_to ≈ θ_from` — both
+ *  required, since a product of rotations about two distinct world axes has no single axis. The
+ *  `to.turnDeg == null` guard excludes the both-planes Set 3: that Set's `eff` is deliberately a
+ *  COPY of Set 2's own (projectSequentialBothPlanesPose, ADR-093) for LABELLING only — it is not
+ *  the rotation actually applied there (a yaw), so `eff` alone can't tell the two cases apart.
+ *
+ *  Why the FRONT view, not the top view: flattenVP is `(u,v) = (-z, y)`. Under `Rx(A)`, `y' = y
+ *  cosA - z sinA` and `z' = y sinA + z cosA`; substituting `z=-u, y=v` gives `u' = u·cosA -
+ *  v·sinA`, `v' = u·sinA + v·cosA` — exact SO(2). (The top view drops `y` — the very coordinate
+ *  `Rx` mixes into `z` — so it foreshortens instead of rotating; ADR-104's turn uses the top view
+ *  because ITS invariant, ADR-093's yaw, is the Y-axis dual of this one.) The drawn line SET is
+ *  also unchanged, not just its shape: `visibleInVP`/`onOutlineVP` (projectionDrawer.js) key off
+ *  `worldNormal.x`, and `edgeKindOf` keys off a dot product with `axisDir` — both untouched by a
+ *  rotation about that same world-X axis, by construction. See DECISIONS.md ADR-110 for the full
+ *  proof (includes why `restingPlane:'VP'` and a VP-inclination step can't reach this branch). */
+function methodStepIsXTilt(fromSet, toSet) {
+  if (toSet.turnDeg != null) return false; // ADR-093 sequential yaw — handled by the turn path
+  return Math.abs(fromSet.eff.angleVP) < ANGLE_EPS
+      && Math.abs(toSet.eff.angleVP) < ANGLE_EPS
+      && Math.abs(toSet.eff.rotationY - fromSet.eff.rotationY) < ANGLE_EPS
+      && toSet.trueShape === 'front';
 }
 
 /** Total animation units for a given Set + beat index — world-space counts only (no screen
@@ -2752,34 +2785,46 @@ function startMethodBeatAnim(set, beatIndex) {
   });
 }
 
-/** Play the Set-to-Set ghost: lift a faded copy of Set 2's own top view off the sheet, rotate it
- *  about its axis foot, and land it on Set 3's start position (drawMethodGhost does the per-frame
- *  work; this only solves the pose-independent facts once, see methodGhost's own header). No-ops
- *  with a `false` return when there is nothing to turn — mirrors beginShowMethod's own
- *  boolean-return, no-op-on-false shape, so methodController.js can treat this identically to
- *  sim.method.begin(). Only ever eligible for the both-planes Set 3 today (ADR-093's `turnDeg`,
- *  which methodController.js's canTilt() also gates the button's visibility on, PLUS
- *  methodArcEligible — the rigid-2D-motion claim only holds when Set 3's true-shape view is
- *  genuinely the top view, the same guard beat 12's own angle arc already depends on) — a
- *  single-plane Set1→Set2 ghost is out of scope. */
+/** Play the Set-to-Set ghost: lift a faded copy of the previous Set's own true-shape view off the
+ *  sheet, rotate+translate it, and land it on this Set's start position (drawMethodGhost does the
+ *  per-frame work; this only solves the pose-independent facts once, see methodGhost's own
+ *  header). No-ops with a `false` return when there is nothing eligible — mirrors beginShowMethod's
+ *  own boolean-return, no-op-on-false shape, so methodController.js can treat this identically to
+ *  sim.method.begin().
+ *
+ *  Two eligible transitions (ADR-104 + ADR-110), sharing this one entry point since only one can
+ *  ever apply to a given Set (`methodStepIsXTilt` itself excludes the `turnDeg != null` case):
+ *   - **turn** — the both-planes Set 3 (ADR-093's `turnDeg`, gated by `methodArcEligible`: the
+ *     rigid-2D-motion claim only holds when Set 3's true-shape view is genuinely the top view).
+ *   - **tilt** — ADR-110: any step whose ΔR is provably a pure world-X rotation (Set1→Set2 of the
+ *     one-plane tier, or the both-planes tier's own Set1→Set2), riding the FRONT view instead. */
 function startMethodTilt() {
   if (!methodActive) return false;
   const set = methodSets[methodSet];
   const prevSet = methodSets[methodSet - 1];
+  if (!set || !prevSet) return false;
+  const isTurn = set.turnDeg != null;
+  const isTilt = !isTurn && methodStepIsXTilt(prevSet, set);
+  if (!isTurn && !isTilt) return false;
+  if (isTurn && !methodArcEligible(set)) return false;
   const axis3 = set?.ann?.axis;
-  if (!set || set.turnDeg == null || !prevSet || !methodArcEligible(set) || (axis3?.length ?? 0) < 6) return false;
+  if ((axis3?.length ?? 0) < 6) return false;
   stopMethodBeatAnim(); // settles any in-flight beat reveal AND cancels a prior in-flight ghost —
                         // the exact ADR-091 cancel-and-snap contract, reused in both directions.
 
-  // Which end of `ann.axis` is the turning pivot — beat 12's own screen rule (drawMethodSheet:
-  // "lower on screen — deterministic, no world guess") reduces to a raw world-x comparison here:
-  // flattenHP's y-output (`projectSheet`) is an INCREASING affine function of world-x with
-  // identical coefficients for both endpoints, so dx/scale/zoom/pan all cancel and no projection
-  // call is needed. Set 2 shares this SAME array index — both Sets harvest from one shared
-  // geometry with only pose differing, the same cross-Set assumption beat 6's projector
+  // Which end of `ann.axis` is the turning pivot — beat 12's own screen rule ("lower on screen —
+  // deterministic, no world guess") reduces to a raw world-coordinate comparison, no projection
+  // call needed, since each flatten's canvas output is an affine function (with IDENTICAL
+  // coefficients for both endpoints) of exactly one world coordinate: flattenHP's canvas-y
+  // INCREASES with world-x (turn/top-view case); flattenVP's canvas-y DECREASES with world-y
+  // (tilt/front-view case, ADR-110) — so "lower on screen" flips which raw comparison picks it.
+  // Set 2 (or Set 1) shares this SAME array index as the destination Set — both Sets harvest from
+  // one shared geometry with only pose differing, the same cross-Set assumption beat 6's projector
   // derivation already relies on for `ann.labels` (main.js, drawMethodSheet).
-  const vertexIsFirst = axis3[0] >= axis3[axis3.length - 3];
-  methodGhost = { fromIndex: methodSet - 1, vertexIsFirst, turnDeg: set.turnDeg };
+  const vertexIsFirst = isTurn
+    ? axis3[0] >= axis3[axis3.length - 3]
+    : axis3[1] <= axis3[axis3.length - 2];
+  methodGhost = { fromIndex: methodSet - 1, vertexIsFirst, turnDeg: set.turnDeg, kind: isTurn ? 'turn' : 'tilt' };
 
   methodTiltMotionT = 0;
   methodTiltAlpha = 1;
@@ -2788,7 +2833,12 @@ function startMethodTilt() {
     methodAnimLastT = 0;
     methodAnimRafId = requestAnimationFrame(methodAnimFrame);
   }
-  announce(`Turning Set ${methodSet}'s top view ${Math.round(set.turnDeg)}° into Set ${methodSet + 1}'s position.`);
+  if (isTurn) {
+    announce(`Turning Set ${methodSet}'s top view ${Math.round(set.turnDeg)}° into Set ${methodSet + 1}'s position.`);
+  } else {
+    const deg = Math.round(Math.abs(set.eff.angleHP - prevSet.eff.angleHP));
+    announce(`Tilting Set ${methodSet}'s front view ${deg}° into Set ${methodSet + 1}'s position.`);
+  }
   methodTiltHandle = tween({
     from: 0,
     to: METHOD_TILT_TOTAL_MS,
@@ -4309,28 +4359,34 @@ function drawMethodView() {
   if (methodTiltActive) drawMethodGhost(ctx, w, h);
 }
 
-/** Per-frame draw for the Set-to-Set ghost (startMethodTilt) — lifts a faded copy of Set 2's own
- *  top view off the sheet and rigidly rotates+translates it into Set 3's start position:
- *  `ghostPx(P, t) = Rot(θ·t)·(Ppx − pivot2px) + pivot2px + t·(pivot3px − pivot2px)`, a pure rotate
- *  +translate of Set 2's own already-flattened points — nothing reshaped, which is the literal
- *  proof this IS Set 2's drawing, tilted (see DECISIONS.md). Lands pixel-exact because Set 3's
- *  pose IS Set 2's yawed about world-Y (ADR-093) and the top view drops Y. θ is MEASURED between
- *  the two Sets' own drawn axis directions in canvas px, never declared from `turnDeg`'s sign —
- *  `projectSheet` below applies a y-flip, so a world rotation reads as the opposite sense on
- *  canvas (main.js CLAUDE.md: re-derive every ported sign visually). Painted AFTER drawMethodSheet
- *  so it overlays settled content, same ordering the old inset used — but ON the sheet, in sheet
- *  space, so a pan/zoom mid-tilt keeps it locked to the drawing (the old screen-anchored inset
- *  ignored methodPanX/Y/methodZoom entirely). Calls methodSheetLayout itself rather than threading
- *  state out of drawMethodSheet — setMethodFocus already establishes that call-it-again precedent
- *  for this single-source layout. Only ever called while `methodArcEligible` held true at ghost
- *  start (startMethodTilt's own gate), so viewA is guaranteed the HP/top view here — `.hp`/
- *  `.hpOutline` are read directly, not re-derived via methodViewSplit. */
+/** Per-frame draw for the Set-to-Set ghost (startMethodTilt) — lifts a faded copy of the previous
+ *  Set's own true-shape view off the sheet and rigidly rotates+translates it into this Set's start
+ *  position: `ghostPx(P, t) = Rot(θ·t)·(Ppx − pivot2px) + pivot2px + t·(pivot3px − pivot2px)`, a
+ *  pure rotate+translate of the source Set's own already-flattened points — nothing reshaped,
+ *  which is the literal proof this IS that Set's drawing, moved (see DECISIONS.md). θ is MEASURED
+ *  between the two Sets' own drawn axis directions in canvas px, never declared from a stored
+ *  angle's sign — `projectSheet` below applies a y-flip, so a world rotation reads as the opposite
+ *  sense on canvas (main.js CLAUDE.md: re-derive every ported sign visually). Painted AFTER
+ *  drawMethodSheet so it overlays settled content — but ON the sheet, in sheet space, so a
+ *  pan/zoom mid-tilt keeps it locked to the drawing. Calls methodSheetLayout itself rather than
+ *  threading state out of drawMethodSheet — setMethodFocus already establishes that
+ *  call-it-again precedent for this single-source layout.
+ *
+ *  `methodGhost.kind` (set by startMethodTilt) picks the view: **'turn'** lands pixel-exact
+ *  because Set 3's pose IS Set 2's yawed about world-Y (ADR-093, top view drops Y) — reads `.hp`/
+ *  `.hpOutline`, guarded by `methodArcEligible` at ghost start so viewA really is the top view.
+ *  **'tilt'** (ADR-110) lands pixel-exact because that step's pose delta IS a pure world-X
+ *  rotation (front view drops X) — reads `.vp`/`.vpOutline`. No angle arc is drawn for a tilt:
+ *  `strokeAngleArc`'s datum is horizontal, but a tilt's axis starts near-VERTICAL in the front
+ *  view, so the datum would flip sides mid-flight (ADR-110) — the destination Set's own beat-12
+ *  arc marks the settled angle a moment later instead. */
 function drawMethodGhost(ctx, w, h) {
   if (!methodGhost || !methodActive) return;
   const set3 = methodSets[methodSet];
   const set2 = methodSets[methodGhost.fromIndex];
   const axis2 = set2?.ann?.axis, axis3 = set3?.ann?.axis;
   if (!set2 || !set3 || !axis2 || !axis3 || axis2.length < 6 || axis3.length < 6) return;
+  const isTilt = methodGhost.kind === 'tilt';
 
   const L = methodSheetLayout(w, h);
   const projectSheet = (p) => ({
@@ -4338,8 +4394,10 @@ function drawMethodGhost(ctx, w, h) {
     y: L.cy - (p.y - L.anchorSY) * WORLD_TO_MM * L.scale * methodZoom + methodPanY,
   });
   const flattenHPAt = (dx) => (x, y, z) => projectSheet({ x: -z + dx, y: -x });
-  const flatten2 = flattenHPAt(methodGhost.fromIndex * (L.blockW + L.STAGE_GAP));
-  const flatten3 = flattenHPAt(methodSet * (L.blockW + L.STAGE_GAP));
+  const flattenVPAt = (dx) => (x, y, z) => projectSheet({ x: -z + dx, y });
+  const flattenAt = isTilt ? flattenVPAt : flattenHPAt;
+  const flatten2 = flattenAt(methodGhost.fromIndex * (L.blockW + L.STAGE_GAP));
+  const flatten3 = flattenAt(methodSet * (L.blockW + L.STAGE_GAP));
 
   const vIdx = methodGhost.vertexIsFirst ? 0 : axis2.length - 3;
   const fIdx = methodGhost.vertexIsFirst ? axis2.length - 3 : 0;
@@ -4370,15 +4428,21 @@ function drawMethodGhost(ctx, w, h) {
 
   const paper = cssVar('--color-paper');
   const hpCol = cssVar('--color-hp-line');
+  const vpCol = cssVar('--color-vp-line');
   const inkCol = cssVar('--color-ink');
   const refCol = cssVar('--color-ink-secondary');
   const labelFont = `11px ${cssVar('--font-sans') || 'sans-serif'}`;
+  const lineCol = isTilt ? vpCol : hpCol;
+  const outlineData = isTilt ? set2.data.vpOutline : set2.data.hpOutline;
+  const bodyData = isTilt ? set2.data.vp : set2.data.hp;
 
   ctx.save();
   ctx.globalAlpha = GHOST_ALPHA * methodTiltAlpha;
-  strokeMethodLines(ctx, set2.data.hpOutline, flattenGhost, hpCol);
-  strokeMethodLines(ctx, set2.data.hp, flattenGhost, hpCol);
+  strokeMethodLines(ctx, outlineData, flattenGhost, lineCol);
+  strokeMethodLines(ctx, bodyData, flattenGhost, lineCol);
   ctx.restore();
+
+  if (isTilt) return; // ADR-110: no angle arc for a tilt — see this function's own header
 
   const pxPerUnit = WORLD_TO_MM * L.scale * methodZoom; // matches beat 12's own arc radius formula
   ctx.save();
@@ -5166,9 +5230,14 @@ const simController = {
      *  folds it in here too so this one predicate backs the auto-play gate (methodController.js
      *  goNext), the replay control's visibility, AND the engine's own guard — previously
      *  `turnDeg != null` alone could show/enable a control `startMethodTilt` would then no-op). */
+    // ADR-110: widened from "turn only" to also accept a Set1→Set2-shaped TILT
+    // (methodStepIsXTilt) — see startMethodTilt's own header for which of the two applies.
     canTilt: () => {
       const set = methodSets[methodSet];
-      return set?.turnDeg != null && methodArcEligible(set);
+      const prevSet = methodSets[methodSet - 1];
+      if (!set || !prevSet) return false;
+      if (set.turnDeg != null) return methodArcEligible(set);
+      return methodStepIsXTilt(prevSet, set);
     },
     /** Play the tilt from the previous Set's pose into the current one (startMethodTilt's own
      *  header has the full contract). Same boolean-return, no-op-on-false shape as begin(). */

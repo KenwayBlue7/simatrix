@@ -2215,11 +2215,14 @@
       <!-- Hidden, not merely disabled, whenever sim.method.canTilt() is false —
            methodController.js's own focusables() selects `button` and filters on
            `!disabled && offsetParent !== null`, so a hidden button needs no separate focus-trap
-           handling. Shown only while the current Set is a Set-to-Set tilt's destination (today:
-           the both-planes tier's Set 3, ADR-093's turnDeg + ADR-099's methodArcEligible). Replays
-           idempotently — sim.method.playTilt() cancels a live tilt before starting a new one. -->
+           handling. Shown only while the current Set is a Set-to-Set ghost's destination — either
+           a TURN (both-planes Set 3, ADR-093's turnDeg + ADR-099's methodArcEligible) or a TILT
+           (ADR-110's methodStepIsXTilt). Label stays generic since which one applies varies by
+           Set; the specific motion is narrated by startMethodTilt's own announce() instead.
+           Replays idempotently — sim.method.playTilt() cancels a live tilt before starting a new
+           one. -->
       <button type="button" class="method-replay" id="method-replay-turn" hidden
-              title="Replay the turn" aria-label="Replay Set 2 turning into Set 3's position">↻</button>
+              title="Replay the motion" aria-label="Replay the Set-to-Set motion">↻</button>
     </div>
     <div class="method-view__stage">
       <canvas id="method-canvas" aria-label="Construction walkthrough: the problem's textbook construction drawn as successive Sets"></canvas>
