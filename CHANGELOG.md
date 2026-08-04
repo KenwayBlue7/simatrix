@@ -3,6 +3,9 @@
 All notable changes at the Simatrix project root (spanning Module1, Module2, and the
 topic deploy copies). Per-module changelogs live inside each module folder.
 
+## 2026-08-05
+- Merged: teammate's Projection of Straight Lines fixes from local branch `fix/traces-truelength-f1-f9` (never pushed to `origin` — audited first per ADR-039's gitlink-risk lesson, confirmed it was a real git repo sharing this repo's history, not an untracked drop). Brings in Art 10-8 Method II for the θ+φ=90° trace case, a True-Length no-op fix, drawn apparent angles (α/β), and a boundary floating-point tolerance fix. See `DECISIONS.md` ADR-110. Renumbered the same day's in-flight Show Method ADR from 110 to 111 to resolve the collision (both sides independently claimed ADR-110 at the same log position).
+
 ## 2026-08-04
 - Fixed: Module 2's Side view was folded down beside the Top view instead of beside the Front view — a faculty review caught that this violated standard first-angle convention (Side must share Front's height band, not Top's). Root cause: the Profile Plane's fold hinge was a world-space sibling of the VP fold pivot instead of nested inside it. Fixed the 3D fold, the 2D Compare sheet's projection formula, and the flat connector lines; two other codebases (Glass Box, Sections) inherited the same bug and are follow-up work. See `DECISIONS.md` ADR-106.
 - Changed: Show Method's (Module 2) "Watch the turn" control now animates directly on the drawing sheet instead of in a separate 3D pictorial inset — a faded copy of Set 2's own top view rotates+translates into Set 3's start position with the turn angle marked at the pivot, matching how the reference textbooks (John, Bhatt) actually draw this step; the two reference PDFs were read cover-to-cover on this transition before redesigning. See `DECISIONS.md` ADR-104 (supersedes ADR-101).
