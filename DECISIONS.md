@@ -1666,7 +1666,12 @@ Observer icon get their own `.visible` writes in `applyPlaneOpacity()`/`applyFol
 disposal traversal pulls CSS2D DOM nodes from the overlay per RULES.md §3.5 (`disposeObj` handles
 `isCSS2DObject`), since the auto-remove listener only fires for a directly-removed child, not a
 descendant of a cleared group.
-**Status:** Active (supersedes ADR-044's fold clause; ADR-044's PP placement stands)
+**Status:** Superseded by ADR-106 (2026-08-04 faculty review: "beside the top view" is wrong
+first-angle convention — Side must share the FRONT view's band, not the Top view's; ADR-044's
+original fold-placement reasoning was correct and this ADR's reversal of it was the regression).
+ADR-106 fixes Module 2 only; this topic (`graphics_module_1_topic_4_understanding_orthographic_views`)
+still carries the bug pending a follow-up session — its PP fold and `drawCompare()` port are
+UNCHANGED by ADR-106. ADR-044's PP placement (+X, viewing direction −X) is unaffected and stands.
 
 ---
 
@@ -1972,7 +1977,9 @@ ADR-052 live-auto-fit era and was never re-derived against ADR-053's world-origi
 **Verify:** via CDP, read the XY line's painted canvas Y (temp probe mirroring the `__dbg`
 pattern used in ADR-054/055's verification) before and after moving **Distance from HP** from 0
 to 50; assert byte-identical. Same check for X1-Y1's canvas X under **Distance from VP**.
-**Status:** Active
+**Status:** Active (amended by ADR-106 — X1-Y1's identity is the VP∩PP hinge, not HP∩PP, and its
+length now spans the Front+Side block, not Top+Side; its analytic position formula, `x1X = -z0`,
+and its slider-invariance proof are unchanged)
 
 ---
 
@@ -4742,6 +4749,178 @@ after `drawMethodSheet`, same paint ordering the inset used); module state `meth
 `stopMethodBeatAnim()`-first contract; it gains the `methodArcEligible(set)` guard.
 `METHOD_BEAT_COUNT` stays 14 — the ghost remains a motion cue, not a beat.
 **Status:** Active.
+
+---
+
+## ADR-105: Ghost turn — shortest-path rotation, and the trigger merges into Next; amends ADR-104's "methodController.js needed no changes" clause
+
+**Date:** 2026-08-04
+**Decision:** Two fixes to the ADR-104 ghost.
+
+**1. Shortest-path θ.** `drawMethodGhost` (`main.js`) measured the turn as a raw difference of two
+`atan2` calls: `Math.atan2(far3.y-pivot3.y, far3.x-pivot3.x) - Math.atan2(far2.y-pivot2.y,
+far2.x-pivot2.x)`. `atan2` itself returns `(-π, π]`, but a DIFFERENCE of two such values spans
+`(-2π, 2π)` and was never wrapped back down — when Set 2's and Set 3's drawn axis directions
+straddle the ±180° seam (one just under +180°, the other just over −180°), the raw difference
+reads as e.g. +330° for a turn that is really −30°, and the ghost visibly spins the long way
+round. Fixed with the same wrap idiom `strokeAngleArc` already applies to its own `diff` two
+screens up in the same file: `while (theta > Math.PI) theta -= 2*Math.PI; while (theta <= -Math.PI)
+theta += 2*Math.PI;`. This is provably correct here, not merely prettier: `turnDeg` is
+`plan.sequential.secondAngle`, sourced from the `rng-anglehp`/`rng-anglevp` sliders
+(`index.html`), range `[-90, 90]` — so `|true turn| ≤ 90° < 180°`, meaning the shortest-path wrap
+can never pick the wrong rotation, only stop picking the needlessly long one. `t=1` still lands on
+Set 3 exactly (`Rot(θ)` and `Rot(θ ± 2π)` are the same rotation), so ADR-104's landing proof is
+untouched.
+
+**2. Trigger merges into Next.** ADR-104 explicitly left the manual "Watch the turn" button and
+`methodController.js` untouched ("the manual, replayable 'Watch the turn' button is unchanged in
+contract; `index.html` and `methodController.js` needed no changes at all") — that sentence is now
+superseded. The turn is the payoff of the Set 2 → Set 3 transition, so it now plays automatically
+as part of the Next click that crosses that boundary, in `goNext` (`methodController.js`):
+`if (crossedSet && sim.method.canTilt()) sim.method.playTilt();`, called after `syncCaption()` so
+`startMethodTilt`'s own `announce()` ("Turning Set 2's top view N° into Set 3's position", then
+"Now at Set 3 — ‹label›" on completion) is the narration actually read out, not immediately
+overwritten by it. No engine change was needed to make the landing itself safe: Set 3's beat 0 has
+zero animation units (`methodBeatUnitCount`'s `default:` arm) and draws no view geometry, so
+`setMethodProgress`'s own `startMethodBeatAnim` call is already a no-op there — the ghost cannot
+collide with a beat reveal. `playTilt()`'s existing idempotent, self-gating, `stopMethodBeatAnim()`
+-first contract (ADR-104) needed no change either.
+
+Deliberately **not** wired into `goSkipSet` — Skip exists to cut click cost on the 15-beat/Set
+template (ADR-087 Decision 2); firing a 1.65s animation on the "get me past this" control fights
+its own purpose. `goBack` is likewise untouched, matching `setMethodProgress`'s pre-existing "only
+a genuine forward step animates in" rule.
+
+**Replay control.** The old `#method-tilt` pill is repurposed rather than deleted: renamed
+`#method-replay-turn`, moved out of `.method-bar` into a new `.method-corner` wrapper beside
+`#method-chips` (top-right, `index.html`), restyled from a full-width text pill to a small
+circular icon button (↻, `aria-label="Replay the turn"`) matching `.set-chip`'s own token
+language and 28px footprint. Its wiring is unchanged — same `sim.method.playTilt()` call,
+`renderProgress`'s same `hidden = !sim.method.canTilt()` gate, same idempotent-replay contract.
+Rejected the alternative of overloading the Set 3 chip's re-click to trigger replay: ADR-084
+Decision 7 ("chips only ever focus/zoom, never move the sequence") is easiest to keep intact by
+construction when the replay trigger is a different element entirely, not a second meaning
+layered onto a chip click; a chip-click-count-based exception would also be undiscoverable.
+`.method-corner` takes over `.set-chips`' old `position: absolute; top; right` so the replay
+button can be `chipRow`'s sibling rather than its child — `renderChips()` still does
+`chipRow.innerHTML = ''` on every `start()`, which would otherwise wipe a static button nested
+inside it.
+
+**`canTilt()` tightened.** It previously tested only `turnDeg != null`; `startMethodTilt` itself
+also requires `methodArcEligible(set)` (Set 3's true-shape view must genuinely be the top view —
+the same guard the rigid-2D-motion claim depends on). A Set could theoretically satisfy the first
+but not the second, showing/enabling a control `startMethodTilt` would then silently no-op. Folded
+`methodArcEligible` into `canTilt()` itself (`main.js`), so one predicate now backs the auto-play
+gate in `goNext`, the replay button's visibility, and the engine's own guard.
+
+**Alternatives rejected:**
+- **Derive θ from `turnDeg`'s own sign instead of wrapping the measured difference.** Rejected —
+  ADR-104 already rejected this once for the un-wrapped case (the `projectSheet` y-flip makes
+  declaring the sign from `turnDeg` the exact ported-sign trap `Module2/CLAUDE.md` warns about);
+  wrapping the MEASURED value preserves ADR-104's "measured, never declared" property while fixing
+  the range bug, rather than reopening a rejected approach.
+- **Block Next/disable input while the ghost plays.** Rejected — every other Show Method animation
+  (beat stroke-in, focus pan/zoom) is already interruptible by Next (`setMethodProgress`'s
+  `stopMethodBeatAnim()`), and special-casing the ghost to block input would be the one
+  inconsistent animation on the platform.
+- **Auto-play on `goSkipSet` too, since it also can cross into Set 3.** Rejected — see Decision
+  above; contradicts Skip's own click-cost-mitigation purpose (ADR-087 Decision 2).
+
+**Consequences:** `drawMethodGhost`'s `theta` computation (`main.js`) gains a wrap loop.
+`stopMethodBeatAnim` now also clears `methodGhost = null` (was previously left stale on a
+cancelled-mid-flight tilt; harmless since `drawMethodView` gates on `methodTiltActive`, but no
+longer left dangling). `sim.method.canTilt()` (`main.js`) now also checks `methodArcEligible`.
+`methodController.js`'s `goNext` gains one guarded `playTilt()` call; its local `tiltBtn` is
+renamed `replayBtn` (`#method-tilt` → `#method-replay-turn`). `index.html` gains `.method-corner`
+and `.method-replay`; `.set-chips` drops its own `position/top/right/z-index` (now inherited from
+the wrapper). `METHOD_BEAT_COUNT` (14) and the ghost's timing constants are unchanged.
+**Status:** Active. Amends ADR-104's Scope clause; ADR-104 itself stays Active.
+
+---
+
+## ADR-106: Module 2's Profile Plane folds INTO the VP about the VP∩PP line, not down onto the HP — the Side view lands beside the FRONT view, not the Top view
+
+**Date:** 2026-08-04
+**Decision:** A 2026-08-04 faculty review flagged that Module 2 — the platform's master/reference
+implementation for orthographic-view layout (`Module2/CLAUDE.md`) — laid the Side view out
+against the wrong anchor. Standard first-angle projection: **Front is the anchor**; Top sits
+directly below it (shared vertical projectors, same width band); **Side sits directly to the
+RIGHT of Front, at the same height** (shared horizontal projectors, same height band). Side has
+no direct projection relationship with Top. Module 2 instead folded the Profile Plane DOWN onto
+the HP (`PP_FOLD_TARGET = −π/2` about `ppHingeGroup`'s local X, the hinge a world-space SIBLING
+of `vpFoldGroup`), landing the Side view beside the **Top** view — a bottom-right "4th-quadrant"
+block sharing Top's row instead of Front's.
+
+Fixed in `Module2/` only (scope: this session; the clone, Glass Box, and Sections carry the same
+bug and are follow-up work — see Consequences):
+- `ppHingeGroup` is now **nested inside `vpFoldGroup`** (was a scene-level sibling), positioned at
+  local `(0, 0, z0)` — the VP∩PP line now lives IN the VP's own local frame, at the z0 slice.
+- `PP_FOLD_TARGET` flips to `+π/2`, applied about `ppHingeGroup`'s **local Y** (was local X). This
+  folds the PP sideways INTO the VP plane about the VP∩PP line; `vpFoldGroup`'s own existing
+  `+π/2`-about-Z fold then carries it down WITH the front view, same `foldProgress` driving both.
+- Full derivation (local PP point `(x,y,0)` → world): `R_y(+90°)` → `(0,y,−x)` → `+hinge(0,0,z0)`
+  → `(0,y,z0−x)` in `vpFoldGroup`'s frame → `vpFoldGroup`'s own `R_z(+90°)` → `(−y,0,z0−x)` in
+  world → answer-sheet camera `(sheetX,sheetY)=(−worldZ,−worldX)` → sheet `(x−z0, y)`. `sheetY=y`
+  is now **identical to the Front view's own `sheetVP.y=worldY`** (was `sheetY=−x`, identical to
+  Top's `sheetHP.y=−worldX`) — Side now shares Front's height band.
+- `projectionDrawer.js`'s flat-connector builder ties the folded Side point to the folded FRONT
+  point (`foldedFront = (-vertex.y, 0, vertex.z)`, `foldedSide = (-vertex.y, 0, z0-vertex.x)` —
+  both share world x, giving a horizontal projector), not to `projectHP(vertex)`.
+- `drawCompare()`'s X1-Y1 reference line is now identified as the VP∩PP hinge (was HP∩PP) and its
+  length spans the Front+Side block (`vpBox`), not Top+Side (`hpBox`) — see the ADR-056 amendment.
+  Its position formula, `x1X = −z0`, is numerically unchanged (the hinge's sheetX is the same
+  either way).
+- `Module2/src/stepper.js:49`'s Step-6 tutorial caption ("the side view beside the front") needed
+  **no change** — the copy was already correct; only the code contradicted it.
+
+**Why:** `Module2/CLAUDE.md` designates this module the design-system's master/reference
+implementation (echoed in the platform root `RULES.md`), so its layout bug propagated by
+citation rather than staying contained: ADR-049 explicitly ported Module 2's fold to
+`graphics_module_1_topic_4_understanding_orthographic_views` for "parity," **overturning that
+topic's own correct fold** (ADR-044, which had it right — Side right of Front — hours earlier the
+same day). The bug is deliberate-looking (`PP_FOLD_TARGET`'s own doc comment asserted the
+Top-relative placement as intended, "the 4th-quadrant layout"), not an oversight, so a straight
+faculty audit was needed to catch it. Root cause was almost certainly a literal Unity-prototype
+port that was never re-checked against first-angle convention — exactly the risk
+`Module2/CLAUDE.md`'s "re-derive every ported sign visually" rule exists to catch, and the rule
+was not applied to this fold's hinge axis/nesting when it was first written.
+**Alternatives rejected:**
+- **Keep the HP-fold hinge, fix only `drawCompare()`'s sheet formula.** Rejected — the 2D sheet
+  and the 3D pane's own live fold must show the SAME layout (`drawCompare`'s header comment: sheet
+  points are read "exactly where the 3D pane's own fold puts them"); patching only the 2D sheet
+  would silently diverge the two surfaces, the same anti-pattern ADR-044 explicitly rejected for
+  Glass Box ("mirror the 2D Compare sheet layout instead... papering over it").
+- **Keep `ppHingeGroup` a world-space sibling, fold it about a different axis to fake landing
+  beside Front.** Rejected — Front's own view MOVES (it's parented to `vpFoldGroup`, which
+  animates); a sibling pivot cannot track a moving target without duplicating `vpFoldGroup`'s
+  rotation by hand every frame. Nesting is the only construction where "ride the VP fold down" is
+  automatic and stays correct through the fold animation, not just at `foldProgress=1`.
+**Consequences:** `Module2/src/projectionDrawer.js`'s `visibleInPP`/`projectPP`/`options.z0`
+doc comments updated to name the VP∩PP hinge; the `worldNormal.z > 0` visibility test itself is
+UNCHANGED (observer direction is independent of the fold). `answerSheetBox()`'s Z-range formula
+updates from `z0 − y` to `z0 − x`. `positionRefLabels()` places `sideViewLabel` in the Front
+caption's X-band instead of the Top caption's. `simAPI.reset()`'s `ppHingeGroup.rotation` reset
+moves from `.x` to `.y`. Verified live (PHP dev server, foreground Chrome tab — MCP tabs run
+`document.hidden=false` here so no rAF-pump workaround was needed): Compare 2D sheet shows Side
+right of Front at matching height with nothing beside Top; the 3D pane's flattened answer-sheet
+view shows the same; dragging **Distance from HP** moves Front+Side together with Top fixed;
+dragging **Distance from VP** moves Top down and Side right with Front fixed; cycling shapes
+(cube/pyramid/cylinder/prism ×5) produced no console errors. **Known pre-existing, unrelated
+issue found during verification and left untouched (out of scope):** `positionRefLabels`'s shared
+`M = 2.0` world-unit caption overshoot is disproportionately large relative to a small solid's
+own bounding box (e.g. a 20mm-base pyramid is ~2 world units per `WORLD_TO_MM=10`), which pushes
+the "Top View"/"Front View" captions (not "Side View," whose overshoot direction happens to stay
+on-canvas) far outside the Compare sheet's auto-fit frame for small solids. Pre-dates this ADR;
+worth its own ticket.
+**Follow-up (separate sessions, not fixed here):** `graphics_module_2_topic_2_simple_positions`
+(Module 2 clone — `main.js`/`src/stepper.js`/`src/projectionDrawer.js` carry byte-identical
+copies of the pre-fix code), `graphics_module_1_topic_4_understanding_orthographic_views` (Glass
+Box — see the ADR-049 Status amendment above), and `graphics_module_3_topic_1_sections_of_solids`
+(`src/projectionDrawer.js` ported the same Top-relative connector logic; this module has no 2D
+Compare sheet of its own, so only its live-3D projector geometry is affected).
+**Status:** Active. Supersedes ADR-049's fold clause for Module 2 (ADR-049 itself, scoped to
+Glass Box, is separately marked Superseded above pending that topic's own fix). Amends ADR-056
+(X1-Y1 identity/length only; its position formula is unchanged).
 
 ---
 

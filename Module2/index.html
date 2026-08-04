@@ -611,19 +611,27 @@
       box-shadow: var(--shadow-md); /* transient floating surface (Flat-Ink exception) */
     }
 
-    /* ---- Set-N focus chips — floating group, top-right, mirroring .quick-views' pill group
-       (same token language, same segmented-pill shape) but for Set-1/2/3 focus rather than
-       Top/Front/Side. "Set" not "Stage" in every class/attr name here: .compare-card__stage
-       (the Compare sheet's own canvas area) already owns that word (ADR-084 naming note,
-       still true post-ADR-085). A direct child of #method-view in the markup (position:fixed,
-       inset:0), NOT .method-view__stage — its containing block is the whole takeover, so
-       top/right stay a flush ~8px corner inset regardless of .method-title's height above the
-       stage (ADR-098 addendum). */
-    .set-chips {
+    /* ---- Set-N focus chips + the ADR-105 turn-replay control — floating group, top-right,
+       mirroring .quick-views' pill group (same token language, same segmented-pill shape) but
+       for Set-1/2/3 focus rather than Top/Front/Side. "Set" not "Stage" in every class/attr name
+       here: .compare-card__stage (the Compare sheet's own canvas area) already owns that word
+       (ADR-084 naming note, still true post-ADR-085). A direct child of #method-view in the
+       markup (position:fixed, inset:0), NOT .method-view__stage — its containing block is the
+       whole takeover, so top/right stay a flush ~8px corner inset regardless of .method-title's
+       height above the stage (ADR-098 addendum). ADR-105 moved the absolute positioning here,
+       one level up from .set-chips itself, so the replay button can sit as its own sibling
+       pill immediately next to the chip row without being wiped by renderChips()'s
+       `chipRow.innerHTML = ''` rebuild. */
+    .method-corner {
       position: absolute;
       top: var(--space-2);
       right: var(--space-2);
       z-index: 1;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .set-chips {
       display: inline-flex;
       gap: 2px;
       padding: 3px;
@@ -650,6 +658,31 @@
     .set-chip:focus-visible { outline: none; box-shadow: var(--ring-focus); }
     .set-chip:disabled { opacity: 0.4; cursor: not-allowed; }
     .set-chip.is-active { background: var(--color-accent); color: var(--color-paper); }
+
+    /* ADR-105 — small circular icon twin of .set-chip (same 28px footprint, same token
+       language) for the turn-replay control: a deliberate, explicit exception to "chips only
+       focus/zoom" (ADR-084 Decision 7) rather than an overload of chip-click behaviour, so it is
+       its own pill, not a chip. */
+    .method-replay {
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      font-size: var(--text-md);
+      line-height: 1;
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard);
+    }
+    .method-replay:hover { color: var(--color-ink); }
+    .method-replay:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .method-replay[hidden] { display: none; }
 
     /* Narrow iframe: stack the bar's buttons instead of letting them overflow. Width now lives
        on .method-controls (ADR-094's outer wrapper) — .method-bar is no longer itself
@@ -2169,11 +2202,25 @@
          this is not a second live region. -->
     <div id="method-caption" class="method-title" aria-hidden="true"></div>
     <!-- Direct child of #method-view (position:fixed, inset:0), not .method-view__stage — the
-         stage now starts BELOW .method-title, so anchoring here instead keeps this pill flush
+         stage now starts BELOW .method-title, so anchoring here instead keeps this row flush
          with the view's actual top-right corner regardless of the title row's height, matching
          the platform's normal ~8px corner-inset spacing rather than inheriting the stage's own
-         lower top edge as extra empty space above it. -->
-    <div id="method-chips" class="set-chips" role="group" aria-label="Focus a Set" hidden></div>
+         lower top edge as extra empty space above it. ADR-105: now also carries the turn-replay
+         control (moved off .method-bar — the turn itself auto-plays on the Next click that
+         crosses Set 2 -> Set 3, so this is a replay affordance, not the primary trigger),
+         positioned right after the chips so it sits next to Set 3's own chip — the LAST chip,
+         since .set-chips is a plain left-to-right row and this whole group is right-anchored. -->
+    <div class="method-corner">
+      <div id="method-chips" class="set-chips" role="group" aria-label="Focus a Set" hidden></div>
+      <!-- Hidden, not merely disabled, whenever sim.method.canTilt() is false —
+           methodController.js's own focusables() selects `button` and filters on
+           `!disabled && offsetParent !== null`, so a hidden button needs no separate focus-trap
+           handling. Shown only while the current Set is a Set-to-Set tilt's destination (today:
+           the both-planes tier's Set 3, ADR-093's turnDeg + ADR-099's methodArcEligible). Replays
+           idempotently — sim.method.playTilt() cancels a live tilt before starting a new one. -->
+      <button type="button" class="method-replay" id="method-replay-turn" hidden
+              title="Replay the turn" aria-label="Replay Set 2 turning into Set 3's position">↻</button>
+    </div>
     <div class="method-view__stage">
       <canvas id="method-canvas" aria-label="Construction walkthrough: the problem's textbook construction drawn as successive Sets"></canvas>
       <div class="method-controls">
@@ -2184,14 +2231,9 @@
                the NEXT Set's first beat only, never the whole method. Hidden entirely once the
                walkthrough is on its last Set — there is no Set left to skip to
                (methodController.js renderProgress; ADR-094 made the code actually match this
-               comment, which the disabled-only original never did). -->
-          <!-- Set-to-Set tilt (amends ADR-085's no-tween clause — see DECISIONS.md). Hidden, not
-               merely disabled, whenever sim.method.canTilt() is false — methodController.js's own
-               focusables() selects `button` and filters on `!disabled && offsetParent !== null`,
-               so a hidden button needs no separate focus-trap handling. Shown only while the
-               current Set is a Set-to-Set tilt's destination (today: the both-planes tier's
-               Set 3, ADR-093's turnDeg). -->
-          <button type="button" class="btn btn--small" id="method-tilt" hidden>Watch the turn</button>
+               comment, which the disabled-only original never did). ADR-105: does NOT auto-play
+               the Set 2 -> Set 3 turn even when it skips into Set 3 — Skip exists to cut click
+               cost, playing a 1.65s animation there fights that. -->
           <button type="button" class="btn btn--small" id="method-skip-set">Skip to next Set</button>
           <button type="button" class="btn btn--small" id="method-exit">Exit method</button>
         </div>
@@ -2482,7 +2524,7 @@
             <svg class="hint__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             <span>The planes hinge along the
               <button type="button" class="term" aria-describedby="def-ground">ground line<span class="term__pop" role="tooltip" id="def-ground">The line where the HP and VP meet. The planes fold open along it to bring every view onto one flat sheet.</span></button>
-              where they meet, so the front view ends up directly across from the top view, with the side view beside it: the standard sheet layout.</span>
+              where they meet, so the front view ends up directly across from the top view, with the side view beside the front view: the standard sheet layout.</span>
           </p>
           <button id="btn-flatten" class="btn btn--primary btn--block" type="button">Flatten to 2D</button>
           <button id="btn-unfold" class="btn btn--block" type="button" hidden>Unfold to 3D</button>

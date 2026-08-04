@@ -5,8 +5,8 @@
     "semantic_hash": ""
   },
   "main.js": {
-    "mtime": 1785827397.401946,
-    "ast_hash": "8b890f614a498a114b72cd1eb3ccced2",
+    "mtime": 1784189098.2649112,
+    "ast_hash": "02d7a08e6210840d04e6a8383c6a5aa4",
     "semantic_hash": ""
   },
   "meta.json": {
@@ -70,13 +70,13 @@
     "semantic_hash": ""
   },
   "src/problems.js": {
-    "mtime": 1785395890.8424866,
-    "ast_hash": "2c6558d3135d50bea9bf77096b5d674a",
+    "mtime": 1781211204.9709327,
+    "ast_hash": "32d6bee54c0b69da04c40f97fcb454af",
     "semantic_hash": ""
   },
   "src/projectionDrawer.js": {
-    "mtime": 1785827348.8332524,
-    "ast_hash": "21b96a948f0e6e1cb328faada7f51574",
+    "mtime": 1784087336.3766434,
+    "ast_hash": "8f50288ad758e6fc7234b479f383ce7b",
     "semantic_hash": ""
   },
   "src/shapeData.js": {
@@ -85,8 +85,8 @@
     "semantic_hash": ""
   },
   "src/stepper.js": {
-    "mtime": 1785488386.8909826,
-    "ast_hash": "6977684b75cf5d3b8c7e8a8e4d990095",
+    "mtime": 1783783301.9449956,
+    "ast_hash": "1fc44fa8c3e9d214090b82b08bef43b1",
     "semantic_hash": ""
   },
   "src/terms.js": {
@@ -100,8 +100,8 @@
     "semantic_hash": ""
   },
   "src/vertexLabeler.js": {
-    "mtime": 1785603548.9199266,
-    "ast_hash": "2f2a09e8fc4d6367846a29e53994b146",
+    "mtime": 1783762407.2236924,
+    "ast_hash": "570f8814ef9fb1e7de1136f468f6144f",
     "semantic_hash": ""
   },
   ".impeccable/critique/2026-05-29T05-17-54Z__index-html.md": {
@@ -125,8 +125,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1785828428.3601453,
-    "ast_hash": "c42481d98db1969b42ac0140a7a64faa",
+    "mtime": 1784188310.731389,
+    "ast_hash": "93880062abc3ea5b700daf1e7d208f07",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -135,18 +135,13 @@
     "semantic_hash": ""
   },
   "DESIGN.md": {
-    "mtime": 1785395890.829448,
-    "ast_hash": "77f855802eb52a22a331d19be3c0a1e9",
+    "mtime": 1781513857.7541535,
+    "ast_hash": "ce9d015bad1f0506cb4dc32d21df0d4f",
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1785827369.010685,
-    "ast_hash": "e3f3f5fe06e8c4c6acc5e341f379a623",
-    "semantic_hash": ""
-  },
-  "src/methodController.js": {
-    "mtime": 1785813359.478364,
-    "ast_hash": "523c8e1a17d20bb33a5a55f76d8a277b",
+    "mtime": 1784184962.8313055,
+    "ast_hash": "e0ffc9e12a0587fac58a2e0abdc7bb88",
     "semantic_hash": ""
   }
 }

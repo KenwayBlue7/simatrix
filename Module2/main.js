@@ -228,12 +228,13 @@ let vpGrid;
 let ppGrid;
 
 /**
- * Hinge for the profile plane's flatten fold (Step 6). Parented to the SCENE (world
- * space — a sibling of vpFoldGroup, NOT nested in it) and translated onto the HP∩PP
- * line at the PP standoff (position (0, 0, z0), z0 set per rebuild from the solid's
- * depth). Rotating it about its LOCAL X by PP_FOLD_TARGET (−90°) folds the profile
- * plane down onto the HP, landing the side view beside the TOP view at (x, 0, z0 − y).
- * Holds the PP grid, the PP label, and — once drawn — the PP projection subgroup.
+ * Hinge for the profile plane's flatten fold (Step 6). Parented INSIDE vpFoldGroup
+ * (ADR-106 — NOT the scene) and translated onto the VP∩PP line at the PP standoff
+ * (local position (0, 0, z0), z0 set per rebuild from the solid's depth). Rotating it
+ * about its LOCAL Y by PP_FOLD_TARGET (+90°) folds the profile plane sideways into the
+ * VP plane; vpFoldGroup's own fold then carries it down with the front view, landing
+ * the side view beside the FRONT view at (−y, 0, z0 − x). Holds the PP grid, the PP
+ * label, and — once drawn — the PP projection subgroup.
  */
 let ppHingeGroup;
 
@@ -304,14 +305,18 @@ let solidAppearing = false;
  *  the standard unfolded layout. Sign re-derived visually (CLAUDE.md). */
 const FOLD_TARGET = Math.PI / 2;
 
-/** PP fold angle at foldProgress = 1, applied to ppHingeGroup's LOCAL X in WORLD space
- *  (the hinge group is parented to the scene, NOT inside vpFoldGroup). −90° about X folds
- *  the profile plane DOWN onto the HP about the HP∩PP line (the world X-axis at z = z0),
- *  carrying its local point (x, y, 0) to (x, 0, z0 − y) — beside the TOP view, sharing the
- *  top view's X band (the 4th-quadrant layout). Independent of the VP fold. Sign pairs with
- *  visibleInPP's `worldNormal.z > 0`; re-derive visually (square pyramid apex must point
- *  consistently with the top view — flip to +Math.PI/2 if mirrored) (CLAUDE.md). */
-const PP_FOLD_TARGET = -Math.PI / 2;
+/** PP fold angle at foldProgress = 1, applied to ppHingeGroup's LOCAL Y (the hinge group is
+ *  now parented INSIDE vpFoldGroup, not the scene — see buildScene). +90° about Y folds the
+ *  profile plane sideways into the VP plane about the VP∩PP line (world x = 0 at z = z0),
+ *  carrying its local point (x, y, 0) to (0, y, z0 − x) in vpFoldGroup's frame. vpFoldGroup's
+ *  OWN +90°-about-Z fold (FOLD_TARGET, same progress p) then carries that on into the world,
+ *  landing the side view beside the FRONT view: (0, y, z0−x) → (−y, 0, z0−x) — sheetY = y,
+ *  identical to the front view's own sheetY (sheetVP.y = worldY), so Side shares Front's
+ *  height band (ADR-106; supersedes the old HP∩PP-hinge fold that shared Top's band).
+ *  Sign pairs with visibleInPP's `worldNormal.z > 0` (observer direction is unchanged by
+ *  the fold); re-derive visually (square pyramid apex must point consistently with the
+ *  front view — flip to −Math.PI/2 if mirrored) (CLAUDE.md). */
+const PP_FOLD_TARGET = Math.PI / 2;
 
 /** Gap between the solid's nearest face and the profile plane (the side "wall of the
  *  box"), mirroring the HP/VP standoffs so the side view never slices the solid. The
@@ -942,8 +947,8 @@ function rebuild(shapeData) {
 
   // Seat the profile plane just clear of the solid's nearest face (−Z side), so the
   // side view casts onto the "side wall of the box" without slicing it. The PP hinge
-  // axis is the HP∩PP line at this z0; projectPP draws the side view at the hinge's
-  // local z=0, so this Z position is the plane's whole standoff (mirrors HP/VP gaps).
+  // axis is the VP∩PP line at this z0 (ADR-106); projectPP draws the side view at the
+  // hinge's local z=0, so this Z position is the plane's whole standoff (mirrors HP/VP gaps).
   {
     const box = new THREE.Box3().setFromObject(mesh);
     ppHingeGroup.position.z = box.min.z - PP_MARGIN;
@@ -1035,14 +1040,15 @@ function refreshProjections() {
   // its own, but matrixWorld is used here anyway so this stays correct if that ever changes).
   const worldAxis = new THREE.Vector3(0, 1, 0).transformDirection(currentMesh.matrixWorld);
   // Pass the seated PP standoff (set in rebuild before this runs) so the flat
-  // connectors can land the side-view projectors at z0 − y in the folded layout.
+  // connectors can land the side-view projectors at z0 − x in the folded layout (ADR-106).
   activeProjection = drawProjections(edgeMap, {
     width, height, z0: ppHingeGroup.position.z, axis: worldAxis,
   });
 
   // HP top view + connectors render in world space; the VP front view hinges on
   // the ground line, so move it under the VP fold pivot. The PP side view hinges on the
-  // HP∩PP line (a separate world-space pivot), so move it under the PP hinge group.
+  // VP∩PP line (ADR-106 — ppHingeGroup is nested inside vpFoldGroup), so move it under
+  // the PP hinge group, which rides the VP fold down with the front view.
   shapeGroup.add(activeProjection.group);
   vpFoldGroup.add(activeProjection.vpGroup);
   ppHingeGroup.add(activeProjection.ppGroup);
@@ -1083,11 +1089,12 @@ function refreshProjections() {
 function applyFoldVisual(p) {
   foldProgress = p;
   if (vpFoldGroup) vpFoldGroup.rotation.z = FOLD_TARGET * p;
-  // Independent second fold (world space, NOT nested in vpFoldGroup): swing the profile
-  // plane DOWN onto the HP about the HP∩PP line (local X at z0), landing the side view
-  // beside the TOP view at (x, 0, z0 − y). Same progress p drives both folds so they
-  // complete together.
-  if (ppHingeGroup) ppHingeGroup.rotation.x = PP_FOLD_TARGET * p;
+  // Composed fold (ADR-106): ppHingeGroup is nested INSIDE vpFoldGroup, so this local-Y
+  // rotation folds the profile plane sideways into the VP plane about the VP∩PP line, and
+  // then rides vpFoldGroup's own Z rotation down with the front view — landing the side
+  // view beside the FRONT view at (−y, 0, z0 − x). Same progress p drives both folds so
+  // they complete together.
+  if (ppHingeGroup) ppHingeGroup.rotation.y = PP_FOLD_TARGET * p;
 
   const solidOpacity = 1 - p; // linear fold progress — drives the connector cross-fade timing
 
@@ -1764,8 +1771,8 @@ function setFlatView(kind) {
  * World box of the FINAL flattened layout (all three views in the Y=0 floor), derived
  * analytically from the solid's box + the PP standoff so it's correct from the instant the
  * fold starts (no need to wait for the animation). Mappings (see projectionDrawer /
- * applyFoldVisual): top view (x,0,z); folded front view (−y,0,z); folded side view
- * (x,0,z0−y). The union spans those X/Z ranges; Y is flat.
+ * applyFoldVisual, ADR-106): top view (x,0,z); folded front view (−y,0,z); folded side view
+ * (−y,0,z0−x). The union spans those X/Z ranges; Y is flat.
  * @returns {THREE.Box3}
  */
 function answerSheetBox() {
@@ -1773,12 +1780,12 @@ function answerSheetBox() {
   const { min, max } = solid;
   const z0 = ppHingeGroup.position.z;
   const M = 2.0; // match positionRefLabels overshoot so captions stay framed
-  // X: top view (x) + front view (−y); the side view's X is the solid's x, already covered.
+  // X: top view (x) + front view AND side view (both −y — they share the X band, ADR-106).
   // +M / −M push the boundaries out to the top + front caption edges.
   const xs = [min.x, max.x + M, -max.y - M, -min.y];
-  // Z: top/front view (z) + side view (z0 − y, beside the top view on the −Z side).
+  // Z: top/front view (z) + side view (z0 − x, beside the FRONT view on the −Z side).
   // −M extends the −Z boundary out to the side-view caption (see positionRefLabels).
-  const zs = [min.z, max.z, z0 - max.y - M, z0 - min.y];
+  const zs = [min.z, max.z, z0 - max.x - M, z0 - min.x];
   return new THREE.Box3(
     new THREE.Vector3(Math.min(...xs), -0.01, Math.min(...zs)),
     new THREE.Vector3(Math.max(...xs), 0.01, Math.max(...zs)),
@@ -1970,16 +1977,18 @@ function positionRefLabels(box) {
   // world Z reads across it. The three views land (see answerSheetBox / projectionDrawer):
   //   • Top view   at +X, spanning the solid's X/Z extents.
   //   • Front view at −Y (negative X on the floor) → ABOVE the top view on screen.
-  //   • Side view  beside the TOP view at Z = z0 − y (shares the top view's X band, −Z side).
+  //   • Side view  beside the FRONT view at Z = z0 − x (shares the front view's X band —
+  //     screen-vertical — so Side lands at the SAME on-screen height as Front; ADR-106,
+  //     supersedes the old HP∩PP-hinge fold that shared the top view's band instead).
   // Caption each just clear of its view: top view below it (+X), front above (−X), side
-  // beside the top view further along −Z.
+  // beside the front view further along −Z.
   if (!topViewLabel) return;
   const groundCz = (box.min.z + box.max.z) / 2; // shared top/front horizontal centre
   topViewLabel.position.set(box.max.x + M, 0, groundCz);
   frontViewLabel.position.set(-box.max.y - M, 0, groundCz);
-  const sideCx = (box.min.x + box.max.x) / 2;     // share the top view's X band
-  const sideEdgeZ = z0 - box.max.y;                // side view's −Z (screen-left) edge
-  sideViewLabel.position.set(sideCx, 0, sideEdgeZ - M); // M past the edge, not the centre
+  const frontCx = -(box.min.y + box.max.y) / 2;   // share the front view's X band (on-screen height)
+  const sideEdgeZ = z0 - box.max.x;                // side view's −Z (screen-left) edge
+  sideViewLabel.position.set(frontCx, 0, sideEdgeZ - M); // M past the edge, not the centre
 }
 
 function buildScene(container) {
@@ -2050,32 +2059,35 @@ function buildScene(container) {
 
   // Profile plane (PP, side view). Normal +Z, so it lies in the XY plane: a GridHelper
   // defaults to XZ (normal Y), so tip it 90° about X to stand it in XY (upright). It is
-  // parented under ppHingeGroup, which is a sibling fold pivot in WORLD space (NOT nested
-  // in vpFoldGroup). Folding ppHingeGroup −90° about its local X swings the profile plane
-  // DOWN onto the HP about the HP∩PP line, laying the grid flat (XZ) beside the top view.
-  // The hinge's Z position (the PP standoff z0) is set per-rebuild from the solid's depth;
-  // default here keeps the empty-scene grid clear of the origin.
+  // parented under ppHingeGroup, which is NESTED INSIDE vpFoldGroup (ADR-106 — was a
+  // sibling fold pivot in world space; that landed the side view beside the TOP view,
+  // which is wrong). Folding ppHingeGroup +90° about its local Y swings the profile plane
+  // SIDEWAYS into the VP plane about the VP∩PP line; vpFoldGroup's own fold then carries
+  // it down WITH the front view, laying the grid flat beside the front view. The hinge's
+  // Z position (the PP standoff z0) is set per-rebuild from the solid's depth; default
+  // here keeps the empty-scene grid clear of the origin.
   ppGrid = new THREE.GridHelper(40, 40, cssVar('--color-bench-grey'), cssVar('--color-border'));
   ppGrid.material.opacity = 0.35;
   ppGrid.material.transparent = true;
   ppGrid.rotation.x = Math.PI / 2;
 
   ppHingeGroup = new THREE.Group();
-  ppHingeGroup.position.z = DEFAULT_PP_STANDOFF; // origin on the HP∩PP line (0, 0, z0)
+  ppHingeGroup.position.z = DEFAULT_PP_STANDOFF; // origin on the VP∩PP line (0, 0, z0) in vpFoldGroup's frame
   // The profile plane is the LAST plane introduced (Step 5), so it stays hidden
   // through the empty start and Steps 1–4 to keep the viewport uncluttered while the
   // learner works the HP/VP top + front views. setSideViewVisible reveals it.
   ppHingeGroup.visible = false;
   ppHingeGroup.add(ppGrid);
-  scene.add(ppHingeGroup);
+  vpFoldGroup.add(ppHingeGroup); // ADR-106 — nested so the PP fold rides the VP fold down
 
   // PP pill. Parented under the hinge so it rides the fold and stays labelled on the
   // flattened sheet, beside the folded side view (same rationale as the VP label riding
-  // vpFoldGroup). The hinge sits at world z = DEFAULT_PP_STANDOFF (-3, reset per-rebuild
-  // to box.min.z - PP_MARGIN), so local (4, 4, 0) resolves to world (4, 4, -3) — tight
-  // enough to sit inside the default camera frame (~±4 units) without a zoom-out, and
-  // still clear of the HP/VP pills. Local z stays 0 so the -90°-about-X fold still lands
-  // it flat on the floor beside the folded side view.
+  // vpFoldGroup). Pre-fold (upright), vpFoldGroup carries no translation, so this local
+  // (4, 4, 0) reads as world (4, 4, DEFAULT_PP_STANDOFF) — tight enough to sit inside the
+  // default camera frame (~±4 units) without a zoom-out, and still clear of the HP/VP
+  // pills. ADR-106: the +90°-about-Y PP fold now composes with vpFoldGroup's own fold, so
+  // this pill lands beside the folded SIDE view wherever that settles beside the front
+  // view — re-verify it doesn't collide with the side-view linework after the fold change.
   ppPlaneLabel = makePlaneLabel('PP', 'pp');
   ppPlaneLabel.position.set(4, 4, 0);
   ppPlaneLabel.visible = false; // hidden with the profile plane until Step 5 (see ppPlaneLabel decl)
@@ -2679,6 +2691,8 @@ function stopMethodBeatAnim() {
   methodTiltHandle?.cancel();
   methodTiltHandle = null;
   methodTiltActive = false;
+  methodGhost = null; // ADR-105: a cancelled-mid-flight tilt left this populated (harmless, since
+                       // drawMethodView gates on methodTiltActive, but stale state worth clearing)
   stopMethodFocusAnim(true);
   if (methodAnimRafId !== null) {
     cancelAnimationFrame(methodAnimRafId);
@@ -4228,9 +4242,10 @@ const compare = {
  * dashed, per view) LineSegments2 geometry the 3D scene itself draws with
  * (activeProjection's hp/vp/pp groups — projectionDrawer.js's classifyEdge/visibleInHP/
  * VP/PP, untouched here), then applies the SAME analytic fold this sim's own Step-6 uses
- * (vpFoldGroup's +90° about Z: (x,y,z)→(−y,x,z); ppHingeGroup's −90° about local X at its
- * z0 hinge: (x,y,z)→(x,z,−y)) so the folded points land exactly where the 3D pane's own
- * fold puts them.
+ * (vpFoldGroup's +90° about Z: (x,y,z)→(−y,x,z); ppHingeGroup's +90° about local Y at its
+ * z0 hinge, NESTED inside vpFoldGroup so its fold composes with the VP fold — ADR-106:
+ * (x,y,z)→(0,y,z0−x) in vpFoldGroup's frame →(−y,0,z0−x) in world) so the folded points
+ * land exactly where the 3D pane's own fold puts them.
  *
  * ADR-052 (answer-sheet projection, replaces the old same-axis toCanvas): those folded
  * WORLD points are then run through the answer-sheet camera's OWN top-down projection —
@@ -4239,10 +4254,11 @@ const compare = {
  * camera's screen-right basis vector is cross(forward, up) = cross((0,−1,0),(−1,0,0)) =
  * (0,0,−1), i.e. screenX ∝ −worldZ, and screen-up ∝ −worldX (matching "up = −X" — see
  * QUICK_VIEWS/FLAT_VIEW_UP comments). So sheet-space is (sheetX, sheetY) = (−worldZ,
- * −worldX) — front view above top view, side view to the RIGHT of top view — verified
- * pixel-for-pixel against the 3D pane's own rendered flatten (Step 6, first-angle
- * layout). The prior mapping used (worldX, worldZ) directly (no camera projection at
- * all), which produced a 90°-rotated, mirrored sheet (front left of top, side below).
+ * −worldX) — front view above top view, side view to the RIGHT of the FRONT view
+ * (ADR-106) — verified pixel-for-pixel against the 3D pane's own rendered flatten
+ * (Step 6, first-angle layout). The prior mapping used (worldX, worldZ) directly (no
+ * camera projection at all), which produced a 90°-rotated, mirrored sheet (front left
+ * of top, side below).
  *
  * Also replicates the BIS Type-B dimension layer (ADR-041 — dimension/extension lines,
  * filled 3:1 arrowhead triangles, numeric CSS2D labels living in activeProjection's
@@ -4331,8 +4347,16 @@ function drawMethodGhost(ctx, w, h) {
   const far2px = flatten2(axis2[fIdx], axis2[fIdx + 1], axis2[fIdx + 2]);
   const pivot3px = flatten3(axis3[vIdx], axis3[vIdx + 1], axis3[vIdx + 2]);
   const far3px = flatten3(axis3[fIdx], axis3[fIdx + 1], axis3[fIdx + 2]);
-  const theta = Math.atan2(far3px.y - pivot3px.y, far3px.x - pivot3px.x)
-              - Math.atan2(far2px.y - pivot2px.y, far2px.x - pivot2px.x);
+  let theta = Math.atan2(far3px.y - pivot3px.y, far3px.x - pivot3px.x)
+            - Math.atan2(far2px.y - pivot2px.y, far2px.x - pivot2px.x);
+  // ADR-105: atan2's own range is (-pi, pi], so this DIFFERENCE spans (-2pi, 2pi) unwrapped —
+  // near the +/-180 deg seam the raw value can read as e.g. +330 deg for a true -30 deg turn.
+  // Wrapping to (-pi, pi] is provably the shortest path AND the correct one here: turnDeg is a
+  // rng-anglehp/rng-anglevp slider value in [-90, 90] (index.html), so |true turn| <= 90 deg is
+  // always well inside the wrap's own +/-180 deg range — same idiom strokeAngleArc already uses
+  // for its own `diff` (this file, above).
+  while (theta > Math.PI) theta -= 2 * Math.PI;
+  while (theta <= -Math.PI) theta += 2 * Math.PI;
 
   const t = methodTiltMotionT;
   const cosT = Math.cos(theta * t), sinT = Math.sin(theta * t);
@@ -4400,7 +4424,11 @@ function drawCompare() {
   // exists, then draw it (pass 2) once `project` is known.
   const sheetHP = (x, _y, z) => ({ x: -z, y: -x });          // top view: HP never folds
   const sheetVP = (_x, y, z) => ({ x: -z, y });               // front view: (x,y,z)→(−y,x,z)
-  const sheetPP = (x, y, _z) => ({ x: y - z0, y: -x });        // side view: (x,y,z)→(x,z,z0−y)
+  // Side view (ADR-106): the PP fold now composes with the VP fold — local (x,y,0) →
+  // R_y(+90°) → (0,y,−x) → +hinge(0,0,z0) → (0,y,z0−x) [vpFoldGroup frame] → R_z(+90°) →
+  // (−y,0,z0−x) [world] → camera (sheetX=−worldZ, sheetY=−worldX) = (x−z0, y). sheetY=y
+  // matches sheetVP's own y exactly, so Side shares Front's row (was sheetY=−x, Top's row).
+  const sheetPP = (x, y, _z) => ({ x: x - z0, y });
   // Captions store their ALREADY-POST-FOLD world position (positionRefLabels), so they
   // only need the camera projection, not a fold.
   const sheetCaption = (px, _py, pz) => ({ x: -pz, y: -px });
@@ -4491,8 +4519,8 @@ function drawCompare() {
 
   // ADR-054 (refines ADR-053's anchor clause; scale above is unchanged): pinning sheet-space
   // (0,0) to the canvas centre left the drawing lopsided — Front/Top (sheetHP.x=sheetVP.x=-z)
-  // sit centred near sheetX=0, but the Side block (sheetPP.x=y-z0) sits a further E+GAP to the
-  // RIGHT of that, so the nominal layout's own centre is NOT world-origin — it's offset exactly
+  // sit centred near sheetX=0, but the Side block (sheetPP.x=x-z0, ADR-106) sits a further
+  // E+GAP to the RIGHT of that, so the nominal layout's own centre is NOT world-origin — it's offset exactly
   // (E+GAP)/2 to the right (0 with no side view). Anchoring there instead of at (0,0) balances
   // the left/right margins. Derived ONLY from E/GAP/showSideViewFlag — same distance/angle
   // -independent inputs as `scale` itself, so this is still an intrinsic-size constant, never
@@ -4524,18 +4552,18 @@ function drawCompare() {
   // ---- Orthographic ground-line reference marks (XY / X1-Y1) — a thin dashed underlay
   // drawn BEFORE the view linework below so the actual outlines paint on top of it, matching
   // standard BIS sheet convention (a light construction line, not part of the drawing itself).
-  // XY is the HP∩VP ground line (Front folds down to meet Top); X1-Y1 is the HP∩PP hinge
-  // (Top+Front meet the Side view). ADR-056 (supersedes the 2026-07-16 visual-gap-midpoint
-  // placement): each line is PINNED to its analytic hinge coordinate — sheetY=0 for XY,
-  // sheetX=−z0 for X1-Y1 (see the sheetHP/sheetVP/sheetPP header derivation) — never a live
-  // bbox midpoint, because the Front view's sheetY (=worldY) and the Side view's sheetX
-  // (=worldY−z0) both move under the distHP slider (seatOnPlanes), which dragged the old
-  // midpoint along with the geometry instead of leaving it as a fixed hinge. hpBox/vpBox/ppBox
-  // are read ONLY to size each line's LENGTH along its own perpendicular axis (sheetX for XY,
-  // sheetY for X1-Y1) — both of those axes are distance-slider-invariant (sheetHP.x=sheetVP.x=
-  // −worldZ; sheetHP.y=−worldX), so the length can safely track the drawing without the
-  // position drifting. Skipped entirely once nothing is drawable (guarded by the early return
-  // above).
+  // XY is the HP∩VP ground line (Front folds down to meet Top); X1-Y1 is the VP∩PP hinge
+  // (ADR-106 — Front+Side meet the Side view, not Top+Side). ADR-056 (supersedes the
+  // 2026-07-16 visual-gap-midpoint placement): each line is PINNED to its analytic hinge
+  // coordinate — sheetY=0 for XY, sheetX=−z0 for X1-Y1 (see the sheetHP/sheetVP/sheetPP
+  // header derivation) — never a live bbox midpoint, because the Front view's sheetY
+  // (=worldY) and the Side view's sheetX (=worldX−z0) both move under the distVP/distHP
+  // sliders (seatOnPlanes), which dragged the old midpoint along with the geometry instead
+  // of leaving it as a fixed hinge. hpBox/vpBox/ppBox are read ONLY to size each line's
+  // LENGTH along its own perpendicular axis (sheetX for XY, sheetY for X1-Y1) — both of
+  // those axes are distance-slider-invariant (sheetHP.x=sheetVP.x=−worldZ; sheetVP.y=
+  // sheetPP.y=worldY), so the length can safely track the drawing without the position
+  // drifting. Skipped entirely once nothing is drawable (guarded by the early return above).
   const hpValid = Number.isFinite(hpBox.minX);
   const vpValid = Number.isFinite(vpBox.minX);
   const ppValid = showSideViewFlag && Number.isFinite(ppBox.minX);
@@ -4548,7 +4576,8 @@ function drawCompare() {
   if (hpValid || vpValid) {
     const xyY = 0; // analytic HP∩VP ground line (sheetY=0) — ADR-056, never the live view midpoint
     // Length spans only the Top+Front block, on sheetX (=−worldZ) which is invariant under
-    // distHP/distVP — deliberately excludes the Side view (its sheetX tracks distHP via z0).
+    // distHP/distVP — deliberately excludes the Side view (its sheetX tracks distVP via z0,
+    // ADR-106).
     let xMin = Infinity, xMax = -Infinity;
     if (hpValid) { xMin = Math.min(xMin, hpBox.minX); xMax = Math.max(xMax, hpBox.maxX); }
     if (vpValid) { xMin = Math.min(xMin, vpBox.minX); xMax = Math.max(xMax, vpBox.maxX); }
@@ -4561,12 +4590,12 @@ function drawCompare() {
   }
 
   if (ppValid) {
-    const x1X = -z0; // analytic HP∩PP hinge (sheetX=−z0) — ADR-056, never the live view midpoint
-    // Length spans the Top+Side block, on sheetY (=−worldX for Top, =−worldX for Side) which is
-    // invariant under distHP/distVP — deliberately excludes the Front view (its sheetY=worldY
-    // tracks distHP directly).
-    const yMin = Math.min(hpValid ? hpBox.minY : ppBox.minY, ppBox.minY) - REF_OVERSHOOT;
-    const yMax = Math.max(hpValid ? hpBox.maxY : ppBox.maxY, ppBox.maxY) + REF_OVERSHOOT;
+    const x1X = -z0; // analytic VP∩PP hinge (sheetX=−z0) — ADR-056, never the live view midpoint
+    // Length spans the Front+Side block (ADR-106), on sheetY (=worldY for both) which is
+    // invariant under distVP — deliberately excludes the Top view (its sheetY=−worldX
+    // tracks distVP directly).
+    const yMin = Math.min(vpValid ? vpBox.minY : ppBox.minY, ppBox.minY) - REF_OVERSHOOT;
+    const yMax = Math.max(vpValid ? vpBox.maxY : ppBox.maxY, ppBox.maxY) + REF_OVERSHOOT;
     const a = project({ x: x1X, y: yMin });
     const b = project({ x: x1X, y: yMax });
     ctx.beginPath();
@@ -4939,7 +4968,7 @@ window.simAPI = {
     if (connectorToggleEl) connectorToggleEl.checked = true;
     foldProgress = 0;
     if (vpFoldGroup) vpFoldGroup.rotation.z = 0;
-    if (ppHingeGroup) ppHingeGroup.rotation.x = 0;
+    if (ppHingeGroup) ppHingeGroup.rotation.y = 0;
     applyProfilePlaneVisibility(false);
     setRefLabelOpacity(0);     // 2D-drawing annotations belong to the folded state only
     setFirstAngleSymbol(false);
@@ -5131,10 +5160,16 @@ const simController = {
      *  numeric position; out-of-range Set returns ''. */
     beatLabel: (set, beat) => methodBeatLabel(set, beat),
     /** Whether the CURRENT Set is a Set-to-Set tilt's destination — true only for the
-     *  both-planes tier's Set 3 (ADR-093's `turnDeg`, non-null only there). methodController.js
-     *  gates the "Watch the turn" control's visibility on this, re-checked every renderProgress
-     *  so the button appears/disappears exactly when Set 3 becomes/stops being current. */
-    canTilt: () => methodSets[methodSet]?.turnDeg != null,
+     *  both-planes tier's Set 3 (ADR-093's `turnDeg`, non-null only there) AND
+     *  `methodArcEligible` (the rigid-2D-motion claim only holds when Set 3's true-shape view is
+     *  genuinely the top view — the same guard `startMethodTilt` itself already required, ADR-105
+     *  folds it in here too so this one predicate backs the auto-play gate (methodController.js
+     *  goNext), the replay control's visibility, AND the engine's own guard — previously
+     *  `turnDeg != null` alone could show/enable a control `startMethodTilt` would then no-op). */
+    canTilt: () => {
+      const set = methodSets[methodSet];
+      return set?.turnDeg != null && methodArcEligible(set);
+    },
     /** Play the tilt from the previous Set's pose into the current one (startMethodTilt's own
      *  header has the full contract). Same boolean-return, no-op-on-false shape as begin(). */
     playTilt: () => startMethodTilt(),

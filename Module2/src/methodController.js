@@ -55,8 +55,8 @@ export function initMethodController(sim) {
   const backBtn = document.getElementById('method-back');
   const skipBtn = document.getElementById('method-skip-set'); // ADR-087 Decision 2
   const exitBtn = document.getElementById('method-exit');
-  const tiltBtn = document.getElementById('method-tilt'); // Set-to-Set tilt
-  if (!viewEl || !chipRow || !captionEl || !nextBtn || !backBtn || !skipBtn || !exitBtn || !tiltBtn) {
+  const replayBtn = document.getElementById('method-replay-turn'); // ADR-105: turn replay control
+  if (!viewEl || !chipRow || !captionEl || !nextBtn || !backBtn || !skipBtn || !exitBtn || !replayBtn) {
     // Takeover markup missing (shouldn't happen — index.html ships it) — degrade to a no-op
     // rather than throw, matching problemLibrary.js's own ac.abort()-guarded degrade shape.
     return { sync: () => {}, dispose: () => {} };
@@ -155,11 +155,11 @@ export function initMethodController(sim) {
     const noSetToSkipTo = curSet >= setCount - 1;
     skipBtn.hidden = noSetToSkipTo;
     skipBtn.disabled = noSetToSkipTo;
-    // Set-to-Set tilt: hidden (not merely disabled) whenever the current Set isn't a tilt's
-    // destination — focusables() below selects `button` and filters on offsetParent, so a
-    // hidden button needs no separate focus-trap handling. Re-checked every renderProgress
+    // ADR-105: turn-replay control — hidden (not merely disabled) whenever the current Set isn't
+    // a tilt's destination — focusables() below selects `button` and filters on offsetParent, so
+    // a hidden button needs no separate focus-trap handling. Re-checked every renderProgress
     // (Next/Back/Skip all call it), same cadence as the skip button's own hidden state above.
-    tiltBtn.hidden = !sim.method.canTilt();
+    replayBtn.hidden = !sim.method.canTilt();
     // Re-render chip reached-state every step — a chip flips from disabled to enabled the
     // moment Next first draws its Set (mirrors stepper.js's rail re-render on every step).
     const chips = chipRow.querySelectorAll('.set-chip');
@@ -296,10 +296,21 @@ export function initMethodController(sim) {
       curBeat += 1;
       if (curBeat >= BEAT_COUNT) { curBeat = 0; curSet += 1; }
     } while (flatIndex() < finalIndex && !hasVisibleContent(curSet, curBeat));
-    if (curSet !== prevSet) clearFocusChip();
+    const crossedSet = curSet !== prevSet;
+    if (crossedSet) clearFocusChip();
     sim.method.setProgress(curSet, curBeat);
     renderProgress();
     syncCaption();
+    // ADR-105: the Set 2 -> Set 3 turn is this click, not a separate "Watch the turn" button —
+    // curBeat===0 is always true on a set crossing (beat 0 is hardcoded content-bearing, see
+    // hasVisibleContent), and canTilt() is only true for the both-planes tier's Set 3, so this
+    // fires exactly once per forward crossing into that Set. sim.method.playTilt() is idempotent
+    // and self-gating (startMethodTilt no-ops with a false return otherwise) — called AFTER
+    // syncCaption() so the tilt's own announce() (turning..., then landed) is what's actually
+    // read out, not immediately overwritten by it. Deliberately not wired into goSkipSet (Skip
+    // exists to cut click cost, ADR-087 Decision 2 — playing a 1.65s animation there fights that)
+    // or goBack (matches setMethodProgress's own "only a genuine forward step animates" rule).
+    if (crossedSet && sim.method.canTilt()) sim.method.playTilt();
   }
 
   function goBack() {
@@ -337,10 +348,12 @@ export function initMethodController(sim) {
   skipBtn.addEventListener('click', goSkipSet, listen);
   backBtn.addEventListener('click', goBack, listen);
   exitBtn.addEventListener('click', stop, listen);
-  // No-op (not disabled) if the Set changed out from under a stale click, or a tilt is already
-  // playing — sim.method.playTilt() itself is idempotent (startMethodTilt cancels a live tilt
-  // before starting a new one, the same ADR-091 cancel-and-snap contract Next already relies on).
-  tiltBtn.addEventListener('click', () => sim.method.playTilt(), listen);
+  // ADR-105: explicit replay, not the primary trigger anymore (goNext auto-plays the turn on the
+  // Set 2 -> Set 3 crossing) — no-op (not disabled) if the Set changed out from under a stale
+  // click, or a tilt is already playing — sim.method.playTilt() itself is idempotent
+  // (startMethodTilt cancels a live tilt before starting a new one, the same ADR-091
+  // cancel-and-snap contract Next already relies on).
+  replayBtn.addEventListener('click', () => sim.method.playTilt(), listen);
   viewEl.addEventListener('keydown', onViewKeydown, listen);
 
   /** Re-evaluate the Step-6 trigger's visible/enabled state AND reconcile against an EXTERNAL

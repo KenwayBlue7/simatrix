@@ -193,6 +193,26 @@ Every rule is formatted:
 > of its logic. *(ADR-019)*
 > Reason: a replica once passed while the shipped module had a real call-site bug.
 
+> **§2.19a ❌ NEVER** ship a visual/UI fix or feature on *assumed* geometric or logical
+> correctness. Before implementing anything involving geometry, angles, positions, or derived
+> values: **✅ DO** trace and verify the actual math/logic first — against the reference textbook
+> figure where one exists — instead of pattern-matching to what looks visually plausible. Where
+> the geometry allows it, define a **provable** correctness test ("point A lands within sub-pixel
+> tolerance of point B"), not just a visual spot-check. Where a measured value's own math
+> guarantees a range (e.g. a signed-angle difference of two `atan2` calls, which spans `(-2π,2π)`
+> unless wrapped), check the fix against that range, not just against one example that looked
+> right. *(ADR-090, ADR-099, ADR-103, ADR-104, ADR-105)*
+> Reason: every real bug in this project's history rendered plausibly while its math was never
+> checked — a caption declaring "30° to the HP" over an axis actually drawn at 60° (ADR-099), a
+> beat gate that passed while drawing zero new segments (ADR-090), a base-edge dimension measuring
+> a triangulation-seam diagonal because "greatest projected length" guarantees a diagonal wins
+> (ADR-103), a height dimension anchored to a synthetic bbox point instead of the real apex
+> (ADR-103), and a rotation computed as a raw difference of two `atan2` calls that visibly spun the
+> long way round near the ±180° seam because the difference was never wrapped back into `(-π,π]`
+> (ADR-105). ADR-104's on-sheet ghost is the pattern done right: the claim (Set 3's top view IS
+> Set 2's top view under a rigid 2D rotate+translate) was *proved* from the pose derivation before
+> a line was drawn, so `t=1` lands on Set 3 by construction rather than by eye.
+
 > **§2.20 ✅ DO** pin **`three-mesh-bvh`** in the **same import map** as `three`, at a version
 > compatible with `three@0.160.0`. **❌ NEVER** add it via npm/a bundler, or pin it to `@latest`.
 > *(ADR-030)*
@@ -781,6 +801,7 @@ Every rule is formatted:
   (`sim:ready` boot, `sim:complete` lesson-finish), a second reset path, or any non-CDN network
   call. *(§2.9, §2.10, §2.12, ADR-078, ADR-086)*
 - ❌ Install puppeteer/playwright, or verify against a hand-typed replica instead of the shipped module. *(§2.17, §2.19)*
+- ❌ Ship a geometry/angle/position/derived-value fix verified only by "it looks right on screen" — prove the math first. *(§2.19a)*
 - ❌ Add `three-mesh-bvh` via npm/a bundler, or pin it to `@latest` instead of the shared import map. *(§2.20)*
 
 **3D scene**

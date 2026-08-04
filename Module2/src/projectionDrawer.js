@@ -263,10 +263,11 @@ function visibleInVP(faces) {
  * that observer (`worldNormal.z > 0`), otherwise the body occludes it and it is
  * drawn dashed. Convexity makes the normal test exact, as for HP/VP.
  *
- * SIGN (CLAUDE.md): the `> 0` here pairs with the PP_FOLD_TARGET (−90° about local X)
- * fold in main.js. The observer direction is unchanged by the fold, so this `> 0` test
- * is retained; only the side view's PLACEMENT changed (now beside the top view). Re-derive
- * VISUALLY against the worked square pyramid if the fold sign changes — do not flip blindly.
+ * SIGN (CLAUDE.md): the `> 0` here pairs with the PP_FOLD_TARGET (+90° about local Y,
+ * ADR-106) fold in main.js. The observer direction is unchanged by the fold, so this
+ * `> 0` test is retained; only the side view's PLACEMENT changed (now beside the FRONT
+ * view, not the top view — ADR-106). Re-derive VISUALLY against the worked square
+ * pyramid if the fold sign changes — do not flip blindly.
  *
  * @param {import('./meshAnalyzer.js').Face[]} faces Faces sharing the edge.
  * @returns {boolean}
@@ -402,12 +403,13 @@ function projectVP(p) {
 /**
  * Project a world point onto PP, the profile (side) plane — the "cast to the side
  * wall" view. Zeroes Z, keeps X and Y. The plane's standoff from the solid (its z0
- * offset, and the flatten hinge about the HP∩PP line) is owned by the CONSUMER:
- * main.js parents the returned ppGroup under a hinge group translated to (0, 0, z0)
- * in WORLD space and rotated about its local X (folding the plane down onto the HP),
- * so here we draw the bare side view at z = 0 in that group's local frame. (The third
- * orthographic view — there is no Unity sign to re-derive; like HP/VP it just zeroes
- * one world coordinate.)
+ * offset, and the flatten hinge about the VP∩PP line) is owned by the CONSUMER
+ * (ADR-106): main.js parents the returned ppGroup under a hinge group NESTED inside
+ * vpFoldGroup, translated to local (0, 0, z0), and rotated about its local Y (folding
+ * the plane sideways into the VP plane, then riding the VP's own fold down with the
+ * front view), so here we draw the bare side view at z = 0 in that group's local
+ * frame. (The third orthographic view — there is no Unity sign to re-derive; like
+ * HP/VP it just zeroes one world coordinate.)
  * @param {THREE.Vector3} p
  * @returns {THREE.Vector3}
  */
@@ -611,8 +613,8 @@ function buildArrowMesh(positions, color) {
  * @param {boolean} [options.drawHidden=true] Draw occluded edges as dashed lines.
  * @param {boolean} [options.drawConnectors=true] Draw the dotted 3D→2D connectors.
  * @param {number} [options.z0=0] PP standoff (ppHingeGroup.position.z, owned by the
- *   consumer). Needed only to place the folded side-view flat connectors at z0 − x;
- *   harmless at 0 when no profile plane has been seated yet.
+ *   consumer). Needed only to place the folded side-view flat connectors at the VP∩PP
+ *   hinge, z0 − x (ADR-106); harmless at 0 when no profile plane has been seated yet.
  * @param {THREE.Vector3} [options.axis=(0,1,0)] ADR-087 — the solid's WORLD-space axis
  *   direction (unit vector), used only to split each plane's visible/hidden batch further into
  *   base/generator sub-batches (see `edgeKindOf`). Every Module 2 solid is generated upright
@@ -754,13 +756,15 @@ export function drawProjections(edgeMap, options = {}) {
       const foldedFront = new THREE.Vector3(-vertex.y, 0, vertex.z);
       addSegment(flatConnectors, projectHP(vertex), foldedFront);
 
-      // Side-view projector: link the TOP-view point to the folded SIDE-view point.
-      // The PP now hinges DOWN onto the HP about the HP∩PP line (−90° about local X, in
-      // world space), carrying a PP point (x, y, 0) at standoff z0 to (x, 0, z0 − y) —
-      // beside the TOP view. Top and side share world X (= the solid's x), so this
-      // projector runs along Z at constant x, tying the side view to the top view.
-      const foldedSide = new THREE.Vector3(vertex.x, 0, z0 - vertex.y);
-      addSegment(flatConnectors, projectHP(vertex), foldedSide);
+      // Side-view projector: link the FRONT-view point to the folded SIDE-view point
+      // (ADR-106). The PP now hinges SIDEWAYS into the VP plane about the VP∩PP line
+      // (+90° about local Y, nested inside vpFoldGroup so it rides the VP's own fold
+      // down), carrying a PP point (x, y, 0) at standoff z0 to (−y, 0, z0 − x) — beside
+      // the FRONT view. Front and side share world X (= −vertex.y, the same mapping
+      // foldedFront uses), so this projector runs HORIZONTALLY at constant world x,
+      // tying the side view to the front view — not the top view.
+      const foldedSide = new THREE.Vector3(-vertex.y, 0, z0 - vertex.x);
+      addSegment(flatConnectors, foldedFront, foldedSide);
     }
   }
 

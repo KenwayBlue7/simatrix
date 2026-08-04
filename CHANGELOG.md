@@ -4,7 +4,11 @@ All notable changes at the Simatrix project root (spanning Module1, Module2, and
 topic deploy copies). Per-module changelogs live inside each module folder.
 
 ## 2026-08-04
+- Fixed: Module 2's Side view was folded down beside the Top view instead of beside the Front view — a faculty review caught that this violated standard first-angle convention (Side must share Front's height band, not Top's). Root cause: the Profile Plane's fold hinge was a world-space sibling of the VP fold pivot instead of nested inside it. Fixed the 3D fold, the 2D Compare sheet's projection formula, and the flat connector lines; three other codebases (the Module 2 clone, Glass Box, Sections) inherited the same bug and are follow-up work. See `DECISIONS.md` ADR-106.
 - Changed: Show Method's (Module 2) "Watch the turn" control now animates directly on the drawing sheet instead of in a separate 3D pictorial inset — a faded copy of Set 2's own top view rotates+translates into Set 3's start position with the turn angle marked at the pivot, matching how the reference textbooks (John, Bhatt) actually draw this step; the two reference PDFs were read cover-to-cover on this transition before redesigning. See `DECISIONS.md` ADR-104 (supersedes ADR-101).
+- Added: RULES.md §2.19a — geometry/UI fixes must verify the underlying math before shipping, not rely on visual plausibility (every real bug in the project's history looked right on screen before it was traced and fixed).
+- Fixed: Show Method's (Module 2) ghost turn spun the long way round near the ±180° seam — its rotation angle was a raw difference of two `atan2` calls, never wrapped back into a shortest path. Now wrapped, provably safe since the real turn is always ≤ 90°. See `DECISIONS.md` ADR-105.
+- Changed: Show Method's (Module 2) Set 2 → Set 3 ghost turn now plays automatically as part of the Next click that crosses that boundary, instead of requiring a separate "Watch the turn" click afterward; that button is repurposed into a small replay icon beside the Set 3 chip rather than removed. See `DECISIONS.md` ADR-105.
 
 ## 2026-08-03
 - Fixed: Show Method's (Module 2) Set 2 caption could overlap its own nav pill on a 3-Set problem — the vertical fit never counted the caption's own offset below the block. See `DECISIONS.md` ADR-102.
