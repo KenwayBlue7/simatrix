@@ -1467,7 +1467,9 @@ PP-tagged buffer in `castProjectors()` target `x = +H`. The exploded pane offset
 longer a fixed constant — it is now computed per rebuild from the domain object's live bounding box
 (see ADR-045), so `createGlassBox()`/`castProjectors()` take an options object instead of positional
 args. `--color-hp/vp/pp-line` tokens are still the only colour source (ADR-003 unaffected).
-**Status:** Active — grid matrices + PP placement stand; the PP **fold clause** superseded by ADR-049
+**Status:** Active — grid matrices + PP placement stand. The PP **fold clause** was superseded by
+ADR-049 (2026-07-13) and then **restored** by ADR-108 (2026-08-04), which found ADR-049's "Module 2
+parity" fold to be the actual regression — see ADR-108.
 
 ---
 
@@ -1666,12 +1668,13 @@ Observer icon get their own `.visible` writes in `applyPlaneOpacity()`/`applyFol
 disposal traversal pulls CSS2D DOM nodes from the overlay per RULES.md §3.5 (`disposeObj` handles
 `isCSS2DObject`), since the auto-remove listener only fires for a directly-removed child, not a
 descendant of a cleared group.
-**Status:** Superseded by ADR-106 (2026-08-04 faculty review: "beside the top view" is wrong
-first-angle convention — Side must share the FRONT view's band, not the Top view's; ADR-044's
-original fold-placement reasoning was correct and this ADR's reversal of it was the regression).
-ADR-106 fixes Module 2 only; this topic (`graphics_module_1_topic_4_understanding_orthographic_views`)
-still carries the bug pending a follow-up session — its PP fold and `drawCompare()` port are
-UNCHANGED by ADR-106. ADR-044's PP placement (+X, viewing direction −X) is unaffected and stands.
+**Status:** The **fold clause** (item 1) is superseded by ADR-108 (2026-08-04: "beside the top view"
+is wrong first-angle convention — Side must share the FRONT view's band, not the Top view's;
+ADR-044's original fold-placement reasoning was correct and this ADR's reversal of it was the
+regression, traced to a bad "Module 2 parity" citation — Module 2 itself carried the same bug at
+the time, fixed separately by ADR-106). ADR-044's PP placement (+X, viewing direction −X) is
+unaffected and stands, as do this ADR's other three clauses (exploded planes, CSS2D plane pills,
+CSS2D Observer icon) — only the fold hinge/direction is reverted, by ADR-108.
 
 ---
 
@@ -4912,15 +4915,225 @@ own bounding box (e.g. a 20mm-base pyramid is ~2 world units per `WORLD_TO_MM=10
 the "Top View"/"Front View" captions (not "Side View," whose overshoot direction happens to stay
 on-canvas) far outside the Compare sheet's auto-fit frame for small solids. Pre-dates this ADR;
 worth its own ticket.
-**Follow-up (separate sessions, not fixed here):** `graphics_module_2_topic_2_simple_positions`
-(Module 2 clone — `main.js`/`src/stepper.js`/`src/projectionDrawer.js` carry byte-identical
-copies of the pre-fix code), `graphics_module_1_topic_4_understanding_orthographic_views` (Glass
-Box — see the ADR-049 Status amendment above), and `graphics_module_3_topic_1_sections_of_solids`
+**Follow-up (separate sessions, not fixed here):** `graphics_module_3_topic_1_sections_of_solids`
 (`src/projectionDrawer.js` ported the same Top-relative connector logic; this module has no 2D
-Compare sheet of its own, so only its live-3D projector geometry is affected).
+Compare sheet of its own, so only its live-3D projector geometry is affected) carried the bug —
+now fixed, see ADR-109.
+`graphics_module_2_topic_2_simple_positions` (Module 2 clone) carried the same byte-identical
+pre-fix code but is now fixed — see ADR-107, which backports this ADR to that clone.
+`graphics_module_1_topic_4_understanding_orthographic_views` (Glass Box) also carried the bug
+(ported here by ADR-049's citation) but is now fixed too — see ADR-108, which restores that topic's
+own pre-existing correct fix (ADR-044) rather than porting this ADR's nested-hinge construction,
+since Glass Box's VP does not fold (unlike Module 2's).
 **Status:** Active. Supersedes ADR-049's fold clause for Module 2 (ADR-049 itself, scoped to
 Glass Box, is separately marked Superseded above pending that topic's own fix). Amends ADR-056
 (X1-Y1 identity/length only; its position formula is unchanged).
+
+---
+
+## ADR-107: ADR-106 backported to the Module 2 clone (`graphics_module_2_topic_2_simple_positions`) — Side view now lands beside Front, not Top
+
+**Date:** 2026-08-04
+**Decision:** Per ADR-009 (copy-paste-clone architecture, no automatic sync), ADR-106's Side-view
+fold fix was hand-transplanted from `Module2/` into its "simple positions" clone, which carried
+the identical bug byte-for-byte in every affected hunk of `main.js` and `src/projectionDrawer.js`
+(`ppHingeGroup` a world-space sibling of `vpFoldGroup` folding `−90°` about local X onto the HP;
+`sheetPP`, `answerSheetBox()`, `positionRefLabels()`, the X1-Y1 reference line, and the flat
+side-view connector all keyed off the same Top-relative placement). The fix and its full
+derivation are ADR-106's, cited rather than re-derived here: `ppHingeGroup` now nests inside
+`vpFoldGroup` at local `(0, 0, z0)`, `PP_FOLD_TARGET` flips to `+π/2` about local Y, and every
+consumer of the fold (`applyFoldVisual`, `answerSheetBox`, `positionRefLabels`, `drawCompare`'s
+`sheetPP`/X1-Y1 block, `simAPI.reset`, and `projectionDrawer.js`'s `visibleInPP`/`projectPP`/flat
+connector) was updated in lockstep, exactly mirroring ADR-106's own hunks.
+**Clone-specific notes (where this session diverged from a literal copy):**
+- This clone has no `methodController.js` / Show Method feature (`sim.method.*` calls were
+  surgically removed in an earlier session — "simple positions" never tilts), so the ADR-105
+  hunks bundled into the same Module2 commit (`c288974`) that also carried ADR-106 — the ghost-turn
+  angle wrap, `canTilt`'s `methodArcEligible` gate, `stopMethodBeatAnim`'s `methodGhost` reset —
+  do not apply and were skipped entirely.
+- The clone's `ppPlaneLabel` sits at local `(0, 4, 0)` (Module2 uses `(4, 4, 0)`) — left as-is,
+  only the surrounding comment was updated to flag it for re-verification against the new
+  composed fold, per Module2's own equivalent comment.
+- A handful of this clone's comments (`main.js`'s `ppHingeGroup` doc, the `rebuild()` PP-standoff
+  comment, `refreshProjections()`'s parent comment, and the `buildScene()` block comment above the
+  PP grid) already described the nested/VP∩PP design in prose — stale drift written ahead of code
+  that was never actually updated to match. Those comments needed no further edit; the code has
+  now caught up to what they already claimed. Every other comment in both files still described
+  the old HP∩PP/Top-relative fold and was rewritten to match Module2's corresponding fixed comment.
+- `src/stepper.js:49`'s Step-5 copy already read "the side view beside the front" — like Module2's
+  own stepper caption, it needed no change; only the code disagreed with it.
+**Why:** Same as ADR-106 — first-angle convention requires Side to share Front's height band, not
+Top's. This is a straight backport, not an independent re-derivation; the geometry/signs are
+proven in ADR-106 and were not re-litigated here.
+**Consequences:** `DECISIONS.md`'s ADR-106 Follow-up list amended to strike this clone (see above).
+`graphics_module_1_topic_4_understanding_orthographic_views` (Glass Box) and
+`graphics_module_3_topic_1_sections_of_solids` still carry the bug — unaffected by this session.
+Verified live (foreground Chrome tab, XAMPP-served — MCP tabs run `document.hidden=false` here so
+no rAF-pump workaround was needed) against ADR-106's own pass criteria: 2D Compare sheet shows
+Side right of Front at matching height with nothing beside Top; the 3D pane's flattened answer
+sheet agrees; dragging Distance from HP moves Front+Side together with Top fixed; dragging
+Distance from VP moves Top down and Side right with Front fixed; the X1-Y1 reference line stays
+pinned under both sliders; shape cycling (cube/pyramid/cylinder/prism ×5) produced no console
+errors; `renderer.info.memory` geometry/texture counts stayed flat across rapid rebuilds.
+**Status:** Active.
+
+---
+
+## ADR-108: Glass Box's Profile Plane folds sideways into the VP about the VP∩PP line — restoring ADR-044, superseding ADR-049's fold clause
+
+**Date:** 2026-08-04
+**Decision:** In `graphics_module_1_topic_4_understanding_orthographic_views`, the PP fold reverts
+to ADR-044's original design: `foldPivotPP` becomes a scene-level SIBLING of `foldPivotHP` (both
+children of `foldRoot`, alongside the fixed `vpRoot`) instead of nested inside the HP hinge's inner
+group. Its pivot moves from `(D,−D,0)` (the HP∩PP line, along Z) to `(D,0,−D)` (the **VP∩PP** line,
+along Y); `PP_FOLD_ANGLE` flips from `−π/2` to `+π/2`; `applyFoldPose()` drives it via
+`foldPivotPP.rotation.y` (was `.rotation.z`). This lands the Side view **beside the Front view, at
+the same height** (shared horizontal projectors), not beside the Top view. `drawCompare()`'s 2D
+sheet is rewritten in lockstep: `sideC` moves from the bottom-right (beside Top) to the right of
+Front at Front's own centre-Y, the second fold-reference line moves from between Top/Side to
+between Front/Side, and the Side view's own drawing is re-authored with its axes swapped
+(`u = +worldZ` horizontal, `v = −worldY` vertical, matching Front's height convention) — since this
+topic's Compare sheet is hand-authored directly from the dimension table (ADR-050), not derived
+from the 3D fold geometry, so it cannot simply be "moved," only redrawn rotated.
+**Why:** ADR-044 (2026-07-13) had this right the same day it was written — PP hinges directly onto
+the fixed VP about their shared edge, swinging Side to the right of Front. Hours later, ADR-049
+reverted just this fold clause to instead nest the PP hinge inside the HP hinge and fold it down
+onto the HP, explicitly citing "Module 2 parity" (`PP_FOLD_TARGET`) as the reason. That citation was
+the bug: Module 2 itself had the wrong layout at the time (Side beside Top, a "4th-quadrant"
+misreading of first-angle projection), not fixed until ADR-106 that same faculty-review session
+(2026-08-04). ADR-106's Status note and Follow-up list already flagged that this topic inherited
+the mistake via citation and would need its own pass. **Module 2's own fix (ADR-106) does not
+transplant here.** ADR-106 nests Module 2's `ppHingeGroup` inside `vpFoldGroup` because Module 2's
+VP is not fixed — it folds along with the rest of the box (`vpFoldGroup`'s own `+π/2`-about-Z), so a
+free-standing PP pivot could never track a moving Front view; nesting is what lets "PP into VP, VP
+into the fold" compose automatically at every frame of the animation. Glass Box's VP (`vpRoot`) is a
+plain group at identity — it never moves — so nothing needs to ride along with it, and the pivot can
+sit directly on the VP∩PP line as a scene sibling, exactly as ADR-044 originally built it. This ADR
+is therefore a **restoration** of Glass Box's own prior, independently-correct fix, not a port of
+Module 2's construction, and the geometry was re-verified by hand rather than copied from either
+ADR-044 (whose literal code no longer exists — the whole 2026-07-13 build landed in one squashed
+commit, `6f7376f`, with no finer git history to restore from) or Module 2's ADR-106 (wrong topology
+for this module): a PP pane point `(D,y,z)` rotated `+π/2` about local Y at pivot `(D,0,−D)` lands
+at world `(2D+z, y, −D)` — height `y` passes through unchanged (same band as Front's own
+`(x,y,−D)`), and the horizontal coordinate `2D+z` places it to the right of the fixed VP with the
+explode gap preserved between panes.
+**Alternatives rejected:**
+- **Port Module 2's ADR-106 nested-hinge construction as-is.** Rejected — see Why: it solves a
+  problem (a moving VP) that does not exist in this topic. Copying it would nest PP inside a HP
+  hinge that has no reason to carry it, adding indirection for no benefit and leaving the topic's
+  own architecture inconsistent with its own "VP is fixed" invariant (documented in this topic's
+  fold-overview comment since ADR-044).
+- **Patch only `drawCompare()`'s 2D layout, leave the 3D fold alone.** Rejected for the same reason
+  ADR-106 rejected it for Module 2: the 2D sheet and the live 3D fold must show the same layout, or
+  the two surfaces silently diverge — the exact anti-pattern ADR-044 itself flagged when it rejected
+  "mirror the 2D Compare sheet instead" as papering over a 3D bug.
+**Consequences:** `main.js`'s fold-overview comment block, the `foldPivotPP` state doc, and
+`assembleScene()`'s HINGE TOPOLOGY doc are rewritten to describe the sibling topology and the
+VP-is-fixed rationale, so a future session doesn't reach for Module 2's nested pattern again without
+re-checking this module's own architecture first. `src/glassBox.js`'s header comment and
+`createGlassBox()` docstring (prose only — no code there depends on fold direction; the pane
+geometry is authored in world space at rest and the hinge alone determines its folded position) are
+updated to match. Verified live (XAMPP `:8080`, foreground Chrome tab — this environment runs
+`document.hidden=false`, so no rAF-pump workaround needed, per ADR-106/107's own verification note):
+driving Step 1→5, the 2D Compare sheet shows Side right of Front at matching height with nothing
+beside Top; the 3D pane's flattened fold agrees; the Fold/Unfold rail toggle replays correctly both
+directions mid-tween; `renderer.info.memory` geometry/texture counts stay flat across repeated
+`simAPI.reset()` cycles; zero console errors. This topic has no HP/VP distance sliders (unlike
+Module 2), so ADR-106's drag-behaviour check has no analogue here; substituted with orbit-drag and
+fold-replay checks instead.
+**Status:** Active. Supersedes ADR-049's fold clause (its other three clauses — exploded planes,
+CSS2D plane pills, CSS2D Observer icon — are unaffected and stand). Restores ADR-044's original fold
+design. Strikes `graphics_module_1_topic_4_understanding_orthographic_views` from ADR-106's
+Follow-up list — `graphics_module_3_topic_1_sections_of_solids` was the only item remaining and is
+now fixed too, see ADR-109; ADR-106's Follow-up list is fully closed.
+
+---
+
+## ADR-109: Sections of Solids' flattened side-view connector now ties to the FRONT view, not the Top view — closing ADR-106's Follow-up list
+
+**Date:** 2026-08-04
+**Decision:** `graphics_module_3_topic_1_sections_of_solids` was the last module named in ADR-106's
+Follow-up list. `src/projectionDrawer.js`'s `flatConnectors` batch (`drawProjections()`) computed
+its folded side-view point as `foldedSide = (vertex.x, 0, z0 − vertex.y)` and drew the segment from
+`projectHP(vertex)` (the TOP view) to `foldedSide` — sharing world X with the Top view, the same
+Top-relative construction ADR-106/107/108 all fixed elsewhere. Corrected to match those ADRs
+exactly, cited rather than re-derived here: `foldedSide = (−vertex.y, 0, z0 − vertex.x)`, drawn
+from `foldedFront` (not `projectHP(vertex)`) to `foldedSide` — Front and Side now share world X
+(`−vertex.y`), giving a horizontal projector, and the segment ties Side to Front as first-angle
+projection requires.
+
+Two things distinguish this module from the other three fixes and are worth recording:
+- **This module has no fold pivot at all.** `main.js` has no `vpFoldGroup`, `ppHingeGroup`, or
+  `PP_FOLD_TARGET` — the fold-to-flat-sheet animation is explicitly unbuilt (`CLAUDE.md`'s own
+  "Build status" line, `main.js`'s file-header comment). The profile plane is carried by a plain,
+  unrotated `ppHolder` translated to `z0` (`main.js:611-616`). So unlike Module 2/its
+  clone/Glass Box, there was never a wrong *fold* to fix here — only the wrong *connector* math,
+  copy-pasted from the pre-fix Module2 source (ADR-060/061 note this file was copied
+  byte-identical at the time). This is the scope the task brief predicted and the audit confirmed.
+- **The buggy geometry was never actually rendering.** `main.js:619-622` builds
+  `flatConnectorGroup` and immediately parks it `visible = false`, with a comment noting the
+  group is held for "a later (fold) phase." The fix is therefore a **latent-bug** fix: no visual
+  regression existed to observe before or after, because the group has never been shown. Chose to
+  fix it now anyway rather than leave it for whoever builds the fold phase, since the wrong
+  formula would otherwise ship silently the day that phase lands and the group's `visible` flag
+  flips to `true`.
+
+Also corrected in the same pass: four doc comments in `projectionDrawer.js` (`visibleInPP`'s SIGN
+note, `projectPP`'s hinge description, `flatConnectorGroup`'s JSDoc, and the `options.z0` JSDoc)
+that described the old HP∩PP/beside-Top construction — two of them (`projectPP`'s doc citing a
+rotation on `ppHingeGroup`, and `options.z0`'s doc citing `ppHingeGroup.position.z`) also named
+state objects (`ppHingeGroup`, a rotated hinge) that do not exist anywhere in this module's
+`main.js`, i.e. they were already inaccurate independent of the Top-vs-Front bug. Reworded to
+describe the actual current state (a static `ppHolder`, no rotation) plus the contract a future
+fold-phase implementation must satisfy (VP∩PP hinge, nested pivot per ADR-106's reasoning, since
+this module's own VP will presumably fold like Module 2's rather than staying fixed like Glass
+Box's — left as an open call for whoever builds that phase, not decided here).
+
+**Why:** Same first-angle rationale as ADR-106/107/108 — Side has no direct projection
+relationship with Top; it shares Front's height band. Not re-litigated here.
+**Alternatives rejected:**
+- **Re-copy `Module2/src/projectionDrawer.js` verbatim, per this module's own `CLAUDE.md:11-13`
+  ("BYTE-IDENTICAL Module2 copy... fix drift in Module2/ and re-copy, never patch here").**
+  Rejected — measured drift between the two files is 504 changed lines across 18 diff hunks
+  (`diff --strip-trailing-cr`). Module2's copy has since grown ADR-087's base/generator edge
+  batches, ADR-102/103's restricted dimension layer, and other features this pruned module
+  neither has nor wants. A re-copy would be a large, unreviewed behavior change disguised as a
+  sync. Hand-patched instead, and `CLAUDE.md:11-13` is corrected in this same session to record
+  the drift and retire the "never patch here" instruction — see Consequences.
+**Consequences:** `graphics_module_3_topic_1_sections_of_solids/src/projectionDrawer.js`'s
+`foldedSide` math and its four surrounding doc comments are updated (see Decision). This module's
+own `CLAUDE.md:11-13` is corrected to stop claiming byte-identical parity with Module2 and to
+record that targeted, ADR-cited patches are the route for this file going forward. ADR-106's
+Follow-up list is now fully closed (see that ADR's amended Status note above).
+
+Verification could not follow ADR-106/107/108's own live-3D-pane pattern, because the connector
+group in question is never shown (`main.js:619-622`, see Decision). Verified instead by
+temporarily forcing `flatConnectorGroup.visible = true` at runtime in a foreground Chrome tab
+(XAMPP-served, no rAF-pump workaround needed — this environment runs `document.hidden = false`
+per ADR-106/107/108's own note) and reading the rendered `LineSegments2`'s
+`instanceStart`/`instanceEnd` attributes directly: every side-view projector's two endpoints now
+share world X (the horizontal, Front-aligned signature the fix predicts), where before the fix
+they did not. Screenshot confirmed the same visually — side projectors run horizontally out of
+the front view rather than along Z out of the top view. Reverted the runtime override via reload;
+confirmed zero console errors and flat `renderer.info.memory` geometry/texture counts across
+repeated `simAPI.reset()` cycles.
+
+Two things were noticed during the audit but are explicitly **out of scope** for this ADR:
+- This module carries dormant 2D-Compare-sheet scaffolding (`index.html`'s `.compare-card` CSS
+  and a `hidden` card, `projectionDrawer.js`'s vestigial `segments.userData.hidden` tag) with
+  comments naming a `drawCompare()` that is never wired into `main.js`. Confirms ADR-106's own
+  note that this module has no 2D sheet. Whoever wires it must use the Front-anchored layout
+  fixed here, and must build any fold pivot nested (ADR-106's construction), not as a scene
+  sibling (ADR-108's construction) — this module's VP is not obviously fixed the way Glass Box's
+  is, so that choice needs its own re-derivation, not a default copy of either prior fix.
+- `graphics_module_2_topic_2_simple_positions/src/projectionDrawer.js` no longer sets
+  `segments.userData.hidden`, but its `main.js:2689-2690` still reads that tag to choose dash
+  pattern/line width for its 2D Compare sheet — so that sheet now draws every line solid. Checked
+  against `git show HEAD` and confirmed this predates ADR-107's uncommitted work, i.e. it is a
+  pre-existing, unrelated drift bug, not a regression from any session in this ADR chain. Left
+  untouched; worth its own ticket.
+**Status:** Active. Closes ADR-106's Follow-up list (all four modules now fixed: Module2 itself
+by ADR-106, the clone by ADR-107, Glass Box by ADR-108, Sections of Solids here).
 
 ---
 

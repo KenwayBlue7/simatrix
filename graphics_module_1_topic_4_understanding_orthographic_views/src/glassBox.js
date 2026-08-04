@@ -11,13 +11,15 @@
 // (the orchestrator) calls createGlassBox() + castProjectors() inside its single rebuild() pipeline
 // and adds the returned groups to the scene.
 //
-// FIRST-ANGLE ORIENTATION (ADR-044, fold path revised by ADR-049). The three panes form an
-// EXPLODED corner box: each pane spans [−half, half] in-plane but sits at `offset` (> half) on its
-// normal axis, so the panes never share vertices and a visible air gap separates their edges:
+// FIRST-ANGLE ORIENTATION (ADR-044, restored by ADR-108 after ADR-049's "Module 2 parity" fold —
+// wrong at the time, since Module 2 itself carried the bug ADR-106 later fixed). The three panes
+// form an EXPLODED corner box: each pane spans [−half, half] in-plane but sits at `offset` (> half)
+// on its normal axis, so the panes never share vertices and a visible air gap separates their edges:
 //   • HP (teal)   — floor,      y = −offset → Top view, unfolds DOWN (below Front)
 //   • VP (amber)  — back wall,  z = −offset → Front view, stays FIXED
-//   • PP (violet) — RIGHT wall, x = +offset → Side view, folds DOWN onto the HP (ADR-049, matching
-//     Module 2's PP_FOLD_TARGET) so it lands BESIDE THE TOP VIEW in the flat layout.
+//   • PP (violet) — RIGHT wall, x = +offset → Side view, folds SIDEWAYS into the VP plane about the
+//     VP∩PP line (ADR-044/ADR-108) so it lands BESIDE THE FRONT VIEW, at the same height, in the
+//     flat layout.
 // The object is viewed from −X to cast the Side view onto the PP at +X.
 //
 // FAT LINES (CLAUDE.md, non-negotiable). Standard LineBasicMaterial is capped at 1px on most GPUs,
@@ -174,8 +176,9 @@ function makePlaneLabel(text, plane) {
  * [−half, half] in-plane but sits at `offset` (> half) on its normal axis — HP floor (y=−offset,
  * teal), VP back wall (z=−offset, amber), PP RIGHT wall (x=+offset, violet) — so the panes never
  * share vertices and a visible air gap separates their edges. Each pane carries a `userData.plane`
- * tag so main.js can re-parent it onto its fold-hinge pivot (grid + border + label ride together),
- * and a CSS2D name pill ("HP"/"VP"/"PP") on its outer edge.
+ * tag so main.js can re-parent it onto its fold-hinge pivot (grid + border + label ride together;
+ * PP's hinge folds it beside the FRONT view, not the Top view — ADR-044/ADR-108), and a CSS2D name
+ * pill ("HP"/"VP"/"PP") on its outer edge.
  *
  * @param {{ half: number, offset: number, divisions?: number, resolution?: THREE.Vector2 }} cfg
  * @returns {THREE.Group} Add THIS to the scene; teardown is main.js's deep disposal traversal.

@@ -8,11 +8,15 @@ Simatrix platform.
 **Build status:** the Module 2 solid-geometry engine is restored byte-identical; the
 **section-cut engine is built** (`src/sectionCut.js` — analytic single-plane clipper + welded
 loop chaining + solid cap; root `../DECISIONS.md` ADR-058/059); and the **drawing
-layer is built** (ADR-060/061): `src/projectionDrawer.js` is a BYTE-IDENTICAL Module2
-copy drawing the first-angle top/front/side views (fix drift in `Module2/` and re-copy, never
-patch here — all section-specific drawing lives in `src/sectionView.js` instead: 45°
+layer is built** (ADR-060/061): `src/projectionDrawer.js` was originally copied byte-identical
+from Module2 but has since drifted (measured 2026-08-04: ~500 changed lines across 18 hunks,
+root `../DECISIONS.md` ADR-109) — Module2's copy has grown ADR-087's base/generator edge
+batches, ADR-102/103's restricted dimension layer, and its 2D Compare sheet, none of which this
+pruned module has or wants. **Re-copying Module2's file is no longer viable** (it would drag in
+unwanted behavior); make targeted, ADR-cited hand-patches here instead, same as any other file —
+all section-specific drawing lives in `src/sectionView.js` instead: 45°
 apparent-shape hatching per view + the TRUE SHAPE auxiliary sheet drawn 1:1 from the loop's
-(u,v) coordinates, revealed by wizard stage 4/5). Still net-new for later passes: the
+(u,v) coordinates, revealed by wizard stage 4/5. Still net-new for later passes: the
 fold-to-flat-sheet animation, dimensioning (needs a CSS2DRenderer), and the problem library —
 see "Section-cut engine" below.
 

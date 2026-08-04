@@ -5,6 +5,9 @@ All notable changes to Module 3 · Topic 1 (Sections of Solids).
 (This topic's own history starts fresh from the scaffold date below — `template_starter/`'s prior
 build history belongs to the template, not this topic, per MODULE-STARTER §3.2 convention.)
 
+## 2026-08-04
+- Fixed: the flattened side-view connector line in `src/projectionDrawer.js` tied to the Top view's point instead of the Front view's — a copy-pasted bug also fixed platform-wide in Module 2/its clone/Glass Box (root `DECISIONS.md` ADR-106/107/108). This module has no fold pivot yet and the connector group is parked hidden, so the bug was latent (never rendered) rather than visible; fixed now ahead of the fold-phase build. See root `DECISIONS.md` ADR-109.
+
 ## 2026-07-31
 - Added: "Finish lesson" button (Module 2 Finish-button pilot rollout) — `#btn-finish` takes over the footer's primary slot at the terminal step 5 "The true shape" exactly when `#btn-next` vacates it. Click posts `sim:complete` and announces "Lesson marked complete." (`main.js`, `src/stepper.js`, `index.html`.)
 - Changed: `sim:complete` (`markComplete()`) drops its one-shot `window.__simComplete` latch — fires on every "Finish lesson" click now, replacing the old auto-fire on first terminal-step arrival. (`main.js`, `src/stepper.js`.)

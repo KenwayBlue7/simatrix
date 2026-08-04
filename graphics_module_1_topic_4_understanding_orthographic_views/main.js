@@ -95,22 +95,25 @@ const VIEW_PLANE = { top: 'hp', front: 'vp', side: 'pp' };
 const BOOT_INTO_COMPARE_SPLIT = false;
 
 // ── Fold (the cinematic unfold into a flat first-angle layout) ──────────────────────────────────
-// VP (back wall, z = −D where D = planeOffset) stays fixed. ADR-049 (matching Module 2's
-// PP_FOLD_TARGET): the PP hinges DOWN onto the HP, and the HP — carrying the PP — hinges down
-// into VP's plane. Both driven by the same progress so they complete together:
-//   • PP (right wall) rotates −90° about the HP∩PP line (x = +D, y = −D, along Z) → side wall
-//     swings outward-down onto the HP, landing the Side view BESIDE THE TOP VIEW. Its pivot is
-//     NESTED inside the HP hinge so the flattened Side view rides the HP fold into the sheet.
+// VP (back wall, z = −D where D = planeOffset) stays fixed. ADR-108 restores ADR-044's original
+// design (superseding ADR-049's "Module 2 parity" fold, which was wrong — Module 2 itself carried
+// the bug at the time, fixed later by ADR-106). PP and HP hinge INDEPENDENTLY, as siblings, both
+// swinging directly onto the fixed VP's plane — unlike Module 2, where the VP itself folds and the
+// PP hinge must nest inside it to track a moving target; that nesting has no reason to exist here:
+//   • PP (right wall) rotates +90° about the VP∩PP line (x = +D, z = −D, along Y) → side wall
+//     swings sideways into the VP plane, landing the Side view BESIDE THE FRONT VIEW at the SAME
+//     HEIGHT (world Y is untouched by a Y-axis rotation) — shared horizontal projectors.
 //   • HP (floor)      rotates +90° about the ground line (0, −D, −D, along X) → floor + Top view
-//     (+ the folded-down PP + Side view) swing DOWN below the Front view.
-// All three end coplanar with VP (Front centre, Top below, Side beside Top — bottom-right, the
-// Module-2 4th-quadrant layout). The 3D block, the observer and the sight lines DISSOLVE across
-// the fold.
+//     swing DOWN below the Front view, sharing its width (vertical projectors).
+// Both driven by the same progress so they complete together. All three end coplanar with VP
+// (Front centre, Top below, Side beside Front — first-angle's actual layout, not Module 2's old
+// bottom-right "4th-quadrant" mistake). The 3D block, the observer and the sight lines DISSOLVE
+// across the fold.
 const FOLD_DURATION = 1600;            // ms — the weighted "physical hinge" swing (easeFold)
 const HP_FOLD_ANGLE = Math.PI / 2;     // HP floor hinges down about the ground line
-const PP_FOLD_ANGLE = -Math.PI / 2;    // PP hinges DOWN onto the HP about the HP∩PP line — the same
-                                       // −90° as Module 2's PP_FOLD_TARGET (ADR-049; was +π/2 about
-                                       // the VP∩PP edge, which parked Side beside Front)
+const PP_FOLD_ANGLE = Math.PI / 2;     // PP hinges sideways into the VP plane about the VP∩PP edge
+                                       // (ADR-044/ADR-108; ADR-049's −π/2-about-HP∩PP "Module 2
+                                       // parity" value is superseded — it parked Side beside Top)
 
 // ── 2D Compare sheet (ADR-038) ──────────────────────────────────────────────────────────────────
 // The scale is LOCKED to these static sheet bounds — the block's bounding-box half-extents plus a
@@ -181,9 +184,9 @@ let sightObj = null;         // LineSegments2 of the current view's sight lines 
  *  the materials that dissolve across the fold. driveFold animates the pivots; rebuild() snaps them
  *  to the current fold state so a rebuild-while-unfolded lands flat instantly (no animation). */
 let foldPivotHP = null;      // Group hinged about the ground line (0,−D,−D): floor + top view + grid
-                             // (+ the nested PP hinge, which rides it — ADR-049)
-let foldPivotPP = null;      // Group hinged about the HP∩PP line (+D,−D, along Z), NESTED inside the
-                             // HP hinge: side wall + side view fold DOWN onto the HP (ADR-049)
+let foldPivotPP = null;      // Group hinged about the VP∩PP line (D,0,−D), a SIBLING of the HP hinge
+                             // (not nested — the VP is fixed here, unlike Module 2): side wall +
+                             // side view fold sideways into the VP plane (ADR-044/ADR-108)
 let foldFadeMats = [];       // [{ mat, base }] — materials faded out as the box flattens
 /** Whether the box is currently unfolded flat (true) or a 3D box (false). */
 let isUnfolded = false;
@@ -485,10 +488,13 @@ function rebuild(shapeData) {
  * so the world-baked fat-line geometry keeps its position at rest (rotation 0) and simply rotates
  * about the hinge LINE when the pivot turns — no geometry recompute.
  *
- * HINGE TOPOLOGY (ADR-049, matching Module 2's PP fold): the PP hinge is NESTED inside the HP
- * hinge's inner group. The PP folds DOWN onto the HP about the HP∩PP line, and the HP fold then
- * carries the flattened PP with it into the VP plane — landing the Side view beside the Top view.
- * The solid and the Observer are NOT hinged; they dissolve across the fold.
+ * HINGE TOPOLOGY (ADR-108, restoring ADR-044 — supersedes ADR-049's "Module 2 parity" nesting):
+ * the PP hinge is a scene-level SIBLING of the HP hinge, not nested inside it. Module 2 nests its
+ * PP hinge inside the VP's own fold group because Module 2's VP itself folds, so a free-standing
+ * pivot could not track a moving Front view; that constraint does not apply here — Glass Box's VP
+ * (`vpRoot`) is fixed at identity, so PP can hinge straight onto it. PP folds sideways into the VP
+ * plane about the VP∩PP line, independently of the HP fold — landing the Side view beside the
+ * Front view. The solid and the Observer are NOT hinged; they dissolve across the fold.
  */
 function assembleScene() {
   const D = planeOffset;
@@ -503,16 +509,15 @@ function assembleScene() {
   hpInner.position.set(0, D, D); // = −pivot, so children sit at their world coords when unrotated
   foldPivotHP.add(hpInner);
 
-  // PP hinges about the HP∩PP line (x=+D, y=−D, along Z) and RIDES the HP hinge: nested inside
-  // hpInner (which restores the world frame at rest), so PP's own −90° drop onto the HP composes
-  // with the HP's +90° swing into the VP plane (ADR-049).
+  // PP hinges about the VP∩PP line (x=+D, z=−D, along Y), directly onto the FIXED VP — a scene
+  // sibling of the HP hinge, not nested inside it (ADR-108 restores ADR-044; see the HINGE
+  // TOPOLOGY doc above for why Module 2's nesting doesn't apply here).
   foldPivotPP = new THREE.Group();
   foldPivotPP.name = 'PP hinge';
-  foldPivotPP.position.set(D, -D, 0);
+  foldPivotPP.position.set(D, 0, -D);
   const ppInner = new THREE.Group();
-  ppInner.position.set(-D, D, 0); // = −pivot
+  ppInner.position.set(-D, 0, D); // = −pivot
   foldPivotPP.add(ppInner);
-  hpInner.add(foldPivotPP);
 
   // VP is fixed — a plain group at identity keeps its pieces where they are.
   const vpRoot = new THREE.Group();
@@ -520,7 +525,7 @@ function assembleScene() {
 
   const foldRoot = new THREE.Group();
   foldRoot.name = 'Fold Root';
-  foldRoot.add(foldPivotHP, vpRoot);
+  foldRoot.add(foldPivotHP, foldPivotPP, vpRoot);
   shapeGroup.add(foldRoot);
 
   // Route every tagged pane piece (grid + border + CSS2D pill) and 2D view outline onto its
@@ -569,9 +574,9 @@ function gatherFadeMaterials() {
  */
 function applyFoldPose(f) {
   if (foldPivotHP) foldPivotHP.rotation.x = f * HP_FOLD_ANGLE;
-  // PP drops about the HP∩PP line (local Z) — nested inside the HP hinge, so the same f drives
-  // both folds and they complete together (ADR-049, Module 2's same-progress dual fold).
-  if (foldPivotPP) foldPivotPP.rotation.z = f * PP_FOLD_ANGLE;
+  // PP swings about the VP∩PP line (local Y) — an independent sibling hinge, driven by the same f
+  // so both folds complete together (ADR-108 restores ADR-044).
+  if (foldPivotPP) foldPivotPP.rotation.y = f * PP_FOLD_ANGLE;
 
   // Fade the 3D-only dressing out as the box flattens; hide it entirely once flat so no faint ghost
   // lines linger over the clean 2D layout (and to avoid z-fighting the flattened outlines). Only
@@ -1339,9 +1344,11 @@ function paintCompare() {
 
 /**
  * Render the first-angle 2D multiview on the right-pane canvas in the layout the 3D fold actually
- * produces (ADR-049, Module 2's 4th-quadrant arrangement): Front view (VP) top-left, Top view (HP)
- * below it, Side view (PP) BESIDE THE TOP VIEW (bottom-right — the PP folds down onto the HP, so
- * Top and Side share the depth axis: features at the same Z line up horizontally between them).
+ * produces (ADR-108 restores ADR-044, superseding ADR-049's "Module 2 parity" layout — Module 2
+ * carried the same bug at the time, fixed later by ADR-106): Front view (VP) top-left, Top view
+ * (HP) below it (shares Front's X — vertical projectors), Side view (PP) BESIDE THE FRONT VIEW at
+ * the SAME HEIGHT (the PP folds sideways into the VP plane, so Front and Side share the height
+ * axis: features at the same Y line up horizontally between them — shared horizontal projectors).
  * Each view is constructed directly from the Bearing Block's dimension table (ADR-050 final
  * polish — matches src/glassBox.js castProjectors()'s draughtsman-authored pane outlines, not an
  * EdgesGeometry extraction) in the plane's design-token hue (teal HP / amber VP / violet PP) over a
@@ -1361,12 +1368,15 @@ function drawCompare(ctx, w, h) {
   const { hx, hy, hz, gap, padPx } = sheet;
 
   // --- Sheet layout in model units (paper space: +x right, +y DOWN). Front top-left is the origin.
-  const contentW = 2 * hx + gap + 2 * hy;          // Top | gap | Side, across the bottom band
-  const contentH = 2 * hy + gap + 2 * hz;          // Front / gap / Top-Side band, down
+  // First-angle: Top sits below Front (shares X, vertical projectors); Side sits beside Front at
+  // the SAME height (shares Y, horizontal projectors) — ADR-108 restores ADR-044, superseding
+  // ADR-049's "beside Top" layout.
+  const contentW = 2 * hx + gap + 2 * hz;          // Front+Top column | gap | Side, across
+  const contentH = 2 * hy + gap + 2 * hz;          // Front / gap / Top band, down (Side sits in
+                                                    // the top portion, matching Front's height)
   const frontC = { x: hx, y: hy };                           // Front centre (top-left)
   const topC = { x: hx, y: 2 * hy + gap + hz };             // Top centre (below Front, shares X)
-  const sideC = { x: 2 * hx + gap + hy, y: 2 * hy + gap + hz }; // Side centre (beside Top, shares
-                                                                // the bottom band — ADR-049)
+  const sideC = { x: 2 * hx + gap + hz, y: hy };            // Side centre (beside FRONT, shares Y)
 
   // --- FIXED scale: fit the STATIC sheet bounds (not the geometry) into the canvas, centred.
   const s = Math.min((w - 2 * padPx) / contentW, (h - 2 * padPx) / contentH);
@@ -1385,10 +1395,11 @@ function drawCompare(ctx, w, h) {
   };
   wash(frontC, hx, hy, '--color-vp-line');
   wash(topC, hx, hz, '--color-hp-line');
-  wash(sideC, hy, hz, '--color-pp-line');
+  wash(sideC, hz, hy, '--color-pp-line');
 
-  // Fold reference lines (thin, dashed, ink-secondary): the ground line between Front & Top and
-  // the HP∩PP reference line between Top & Side — the seams the panes hinge about (ADR-049).
+  // Fold reference lines (thin, dashed, ink-secondary): the ground line between Front & Top, and
+  // the VP∩PP reference line between Front & Side — the seams the panes hinge about (ADR-108
+  // restores ADR-044; the second line moved from Top↔Side to Front↔Side).
   ctx.save();
   ctx.strokeStyle = cssVar('--color-ink-secondary');
   ctx.globalAlpha = 0.5;
@@ -1398,8 +1409,8 @@ function drawCompare(ctx, w, h) {
   ctx.beginPath(); ctx.moveTo(toX(0), groundY); ctx.lineTo(toX(2 * hx), groundY); ctx.stroke();
   const refX = toX(2 * hx + gap / 2);
   ctx.beginPath();
-  ctx.moveTo(refX, toY(2 * hy + gap));
-  ctx.lineTo(refX, toY(2 * hy + gap + 2 * hz));
+  ctx.moveTo(refX, toY(0));
+  ctx.lineTo(refX, toY(2 * hy));
   ctx.stroke();
   ctx.restore();
 
@@ -1497,18 +1508,19 @@ function drawCompare(ctx, w, h) {
   // all share the full block depth, so their union is a single profile with no interior edge —
   // matches castProjectors' ppView. PLUS the base-shelf's top edge: the base sticks out laterally
   // past the narrower body, so its top face forms a real physical corner across the full depth.
-  // u = world Y, v = world Z direct (no flip), matching the old projSide convention (the folded PP
-  // reads Y right, Z down).
+  // u = world Z direct (no flip), v = −world Y (matching Front's own v convention, so Side's
+  // height band lines up exactly with Front's — ADR-108 restores ADR-044; Side is beside Front
+  // now, not beside Top, so it reads depth-horizontal/height-vertical, the old view rotated).
   strokeView(sideC, '--color-pp-line', (px, py) => {
-    ctx.rect(px(bBot), py(-hD), (domeTop - bBot) * s, 2 * hD * s);
-    ctx.moveTo(px(bTop), py(-hD)); ctx.lineTo(px(bTop), py(hD)); // base-shelf top edge
+    ctx.rect(px(-hD), py(-domeTop), 2 * hD * s, (domeTop - bBot) * s);
+    ctx.moveTo(px(-hD), py(-bTop)); ctx.lineTo(px(hD), py(-bTop)); // base-shelf top edge
   });
   // Hidden: both holes' axes run in-plane here — the bore's rim walls + the mounting holes' rims.
   strokeHidden(sideC, '--color-pp-line', (px, py) => {
-    ctx.moveTo(px(axis - boreR), py(-hD)); ctx.lineTo(px(axis - boreR), py(hD));
-    ctx.moveTo(px(axis + boreR), py(-hD)); ctx.lineTo(px(axis + boreR), py(hD));
-    ctx.moveTo(px(bBot), py(-mR)); ctx.lineTo(px(bTop), py(-mR));
-    ctx.moveTo(px(bBot), py(mR)); ctx.lineTo(px(bTop), py(mR));
+    ctx.moveTo(px(-hD), py(-(axis - boreR))); ctx.lineTo(px(hD), py(-(axis - boreR)));
+    ctx.moveTo(px(-hD), py(-(axis + boreR))); ctx.lineTo(px(hD), py(-(axis + boreR)));
+    ctx.moveTo(px(-mR), py(-bBot)); ctx.lineTo(px(-mR), py(-bTop));
+    ctx.moveTo(px(mR), py(-bBot)); ctx.lineTo(px(mR), py(-bTop));
   });
 
   // View captions (quiet mono, ink-secondary) below each view — names the three orthographic views.
@@ -1519,7 +1531,7 @@ function drawCompare(ctx, w, h) {
   ctx.textBaseline = 'top';
   ctx.fillText('FRONT', toX(frontC.x), toY(frontC.y + hy) + 6);
   ctx.fillText('TOP', toX(topC.x), toY(topC.y + hz) + 6);
-  ctx.fillText('SIDE', toX(sideC.x), toY(sideC.y + hz) + 6);
+  ctx.fillText('SIDE', toX(sideC.x), toY(sideC.y + hy) + 6);
   ctx.restore();
 }
 

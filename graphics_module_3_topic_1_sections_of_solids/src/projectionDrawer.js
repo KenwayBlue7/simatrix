@@ -263,10 +263,12 @@ function visibleInVP(faces) {
  * that observer (`worldNormal.z > 0`), otherwise the body occludes it and it is
  * drawn dashed. Convexity makes the normal test exact, as for HP/VP.
  *
- * SIGN (CLAUDE.md): the `> 0` here pairs with the PP_FOLD_TARGET (−90° about local X)
- * fold in main.js. The observer direction is unchanged by the fold, so this `> 0` test
- * is retained; only the side view's PLACEMENT changed (now beside the top view). Re-derive
- * VISUALLY against the worked square pyramid if the fold sign changes — do not flip blindly.
+ * SIGN (CLAUDE.md): this module has no fold pivot yet (ADR-109 — the fold-to-flat-sheet
+ * animation is still unbuilt, main.js owns no PP_FOLD_TARGET). The observer direction is
+ * fold-independent regardless, so this `> 0` test needs no change when the fold lands. Per
+ * ADR-106/108, the eventual fold must land the side view beside the FRONT view (VP∩PP hinge,
+ * PP folding sideways into the VP), not beside the top view. Re-derive VISUALLY against the
+ * worked square pyramid if this sign is ever revisited — do not flip blindly.
  *
  * @param {import('./meshAnalyzer.js').Face[]} faces Faces sharing the edge.
  * @returns {boolean}
@@ -303,10 +305,12 @@ function projectVP(p) {
 /**
  * Project a world point onto PP, the profile (side) plane — the "cast to the side
  * wall" view. Zeroes Z, keeps X and Y. The plane's standoff from the solid (its z0
- * offset, and the flatten hinge about the HP∩PP line) is owned by the CONSUMER:
- * main.js parents the returned ppGroup under a hinge group translated to (0, 0, z0)
- * in WORLD space and rotated about its local X (folding the plane down onto the HP),
- * so here we draw the bare side view at z = 0 in that group's local frame. (The third
+ * offset) is owned by the CONSUMER: main.js parents the returned ppGroup under a plain
+ * `ppHolder` translated to (0, 0, z0) in WORLD space, with NO rotation — this module has
+ * no fold pivot yet (ADR-109; the fold-to-flat-sheet animation is unbuilt), so here we
+ * draw the bare side view at z = 0 in that group's local frame. When the fold is built,
+ * ADR-106/108 require it to hinge sideways INTO the VP about the VP∩PP line (landing the
+ * side view beside the FRONT view), not down onto the HP about the HP∩PP line. (The third
  * orthographic view — there is no Unity sign to re-derive; like HP/VP it just zeroes
  * one world coordinate.)
  * @param {THREE.Vector3} p
@@ -442,10 +446,13 @@ function buildArrowMesh(positions, color) {
  * @property {THREE.Group} ppConnectorGroup Dotted 3D→PP connector lines (upright view) — the
  *   side-view counterpart of connectorGroup. Kept SEPARATE so the consumer can reveal it only
  *   once the side view (Step 5) is shown, rather than with the top + front views (Step 4).
- * @property {THREE.Group} flatConnectorGroup Dashed 2D projectors linking the top
- *   view to the FOLDED front view across the ground line — the connector lines of
- *   the flattened drawing. Positioned at the folded layout; the consumer fades them
- *   in as the fold completes (kept out of the fold pivot so they stay static).
+ * @property {THREE.Group} flatConnectorGroup Dashed 2D projectors of the flattened
+ *   drawing: top view → folded front view across the ground line, AND folded front
+ *   view → folded side view (ADR-106/109 — side ties to FRONT, not top). Positioned
+ *   at the folded layout. This module has no fold pivot yet (ADR-109), so the consumer
+ *   (main.js) parks this whole group hidden (`visible = false`) rather than fading it
+ *   in as a fold completes; a future fold-phase consumer should nest a pivot the way
+ *   ADR-106 does, not fade this group in unchanged.
  * @property {THREE.Group} hpDimensionGroup BIS SP 46:2003 Type-B dimensions for the TOP
  *   view only (depth X + distance from VP): one 1.0px --color-ink LineSegments2, a
  *   --color-ink MeshBasicMaterial filled-3:1-triangle arrowhead soup (ADR-041), plus
@@ -494,8 +501,9 @@ function buildArrowMesh(positions, color) {
  * @param {number} [options.height=window.innerHeight] Initial drawing-buffer height.
  * @param {boolean} [options.drawHidden=true] Draw occluded edges as dashed lines.
  * @param {boolean} [options.drawConnectors=true] Draw the dotted 3D→2D connectors.
- * @param {number} [options.z0=0] PP standoff (ppHingeGroup.position.z, owned by the
- *   consumer). Needed only to place the folded side-view flat connectors at z0 − x;
+ * @param {number} [options.z0=0] PP standoff (ppHolder.position.z, owned by the
+ *   consumer — this module has no fold pivot yet, ADR-109). Needed only to place the
+ *   folded side-view flat connectors at z0 − x, the VP∩PP hinge's Z per ADR-106/109;
  *   harmless at 0 when no profile plane has been seated yet.
  * @returns {ProjectionResult}
  */
@@ -603,13 +611,14 @@ export function drawProjections(edgeMap, options = {}) {
       const foldedFront = new THREE.Vector3(-vertex.y, 0, vertex.z);
       addSegment(flatConnectors, projectHP(vertex), foldedFront);
 
-      // Side-view projector: link the TOP-view point to the folded SIDE-view point.
-      // The PP now hinges DOWN onto the HP about the HP∩PP line (−90° about local X, in
-      // world space), carrying a PP point (x, y, 0) at standoff z0 to (x, 0, z0 − y) —
-      // beside the TOP view. Top and side share world X (= the solid's x), so this
-      // projector runs along Z at constant x, tying the side view to the top view.
-      const foldedSide = new THREE.Vector3(vertex.x, 0, z0 - vertex.y);
-      addSegment(flatConnectors, projectHP(vertex), foldedSide);
+      // Side-view projector: link the FRONT-view point to the folded SIDE-view point
+      // (ADR-106/109). The PP hinges SIDEWAYS into the VP about the VP∩PP line, carrying
+      // a PP point (x, y, 0) at standoff z0 to (−y, 0, z0 − x) — beside the FRONT view.
+      // Front and side share world X (= −vertex.y, the same mapping foldedFront uses), so
+      // this projector runs HORIZONTALLY at constant world x, tying the side view to the
+      // front view — not the top view.
+      const foldedSide = new THREE.Vector3(-vertex.y, 0, z0 - vertex.x);
+      addSegment(flatConnectors, foldedFront, foldedSide);
     }
   }
 

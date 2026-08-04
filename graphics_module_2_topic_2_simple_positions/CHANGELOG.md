@@ -2,6 +2,9 @@
 
 All notable changes to Module 2 · Topic 2 (Simple Positions).
 
+## 2026-08-04
+- Fixed: the Side view folded down beside the Top view instead of the Front view, violating standard first-angle convention (Side must share Front's height band via shared horizontal projectors, not Top's) — a byte-identical copy of a bug just fixed in the Module 2 master reference. The Profile Plane's fold hinge (`ppHingeGroup`) was a world-space sibling of the VP fold pivot (`vpFoldGroup`), folding `−90°` about local X onto the HP; it's now nested inside `vpFoldGroup` and folds `+90°` about local Y into the VP plane about the VP∩PP line, riding the VP's own fold down with the front view. Updated `positionRefLabels()`, `answerSheetBox()`, `drawCompare()`'s `sheetPP` formula and its X1-Y1 reference line (now the VP∩PP hinge, spanning Front+Side), and `projectionDrawer.js`'s flat side-view connector (now ties to the folded Front point). Verified live: 2D Compare sheet and 3D flattened answer sheet both show Side right of Front at matching height; the `distHP`/`distVP` sliders move the right views together; shape cycling produced no console errors. See `../DECISIONS.md` ADR-107 (backports ADR-106).
+
 ## 2026-07-31
 - Added: "Finish lesson" button (Module 2 Finish-button pilot rollout — this topic is the exact twin of the pilot's own Step 6 "Flatten") — `#btn-finish` takes over the footer's primary slot at the terminal step exactly when `#btn-next` vacates it, enabled once flattened. Click posts `sim:complete` and announces "Lesson marked complete." (`main.js`, `src/stepper.js`, `index.html`.)
 - Changed: `sim:complete` (`markComplete()`) drops its one-shot `window.__simComplete` latch — fires on every "Finish lesson" click now, replacing the old auto-fire on flatten. (`main.js`, `src/stepper.js`.)
