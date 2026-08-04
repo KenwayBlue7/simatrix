@@ -620,6 +620,14 @@ function buildArrowMesh(positions, color) {
  *   `new THREE.Vector3(0, 1, 0).transformDirection(matrixWorld)` for the live mesh, or the same
  *   against a headless stage's pose matrix. Defaults to world +Y (correct for an upright,
  *   unrotated solid) so existing callers that never pass it still classify sensibly.
+ * @param {{ heightMM: number, baseMM: number|null }} [options.restrictedDims] ADR-102 — when
+ *   given, REPLACES the full 5-dim bbox layer with exactly two dims: overall height (labelled
+ *   with `heightMM`, the caller's TRUE value — not the projected Y-extent, which is only correct
+ *   in Set 1's simple position) and the true base-polygon-edge length (labelled with `baseMM`;
+ *   pass `null` for curved-base solids, which have no single edge to dimension — see
+ *   `findBaseRingEdge`'s own doc for why this module doesn't infer that itself). Only Show
+ *   Method's `projectSet` (main.js) passes this; the live pane's own `drawProjections` call never
+ *   does, so its 5-dim toggle is untouched by this option's existence.
  * @returns {ProjectionResult}
  */
 export function drawProjections(edgeMap, options = {}) {
@@ -631,6 +639,7 @@ export function drawProjections(edgeMap, options = {}) {
     drawDimensions = true,
     z0 = 0,
     axis = new THREE.Vector3(0, 1, 0),
+    restrictedDims = null,
   } = options;
 
   const resolution = new THREE.Vector2(width, height);
@@ -784,32 +793,67 @@ export function drawProjections(edgeMap, options = {}) {
     const V = (x, y, z) => new THREE.Vector3(x, y, z);
     const EXTENT_EPS = 1e-3;
 
-    // Front view (VP, X = 0) → vpDim* (folds with the VP). Height (Y), width (Z, shared with
-    // the top view), and the clearance above the ground line (Y = 0 = HP∩VP) when the solid
-    // stands off HP. Built in the X = 0 plane, the same frame vpGroup draws in, so parenting
-    // this group under the VP fold pivot folds these dims down flat with the front view.
-    if (max.y - min.y > EXTENT_EPS) {
-      pushLinearDim(vpDimBatch, vpArrowPos, vpDimLabels, V(0, min.y, max.z), V(0, max.y, max.z),
-        V(0, 0, DIM_OFFSET), (max.y - min.y) * WORLD_TO_MM);
-    }
-    if (max.z - min.z > EXTENT_EPS) {
-      pushLinearDim(vpDimBatch, vpArrowPos, vpDimLabels, V(0, max.y, min.z), V(0, max.y, max.z),
-        V(0, DIM_OFFSET, 0), (max.z - min.z) * WORLD_TO_MM);
-    }
-    if (min.y > EXTENT_EPS) {
-      pushLinearDim(vpDimBatch, vpArrowPos, vpDimLabels, V(0, 0, min.z), V(0, min.y, min.z),
-        V(0, 0, -DIM_OFFSET), min.y * WORLD_TO_MM);
-    }
+    if (restrictedDims) {
+      // ADR-102/103 — Show Method's own restricted dimension layer (Set 1 only, ADR-103):
+      // overall height + the TRUE base-edge length ONLY, never the live pane's 5 bbox-extent
+      // dims below (untouched, reached only via the `else` branch — restrictedDims is never
+      // passed by the live pane's own drawProjections call). Both dims land in whichever view
+      // the live pane's own placement idiom already uses for that feature (VP for height, HP for
+      // the base edge), so the restricted layer folds/flattens exactly like the full one.
+      // `valueMM` is the caller's TRUE value (main.js reads it straight off shapeData — every Set
+      // shares one geometry, so it's pose-invariant), decoupled from the placement geometry below
+      // exactly the way pushLinearDim already separates the two for every other dim in this file.
+      if (restrictedDims.heightMM != null && max.y - min.y > EXTENT_EPS) {
+        // ADR-103: the dimension LINE stays at the bbox's own max.z (a fixed screen position,
+        // margin-side), but each extension line now ANCHORS to a real point of the drawing at
+        // that height — see pushLinearDim's anchorA/B and ringZExtentAt's own doc for why a
+        // pyramid/cone apex (a single point, usually nowhere near max.z) needs this and a prism
+        // (whose top ring already reaches max.z) does not.
+        const topAnchorZ = ringZExtentAt(edgeMap, max.y, EXTENT_EPS) ?? max.z;
+        const botAnchorZ = ringZExtentAt(edgeMap, min.y, EXTENT_EPS) ?? max.z;
+        pushLinearDim(vpDimBatch, vpArrowPos, vpDimLabels, V(0, min.y, max.z), V(0, max.y, max.z),
+          V(0, 0, DIM_OFFSET), restrictedDims.heightMM,
+          V(0, min.y, botAnchorZ), V(0, max.y, topAnchorZ));
+      }
+      if (restrictedDims.baseMM != null) {
+        // null for Cone/Cylinder (main.js's own gate — no polygon base edge exists to measure;
+        // this module stays shape-agnostic, per its own header, so it never infers that itself).
+        const baseEdge = findBaseRingEdge(edgeMap, axis);
+        if (baseEdge) {
+          const center = box.getCenter(new THREE.Vector3());
+          const off = baseEdgeDimOffset(baseEdge.p1, baseEdge.p2, center);
+          pushLinearDim(hpDimBatch, hpArrowPos, hpDimLabels, baseEdge.p1, baseEdge.p2, off,
+            restrictedDims.baseMM);
+        }
+      }
+    } else {
+      // Front view (VP, X = 0) → vpDim* (folds with the VP). Height (Y), width (Z, shared with
+      // the top view), and the clearance above the ground line (Y = 0 = HP∩VP) when the solid
+      // stands off HP. Built in the X = 0 plane, the same frame vpGroup draws in, so parenting
+      // this group under the VP fold pivot folds these dims down flat with the front view.
+      if (max.y - min.y > EXTENT_EPS) {
+        pushLinearDim(vpDimBatch, vpArrowPos, vpDimLabels, V(0, min.y, max.z), V(0, max.y, max.z),
+          V(0, 0, DIM_OFFSET), (max.y - min.y) * WORLD_TO_MM);
+      }
+      if (max.z - min.z > EXTENT_EPS) {
+        pushLinearDim(vpDimBatch, vpArrowPos, vpDimLabels, V(0, max.y, min.z), V(0, max.y, max.z),
+          V(0, DIM_OFFSET, 0), (max.z - min.z) * WORLD_TO_MM);
+      }
+      if (min.y > EXTENT_EPS) {
+        pushLinearDim(vpDimBatch, vpArrowPos, vpDimLabels, V(0, 0, min.z), V(0, min.y, min.z),
+          V(0, 0, -DIM_OFFSET), min.y * WORLD_TO_MM);
+      }
 
-    // Top view (HP, Y = 0) → hpDim* (stays flat under the HP). Depth (X) and the distance
-    // from VP (the top view's clearance from the ground line X = 0) when the solid stands off VP.
-    if (max.x - min.x > EXTENT_EPS) {
-      pushLinearDim(hpDimBatch, hpArrowPos, hpDimLabels, V(min.x, 0, min.z), V(max.x, 0, min.z),
-        V(0, 0, -DIM_OFFSET), (max.x - min.x) * WORLD_TO_MM);
-    }
-    if (min.x > EXTENT_EPS) {
-      pushLinearDim(hpDimBatch, hpArrowPos, hpDimLabels, V(0, 0, max.z), V(min.x, 0, max.z),
-        V(0, 0, DIM_OFFSET), min.x * WORLD_TO_MM);
+      // Top view (HP, Y = 0) → hpDim* (stays flat under the HP). Depth (X) and the distance
+      // from VP (the top view's clearance from the ground line X = 0) when the solid stands off VP.
+      if (max.x - min.x > EXTENT_EPS) {
+        pushLinearDim(hpDimBatch, hpArrowPos, hpDimLabels, V(min.x, 0, min.z), V(max.x, 0, min.z),
+          V(0, 0, -DIM_OFFSET), (max.x - min.x) * WORLD_TO_MM);
+      }
+      if (min.x > EXTENT_EPS) {
+        pushLinearDim(hpDimBatch, hpArrowPos, hpDimLabels, V(0, 0, max.z), V(min.x, 0, max.z),
+          V(0, 0, DIM_OFFSET), min.x * WORLD_TO_MM);
+      }
     }
   }
 
@@ -1003,6 +1047,128 @@ function pushArrowTriangle(out, tip, along, perp) {
   out.push(tip.x, tip.y, tip.z, a.x, a.y, a.z, b.x, b.y, b.z);
 }
 
+const BASE_RING_EPS = 1e-2; // world units — how close two 'base'-kind edges' axial projections
+                             // must be to count as the SAME ring (see findBaseRingEdge)
+
+/**
+ * Real Z reach of the drawing at a given height (ADR-103) — the largest Z among every edgeMap
+ * vertex within `eps` of `targetY`. Anchors the restricted height dim's extension lines to an
+ * actual point of the front view instead of a synthetic bbox corner: a prism's top and base
+ * rings both already reach the bbox's own Z extent (so this returns the same value the old bbox
+ * corner used — a no-op there), but a pyramid/cone's apex is a single point usually nowhere near
+ * it, and THAT mismatch is exactly the "extension line floats disconnected near the top" bug —
+ * the old code anchored it to `max.z` (a corner of the BASE ring) at apex height, a point that
+ * was never actually part of the front view's outline there.
+ * @param {Map<string, import('./meshAnalyzer.js').EdgeRecord>} edgeMap
+ * @param {number} targetY World Y to search at.
+ * @param {number} eps Tolerance on `targetY`.
+ * @returns {number | null} null if no vertex falls within `eps` of `targetY`.
+ */
+function ringZExtentAt(edgeMap, targetY, eps) {
+  let z = -Infinity;
+  let found = false;
+  for (const { edge } of edgeMap.values()) {
+    for (const p of [edge.p1, edge.p2]) {
+      if (Math.abs(p.y - targetY) <= eps && p.z > z) { z = p.z; found = true; }
+    }
+  }
+  return found ? z : null;
+}
+
+/**
+ * Find the base-ring edge to dimension (ADR-103, fixing ADR-102's original pick). Among every
+ * axis-perpendicular ('base'-kind, `edgeKindOf`) edge, the base ring and the top/cap ring are
+ * both 'base' kind, so they're told apart by axial position — for a RIGID transform (rotation +
+ * translation, uniform scale; every Set's pose), `dot(worldPoint, axisDir)` is an affine function
+ * of the point's LOCAL Y (proof: worldPoint = R·localPoint + T, axisDir = R·(0,1,0), and R being
+ * orthogonal means dot(R·localPoint, R·(0,1,0)) = dot(localPoint, (0,1,0)) = localPoint.y), so it
+ * preserves the base-vs-top ordering regardless of how the Set is posed. The base (every Module 2
+ * solid is generated upright about local +Y, local Y=0 at the base — CLAUDE.md) is therefore
+ * whichever cluster has the SMALLER axial projection.
+ *
+ * TWO fixes over the original ADR-102 pick, both found by reading the textbook (John, Fig 12.20
+ * onward) against a live square pyramid:
+ *  1. `classifyEdge`/`EdgeType.COPLANAR` — the SAME filter the main draw loop already applies at
+ *     this file's own edge-walk above — now excludes triangulation seams before they ever reach
+ *     the 'base' classification. A flat N-gon base face arrives as a fan of triangles; the
+ *     diagonals between them are 'base'-kind (they lie in the base plane, ⊥ the axis) and, being
+ *     longer than any real polygon edge, always won the old "greatest projected length" pick —
+ *     the direct cause of the reported "base edge is a diagonal" bug.
+ *  2. The selection metric is no longer length (restricting the whole feature to Set 1 — ADR-103
+ *     — means the base is always drawn in TRUE shape here, so every real base edge already has
+ *     the same true length; "least foreshortened" no longer discriminates anything). Instead the
+ *     edge is picked for PLACEMENT: the one whose direction has the largest world-X component,
+ *     i.e. reads most nearly VERTICAL on the method sheet (`flattenHP`'s `v = -x`). Its in-plane
+ *     normal is then dominantly Z, which `baseEdgeDimOffset` turns into a dimension line that
+ *     sits beside the view (sheet-horizontal offset) rather than stacking toward the xy line —
+ *     John's own convention (Fig 12.21's edge b–a, Fig 12.25's edge c–d). For a base deliberately
+ *     turned in plan (e.g. the "Orient to Corner" 45° preset), no edge is purely X- or
+ *     Z-aligned — the same metric still picks a definite edge and `baseEdgeDimOffset` draws an
+ *     ALIGNED dimension parallel to it (Fig 12.20's turned-square frustum), rather than crashing
+ *     or degenerating the way a symmetric diagonal did.
+ * Curved-base solids (Cone/Cylinder) have no single true edge — the caller decides whether to
+ * call this at all (main.js gates on shapeData.shape, not attempted here: this module stays
+ * geometry-only, per its own header, and has no shape-kind concept).
+ * @param {Map<string, import('./meshAnalyzer.js').EdgeRecord>} edgeMap
+ * @param {THREE.Vector3} axisDir Unit world-space solid axis (see drawProjections' own `axis`).
+ * @returns {{ p1: THREE.Vector3, p2: THREE.Vector3 } | null} null when no base-kind edge exists.
+ */
+function findBaseRingEdge(edgeMap, axisDir) {
+  const baseEdges = [];
+  for (const { edge, faces } of edgeMap.values()) {
+    if (classifyEdge(faces) === EdgeType.COPLANAR) continue; // triangulation seam, e.g. a base diagonal — not a real edge
+    if (edgeKindOf(edge.p1, edge.p2, axisDir) !== 'base') continue;
+    const midAx = (edge.p1.x + edge.p2.x) / 2 * axisDir.x
+      + (edge.p1.y + edge.p2.y) / 2 * axisDir.y
+      + (edge.p1.z + edge.p2.z) / 2 * axisDir.z;
+    baseEdges.push({ p1: edge.p1, p2: edge.p2, midAx });
+  }
+  if (baseEdges.length === 0) return null;
+  const minAx = Math.min(...baseEdges.map((e) => e.midAx));
+  let best = null;
+  let bestScore = -1;
+  for (const e of baseEdges) {
+    if (e.midAx - minAx > BASE_RING_EPS) continue; // top/cap ring — skip
+    const ex = e.p2.x - e.p1.x, ez = e.p2.z - e.p1.z;
+    const len = Math.hypot(ex, ez); // HP flatten drops Y
+    if (len < 1e-6) continue; // degenerate — shouldn't occur for a real base edge, stays harmless
+    const score = Math.abs(ex) / len; // 1 ⇒ edge runs along world X ⇒ reads vertical on the sheet
+    if (score > bestScore) { bestScore = score; best = e; }
+  }
+  return best ? { p1: best.p1, p2: best.p2 } : null;
+}
+
+/**
+ * World-space offset for a base-edge dimension line (ADR-102/103): perpendicular to the edge
+ * WITHIN the HP flatten plane (drops Y, keeps X/Z), scaled to {@link DIM_OFFSET}, pointing AWAY
+ * from `center` (the solid's own bbox centre) so the dimension never lands back on top of the
+ * drawn edge. Relies on `findBaseRingEdge` (ADR-103) now always handing it a REAL polygon edge —
+ * a real edge's midpoint is never the bbox centre (unlike the diagonal ADR-102 originally picked,
+ * whose midpoint coincides with it exactly, degenerating this dot-product sign test to ~0 and
+ * leaving the offset pointing whichever way the raw perpendicular happened to fall — the direct
+ * cause of the dimension landing in the gap between the top and front views). For an
+ * axis-aligned base this offset is purely sideways (beside the view, John's own placement); for a
+ * base turned in plan it is a genuine diagonal, same as Fig 12.20's aligned dimension. Falls back
+ * to the bbox dims' own (0,0,DIM_OFFSET) when the edge has no XZ extent (degenerate input stays
+ * harmless; `findBaseRingEdge` already excludes zero-length edges itself).
+ * @param {THREE.Vector3} p1
+ * @param {THREE.Vector3} p2
+ * @param {THREE.Vector3} center
+ * @returns {THREE.Vector3}
+ */
+function baseEdgeDimOffset(p1, p2, center) {
+  const ex = p2.x - p1.x;
+  const ez = p2.z - p1.z;
+  const len = Math.hypot(ex, ez);
+  if (len < 1e-6) return new THREE.Vector3(0, 0, DIM_OFFSET);
+  let nx = -ez / len;
+  let nz = ex / len;
+  const midX = (p1.x + p2.x) / 2;
+  const midZ = (p1.z + p2.z) / 2;
+  if (nx * (midX - center.x) + nz * (midZ - center.z) < 0) { nx = -nx; nz = -nz; }
+  return new THREE.Vector3(nx * DIM_OFFSET, 0, nz * DIM_OFFSET);
+}
+
 /**
  * Push one linear dimension between features `A` and `B`, its dimension line stood off
  * perpendicular by `off`. Emits the two extension lines (a {@link DIM_EXT_GAP} gap off
@@ -1014,18 +1180,26 @@ function pushArrowTriangle(out, tip, along, perp) {
  * @param {SegmentBatch} batch
  * @param {number[]}     arrows  Flat triangle-vertex buffer for the filled arrowheads.
  * @param {{ pos: THREE.Vector3, text: string }[]} labels  Collected label placements.
- * @param {THREE.Vector3} A        First measured feature (world space).
- * @param {THREE.Vector3} B        Second measured feature (world space).
+ * @param {THREE.Vector3} A        First point defining the dimension LINE's position (world).
+ * @param {THREE.Vector3} B        Second point defining the dimension line's position (world).
  * @param {THREE.Vector3} off      Perpendicular offset to the dimension line (world).
  * @param {number}        valueMM  The true measurement in millimetres.
+ * @param {THREE.Vector3} [anchorA=A] Real feature point the first extension line starts from
+ *  (ADR-103) — defaults to `A` itself. Needed when the dimension line's own position (`A`) is a
+ *  synthetic bbox corner rather than a point actually on the drawing (e.g. the restricted height
+ *  dim's top end, which must reach the solid's real apex, not the bbox corner above it — see
+ *  `drawProjections`' own call site) so the extension line lands on a real edge instead of
+ *  floating disconnected beside it.
+ * @param {THREE.Vector3} [anchorB=B] Real feature point the second extension line starts from.
  */
-function pushLinearDim(batch, arrows, labels, A, B, off, valueMM) {
+function pushLinearDim(batch, arrows, labels, A, B, off, valueMM, anchorA = A, anchorB = B) {
   const dir = off.clone().normalize();            // extension-line direction (unit)
   const Ad = A.clone().add(off);                  // A projected onto the dimension line
   const Bd = B.clone().add(off);                  // B projected onto the dimension line
-  // extension lines: gap off the feature → overshoot past the dimension line
-  addSegment(batch, A.clone().addScaledVector(dir, DIM_EXT_GAP), Ad.clone().addScaledVector(dir, DIM_EXT_OVERSHOOT));
-  addSegment(batch, B.clone().addScaledVector(dir, DIM_EXT_GAP), Bd.clone().addScaledVector(dir, DIM_EXT_OVERSHOOT));
+  // extension lines: gap off the REAL feature (anchorA/B, which may differ from A/B — see the
+  // anchor params' own doc) → overshoot past the dimension line
+  addSegment(batch, anchorA.clone().addScaledVector(dir, DIM_EXT_GAP), Ad.clone().addScaledVector(dir, DIM_EXT_OVERSHOOT));
+  addSegment(batch, anchorB.clone().addScaledVector(dir, DIM_EXT_GAP), Bd.clone().addScaledVector(dir, DIM_EXT_OVERSHOOT));
   // the dimension line
   addSegment(batch, Ad, Bd);
   // outward filled 3:1 triangle arrowheads (back-spread splays in the extension-line

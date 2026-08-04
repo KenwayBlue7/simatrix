@@ -547,6 +547,25 @@
     }
     .method-view[hidden] { display: none; }
     .method-view:not([hidden]) { animation: libraryIn var(--dur-step) var(--ease-standard); }
+    /* ---- ADR-095: per-beat step description, promoted to a flow row ABOVE the stage — a
+       flex child of .method-view (which is flex-direction:column), not an absolute overlay.
+       That makes it structurally impossible for this title to collide with the canvas' own
+       Set caption (painted near the bottom of the drawing) or with .set-chips (top-right of
+       the stage): the stage shrinks to make room instead of this floating over it. Reserves
+       its line-height even when empty (no `:empty{display:none}`) so the canvas never resizes
+       mid-walkthrough as beats come and go. NOT a reintroduction of the ADR-085-removed title
+       bar — no border/background, no step count, just the current beat's plain-language text
+       (methodController.js syncCaption(); #sim-status already narrates the same text, hence
+       aria-hidden). */
+    .method-title {
+      flex: 0 0 auto;
+      padding: var(--space-4) var(--space-5) var(--space-2);
+      min-height: calc(var(--text-lead) * 1.4);
+      text-align: center;
+      font-size: var(--text-lead);
+      font-weight: 600;
+      color: var(--color-ink);
+    }
     .method-view__stage {
       flex: 1 1 auto;
       position: relative;
@@ -564,10 +583,9 @@
     }
 
     /* ---- Walkthrough controls — floating group, bottom-centre, overlaying the drawing
-       (ADR-085; no title bar — Back/Next/Exit are the entire toolbar now). ADR-094 stacks a
-       plain-text caption above the pill via this wrapper — NOT a reintroduction of the removed
-       title bar (no border/background of its own, no step count, just the current beat's
-       plain-language caption). */
+       (ADR-085; no title bar — Back/Next/Exit are the entire toolbar now). The per-beat
+       caption used to stack above this pill (ADR-094) but moved to .method-title (ADR-095) —
+       this wrapper now holds only the pill. */
     .method-controls {
       position: absolute;
       bottom: var(--space-5);
@@ -579,14 +597,6 @@
       align-items: center;
       gap: var(--space-2);
     }
-    /* ADR-094 — see .method-controls comment above for why this isn't the removed title bar. */
-    .method-caption {
-      padding: 0 var(--space-2);
-      font-size: var(--text-sm);
-      color: var(--color-ink-secondary);
-      text-align: center;
-    }
-    .method-caption:empty { display: none; }
     .method-bar {
       display: flex;
       align-items: center;
@@ -594,7 +604,9 @@
       padding: var(--space-2) var(--space-3);
       background: var(--color-panel);
       border: 1px solid var(--color-border);
-      border-radius: 999px;
+      /* ADR-095: concentric with the .btn--small children's --radius-sm (6px) across this
+         bar's own var(--space-2) = 8px vertical padding, not an unrelated stadium 999px. */
+      border-radius: calc(var(--radius-sm) + var(--space-2));
       font-size: var(--text-sm);
       box-shadow: var(--shadow-md); /* transient floating surface (Flat-Ink exception) */
     }
@@ -603,7 +615,10 @@
        (same token language, same segmented-pill shape) but for Set-1/2/3 focus rather than
        Top/Front/Side. "Set" not "Stage" in every class/attr name here: .compare-card__stage
        (the Compare sheet's own canvas area) already owns that word (ADR-084 naming note,
-       still true post-ADR-085). */
+       still true post-ADR-085). A direct child of #method-view in the markup (position:fixed,
+       inset:0), NOT .method-view__stage — its containing block is the whole takeover, so
+       top/right stay a flush ~8px corner inset regardless of .method-title's height above the
+       stage (ADR-098 addendum). */
     .set-chips {
       position: absolute;
       top: var(--space-2);
@@ -642,7 +657,8 @@
        own shrink-to-fit size instead of the stage. */
     @media (max-width: 480px) {
       .method-controls { width: calc(100% - var(--space-6)); }
-      .method-bar { flex-direction: column; border-radius: var(--radius-md); width: 100%; }
+      /* Stacked buttons keep the same concentric radius law as the row layout above. */
+      .method-bar { flex-direction: column; border-radius: calc(var(--radius-sm) + var(--space-2)); width: 100%; }
     }
 
     /* ============================================================
@@ -2143,23 +2159,39 @@
        instant state changes. methodController.js (src/methodController.js) owns every child here
        except the canvas, which main.js draws into (drawMethodView/drawMethodSheet). -->
   <div id="method-view" class="method-view" role="dialog" aria-modal="true" aria-label="Show Method — construction walkthrough" hidden>
+    <!-- ADR-095: plain-language caption for the CURRENT beat only ("Outline of the top view",
+         not a step count — ADR-089 Decision 2 already rejected the numeric counter this
+         deliberately isn't), promoted to its own top-of-view flow row (.method-title) — clear
+         of the canvas' own bottom-of-block Set caption ("Set N — <label>") and of the
+         .method-controls pill below, so the two captions can never overlap or repeat each
+         other (beat 0 reads "Starting Set N" here, never the Set label itself). aria-hidden:
+         #sim-status already narrates the identical text (methodController.js syncCaption), so
+         this is not a second live region. -->
+    <div id="method-caption" class="method-title" aria-hidden="true"></div>
+    <!-- Direct child of #method-view (position:fixed, inset:0), not .method-view__stage — the
+         stage now starts BELOW .method-title, so anchoring here instead keeps this pill flush
+         with the view's actual top-right corner regardless of the title row's height, matching
+         the platform's normal ~8px corner-inset spacing rather than inheriting the stage's own
+         lower top edge as extra empty space above it. -->
+    <div id="method-chips" class="set-chips" role="group" aria-label="Focus a Set" hidden></div>
     <div class="method-view__stage">
       <canvas id="method-canvas" aria-label="Construction walkthrough: the problem's textbook construction drawn as successive Sets"></canvas>
-      <div id="method-chips" class="set-chips" role="group" aria-label="Focus a Set" hidden></div>
       <div class="method-controls">
-        <!-- ADR-094: plain-language caption for the CURRENT beat only ("Outline of the top
-             view", not a step count — ADR-089 Decision 2 already rejected the numeric counter
-             this deliberately isn't). aria-hidden: #sim-status already narrates the identical
-             text (methodController.js syncCaption), so this is not a second live region. -->
-        <div id="method-caption" class="method-caption" aria-hidden="true"></div>
-        <div class="method-bar" role="group" aria-label="Walkthrough controls">
+        <div class="method-bar" role="group" aria-label="Walkthrough controls. Press Space to advance.">
           <button type="button" class="btn btn--small" id="method-back">Back</button>
-          <button type="button" class="btn btn--small btn--primary" id="method-next"></button>
+          <button type="button" class="btn btn--small btn--primary" id="method-next" title="Press Space to advance"></button>
           <!-- ADR-087 Decision 2: mitigates the 15-beat/Set template's click cost — jumps to
                the NEXT Set's first beat only, never the whole method. Hidden entirely once the
                walkthrough is on its last Set — there is no Set left to skip to
                (methodController.js renderProgress; ADR-094 made the code actually match this
                comment, which the disabled-only original never did). -->
+          <!-- Set-to-Set tilt (amends ADR-085's no-tween clause — see DECISIONS.md). Hidden, not
+               merely disabled, whenever sim.method.canTilt() is false — methodController.js's own
+               focusables() selects `button` and filters on `!disabled && offsetParent !== null`,
+               so a hidden button needs no separate focus-trap handling. Shown only while the
+               current Set is a Set-to-Set tilt's destination (today: the both-planes tier's
+               Set 3, ADR-093's turnDeg). -->
+          <button type="button" class="btn btn--small" id="method-tilt" hidden>Watch the turn</button>
           <button type="button" class="btn btn--small" id="method-skip-set">Skip to next Set</button>
           <button type="button" class="btn btn--small" id="method-exit">Exit method</button>
         </div>

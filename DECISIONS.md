@@ -3691,7 +3691,10 @@ and available the instant `begin()` builds `methodSets`.
 no hidden geometry on some sub-beat). `sets()`'s existing `reached` semantics (ADR-084 Decision 7)
 are untouched — a Set is "reached" the moment its first beat draws, regardless of how many of its
 interior beats get skipped.
-**Status:** Active
+**Status:** Superseded by ADR-098 — this ADR's own-array-emptiness test still missed a beat that
+is non-empty but redraws lines an earlier beat already put on the sheet; ADR-098 replaces it with
+a mark-novelty test in sheet-local 2D. The skip *mechanism* this ADR introduced (`goNext`/`goBack`
+loop past `hasVisibleContent(set, beat) === false`) is unchanged and still active.
 
 ---
 
@@ -3900,9 +3903,13 @@ so none of this needs backporting):
    (`main.js`, beside `methodContentBeats`, reusing its exact `firstIsHP` split so a beat's caption
    never disagrees with its own content gate) returning plain English ("Outline of the top view",
    "Hidden face lines — front view", "Projectors linking the two views") with beat 0 matching the
-   Set's own canvas caption verbatim. Exposed as `sim.method.beatLabel`. `methodController.js`'s
-   new `syncCaption()` pushes it into a new visible `#method-caption` pill (`index.html`, wrapped
-   with `.method-bar` inside a new `.method-controls` flex-column, `aria-hidden="true"`) AND the
+   Set's own canvas caption verbatim [SUPERSEDED by ADR-098: beat 0 now reads "Starting Set N" —
+   verbatim duplication of the canvas caption turned out to be the second half of a layout defect,
+   see ADR-098 §2]. Exposed as `sim.method.beatLabel`. `methodController.js`'s new `syncCaption()`
+   pushes it into a new visible `#method-caption` pill (`index.html`, wrapped with `.method-bar`
+   inside a new `.method-controls` flex-column, `aria-hidden="true"`) [SUPERSEDED by ADR-098: the
+   caption moved out of `.method-controls` to its own top-of-view title row — stacking it above
+   the pill still collided with the canvas' own Set caption at the same screen row] AND the
    platform's one `#sim-status` live region via the existing `sim.announce`, on every
    Next/Back/Skip and once on `start()`.
 **Why:** all five were found in one investigation and are individually small, but bundled here
@@ -4034,6 +4041,706 @@ to the 2D build's scope, not a replacement for it.
 now on record as having been re-examined at its hardest test case rather than merely inherited by
 topic-numbering momentum. `constructions.js`'s helix math is shared 3D-parametric geometry
 projected into two SVG panes by one shared layout function, not duplicated per-view logic.
+**Status:** Active.
+
+---
+
+## ADR-098: Show Method's beat-emptiness test becomes mark-novelty in sheet-local 2D; the per-beat caption moves to a top-of-view title, out of the canvas-caption's own space; the nav pill's corner radius is made concentric with its buttons; the Set-N chip pill is re-anchored to clear the new title row
+
+**Date:** 2026-08-01
+**Decision:** Three defects survived ADR-089/090/094's pass on Show Method (Module 2), found in
+one audit:
+1. **Redundant click-stops.** ADR-090's `methodContentBeats` (`main.js`) asked only "is this
+   beat's own harvested array non-empty" — too weak. A beat can be non-empty and still redraw
+   exactly what an earlier beat already put on the sheet: a Set with no inclination (Set 1,
+   "Simple position") shows its top view's outline beat and visible-face beat tracing the
+   identical square, and its vertical generators flattening to points in that same view. Four
+   clicks, one visible mark. Fixed by replacing the per-array-emptiness test with a mark-novelty
+   one: each beat's segments are flattened with the SAME sheet-local affine map
+   `drawMethodSheet` uses (`methodFlattenHP`/`methodFlattenVP`, `main.js`), quantized at `1e-3`
+   (the same weld tolerance `meshAnalyzer.js` uses), order-normalized (`A→B === B→A`), and
+   plane-prefixed (HP and VP both flatten `u = -z`, so an unprefixed key would false-match a
+   top-view line against a coincidentally-aligned front-view one). A beat is content-bearing iff
+   at least one of its keys was not already in the accumulated set (`methodSegmentKeys`,
+   rewritten `methodContentBeats`, `main.js`). A degenerate segment (both endpoints quantize to
+   the same point — a generator viewed end-on) contributes no key at all, matching what
+   `strokeMethodLines` actually paints. Beats 6 (projectors) and 13 (labels) stay undeduped
+   (dashed construction lines and text, neither ever meaningfully coincides with view geometry);
+   beat 12 (axis) stays undeduped against view geometry — a different colour/dash is a genuine
+   new mark even collinear with a generator — but still reads `false` when truly degenerate in
+   BOTH flattens, so it doesn't reproduce this exact defect at the beat drawn last. ADR-087's
+   deliberate outline/visible-face overlap is unaffected — `drawMethodSheet`'s gates,
+   `strokeMethodLines`, and the ADR-091 reveal animation are untouched; a skipped beat's lines
+   still paint in full within whichever beat absorbed its click. Verified end-to-end: a scripted
+   Next walkthrough on an upright-then-30°-HP-inclined cube produced zero identical
+   before/after canvas frames across all 14 content-bearing clicks (5 skipped of Set 1's 14
+   beats, 5 skipped of Set 2's), and the mirrored Back walk retraced the same beats with zero
+   no-ops in the reverse direction too.
+2. **Caption collision + duplication.** The per-beat step description (`#method-caption`) lived
+   inside `.method-controls`, stacked directly above the nav pill (ADR-094) — at the same screen
+   row `drawMethodSheet` paints each Set's own canvas caption ("Set N — <label>") under its
+   block, so the canvas caption rendered half-behind the pill. Separately, beat 0's step
+   description returned the Set caption verbatim (`Set ${set+1} — ${s.label}`), duplicating it
+   outright. Fixed two ways: (a) `#method-caption` moved out of `.method-controls` to be the
+   first flow child of `#method-view` (a `flex-direction:column` container), styled as a
+   `.method-title` row above `.method-view__stage` — a flow sibling that shrinks the stage,
+   never an absolute overlay, so it cannot structurally collide with the canvas caption or with
+   `.set-chips` at any width; (b) `drawMethodSheet`'s and `setMethodFocus`'s vertical fit
+   (`main.js`) switched from one symmetric `marginPx` to `marginTopPx`/`marginBottomPx`, with
+   `marginBottomPx = 120` clearing the canvas caption's own offset below `blockH` plus the
+   `.method-controls` pill (`bottom: var(--space-5)` = 24px + the pill's own rendered height,
+   measured live at 49.6px — 120px leaves a comfortable margin, not a tight fit); (c)
+   `methodBeatLabel`'s beat-0 branch (`main.js`) now returns `` `Starting Set ${set+1}` ``
+   instead of the Set caption text, so the two captions never repeat each other. Verified live:
+   opened a 2-Set walkthrough, drove it to each Set's final beat, and screenshotted the
+   bottom region — both Set captions render fully legible, clear of the pill both vertically
+   (visible gap above the pill) and horizontally (each caption sits under its own block, the
+   centred pill sits between them), with the top title always a distinct, single-occurrence
+   string.
+3. **Nav pill radius.** `.method-bar` was `border-radius: 999px` (an unrelated stadium shape)
+   wrapping `.btn--small` children at `--radius-sm` (6px) across the bar's own 8px
+   (`--space-2`) vertical padding — non-concentric corners. Changed to
+   `calc(var(--radius-sm) + var(--space-2))` (14px), in both the row layout and the
+   `@media (max-width: 480px)` stacked variant. Verified via computed style: `14px`, exactly 6 +
+   8, matching the button corners visually.
+4. **[Addendum, same day] Set-N chip gap.** Decision 2's `.method-title` row pushed
+   `.method-view__stage`'s top edge down — but `#method-chips` (the top-right Set-focus pill)
+   was `position: absolute` *inside that stage*, so its `top: var(--space-2)` offset was now
+   measured from the shifted stage edge, not the view's actual top, leaving an oversized gap
+   above it. Moved `#method-chips` to be a direct child of `#method-view` (`position: fixed`,
+   a valid containing block for absolutely-positioned descendants) instead of
+   `.method-view__stage` — no CSS values changed, only which box `top`/`right` are measured
+   against. Verified live: `chips.getBoundingClientRect().top - view.getBoundingClientRect().top`
+   reads exactly `8`, and a screenshot shows the pill level with the top title, no overlap.
+**Why:** all four were found across one audit and one same-day addendum, but share a root cause
+category with ADR-089/090/094 — "every click visibly changes the sheet, nothing overlaps or
+repeats" was the intent; these were the parts of that intent still unmet.
+**Alternatives rejected:** *Detect mark-novelty in world/3D space, not sheet-local 2D* —
+rejected: two distinct world edges routinely flatten to the same sheet line (a prism's top face
+over its bottom face in top view when upright), and a vertical generator flattens to a
+zero-length point in that same view; a 3D comparison misses both, which are exactly the cases
+this fix exists to catch. *Dedupe beats 6/12/13 against view geometry too* — rejected for
+projectors/labels (never meaningfully coincide, and are read by a live region regardless); for
+axis, rejected specifically because a learner-visible colour/dash change is a genuine new mark
+even when geometrically collinear with an already-drawn generator — only the fully-degenerate
+(both-flattens-collapse-to-a-point) case is treated as a true no-op. *Collapse the title row to
+zero height when the caption is empty* (`:empty{display:none}`, ADR-094's original behaviour) —
+rejected: would resize the canvas mid-walkthrough as beats come and go; the row now reserves its
+line-height unconditionally.
+**Consequences:** `methodViewSplit` (ADR-091) is now shared by three call sites instead of two —
+`methodContentBeats` no longer keeps its own independent copy of the `firstIsHP` split (that
+independence was ADR-091's deliberate precedent for a second copy; a third was not, ADR-091's own
+header note). `#method-caption` keeps its id and `aria-hidden` (unchanged JS wiring in
+`methodController.js` — only its DOM position and CSS class changed). No beat template, gate, or
+animation logic changed — `METHOD_BEAT_COUNT`/`BEAT_COUNT` stay at 14 and still must move
+together (ADR-087/094).
+**Status:** Active.
+
+---
+
+## ADR-099: Show Method denotes its angles with a drawn arc + degree label, measured off the Set's actual pose rather than declared from the raw slider; the Set 2→Set 3 carry-over gets its own dash and a Set-aware caption
+
+**Date:** 2026-08-01
+**Decision:** Two gaps found in one audit: (1) nothing on the Show Method sheet showed WHERE an
+inclination angle actually was or WHAT it was measured against — Sets named their angles in the
+caption text only ("Axis 30° to the HP"), never on the drawing itself; Module 2 had zero arc
+primitives anywhere. (2) beat 6's cross-Set derivation line (ADR-092) and its within-Set projector
+line were visually identical (same colour, same short dash, same caption), so a learner had no way
+to tell "linking this Set's two views" apart from "carried over from the last Set," or why.
+
+Fixed as one measured-not-declared system, not a labelling patch:
+1. **Audit finding that reframed the whole angle half:** `angleHP` is a plain X-tilt from upright
+   (`iShape.js`), so an "axis 30° to the HP" problem statement actually draws at **60°** off the
+   HP (confirmed live: world axis direction read back via a temporary debug hook against the
+   "Square pyramid, inclined both ways" problem — `asin(|dir.y|) = 60°`, not 30). `angleVP` alone
+   is faithful (a pure Z-roll, upright ⇒ 0° to VP). The both-planes Set 3 case is worse than a
+   simple complement: its VP-inclination is a SEQUENTIAL yaw-after-tilt (ADR-093), which reads
+   14.48° true 3-D VP-angle for a nominal "30°" — no closed-form correction was going to hold up
+   here. **Chosen fix: measure, don't declare.** Every Set's caption and its arc both derive from
+   the Set's actual resolved world axis (`axisInclinations(dir) = { toHP: asin(|dir.y|), toVP:
+   asin(|dir.x|) }`, `main.js`), so they can never disagree with each other or with the drawing.
+   The underlying slider-vs-statement mismatch itself is explicitly OUT of scope — a separate,
+   larger fix (touching defaults, the −90..90 range, and the face-inclination formula) that this
+   change does not attempt.
+2. **`planMethodStages` stops baking angle text into `label`.** It emits a declarative
+   `labelSpec` (`{kind:'literal',text}` | `{kind:'plane',plane}` | `{kind:'both',firstPlane,
+   secondPlane}`) instead; `projectSet` resolves the actual degrees via `formatSetLabel(spec,
+   incl)` once the Set's real pose is known, reusing the `axis` unit vector ADR-087 already
+   computes there (no re-derivation).
+3. **The arc (`strokeAngleArc`, `main.js`) draws in beat 12** (the axis beat — no new beat,
+   `METHOD_BEAT_COUNT`/`BEAT_COUNT` stay 14, ADR-087/094's invariant untouched), in viewA's own
+   flatten (the Set's `trueShape` view) — gated by a numeric guard, NOT trusted by construction.
+   viewA drops Y (top view) when `firstIsHP`, else drops X (front view); a single line's own
+   inclination is a TRUE angle in a view exactly when the axis has zero component along that
+   view's dropped axis. For a `'plane'`-kind Set on the HP branch this is exact — `angleVP` is
+   held at exactly 0 by `planMethodStages`' own override, so `axisDir.x` is exactly 0 and the
+   front view always qualifies. The mirror VP branch is NOT exact: a manually-dialled
+   angleVP-only pose (`angleHP` 0, no shipped problem exercises this — reachable only via
+   free-explore) keeps `axisDir.z` constant instead, which projects as a purely vertical line —
+   always reading 90° — in BOTH available views, because Show Method has no side view (ADR-088)
+   to show this rotation family true in. **Caught live, not anticipated in the original design**:
+   the first version of this fix assumed the 'plane' case was exact "by construction" for both
+   branches and shipped a "90°" arc beside a "40° to the VP" caption on a free-explore VP-only
+   pose — exactly the arc-disagrees-with-caption failure this whole ADR exists to prevent. Fixed
+   by checking `Math.abs(firstIsHP ? axisDir.y : axisDir.x) < ARC_DIR_EPS` (0.02 rad ≈ 1.1°,
+   floating-point slack only) before drawing, for the 'plane' case specifically — the HP branch
+   still always passes, the VP branch now correctly draws no arc rather than a wrong one. A
+   `'both'`-kind Set (both-planes Set 3) draws the same primitive but denotes the TURN, not a
+   3-D inclination — the previous Set's own same-view axis line is provably horizontal in the
+   top view (its other component is the one just zeroed in step 2), so a plain horizontal datum
+   measures the applied yaw exactly, with no cross-block coordinate reuse needed. Guarded
+   separately to `firstIsHP` (i.e. viewA is genuinely the top view): the sequential yaw (ADR-093)
+   is always about world-Y, which is angle-preserving in a projection ONLY when that projection
+   drops Y — true for the top view, not the front. A future VP-first `method.order` entry would
+   put viewA in the front view instead, where the identical sweep would misrepresent the turn;
+   the guard skips the arc there rather than draw a lie (`method.order` currently has zero
+   entries in `problems.js`, so this is dead code today, same status as ADR-093's own
+   sequential-VP-first branch).
+4. **Beat 6 splits its two line families visually** — the within-Set vertical projector keeps its
+   short dash (`[2,2]`); the cross-Set horizontal carry-over gets a long dash (`[8,4]`), same
+   colour/width. Not `--color-accent`: the palette deliberately keeps sheet linework off blue
+   (`--color-hp-line`'s own token comment, `index.html`).
+5. **Captions become Set-aware** for both halves of the transition (`methodBeatLabel`, Sets 2+
+   only — Set 1 keeps its original text unchanged): beat 1 states WHY view A is drawn first
+   ("drawn first because it shows the new angle true" — the same fact step 3's arc placement
+   relies on); beat 6 names what's carried ("Set N's `<view>` view carried across, `<heights|
+   depths>` unchanged") — heights for a carried front view, depths for a carried top view,
+   matching exactly which sheet-coordinate `drawMethodSheet`'s own `prevFlattenUntouched` holds
+   constant. Beat 12's caption gains the same measured value the arc shows, from the same `incl`/
+   `turnDeg` fields — one source, both readouts.
+**Why:** the whole point of adding an angle denotation was to make Show Method more trustworthy,
+not less — a caption or arc that could ever show a different number than the drawing itself would
+be worse than the missing-denotation status quo it replaces. Measuring off the Set's own resolved
+pose (already computed, already trusted by the rest of the pipeline) was the only source that could
+make that guarantee; every other option available (correcting the caption formula by hand,
+labelling with the stated slider value) either couldn't handle the sequential-yaw case or would
+have shipped an arc that measurably disagreed with its own label.
+**Alternatives rejected:** *Fix the pose at the source* (make `angleHP` genuinely mean
+inclination-to-HP) — correct, but touches defaults, the slider range, the face-inclination
+formula, and any topic cloning this pattern; out of scope for an annotation feature, logged as a
+follow-up instead. *Label arcs with the stated slider values as-is* — fastest, but ships a drawn
+arc whose own label contradicts what it visually measures. *Denote every non-zero angle on every
+Set* (including Set 3's now-apparent first-plane angle) — rejected: that angle is no longer a TRUE
+angle in either of Set 3's own views once the solid is turned, and would need its own
+apparent-angle convention and caveat to stay honest; simpler to show only what each Set newly
+introduces. *A dedicated new beat for the carry-over* — rejected, same reasoning ADR-092 already
+used: no beat index change, no `BEAT_COUNT` bump, no `methodController.js` change.
+**Consequences:** the both-planes Set 3 caption text changes from the old declared
+`Axis 30° to the HP and 30° to the VP` to the measured `Axis 60° to the HP and 14° to the VP` —
+intended, not a regression; the numbers now match what a protractor would read off the sheet.
+`src/methodController.js`, `src/vertexLabeler.js`, and `index.html` are untouched — captions flow
+through the existing `sim.method.beatLabel` surface, and the arc introduces no new CSS token.
+**Status:** Superseded in part — `src/vertexLabeler.js` IS touched by ADR-100 below (axis
+overshoot removal); the caption/label-source claims here remain accurate.
+
+---
+
+## ADR-100: Beat 12's animation unit is a whole view-pass, not a chain-line dash; the angle arc animates in instead of popping in; the axis drops its endpoint overshoot
+
+**Date:** 2026-08-01
+**Decision:** Four small, related defects found in one audit of ADR-091's stroke-in and ADR-099's
+arc, all localized to beat 12:
+1. **Wrong animation granularity.** ADR-091's "one unit = one atomic stroked line" convention means
+   every other beat counts a whole EDGE as one unit. The axis is drawn as a chain (centre) line —
+   `chainPositions` (`vertexLabeler.js`) explodes it into ~22 tiny dash segments per view, and
+   `methodBeatUnitCount`'s old `case 12` counted each dash as its own unit, twice (HP pass + VP
+   pass): ≈44 units × 300ms ≈ **13 seconds**, the walkthrough's one glaring outlier against a
+   couple hundred ms to ~2s everywhere else. Fixed by counting **one unit per view pass** (2
+   units, ≈0.6s) instead — the axis is one line, not N dashes; `strokeAxisPass` (`main.js`, was
+   `strokeAxisInto`) now cuts each pass by WORLD distance along the axis, not by dash index, so
+   the reveal fraction still lands correctly regardless of how many dashes the chain pattern
+   happens to produce.
+2. **Arc appeared instantly.** ADR-099's `arcEligible` check required `!reveal` — the arc was
+   unconditionally suppressed for the whole beat-12 reveal and popped in fully formed the instant
+   the reveal ended, jarring against every line beat's progressive stroke-in. Fixed by giving the
+   arc two more animation units of its own (`methodBeatUnitCount` case 12 is now
+   `2 + (methodArcEligible(set) ? 2 : 0)`) and a `phase` param on `strokeAngleArc`
+   (`{datumT, arcT, labelA}`, each defaulting to 1 = fully drawn — same optional-param precedent
+   ADR-091 set for `strokeMethodLines`' `reveal`): unit index 2 grows the datum ray, unit index 3
+   sweeps the arc itself with the degree label cross-fading in (`ctx.globalAlpha`) over the
+   sweep's last 30%, so the number settles just after the arc finishes rather than mid-sweep
+   against a half-drawn angle. The eligibility check itself is unchanged, only relocated to a
+   standalone `methodArcEligible(set)` — `methodBeatUnitCount` (a pre-flight count) and
+   `drawMethodSheet` (the actual draw) are a beat apart in the source and had already drifted once
+   under ADR-099 (its own "caught live" free-explore VP-only-pose incident); one shared function
+   makes that drift structurally impossible now, mirroring the precedent `methodViewSplit` already
+   set for the firstIsHP/viewA/viewB split.
+3. **Arc too big, label too far out.** Radius `E * 0.22 * pxPerUnit` → `E * 0.14`; the degree
+   label's position changed from `rPx * 1.5` (a radius MULTIPLIER — every future radius tweak
+   would drag the label with it) to `rPx + ARC_LABEL_GAP_PX` (`main.js`, a constant 10px gap
+   outside the arc, independent of radius).
+4. **Axis overshot its true endpoints.** `AXIS_OVERSHOOT` (0.12 world units, `vertexLabeler.js`)
+   was added past both ends of the axis "like a real centre line" — but it made the drawn line
+   visibly run past P (base centre) and O (top/apex), the exact points it's labelling. Removed
+   outright (`bottom`/`topAxis` now sit exactly at `minY`/`maxY`). Deleting it alone would leave
+   the line ending short of or mid-gap at the endpoint on all but a lucky span (the old chain
+   pattern just repeated at its authored length and clamped at `total`), so `chainPositions` now
+   fits an integer number of `[gap,dot,gap,long]` cycles to the exact span and uniformly SCALES
+   every dash/gap/dot length to match — built as an explicit leading-long-dash-then-n-cycles
+   sequence (not a cyclic re-index of a 4-step array from position 0, which was tried first and
+   found to end on a GAP, not a dash) so both ends provably terminate on drawn ink. This is the
+   same function the LIVE 3D PANE's own axis calls (`vertexLabeler.js:364`) — the fix lands there
+   too, deliberately: it is the same axis on the same solid, and an overshoot the sheet no longer
+   has but the 3D view still did would be a new, not a fixed, inconsistency.
+**Why:** all four were small, but all four sat in the one beat (12) a learner's eye lands on last
+and lingers on — the axis and its angle are the payoff of the whole construction. A beat that
+visibly outlasted the rest by 6-7x, an annotation that broke the "everything draws on" pattern, an
+oversized arc crowding the solid, and a line that ran past its own labels all read as unfinished
+polish on exactly the mark meant to look most deliberate.
+**Alternatives rejected:** *Lower `METHOD_SEG_DURATION_MS` globally* — rejected, would speed up
+every beat's per-edge stroke-in, not just the one outlier beat, changing timing ADR-091 already
+tuned elsewhere. *Keep chain-dash-count granularity but shorten each dash's duration* — rejected,
+still couples beat-12 pacing to how finely `CHAIN` happens to subdivide a given axis length,
+which is incidental geometry, not pedagogical content. *Scale only `CHAIN.long`/`CHAIN.dot` and
+leave `CHAIN.gap` unscaled* — rejected for the endpoint fit: an unscaled gap can't guarantee an
+exact integer number of cycles fits the span, reintroducing the short/mid-gap ending this exists
+to fix.
+**Consequences:** beat 12 now takes ≈0.6s (no arc) to ≈1.2s (arc drawn) versus ≈13s before —
+correct, not a regression; a learner who was clicking through quickly never noticed the old
+duration anyway (Next was never gated on animation completing, ADR-091). The axis's chain-line
+dash COUNT changes slightly (pattern is now scaled to fit, not clamped) — cosmetic only, the same
+long-dot-long rhythm reads the same. `src/methodController.js` and `index.html` remain untouched;
+`BEAT_COUNT` stays 14.
+**Status:** Active.
+
+---
+
+## ADR-101: Show Method gains a Set-to-Set tilt — a screen-anchored Canvas2D pictorial, not a live 3D viewport; ADR-085's "no anim.js tween" clause is superseded by ADR-091's own private rAF pump
+
+**Date:** 2026-08-02
+**Decision:** Show Method's both-planes tier (Set 2 → Set 3, the ADR-093 sequential yaw) gains a
+"Watch the turn" control that plays the solid physically rotating between the two Sets' poses,
+rather than the learner only ever seeing both drawings fully settled side by side. Landed in two
+parts:
+- **Phase 0 (prerequisite, no user-visible change).** `projectSetPose`/
+  `projectSequentialBothPlanesPose` (`main.js`) now return the orientation quaternion `q` and the
+  `seat` offset alongside the existing `{eff, m}`; `projectSet` retains them on the Set record as
+  `pose: {q, seat}` — previously computed and discarded every time (`m` was local to `projectSet`,
+  last read at its own `res.dispose()` call). `cacheMethodTiltEdges()` additionally snapshots the
+  current solid's unique edges in LOCAL space (`buildEdgeMap(currentMesh.geometry)`, no
+  `matrixWorld` argument — welding is rotation-invariant, meshAnalyzer.js's own doc) into a flat
+  `Float32Array`, once per `method.begin()`, cleared in `teardownShowMethod`. No THREE.js objects
+  retained; nothing to dispose.
+- **Phase 1 (the tilt itself).** `startMethodTilt()` slerps the previous Set's quaternion into the
+  current one's over `METHOD_TILT_DURATION_MS` (900ms, `easeFold`), re-seating via the existing
+  `computeSeating` each frame and transforming the Phase-0 cached local edges by the interpolated
+  pose. The result draws as a bordered, opaque inset in the TOP-LEFT corner of `#method-canvas`
+  (`drawMethodTilt`, painted after `drawMethodSheet`), projected through a fixed 30° axonometric
+  formula (`projectMethodTiltPoint`) — not a THREE.Camera. The inset's `{scale, cx, cy}` is fit
+  ONCE at tilt start across both endpoint poses (`fitMethodTiltProjection`, 6 sampled t-values), not
+  re-centred every frame, so a seat-driven vertical settle between the two Sets stays visible as
+  real motion instead of being cancelled out by a per-frame auto-fit. No hidden-line pass — every
+  edge strokes solid; this is a motion cue between two already-correct, already-dashed Sets, not a
+  construction drawing of its own.
+
+**ADR-085 correction.** That ADR's consequence clause reads: *"No `anim.js` tween may be added to
+this view while the pause contract holds; any future motion here must be CSS or an instant state
+change."* This was already false in shipped code by the time this ADR was written — **ADR-091**
+(the per-line beat stroke-in) stood up exactly such a tween, riding a **private rAF pump**
+(`methodAnimFrame`/`queueMethodRedraw`, `main.js`) that the takeover owns for itself, explicitly
+BECAUSE `window.simAPI.pause()` has cancelled `animate()`'s own loop. ADR-091's own header says so
+("pumped by THIS module's OWN requestAnimationFrame loop... that loop is paused for the entire
+time Show Method is open"), but ADR-085's consequence line was never amended to match. This ADR
+formally supersedes that clause: **a `tween()` may run inside the takeover, provided it rides
+Show Method's own private pump, never the sim's paused `animate()` loop.** The tilt reuses that
+same pump rather than adding a second one — `methodAnimFrame`'s re-arm condition extends from
+`methodAnimBeat !== -1` to `methodAnimBeat !== -1 || methodTiltActive`, and `stopMethodBeatAnim`
+(the single existing chokepoint for "settle whatever Show Method animation is running", called from
+`setMethodProgress`/Next/Back/skip and `teardownShowMethod`/Exit/Escape/reset) is extended to also
+cancel `methodTiltHandle` — so every path that already knew how to interrupt a beat reveal now
+interrupts a tilt too, with no new call sites.
+
+**Why:** a side-by-side Sets 2/3 comparison is the textbook convention (ADR-084), but it cannot
+show the rotation ITSELF — for a both-planes problem, watching the solid tip-then-turn is the part
+of the construction method a static sheet cannot carry. The two prior blockers (rebuild() being a
+full teardown+rebuild pipeline, and the takeover's pause contract) turned out not to be blockers at
+all once audited: rebuild() is never on the path (every Set already shares `currentMesh.geometry`
+untouched, ADR-084's own "no mesh, no geometry allocation" invariant), and the pause contract was
+already bridged by ADR-091's own pump.
+
+**Alternatives rejected:**
+- **A live WebGL viewport inside the takeover, showing the real 3D solid turning.** Rejected as the
+  first phase's approach — it would need either a second `WebGLRenderer`/canvas (ADR-076 is
+  precedent that this is possible) or re-parenting the live canvas, plus `LineMaterial.resolution`
+  resize sync (ADR-006), a CSS2D overlay move, and a new disposal surface to verify against
+  `renderer.info.memory` — a large risk step for a motion the learner reads as "the solid turned"
+  regardless. Left as a possible Phase 3 if the pictorial doesn't read clearly enough in practice.
+- **Rotating the live 3D solid visually (the `applyFoldVisual` idiom) instead of a headless
+  pictorial.** Rejected — `applyFoldVisual` only ever rotates PLANE pivots (`vpFoldGroup`,
+  `ppHingeGroup`), never the solid itself: `shapeGroup`'s mesh and its edge overlay are flat
+  siblings with no pivot between them and `shapeGroup` (main.js's disposal contract requires flat
+  children), and every projection/hidden-line/label/dimension downstream is a baked WORLD-space
+  snapshot taken once at `buildEdgeMap`/`drawProjections` time against fixed world-axis observers
+  (`projectionDrawer.js`) — a live visual rotation of the solid would desync all of it silently.
+  Moot in any case: Show Method never shows the live scene (ADR-085 keeps it paused and covered).
+- **A new beat in the template.** Rejected — would bump `METHOD_BEAT_COUNT` (14 → 15), touching the
+  hand-duplicated twin in `methodController.js`, ADR-094's init assert, and ADR-098's
+  `methodContentBeats` novelty rule for one motion cue that isn't a construction step. The tilt is
+  an on-demand control (`#method-tilt`, shown only when `sim.method.canTilt()`), not a beat.
+- **Anchoring the inset in sheet space** (following `methodPanX/Y`/`methodZoom`, alongside the Sets
+  themselves). Rejected — `drawMethodSheet`'s and `setMethodFocus`'s sheet-layout block (`E`/`GAP`/
+  `scale`/`anchorSX`) is already duplicated once between those two functions; a third copy for the
+  inset was avoidable by anchoring in plain screen space instead, which also means a drag or
+  focus-jump mid-tilt can never strand the inset off-frame.
+
+**Consequences:** new Set-record field `pose: {q, seat}` (Phase 0); new module state
+(`methodTiltEdges`, `methodTiltActive/FromQ/ToQ/Eff/T/Handle/Projection`, `METHOD_TILT_DURATION_MS/
+SIZE/MARGIN/PAD`); new `sim.method.canTilt()`/`playTilt()`; new `#method-tilt` button in
+`.method-bar` (`index.html`), hidden — not merely disabled — whenever `canTilt()` is false, so
+`methodController.js`'s existing `focusables()` (`button` + `offsetParent !== null`) needs no
+change to keep the focus trap correct. Reduced motion is free (`tween()` itself snaps to the end
+value, `src/anim.js`). Scoped to the both-planes tier's Set 3 only (`turnDeg != null`, ADR-093);
+a single-plane Set1→Set2 tilt (whose combined-Euler pose pair has no proven height-preserving
+invariant the way ADR-093's yaw does) is explicitly out of scope, left for a future phase alongside
+replay/scrub controls and a Phase-3 live-viewport escalation if warranted.
+**Status:** Superseded by ADR-104.
+
+---
+
+## ADR-004 correction (2026-08-02): the "returns early while animating" line is stale
+
+ADR-004's consequences paragraph states *"`rebuild()` returns early while animating, so anything
+that should run during an animation needs separate handling."* Audited while scoping ADR-101 above:
+`rebuild()` has exactly one early return, keyed on a null `shapeData` (the empty-start/reset path),
+not on any animation flag — no `isAnimating` module variable exists anywhere in `main.js`. Rebuild
+is instead **fold-aware by re-application**: it calls `applyFoldVisual(foldProgress)` unconditionally
+near its end (main.js) so a mid-fold or fully-folded state is reconstituted onto the freshly-rebuilt
+geometry rather than rebuild() being skipped during one. The actual "don't run rebuild mid-animation"
+guards live OUTSIDE rebuild, keyed on `foldProgress`/`foldTween`/`methodActive` at each call site
+(e.g. `compare.show()`'s `if (foldTween) return`, `methodCanRun()`'s `foldProgress !== 1` check) —
+ADR-004's own text is left as-is above (historical record), corrected here rather than silently
+edited, per this doc's own precedent for amendments-not-rewrites.
+
+---
+
+## ADR-102: Show Method — caption-clearance fix folded into the layout math, Set-chip focus gains a real tween, and a restricted dimension layer (base edge + height) returns to the walkthrough
+
+**Date:** 2026-08-03
+**Decision:** Three related fixes to the Show Method takeover (Module 2), audited and shipped
+together.
+
+**1. Set 2's caption overlapping the nav pill — a genuine bug in ADR-095's fix, not a new
+regression.** ADR-095 reserved a flat `marginBottomPx = 120` below the fitted block, but the Set
+caption's own offset (`captionY = -(blockH/2 + GAP*0.4)`) was never counted in the fit
+(`nomHmm = blockH * WORLD_TO_MM` — the caption's `GAP*0.4` term is absent). On a height-bound fit
+(the normal case for a 3-Set row), the block fills the whole reserved band and the caption hangs
+a further `≈6%` of the band below it, landing ~9px inside the pill's own footprint. Every Set's
+caption sits at the identical screen row (`anchorSY`); only Set 2 is horizontally centred under
+`.method-controls` (`left: 50%`), so it was the only one that visibly collided — Sets 1/3's
+captions clear the pill purely by being ~397px off to the side. **Fix:** a single shared
+`methodSheetLayout(w, h)` (`main.js`) replaces the two hand-duplicated copies of this layout math
+(`drawMethodSheet` and `setMethodFocus` — flagged as a duplication risk in ADR-095 itself) and
+folds the caption's `GAP*0.4` offset into `nomHmm`/`anchorSY`, so the fit now measures the
+block+caption band together, not the block alone. `marginBottomPx` is now a named constant
+(`METHOD_PILL_RESERVE_PX + METHOD_CAPTION_LINE_PX = 100`) instead of the old bare `120`.
+`setMethodFocus`'s own `zFitH` divides by `(blockH + capGapS)` too, so a focused Set clears the
+pill exactly like the unfocused row. **Verified live** (real Chrome tab, both-planes 3-Set
+problem): `.method-bar`'s screenshot rect sits a clear ~27px below "Set 2 — Axis 60° to the HP"'s
+baseline, in both the unfocused row and a focused Set 2.
+
+**2. Set-chip focus now tweens — amends ADR-085's "instant snap, no tween" clause, the same way
+ADR-101 already amended it for the Set-to-Set tilt.** ADR-085 rejected a tween because the sim
+loop is paused while Show Method is open, so nothing would ever drive one. ADR-091 (2026-07-28)
+stood up a private `requestAnimationFrame` pump for the per-beat stroke-in that keeps running
+regardless of the paused main loop; ADR-101 (2026-08-02) reused that same pump for the tilt. This
+ADR reuses it a third time for `setMethodFocus`: `startMethodFocusAnim`/`stopMethodFocusAnim`
+(`main.js`) tween `methodPanX/Y`/`methodZoom` via `anim.js`'s `tween()`, sharing
+`methodAnimFrame`'s pump (now also gated on a new `methodFocusActive` flag) rather than adding a
+fourth loop. **Timing matches the platform's existing Top/Front/Side quick-view chips exactly** —
+`QUICK_VIEW_MS` (1500) + `easeFold` (`cubicBezier(0.83, 0, 0.17, 1)`), the real values `setView`
+passes to `tweenCamera` (`main.js:1711`), not `easeCamera` (that name is only `tweenCamera`'s
+*default* parameter, used by `setFlatView`/the auto-zoom dolly — `anim.js`'s own doc comment
+claiming otherwise for the quick-views was stale and is corrected in the same pass). Chosen over
+the tilt's own `METHOD_TILT_DURATION_MS` (900ms) deliberately, for parity with the quick-view
+chips elsewhere in Module 2 rather than internal consistency with the tilt. `stopMethodBeatAnim`
+(the existing single chokepoint for settling in-flight Show Method animations) now also calls
+`stopMethodFocusAnim(true)` — a Set change (`goNext`/`goBack`'s `clearFocusChip` →
+`setFocus(null)`, which runs *before* `setProgress`) must SNAP the focus tween to its target, not
+freeze it mid-flight, or the sheet would strand on whichever Set was being left. The drag-to-pan
+and scroll-wheel-zoom handlers each call `stopMethodFocusAnim(false)` first (freeze in place —
+user input wins outright). **Verified live**, via a temporary debug hook driving Show Method's own
+rAF pump manually (this MCP browser tab reports `document.hidden === true`, so native
+`requestAnimationFrame` never fires here — the same environment limitation ADR-089/091 already
+documented): `methodPanX`/`methodZoom` interpolate smoothly along an easeFold-shaped curve (slow
+start, fast middle, slow settle) over ~1300-1500ms and then hold flat; clicking Next mid-tween
+snaps both instantly to the same final values the tween would have settled at on its own.
+
+**3. A restricted dimension layer returns to Show Method — base edge + overall height ONLY,
+supersedes ADR-089 Decision 1.** ADR-089 removed dimensioning from the walkthrough entirely,
+reasoning that BIS Type-B dimensioning is a separate concern from drawing *method*, already
+served by the live pane's own "Show dimensions" toggle. That toggle's 5 dims (`projectionDrawer.js`)
+are all **bounding-box extents** (overall height/width/depth, clearance from each plane) — correct
+for Set 1's simple position, but wrong for Sets 2/3: inclining the solid changes its *projected*
+envelope without changing the base edge's *true* length, so a bbox-width dimension on an inclined
+Set would print a foreshortened number, not the real one. This ADR reverses ADR-089 Decision 1
+for exactly two measurements — the true base-edge length and the true overall height — added as a
+new `options.restrictedDims` branch in `drawProjections` (`projectionDrawer.js`), never passed by
+the live pane's own call (its 5-dim toggle is byte-for-byte unchanged). The base edge needs REAL
+geometry, not a reused bbox extent: `findBaseRingEdge` classifies every edge via the existing
+`edgeKindOf` (`base` vs `generator`, ADR-087), separates the base ring from the top/cap ring by
+axial position along the Set's own world axis (provably rotation-invariant — `dot(worldPoint,
+axisDir)` is an affine function of local Y for any rigid transform), and picks the
+least-foreshortened ring edge in the HP flatten to place the dimension line against; a new
+`baseEdgeDimOffset` computes a per-edge perpendicular-in-plane offset (the existing bbox dims can
+hardcode a single world-axis offset because they're always axis-aligned — an arbitrary-pose base
+edge generally isn't). The PRINTED value is always the Set-invariant true value
+(`shapeData.baseLength`/`height` × `WORLD_TO_MM`, read once in `projectSet`) — decoupled from the
+placement geometry exactly the way `pushLinearDim`'s existing `(A, B, off, valueMM)` signature
+already separates the two for every other dim in the file, so this needed no new primitive, only a
+new caller. Curved-base solids (Cone/Cylinder) get the height dim only — `main.js` gates
+`baseMM: null` off `currentShapeData.shape`, since `projectionDrawer.js` stays shape-agnostic by
+design (its own header) and has no concept of "this solid has no single base edge." **Folded into
+the EXISTING beat 13 (labels), per explicit direction, not a new beat 14** — `METHOD_BEAT_COUNT`
+stays 14, the click budget is completely unchanged (28/42 for 2-/3-Set problems), keeping intact
+the exact rationale ADR-089/090/098 already established for minimizing clicks. Reveal granularity
+for the new dims mirrors ADR-100's fix for the axis: one animation unit per DIMENSION (not per
+line segment) — each unit grows its dimension's own line (extensions snap in immediately, the
+`pushLinearDim`-ordered third segment lerps), with the filled arrowheads + numeral appearing once
+that unit settles. **Verified live**: on a 3×5 SquarePrism at 30°/40° (both-planes), every one of
+its 3 Sets — including both inclined ones — labels the base edge "30" and the height "50"
+identically (the true values, `3×10` and `5×10`), while the base-edge dimension's drawn line
+visibly follows the tilted edge itself (a real oblique dimension, not a straight bbox width) in
+Set 2/3's top view. On a Cone, `hpDimLines` is empty on every Set (no base dimension drawn) and
+`vpDimLines` carries the height only; the beat-13 caption text adjusts automatically ("Vertex
+labels and dimensions — overall height", no "base edge" clause).
+
+**Also, independently:** spacebar now works as an alternate Next trigger while Show Method is
+open — bound on `onViewKeydown` (`methodController.js`), which is attached to `#method-view`
+itself (not `document`), the same scoping that ADR-084's original Escape/Tab-trap handler already
+uses. Every slider/input in the app lives outside `#method-view` (`hidden` and covered while the
+takeover is open), so this is a structural, not a checked, guarantee against firing on background
+controls. Space on any OTHER focused button in the pill (Back/Skip/Exit/Tilt/a Set chip) is left
+to native browser activation (the handler returns early without calling `preventDefault()`) —
+Space only triggers `goNext()` when `#method-next` itself is focused, or nothing more specific is.
+`e.repeat` is checked and dropped so holding the key can't machine-gun beats. **Verified live**
+with genuine OS-level key events (not synthetic `dispatchEvent`): Space on a focused Next advances
+exactly one beat; Space on a focused Back goes backward, not forward; Space with a background
+slider focused (Show Method closed) does nothing.
+
+**Alternatives rejected:**
+- *Dimensions as a new beat 14* — rejected per explicit direction: would have reversed
+  ADR-089/090/098's click-budget rationale for a feature that fits cleanly inside the existing
+  labels beat instead.
+- *Base-edge dimension reusing the bbox width/depth shortcut* — rejected: correct only in Set 1's
+  simple position, silently wrong (foreshortened) on every inclined Set, which is precisely the
+  case this feature exists to cover.
+- *A fourth independent rAF loop for the focus tween* — rejected: ADR-091's pump already exists
+  and already tolerates concurrent use (the tilt is the second reuse, this is the third); a new
+  loop would be pure duplication.
+**Consequences:** new shared `methodSheetLayout()` (replaces two hand-duplicated layout blocks);
+new module state (`methodFocusActive/Handle/Target`); `stopMethodBeatAnim` now settles three
+animations, not two; `drawProjections` gains an `options.restrictedDims` parameter (opt-in, no
+effect on existing callers); `projectSet`'s harvested `data` gains
+`hpDimLines/vpDimLines/hpDimTris/vpDimTris/hpDimLabels/vpDimLabels`, restoring the
+`harvestTriGroup`/`harvestLabelGroup` helpers ADR-089 deleted; `methodBeatUnitCount`/
+`methodBeatLabel` both gain a beat-13 case. `METHOD_BEAT_COUNT` is untouched.
+**Status:** Decision 3's "every Set" and "greatest projected length" clauses superseded same-day
+by ADR-103 (base-edge selection was picking a triangulation-seam diagonal, not a real edge — see
+ADR-103 for the audit and fix). Decisions 1 and 2 (caption clearance, focus-chip tween) remain
+Active.
+
+---
+
+## ADR-103: Show Method's restricted dimension layer — real base edge, textbook placement,
+## Set-1-only (fixes ADR-102 Decision 3)
+
+**Date:** 2026-08-03
+**Decision:** Three bugs in ADR-102's restricted dimension layer, found by live-testing a
+30°/30° square pyramid and cross-checking against the textbook (John, *Engineering Graphics for
+Diploma*, the "Axis Inclined to Both Planes" chapter — Figs 12.20/12.21/12.23/12.24/12.25,
+rendered from the project-root PDF via poppler) — audited, then fixed together.
+
+**1. The "base edge" dimension was measuring a triangulation-seam DIAGONAL, not a real edge.**
+`findBaseRingEdge` (`projectionDrawer.js`) walked the welded `edgeMap` and filtered only on
+`edgeKindOf(...) === 'base'`. `meshAnalyzer.buildEdgeMap` records every triangle edge, so a flat
+N-gon base face (triangulated into a fan) contributes its diagonals alongside its real edges; a
+diagonal lies in the base plane (⊥ the axis, same as a real edge) and so also classifies as
+`'base'`. The picker then took the edge with the "greatest projected length in the HP flatten" —
+intended as "least foreshortened" — which a diagonal always wins (√2× a square's side, more on a
+hexagon), so it was selected every time. **Fix:** exclude coplanar seams using this file's own
+existing `classifyEdge`/`EdgeType.COPLANAR` test (the same filter the main draw loop already
+applies to every other edge, `projectionDrawer.js`'s edge-walk) before the 'base' classification
+runs at all.
+
+**2. Once restricted to Set 1 (Decision 3 below), "greatest projected length" no longer
+discriminates anything — every real base edge is already true length there, so a different
+selection metric is needed for PLACEMENT.** The edge is now picked by which direction reads most
+nearly vertical on the method sheet (largest `|world-X component| / length`, since
+`flattenHP`'s `v = -x`) — its in-plane normal is then dominantly sheet-horizontal, landing the
+dimension beside the view (John's own placement: Fig 12.21's edge b–a, Fig 12.25's edge c–d)
+rather than stacked toward the xy line. For a base deliberately turned in plan (e.g. the
+"Orient to Corner" 45° preset), no edge is purely axis-aligned; the same metric still picks a
+definite edge and draws an ALIGNED dimension parallel to it — Fig 12.20's turned-square frustum
+convention (`□32`/`□16`, aligned to the turned edge) — rather than the diagonal's degenerate
+case. (Confirmed with the user: bare numeral, no `□` prefix — the existing `pushLinearDim` label
+format is unchanged.)
+
+**3. The base-edge dimension's placement was landing in the gap between the top and front
+views — a direct CONSEQUENCE of Bug 1, not an independent defect in the offset formula.**
+`baseEdgeDimOffset`'s "away from the solid's bbox centre" sign test is well-defined for any real
+edge (whose midpoint is never the centre) but degenerates for the diagonal (whose midpoint IS
+the centre exactly, `dot ≈ 0`), leaving the offset direction effectively whatever the raw
+perpendicular happened to compute — the diagonal's own far corner, already at the top view's own
+extreme, then got pushed further outward by that unstable direction, past the outline toward the
+xy line. Fixing Bug 1 (a real, off-centre edge) resolves this without changing the offset
+formula itself.
+
+**4. The overall-height dimension's top extension line was a short, disconnected horizontal
+mark floating near the apex — reported as a possible stray/leftover.** It is not a leftover: the
+height dim is built between synthetic bbox points `V(0, min.y, max.z)`/`V(0, max.y, max.z)`
+(`projectionDrawer.js`), and `pushLinearDim`'s extension lines run from THOSE points, not from
+any point actually on the drawing. A prism's top ring reaches the bbox's own Z extent (so this
+was harmless there), but a pyramid/cone's apex is a single point usually nowhere near `max.z` —
+the extension line floated beside the apex instead of touching it. **Fix:** `pushLinearDim`
+gains optional `anchorA`/`anchorB` parameters — the REAL feature point each extension line starts
+from, independent of the point defining the dimension LINE's own screen position — and a new
+`ringZExtentAt(edgeMap, targetY, eps)` helper finds the actual Z reach of the drawing at the
+apex/base height (a no-op for a prism, the fix for a pyramid/cone). Every other existing
+`pushLinearDim` call is unaffected (both params default to `A`/`B`).
+
+**5. Size dimensions were repeating on every Set — the textbook prints them once.** Every worked
+example read this session (Figs 12.21, 12.23, 12.24, 12.25) prints the base-edge and height
+dimensions exactly once, on the simple-position Set; the inclined Sets carry the beat-12 angle
+arc instead, never a repeated size dimension. `projectSet` (`main.js`) now takes a `setIndex`
+parameter (`plans.map((plan, i) => projectSet(plan, i))`) and passes `restrictedDims` only when
+`setIndex === 0`. Getting Sets 2/3 to draw NOTHING (not the live pane's full 5-dim bbox layer)
+needed a second change: `restrictedDims: null` alone is indistinguishable, inside
+`drawProjections`, from the live pane's own call (which also never passes `restrictedDims` and so
+also defaults to `null`) — it was falling through to the `else` branch (the full 5-dim layer)
+instead of drawing nothing. Sets 2/3 now also pass `drawDimensions: setIndex === 0` explicitly,
+suppressing the whole dimensioning block for those Sets. `methodBeatUnitCount`/the beat-13
+caption (`main.js`) already keyed off `hpDimLines.length`/`vpDimLines.length`, so Sets 2/3
+collapse to a bare "Vertex labels" caption and zero extra animation units with no further change.
+
+**Verified live** (real Chrome tab, `php -S 127.0.0.1:8123` serving `Module2/`, a fresh
+30°/30° square pyramid, base 20 mm, height 30 mm): Set 1's top view prints "20" against the real
+edge D–C, offset beside the square, clear of the xy line; the front view's "30" has both
+extension lines landing on real points (base corner and apex `O`) with no floating mark; Sets 2
+and 3 draw the angle arc only, captioned "Vertex labels" (no dimensions). Screenshots taken at
+each Set match the John figures' convention.
+
+**Alternatives rejected:**
+- *Keep dimensioning every Set, just fix the edge* — rejected per direction: the textbook does
+  not repeat size dimensions on inclined Sets, and repeating them compounds the placement problem
+  (an inclined Set's base ring is itself tilted in 3-D, no longer guaranteed to have an edge
+  reading cleanly beside the view).
+- *Square prefix (`□20`) for a turned base* — rejected per direction: keep the existing bare
+  numeral; only the placement geometry (aligned, parallel to a real edge) needed to change.
+- *Length-based edge selection retained, only excluding diagonals* — rejected: once Set-1-only
+  (this ADR) is applied, every real base edge shares one true length, so length is not a useful
+  placement signal; the sheet-orientation metric is needed regardless.
+
+**Consequences:** `findBaseRingEdge` takes `faces` from `edgeMap` (already present on every
+value) and filters `EdgeType.COPLANAR`; its selection metric changed from edge length to sheet
+orientation. `baseEdgeDimOffset` unchanged in formula, re-documented. `pushLinearDim` gains two
+optional trailing parameters (back-compatible). New helper `ringZExtentAt`. `projectSet` gains a
+`setIndex` parameter; its one call site updated. `drawProjections`'s restricted-dims caller now
+also passes `drawDimensions`. No change to `METHOD_BEAT_COUNT`, the live pane's 5-dim toggle, or
+any beat/click budget.
+**Status:** Active.
+
+---
+
+## ADR-104: Show Method's Set-to-Set tilt becomes an on-sheet ghost — a rigid 2D rotate+translate of Set 2's own top view, not a screen-anchored 3D pictorial; supersedes ADR-101
+
+**Date:** 2026-08-04
+**Decision:** ADR-101's "Watch the turn" control played a screen-anchored, fake-axonometric
+pictorial of the solid physically rotating in a fixed 200px inset (`projectMethodTiltPoint`,
+`fitMethodTiltProjection`, `drawMethodTilt`). Read both reference textbooks cover-to-cover on this
+specific transition before redesigning (John, *Engineering Graphics for Diploma* pp.148–153, Figs
+12.20–12.27; Bhatt, *Engineering Drawing* pp.286–300, Figs 13-29–13-47 — 21 Set-1/2/3 figures,
+zero exceptions): **not one uses a pictorial for the Set-2→Set-3 transition.** Every one is a pure
+2D operation on the sheet itself:
+- John, Fig 12.21 step 2 — *"Copy the front view after tilting the axis by 45° to the xy line."*
+- John, Fig 12.21 step 3 — *"turn the top view about point c, the point of turning PT"* — a named
+  pivot lying on the reference line, not a re-derivation from scratch.
+- Bhatt, Fig 13-30(i)–(iv) — the identical outline drawn three times at three tilt angles, the
+  angle marked at the pivot each time.
+- Bhatt, Fig 13-39 — the only separate small diagram in either book, and it is a trig locus-arc
+  construction for the apparent angle β, not a pictorial of the solid — not a precedent for an
+  inset.
+
+The fix is not to restyle the inset — it is to do on the sheet what the books do on the page: the
+view that carried the true angle in Set 2 is bodily copied and turned about its axis foot onto
+Set 3's own position, faded, angle marked during the motion, then removed as Set 3's real
+beat-by-beat construction begins. Show Method already draws every Set side by side in one figure
+(`methodSheetLayout`/`drawMethodSheet`), which already mirrors the textbook page layout — the
+transition just wasn't using it.
+
+**Why this lands pixel-exact, not merely close:** Set 3's pose is Set 2's pose yawed about
+world-Y (ADR-093), and the top view drops Y. So Set 3's top view IS Set 2's top view under a
+rigid 2D motion — a rotation plus a translation, no scaling, no reshaping. `methodArcEligible`
+(ADR-099/100) already encodes the exact guard this depends on (`kind === 'both'` plus
+`firstIsHP`, i.e. view A really is the top view) — `startMethodTilt` now shares that same gate,
+so the ghost is only ever offered when the claim is provably true.
+
+**θ is measured, never declared.** `projectSheet` applies a uniform scale *and a y-flip*, so a
+world rotation reads as the opposite sense on canvas — exactly the ported-sign trap
+`Module2/CLAUDE.md` warns about. The pivot is chosen by ARRAY INDEX (which end of `ann.axis` beat
+12's own "lower on screen" rule already picks for Set 3, reused by index on Set 2 — both Sets
+harvest from one shared geometry with only pose differing, the same cross-Set assumption beat 6's
+projector derivation already relies on for `ann.labels`), then θ is the signed angle, in canvas
+px, between Set 2's own drawn axis direction and Set 3's — sign, y-flip, and handedness all
+cancel out for free. Per Set-2 sheet point `P` (already flattened at Set 2's own `dx`):
+`ghostPx(P, t) = Rot(θ·t)·(Ppx − pivot2px) + pivot2px + t·(pivot3px − pivot2px)`. At `t=0` this is
+Set 2's drawing untouched; at `t=1` it is Set 3's starting position, by construction.
+
+**Net simplification, not just a re-skin.** The old inset needed a 3D pose (quaternion slerp), a
+local-space edge cache re-projected every frame (`methodTiltEdges`, `cacheMethodTiltEdges`), and a
+hand-rolled fake-axonometric trig projection with its own fit pass. All of it is deleted. The
+ghost instead re-flattens the harvested sheet-space line arrays (`data.hp`/`data.hpOutline`) both
+Sets already carry, through one closed-form 2D transform — no buildEdgeMap, no allocation, no
+disposal, and (unlike the inset, which ignored `methodPanX/Y`/`methodZoom` entirely and was
+anchored in screen space specifically to dodge threading that state through) the ghost now tracks
+a pan/zoom mid-tilt correctly because it lives in sheet space, computed fresh each frame from
+`methodSheetLayout` — the same call-it-again precedent `setMethodFocus` already established for
+that single-source layout.
+
+**Reused verbatim, not reinvented:** `strokeMethodLines` draws the ghost body (per-segment hidden
+dashing comes free from `seg.hidden`, so the ghost keeps Set 2's real line types — a copied
+orthographic view, unlike a pictorial, has a meaningful hidden-line pass); `strokeAngleArc`
+(ADR-099/100) draws the angle mark, fed the ghost's own current (rotating) pivot/far points every
+frame, so its label naturally counts up from ~0° (the near-zero sweep at `t=0` hits the existing
+degenerate-input guard, so no stray dot appears) to the full turn — no separate counter, and it
+agrees with beat 12's arc at rest by construction. The private rAF pump (ADR-091/101) and
+`tween()`/`easeFold` are reused unchanged; `stopMethodBeatAnim` still cancels exactly one handle.
+
+Timing: motion (900ms, `easeFold`) → hold (400ms, full alpha — the payoff frame where ghost and
+Set 3 coincide) → fade (350ms, alpha 1→0), one tween mapped internally to the three phases so the
+cancel/handle contract stays a single chokepoint.
+
+Only view A (the top view) is ghosted. View B (not true-shape in Set 2) is left untouched — no
+textbook figure animates the derived view either; beat 6's projector beat already carries that
+derivation.
+
+**Alternatives rejected:**
+- **Keep the pictorial, just move/restyle it onto the sheet.** Rejected outright by the source
+  material — no figure in either book ever draws a pictorial for this transition; restyling the
+  wrong representation is not a fix.
+- **Derive θ from `turnDeg`'s sign directly.** Rejected — `projectSheet`'s y-flip makes this
+  exactly the ported-sign trap the project's own CLAUDE.md calls out; measuring both Sets' drawn
+  directions and taking the signed difference makes handedness cancel automatically instead of
+  needing to be reasoned about by hand.
+- **Also ghost view B, or extend this to Set1→Set2.** Rejected — out of scope by explicit
+  decision (see Scope below); no textbook figure animates the untouched view, and Set1→Set2's
+  combined-Euler pose pair has no proven angle-preserving invariant the way ADR-093's sequential
+  yaw does.
+
+**Scope:** Set 2 → Set 3 (both-planes tier, `turnDeg != null`) only — identical to ADR-101's
+scope. The manual, replayable **"Watch the turn"** button is unchanged in contract; `index.html`
+and `methodController.js` needed no changes at all.
+
+**Consequences:** removed `projectMethodTiltPoint`, `fitMethodTiltProjection`, `drawMethodTilt`,
+`cacheMethodTiltEdges`, module state `methodTiltEdges`/`methodTiltFromQ/ToQ/Eff/Projection`,
+`_tiltScratchQ/VecA/VecB`, `METHOD_TILT_SIZE/MARGIN/PAD`, and the Set-record's `pose: {q, seat}`
+field (nothing else read it). New: `drawMethodGhost` (`main.js`, called from `drawMethodView`
+after `drawMethodSheet`, same paint ordering the inset used); module state `methodGhost`
+(`{fromIndex, vertexIsFirst, turnDeg}`, pose-independent facts solved once at ghost start) and
+`methodTiltMotionT`/`methodTiltAlpha` (replacing the old single `methodTiltT`); new constants
+`METHOD_TILT_HOLD_MS`/`METHOD_TILT_FADE_MS`/`METHOD_TILT_TOTAL_MS`/`GHOST_ALPHA`.
+`startMethodTilt` keeps its exact boolean-return, no-op-on-false shape and its
+`stopMethodBeatAnim()`-first contract; it gains the `methodArcEligible(set)` guard.
+`METHOD_BEAT_COUNT` stays 14 — the ghost remains a motion cue, not a beat.
 **Status:** Active.
 
 ---

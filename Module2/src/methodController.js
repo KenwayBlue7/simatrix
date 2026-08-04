@@ -37,8 +37,8 @@ const BEAT_COUNT = 14;
 /**
  * @param {import('../main.js').simController} sim  Narrow engine surface — only
  *   sim.method.{canRun,begin,end,isActive,setProgress,setFocus,sets,hasContent,beatCount,
- *   beatLabel}, sim.announce, sim.onStateChange. `sim.method.abort` is called by stepper.js
- *   directly, never from here —
+ *   beatLabel,canTilt,playTilt}, sim.announce, sim.onStateChange. `sim.method.abort` is called by
+ *   stepper.js directly, never from here —
  *   see sync()'s own header for why external teardown is a one-way, reconciled-not-called-back
  *   flow.
  * @returns {{ sync: () => void, dispose: () => void }}
@@ -55,7 +55,8 @@ export function initMethodController(sim) {
   const backBtn = document.getElementById('method-back');
   const skipBtn = document.getElementById('method-skip-set'); // ADR-087 Decision 2
   const exitBtn = document.getElementById('method-exit');
-  if (!viewEl || !chipRow || !captionEl || !nextBtn || !backBtn || !skipBtn || !exitBtn) {
+  const tiltBtn = document.getElementById('method-tilt'); // Set-to-Set tilt
+  if (!viewEl || !chipRow || !captionEl || !nextBtn || !backBtn || !skipBtn || !exitBtn || !tiltBtn) {
     // Takeover markup missing (shouldn't happen — index.html ships it) — degrade to a no-op
     // rather than throw, matching problemLibrary.js's own ac.abort()-guarded degrade shape.
     return { sync: () => {}, dispose: () => {} };
@@ -154,6 +155,11 @@ export function initMethodController(sim) {
     const noSetToSkipTo = curSet >= setCount - 1;
     skipBtn.hidden = noSetToSkipTo;
     skipBtn.disabled = noSetToSkipTo;
+    // Set-to-Set tilt: hidden (not merely disabled) whenever the current Set isn't a tilt's
+    // destination — focusables() below selects `button` and filters on offsetParent, so a
+    // hidden button needs no separate focus-trap handling. Re-checked every renderProgress
+    // (Next/Back/Skip all call it), same cadence as the skip button's own hidden state above.
+    tiltBtn.hidden = !sim.method.canTilt();
     // Re-render chip reached-state every step — a chip flips from disabled to enabled the
     // moment Next first draws its Set (mirrors stepper.js's rail re-render on every step).
     const chips = chipRow.querySelectorAll('.set-chip');
@@ -170,10 +176,29 @@ export function initMethodController(sim) {
     );
   }
 
+  /** Spacebar as an alternate Next trigger — bound on `viewEl` (not `document`), so it is a
+   *  structural no-op everywhere the takeover isn't covering: every slider/input in the app
+   *  lives outside `#method-view` (fixed, inset:0, hidden when closed), and this listener is
+   *  torn down with the rest of this module's DOM wiring (`ac.abort()`), so it can't leak past
+   *  Exit/Escape either. The pill's OTHER buttons (Back/Skip/Exit/Tilt/chips) keep their native
+   *  Space activation — this only steps in when focus is on `#method-next` itself or nowhere
+   *  more specific inside the view (e.g. right after `start()`'s own `nextBtn.focus()`). */
+  function onViewSpace(e) {
+    const el = document.activeElement;
+    if (el && el !== nextBtn && el.tagName === 'BUTTON' && viewEl.contains(el)) return;
+    if (e.repeat) { e.preventDefault(); return; } // holding Space must not machine-gun beats
+    e.preventDefault(); // suppress page scroll AND nextBtn's own native activation (no double-fire)
+    goNext();
+  }
+
   function onViewKeydown(e) {
     if (e.key === 'Escape') {
       e.stopPropagation();
       stop();
+      return;
+    }
+    if (e.code === 'Space' || e.key === ' ') {
+      onViewSpace(e);
       return;
     }
     if (e.key !== 'Tab') return;
@@ -228,10 +253,13 @@ export function initMethodController(sim) {
   }
 
   /** A beat is worth landing on if it is a Set's first beat (the caption reveal — always a
-   *  visible change) or the engine reports it actually adds a mark to the sheet. Some poses
-   *  have no hidden edge on a given view (e.g. no dashed generator to draw), which left that
-   *  beat's Next click producing an identical frame — this is what "Next did nothing" was, not
-   *  a stuck click. */
+   *  visible change) or the engine reports it actually adds a NEW mark to the sheet (ADR-095:
+   *  not just "this beat's own array is non-empty" — a beat can be non-empty and still redraw
+   *  exactly what an earlier beat already put on the sheet, e.g. a top view's outline and
+   *  visible-face beats tracing the identical silhouette, or a prism's vertical generators
+   *  flattening to points in that same view). Either way, the old symptom was the same: a
+   *  Next click producing an identical frame — this is what "Next did nothing" was, not a
+   *  stuck click. */
   function hasVisibleContent(set, beat) {
     return beat === 0 || sim.method.hasContent(set, beat);
   }
@@ -250,10 +278,10 @@ export function initMethodController(sim) {
     sim.method.setFocus(null);
   }
 
-  /** ADR-094 — plain-language orientation for the CURRENT beat, pushed into both the visible
-   *  `#method-caption` pill and the platform's single `#sim-status` announce channel
-   *  (main.js's `announce()`). Deliberately not a step count — see `methodBeatLabel`'s own
-   *  header (main.js) for why that's a separate, already-rejected fix (ADR-089 Decision 2). */
+  /** ADR-094/-095 — plain-language orientation for the CURRENT beat, pushed into both the
+   *  visible `#method-caption` top-title row and the platform's single `#sim-status` announce
+   *  channel (main.js's `announce()`). Deliberately not a step count — see `methodBeatLabel`'s
+   *  own header (main.js) for why that's a separate, already-rejected fix (ADR-089 Decision 2). */
   function syncCaption() {
     const text = sim.method.beatLabel(curSet, curBeat);
     captionEl.textContent = text;
@@ -309,6 +337,10 @@ export function initMethodController(sim) {
   skipBtn.addEventListener('click', goSkipSet, listen);
   backBtn.addEventListener('click', goBack, listen);
   exitBtn.addEventListener('click', stop, listen);
+  // No-op (not disabled) if the Set changed out from under a stale click, or a tilt is already
+  // playing — sim.method.playTilt() itself is idempotent (startMethodTilt cancels a live tilt
+  // before starting a new one, the same ADR-091 cancel-and-snap contract Next already relies on).
+  tiltBtn.addEventListener('click', () => sim.method.playTilt(), listen);
   viewEl.addEventListener('keydown', onViewKeydown, listen);
 
   /** Re-evaluate the Step-6 trigger's visible/enabled state AND reconcile against an EXTERNAL

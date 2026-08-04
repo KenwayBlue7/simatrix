@@ -2461,10 +2461,66 @@ let methodZoom = 1;
 /** Show Method's own reset contract (ADR-085) — resetCompareView() no longer touches this state;
  *  the two surfaces reset independently. Called on begin() and on every teardown path. */
 function resetMethodView() {
+  stopMethodFocusAnim(false); // cancel without snapping — the explicit reset below wins instead
+  methodFocusTarget = null;
   methodPanX = 0;
   methodPanY = 0;
   methodZoom = 1;
   focusSet = null;
+}
+
+// ---- Set-chip focus animation (ADR-102 supersedes ADR-085's "instant snap, no tween" clause for
+// this one interaction — the same amendment ADR-101 already made for the tilt: ADR-091's private
+// rAF pump means a second independent loop is no longer the only way to animate here). Matches
+// the platform's existing Top/Front/Side quick-view chips exactly — QUICK_VIEW_MS + easeFold,
+// reused verbatim rather than a new curve/duration (see tweenCamera's own use of them). ----
+let methodFocusActive = false;   // a focus pan/zoom is currently playing
+let methodFocusHandle = null;    // the live tween handle, so a snap-finish can cancel it mid-flight
+let methodFocusTarget = null;    // { panX, panY, zoom } — the destination of the most recent tween
+
+/** Cancel any in-flight focus tween. `snap` (default) lands methodPanX/Y/methodZoom on the last
+ *  target computed by setMethodFocus; pass false to freeze wherever the tween currently is (used
+ *  by the drag/wheel handlers, which immediately overwrite methodPanX/Y/methodZoom themselves). */
+function stopMethodFocusAnim(snap = true) {
+  methodFocusHandle?.cancel();
+  methodFocusHandle = null;
+  if (snap && methodFocusTarget) {
+    methodPanX = methodFocusTarget.panX;
+    methodPanY = methodFocusTarget.panY;
+    methodZoom = methodFocusTarget.zoom;
+  }
+  methodFocusActive = false;
+}
+
+/** Tween methodPanX/Y/methodZoom to a target, sharing methodAnimFrame's rAF pump (ADR-091) with
+ *  the beat stroke-in and the Set-to-Set tilt — only one of the three is ever actually mid-tween
+ *  (setMethodProgress/stopMethodBeatAnim settle this one first), so nothing new needs pumping. */
+function startMethodFocusAnim(toPanX, toPanY, toZoom) {
+  const from = { panX: methodPanX, panY: methodPanY, zoom: methodZoom };
+  methodFocusTarget = { panX: toPanX, panY: toPanY, zoom: toZoom };
+  stopMethodFocusAnim(false); // cancel a prior focus tween IN PLACE — don't snap it to ITS old target first
+  methodFocusActive = true;
+  if (methodAnimRafId === null) {
+    methodAnimLastT = 0;
+    methodAnimRafId = requestAnimationFrame(methodAnimFrame);
+  }
+  methodFocusHandle = tween({
+    from: 0,
+    to: 1,
+    duration: QUICK_VIEW_MS,
+    ease: easeFold,
+    onUpdate: (t) => {
+      methodPanX = THREE.MathUtils.lerp(from.panX, methodFocusTarget.panX, t);
+      methodPanY = THREE.MathUtils.lerp(from.panY, methodFocusTarget.panY, t);
+      methodZoom = THREE.MathUtils.lerp(from.zoom, methodFocusTarget.zoom, t);
+      queueMethodRedraw();
+    },
+    onComplete: () => {
+      methodFocusActive = false;
+      methodFocusHandle = null;
+      queueMethodRedraw();
+    },
+  });
 }
 
 // ---- Show Method per-line stroke-in (ADR-091). Each beat's lines draw one at a time, ~0.2-0.4s
@@ -2483,6 +2539,34 @@ let methodAnimUnitT = 0;     // 0..1 eased reveal fraction of that unit
 let methodAnimHandle = null; // the live tween handle, so a snap-finish can cancel it mid-flight
 let methodAnimRafId = null;  // this module's own rAF loop handle (animate()'s loop is paused)
 let methodAnimLastT = 0;
+
+// ---- Show Method Set-to-Set ghost (supersedes ADR-101's screen-anchored 3D pictorial — see
+// DECISIONS.md). Both reference textbooks draw this transition as a pure 2D operation: whichever
+// view carried the true angle in Set 2 is bodily copied and turned about its axis foot to land on
+// Set 3's own position — never a pictorial of the solid. This does exactly that: a rigid
+// rotate+translate of Set 2's own already-harvested top-view lines, landing pixel-exact on Set 3's
+// start because Set 3's pose IS Set 2's pose yawed about world-Y (ADR-093) and the top view drops
+// Y. A motion cue between two already-drawn Sets, never a beat of its own (METHOD_BEAT_COUNT stays
+// 14 — ADR-094's assert is untouched). Rides the exact same private rAF pump ADR-091 already stood
+// up (methodAnimFrame/queueMethodRedraw below), not a second loop — no buildEdgeMap/
+// drawProjections, no allocation, no disposal; drawMethodGhost re-flattens the harvested `data`
+// arrays both Sets already carry. ----
+const METHOD_TILT_DURATION_MS = 900;  // motion phase — rotate+translate, easeFold
+const METHOD_TILT_HOLD_MS = 400;      // landed, full alpha — the payoff frame (ghost == Set 3 start)
+const METHOD_TILT_FADE_MS = 350;      // alpha 1 -> 0, then Set 3's own beat-1 stroke-in takes over
+const METHOD_TILT_TOTAL_MS = METHOD_TILT_DURATION_MS + METHOD_TILT_HOLD_MS + METHOD_TILT_FADE_MS;
+const GHOST_ALPHA = 0.35; // base opacity of the copied top view, before the fade-phase multiplier
+let methodTiltActive = false;   // a ghost is currently playing
+let methodTiltMotionT = 0;      // 0..1 eased rotate+translate progress — 1 for the whole hold+fade tail
+let methodTiltAlpha = 1;        // 1 through motion+hold, ramps to 0 across the fade phase
+let methodTiltHandle = null;    // the live tween handle, so a snap-finish can cancel it mid-flight
+/** Pose-independent facts solved ONCE at ghost start (mirrors the old fitMethodTiltProjection's
+ *  "compute once" precedent) — everything PX-valued is recomputed per frame in drawMethodGhost
+ *  from the live sheet layout instead, so a pan/zoom mid-tilt stays correct (the old screen-
+ *  anchored inset ignored methodPanX/Y/methodZoom entirely). `vertexIsFirst`: which end of
+ *  `ann.axis` is the turning pivot, decided once against Set 3 (see startMethodTilt) and reused by
+ *  INDEX on Set 2 — both Sets harvest from one shared geometry, so index correspondence holds. */
+let methodGhost = null; // { fromIndex, vertexIsFirst, turnDeg } | null
 
 /** One atomic stroked line ("moveTo→lineTo→stroke") per k-step — the animation-unit granularity;
  *  matches strokeMethodLines'/the projector-loop's/strokeAxisInto's own iteration exactly, so an
@@ -2520,6 +2604,26 @@ function methodViewSplit(set) {
   };
 }
 
+/** ADR-099/-100: is the angle arc + degree label eligible for this Set at all — the exact
+ *  numeric guard ADR-099 introduced, pulled out to a standalone function (mirroring
+ *  methodViewSplit's own precedent above) so methodBeatUnitCount (a pre-flight COUNT of beat 12's
+ *  animation units) and drawMethodSheet (the actual draw) share one answer and can never disagree
+ *  about whether the arc exists — the two are a beat apart in the source and had already drifted
+ *  once (ADR-099's own "caught live" note). See drawMethodSheet's call site for the full geometric
+ *  reasoning this guard encodes; unchanged from ADR-099, only relocated. */
+const ARC_DIR_EPS = 0.02; // ~1.1° — floating-point slack, not a real tolerance window
+function methodArcEligible(set) {
+  const spec = set.labelSpec;
+  if (!spec) return false;
+  const { firstIsHP } = methodViewSplit(set);
+  if (spec.kind === 'plane') {
+    const dropped = firstIsHP ? set.axisDir.y : set.axisDir.x;
+    return Math.abs(dropped) < ARC_DIR_EPS;
+  }
+  if (spec.kind === 'both') return firstIsHP;
+  return false;
+}
+
 /** Total animation units for a given Set + beat index — world-space counts only (no screen
  *  transform), so pacing stays correct even if the learner pans/zooms/focuses mid-reveal. Mirrors
  *  the exact filters drawMethodSheet's own per-beat gates use (see that function's beat-index
@@ -2538,18 +2642,44 @@ function methodBeatUnitCount(set, beatIndex) {
     case 9: return lineArrayUnitCount(viewB.data, true, 'base');
     case 10: return lineArrayUnitCount(viewB.data, false, 'generator');
     case 11: return lineArrayUnitCount(viewB.data, true, 'generator');
-    case 12: return segUnitCount(set.ann.axis) * 2; // strokeAxisInto runs twice — HP pass, VP pass
+    // ADR-100: one unit per PASS (HP, then VP), not one per chain-line dash — the axis is a
+    // single line, and ADR-091's "one unit = one edge" convention means every other beat already
+    // counts a whole edge as one unit regardless of how many pixels it spans. Chain-dash-counting
+    // made beat 12 ~44 units (~13s) versus a handful for every other beat. Two more units are
+    // added when the angle arc is eligible (methodArcEligible) — the datum+sweep, then the label
+    // fade (see the arc's own reveal phases in drawMethodSheet's beat-12 block). No shipped
+    // problem has a zero-length axis, but `set.ann.axis.length >= 6` is kept as the same
+    // zero-units-for-nothing-to-draw guard the old `segUnitCount(...) * 2` gave for free.
+    case 12: return (set.ann.axis.length >= 6 ? 2 : 0) + (methodArcEligible(set) ? 2 : 0);
+    // ADR-102 — one unit per DIMENSION drawn (0/1/2: base edge in HP, overall height in VP,
+    // either possibly absent — restrictedDims' own baseMM===null gate for curved-base solids,
+    // or EXTENT_EPS in projectionDrawer.js for a degenerate zero-height solid), the same
+    // "one unit per whole mark" convention beat 12 already established for the axis — not one
+    // per line segment, which is the exact bug ADR-100 fixed there. Labels (drawMethodLabels)
+    // have no reveal of their own and stay unaffected — this only adds units for the dims
+    // drawMethodSheet's own beat-13 block folds in alongside them.
+    case 13: return (set.data.hpDimLines.length ? 1 : 0) + (set.data.vpDimLines.length ? 1 : 0);
     default: return 0;
   }
 }
 
-/** Hard-stop: cancels the live tween AND this module's own rAF loop, and resets reveal state so
- *  the next repaint draws methodAnimBeat's beat (if any) fully — the "snap to fully-drawn" half of
- *  ADR-091's Next-mid-animation contract, and the teardown-time cleanup. */
+/** Hard-stop for ALL THREE of Show Method's own animations — the beat stroke-in (ADR-091), the
+ *  Set-to-Set tilt, and the Set-chip focus pan/zoom (ADR-102) — cancelling whichever is live and
+ *  resetting reveal state so the next repaint draws methodAnimBeat's beat (if any) fully. The
+ *  focus tween SNAPS to its target rather than freezing: a Set change (goNext/goBack call
+ *  clearFocusChip → setFocus(null) BEFORE sim.method.setProgress, methodController.js) must not
+ *  leave the sheet stranded mid-zoom on the Set being left. Single chokepoint, called from every
+ *  path that should settle an in-flight animation instantly: setMethodProgress (Next/Back/skip),
+ *  teardownShowMethod (Exit/Escape/reset), and startMethodTilt itself (a tilt first settles any
+ *  in-flight beat reveal before it starts, and cancels a previous tilt if one was already live). */
 function stopMethodBeatAnim() {
   methodAnimHandle?.cancel();
   methodAnimHandle = null;
   methodAnimBeat = -1;
+  methodTiltHandle?.cancel();
+  methodTiltHandle = null;
+  methodTiltActive = false;
+  stopMethodFocusAnim(true);
   if (methodAnimRafId !== null) {
     cancelAnimationFrame(methodAnimRafId);
     methodAnimRafId = null;
@@ -2560,9 +2690,10 @@ function stopMethodBeatAnim() {
 function methodAnimFrame(now) {
   const delta = methodAnimLastT ? Math.min(now - methodAnimLastT, 64) : 16;
   methodAnimLastT = now;
-  tickTweens(delta); // drives methodAnimHandle.onUpdate below — safe to share anim.js's `active`
-                      // Set with the (paused) live pane: nothing else can be tweening right now.
-  if (methodAnimBeat !== -1) {
+  tickTweens(delta); // drives methodAnimHandle's/methodTiltHandle's/methodFocusHandle's onUpdate
+                      // below — safe to share anim.js's `active` Set with the (paused) live pane:
+                      // nothing else can be tweening right now.
+  if (methodAnimBeat !== -1 || methodTiltActive || methodFocusActive) {
     methodAnimRafId = requestAnimationFrame(methodAnimFrame);
   } else {
     methodAnimRafId = null;
@@ -2605,6 +2736,72 @@ function startMethodBeatAnim(set, beatIndex) {
       queueMethodRedraw();
     },
   });
+}
+
+/** Play the Set-to-Set ghost: lift a faded copy of Set 2's own top view off the sheet, rotate it
+ *  about its axis foot, and land it on Set 3's start position (drawMethodGhost does the per-frame
+ *  work; this only solves the pose-independent facts once, see methodGhost's own header). No-ops
+ *  with a `false` return when there is nothing to turn — mirrors beginShowMethod's own
+ *  boolean-return, no-op-on-false shape, so methodController.js can treat this identically to
+ *  sim.method.begin(). Only ever eligible for the both-planes Set 3 today (ADR-093's `turnDeg`,
+ *  which methodController.js's canTilt() also gates the button's visibility on, PLUS
+ *  methodArcEligible — the rigid-2D-motion claim only holds when Set 3's true-shape view is
+ *  genuinely the top view, the same guard beat 12's own angle arc already depends on) — a
+ *  single-plane Set1→Set2 ghost is out of scope. */
+function startMethodTilt() {
+  if (!methodActive) return false;
+  const set = methodSets[methodSet];
+  const prevSet = methodSets[methodSet - 1];
+  const axis3 = set?.ann?.axis;
+  if (!set || set.turnDeg == null || !prevSet || !methodArcEligible(set) || (axis3?.length ?? 0) < 6) return false;
+  stopMethodBeatAnim(); // settles any in-flight beat reveal AND cancels a prior in-flight ghost —
+                        // the exact ADR-091 cancel-and-snap contract, reused in both directions.
+
+  // Which end of `ann.axis` is the turning pivot — beat 12's own screen rule (drawMethodSheet:
+  // "lower on screen — deterministic, no world guess") reduces to a raw world-x comparison here:
+  // flattenHP's y-output (`projectSheet`) is an INCREASING affine function of world-x with
+  // identical coefficients for both endpoints, so dx/scale/zoom/pan all cancel and no projection
+  // call is needed. Set 2 shares this SAME array index — both Sets harvest from one shared
+  // geometry with only pose differing, the same cross-Set assumption beat 6's projector
+  // derivation already relies on for `ann.labels` (main.js, drawMethodSheet).
+  const vertexIsFirst = axis3[0] >= axis3[axis3.length - 3];
+  methodGhost = { fromIndex: methodSet - 1, vertexIsFirst, turnDeg: set.turnDeg };
+
+  methodTiltMotionT = 0;
+  methodTiltAlpha = 1;
+  methodTiltActive = true;
+  if (methodAnimRafId === null) {
+    methodAnimLastT = 0;
+    methodAnimRafId = requestAnimationFrame(methodAnimFrame);
+  }
+  announce(`Turning Set ${methodSet}'s top view ${Math.round(set.turnDeg)}° into Set ${methodSet + 1}'s position.`);
+  methodTiltHandle = tween({
+    from: 0,
+    to: METHOD_TILT_TOTAL_MS,
+    duration: METHOD_TILT_TOTAL_MS,
+    ease: (x) => x, // linear in ms — the three phases below own their own easing/ramp
+    onUpdate: (ms) => {
+      if (ms < METHOD_TILT_DURATION_MS) {
+        methodTiltMotionT = easeFold(ms / METHOD_TILT_DURATION_MS); // the "physical hinge" curve
+        methodTiltAlpha = 1;                                         // the platform's other rotations use
+      } else if (ms < METHOD_TILT_DURATION_MS + METHOD_TILT_HOLD_MS) {
+        methodTiltMotionT = 1; // landed — the payoff frame where ghost and Set 3 coincide
+        methodTiltAlpha = 1;
+      } else {
+        methodTiltMotionT = 1;
+        methodTiltAlpha = 1 - (ms - METHOD_TILT_DURATION_MS - METHOD_TILT_HOLD_MS) / METHOD_TILT_FADE_MS;
+      }
+      queueMethodRedraw();
+    },
+    onComplete: () => {
+      methodTiltActive = false;
+      methodTiltHandle = null;
+      methodGhost = null;
+      queueMethodRedraw();
+      announce(`Now at Set ${methodSet + 1} — ${set.label}.`);
+    },
+  });
+  return true;
 }
 
 /** Coalesce Show Method repaints to one per animation frame — mirrors queueRedraw's shape but
@@ -2831,17 +3028,20 @@ function planMethodStages(eff) {
     overrides: { angleHP: 0, angleVP: 0 },
     modes: { faceInclinationHP: false, faceInclinationVP: false, orientToCorner: false },
     trueShape: 'top',
-    label: 'Simple position',
+    // ADR-099: 'literal' specs pass their text straight through formatSetLabel — no angle to
+    // measure at Simple position.
+    labelSpec: { kind: 'literal', text: 'Simple position' },
   }];
 
   if (n === 2) {
     const axis = Math.abs(eff.angleHP) > ANGLE_EPS ? 'HP' : 'VP';
-    const angle = axis === 'HP' ? eff.angleHP : eff.angleVP;
     plans.push({
       overrides: {},        // the full live shapeData — already the fully resolved pose
       modes: { ...modes },  // the full live mode set (may be face-inclination, orient, or manual)
       trueShape: trueShapeForPlane(axis),
-      label: `Axis ${Math.round(angle)}° to the ${axis}`,
+      // ADR-099: the degree value is resolved in projectSet from the Set's MEASURED pose, not
+      // baked in here from the raw slider — see formatSetLabel/axisInclinations (main.js).
+      labelSpec: { kind: 'plane', plane: axis },
     });
     return plans;
   }
@@ -2853,9 +3053,10 @@ function planMethodStages(eff) {
   if (modes.faceInclinationHP || modes.faceInclinationVP) {
     // Defensive fallback (no current data exercises this): can't cleanly split a
     // face-inclination formula into a single resolved axis, so go straight to the live pose
-    // for both remaining Sets rather than compute a wrong partial pose.
-    plans.push({ overrides: {}, modes: { ...modes }, trueShape: trueShapeForPlane(firstPlane), label: `Axis inclined to the ${firstPlane}` });
-    plans.push({ overrides: {}, modes: { ...modes }, trueShape: trueShapeForPlane(secondPlane), label: 'Axis inclined to both planes' });
+    // for both remaining Sets rather than compute a wrong partial pose. Stays literal text
+    // (ADR-099) — there is no clean single angle to measure and name here either.
+    plans.push({ overrides: {}, modes: { ...modes }, trueShape: trueShapeForPlane(firstPlane), labelSpec: { kind: 'literal', text: `Axis inclined to the ${firstPlane}` } });
+    plans.push({ overrides: {}, modes: { ...modes }, trueShape: trueShapeForPlane(secondPlane), labelSpec: { kind: 'literal', text: 'Axis inclined to both planes' } });
     return plans;
   }
   const firstAngle = firstPlane === 'HP' ? eff.angleHP : eff.angleVP;
@@ -2864,14 +3065,14 @@ function planMethodStages(eff) {
     overrides: firstPlane === 'HP' ? { angleHP: eff.angleHP, angleVP: 0 } : { angleHP: 0, angleVP: eff.angleVP },
     modes: { ...modes },
     trueShape: trueShapeForPlane(firstPlane),
-    label: `Axis ${Math.round(firstAngle)}° to the ${firstPlane}`,
+    labelSpec: { kind: 'plane', plane: firstPlane },
   });
   plans.push({
     overrides: {},           // unused by projectSetPose when `sequential` is set (kept only so
                              // this plan shape still matches plans[0]/[1] for any future reader)
     modes: { ...modes },
     trueShape: trueShapeForPlane(secondPlane),
-    label: `Axis ${Math.round(firstAngle)}° to the ${firstPlane} and ${Math.round(secondAngle)}° to the ${secondPlane}`,
+    labelSpec: { kind: 'both', firstPlane, secondPlane },
     // ADR-093: Set 3's pose is NOT the combined-Euler shortcut above (that's what `overrides: {}`
     // would trigger) — projectSetPose branches on this marker to a separate sequential "tip, then
     // turn" composition instead. See projectSequentialBothPlanesPose's own header for why.
@@ -2893,8 +3094,13 @@ function projectSetPose(overrides, modeSet, sequential) {
   _methodScratch.rotation.order = 'ZXY';
   applyShapeTransform(_methodScratch, eff);
   const seat = computeSeating(currentMesh.geometry, _methodScratch.quaternion, eff);
-  const m = new THREE.Matrix4().compose(new THREE.Vector3(seat.x, seat.y, 0), _methodScratch.quaternion, ONE_SCALE);
-  return { eff, m };
+  // _methodScratch is one shared scratch object reused by every Set (and, for a tilt between two
+  // Sets, read back well after this call returns) — its quaternion must be CLONED before being
+  // retained, or every retained "q" would alias the same object and end up holding whichever Set
+  // was computed last.
+  const q = _methodScratch.quaternion.clone();
+  const m = new THREE.Matrix4().compose(new THREE.Vector3(seat.x, seat.y, 0), q, ONE_SCALE);
+  return { eff, m, q, seat };
 }
 
 /** ADR-093 — Show Method's both-planes Set 3 ONLY. planMethodStages' combined-Euler shortcut
@@ -2931,7 +3137,7 @@ function projectSequentialBothPlanesPose(sequential, modeSet) {
   const q = yaw.multiply(q1);                         // second tilt applied ON TOP, world frame
   const seat = computeSeating(currentMesh.geometry, q, eff1);
   const m = new THREE.Matrix4().compose(new THREE.Vector3(seat.x, seat.y, 0), q, ONE_SCALE);
-  return { eff: eff1, m };
+  return { eff: eff1, m, q, seat };
 }
 
 /** Copy every LineSegments2 child's instanceStart/instanceEnd endpoints into a plain array —
@@ -2956,6 +3162,42 @@ function harvestLineGroup(group) {
   return lines;
 }
 
+/** Copy every triangle-soup Mesh child's position attribute into a flat [x,y,z,x,y,z,…] array
+ *  (3 verts / 9 floats per triangle, world space) — the harvested shape a drawn-array fill reads
+ *  after the live THREE result is disposed. Mirrors harvestLineGroup's own shape-preserving copy
+ *  for the dimension layer's filled 3:1 arrowheads (ADR-041's buildArrowMesh, ADR-102 restores
+ *  this harvest — ADR-089 deleted it along with the dimensions beat it fed). LineSegments2 also
+ *  reports isMesh=true (r160 gotcha, same one drawCompare's fillArrowMesh works around) so it
+ *  must be excluded even though nothing here currently shares a group with one. */
+function harvestTriGroup(group) {
+  const tris = [];
+  if (!group) return tris;
+  for (const child of group.children) {
+    if (!child.isMesh || child.isLineSegments2) continue;
+    const pos = child.geometry?.attributes?.position;
+    if (!pos) continue;
+    for (let i = 0; i < pos.count; i++) tris.push(pos.getX(i), pos.getY(i), pos.getZ(i));
+  }
+  return tris;
+}
+
+/** Copy every CSS2DObject child's world position + live text into the plain `[{text,x,y,z}]`
+ *  shape drawMethodLabels already consumes (it was written for vertexLabeler's corner labels,
+ *  but the shape is identical for the dimension layer's numeric labels — ADR-102 reuses it
+ *  rather than writing a second drawing function). ADR-089 deleted this harvest; ADR-102 restores
+ *  it for the restricted dimension layer only (see projectSet's own restrictedDims comment). */
+function harvestLabelGroup(group) {
+  const labels = [];
+  if (!group) return labels;
+  for (const child of group.children) {
+    if (!child.isCSS2DObject) continue;
+    const text = child.element?.textContent;
+    if (!text) continue;
+    labels.push({ text, x: child.position.x, y: child.position.y, z: child.position.z });
+  }
+  return labels;
+}
+
 /** Corner labels (A, B, C…, O, P) + the axis chain line, planned in vertexLabeler.js's
  *  planAnnotations (LOCAL space, pure) and carried to WORLD space by the stage matrix `m` —
  *  the two new beats the audit found absent from both flat surfaces (vertexLabeler.js only
@@ -2971,12 +3213,40 @@ function harvestAnnotations(m) {
   return { labels: worldLabels, axis: axisSegs };
 }
 
+/** ADR-099 — the axis' TRUE angle to each reference plane, measured from its actual world
+ *  direction rather than read off a slider. Exact and view-independent: asin of the direction
+ *  cosine against each plane's normal (HP: +Y, VP: +X) — unlike a Set's caption/arc, which is
+ *  only a TRUE angle in the one view where the axis happens to be parallel to the OTHER plane. */
+function axisInclinations(dir) {
+  return {
+    toHP: Math.asin(Math.min(1, Math.abs(dir.y))) * RAD2DEG,
+    toVP: Math.asin(Math.min(1, Math.abs(dir.x))) * RAD2DEG,
+  };
+}
+
+/** ADR-099 — Set caption text, built from the Set's MEASURED inclination (axisInclinations)
+ *  rather than the raw angleHP/angleVP slider values planMethodStages used to bake in directly.
+ *  `spec` is planMethodStages' declarative description of which plane(s) this Set's caption
+ *  names — resolving the actual degree values here (once the Set's real pose is known) is what
+ *  keeps the caption from ever disagreeing with the arc drawn on the same Set (both read the
+ *  same `incl`). See DECISIONS.md ADR-099 for why this replaced baked-in slider values. */
+function formatSetLabel(spec, incl) {
+  if (spec.kind === 'literal') return spec.text;
+  const degFor = (plane) => (plane === 'HP' ? incl.toHP : incl.toVP);
+  if (spec.kind === 'plane') return `Axis ${Math.round(degFor(spec.plane))}° to the ${spec.plane}`;
+  return `Axis ${Math.round(degFor(spec.firstPlane))}° to the ${spec.firstPlane} and ${Math.round(degFor(spec.secondPlane))}° to the ${spec.secondPlane}`;
+}
+
 /** Build one Set's complete drawable data for a stage plan. No mesh, no geometry allocation:
  *  every stage shares currentMesh.geometry (overrides never touch shape/baseLength/height).
  *  The only THREE objects created are drawProjections' own result, harvested to plain arrays
  *  and disposed in this SAME tick — same disposal contract as refreshProjections(), just
- *  without ever parenting the result into the scene. */
-function projectSet(plan) {
+ *  without ever parenting the result into the scene.
+ * @param {number} setIndex 0-based Set number within this problem's plan (ADR-103) — the
+ *  restricted dimension layer is Set-1-only (`setIndex === 0`), matching the textbook (John,
+ *  Figs 12.21/12.23/12.24/12.25): size dimensions are printed once, in the simple-position Set,
+ *  never repeated on the inclined Sets (which instead carry the beat-12 angle arc). */
+function projectSet(plan, setIndex) {
   const { eff, m } = projectSetPose(plan.overrides, plan.modes, plan.sequential);
   const box = new THREE.Box3().setFromBufferAttribute(currentMesh.geometry.getAttribute('position'));
   box.applyMatrix4(m); // mirrors rebuild()'s own `new THREE.Box3().setFromObject(mesh)` (main.js)
@@ -2990,57 +3260,169 @@ function projectSet(plan) {
   // too — reading the live mesh's axis here would misclassify every stage but the live one, the
   // same trap z0/dimensions already avoid per ADR-084).
   const axis = new THREE.Vector3(0, 1, 0).transformDirection(m);
-  const res = drawProjections(edgeMap, { width, height, z0, axis });
+  // ADR-103 (amends ADR-102 Decision 3): Show Method's OWN restricted dimension layer — overall
+  // height + the true base-edge length ONLY, never the live pane's 5 bbox-extent dims (untouched
+  // — this option only exists on THIS call) — and SET-1 ONLY. John's own worked examples (Figs
+  // 12.21/12.23/12.24/12.25) print size dimensions exactly once, on the simple-position Set;
+  // Sets 2/3 carry the beat-12 angle arc instead, never a repeated size dimension. Values are
+  // read straight off currentShapeData rather than measured off this Set's own geometry — every
+  // Set shares one geometry (only pose differs, see the pose/eff comment below), so the true
+  // edge length and true height are Set-invariant. `baseMM` is null for Cone/Cylinder — no
+  // polygon base edge exists to measure (baseLength is a diameter for those two; see
+  // shapeData.js's own doc comment).
+  const restrictedDims = setIndex === 0 ? {
+    heightMM: currentShapeData.height * WORLD_TO_MM,
+    baseMM: (currentShapeData.shape === ShapeType.Cone || currentShapeData.shape === ShapeType.Cylinder)
+      ? null
+      : currentShapeData.baseLength * WORLD_TO_MM,
+  } : null;
+  // ADR-103: Sets 2/3 pass `drawDimensions: false` (not just `restrictedDims: null`) —
+  // `restrictedDims: null` alone is indistinguishable, inside drawProjections, from the live
+  // pane's own call (which ALSO never passes restrictedDims and so also defaults to null),
+  // so it fell through to the bbox 5-dim `else` branch instead of drawing nothing. Sets 2/3
+  // must draw NO size dimension at all — the textbook prints these once, on Set 1 (John, Figs
+  // 12.21/12.23/12.24/12.25); the inclined Sets carry the beat-12 angle arc instead.
+  const res = drawProjections(edgeMap, { width, height, z0, axis, restrictedDims, drawDimensions: setIndex === 0 });
   const data = {
     hp: harvestLineGroup(res.hpGroup),
     vp: harvestLineGroup(res.vpGroup),
     pp: harvestLineGroup(res.ppGroup), // ADR-088: side view dropped from the replay; left harmless
     hpOutline: harvestLineGroup(res.hpOutlineGroup),
     vpOutline: harvestLineGroup(res.vpOutlineGroup),
-    // ADR-089: no hpDim*/vpDim* harvest — Show Method no longer replays the dimension layer.
+    // ADR-102 restores the hpDim*/vpDim* harvest ADR-089 deleted — restricted to the two dims
+    // `restrictedDims` above requested, folded into beat 13 (labels) by drawMethodSheet, not a
+    // beat of its own (no METHOD_BEAT_COUNT change — see main.js's own comment on that constant).
+    hpDimLines: harvestLineGroup(res.hpDimensionGroup),
+    vpDimLines: harvestLineGroup(res.vpDimensionGroup),
+    hpDimTris: harvestTriGroup(res.hpDimensionGroup),
+    vpDimTris: harvestTriGroup(res.vpDimensionGroup),
+    hpDimLabels: harvestLabelGroup(res.hpDimensionGroup),
+    vpDimLabels: harvestLabelGroup(res.vpDimensionGroup),
   };
   res.dispose(); // WebGL buffers + CSS2D DOM nodes gone before this function returns
   const ann = harvestAnnotations(m);
-  const set = { label: plan.label, trueShape: plan.trueShape, eff, z0, data, ann };
+  // ADR-099: MEASURED off this Set's own resolved pose, not the raw angleHP/angleVP slider
+  // values planMethodStages used to bake into `label` directly — reuses the `axis` unit vector
+  // already computed above (ADR-087) rather than re-deriving a direction from `ann`.
+  const incl = axisInclinations(axis);
+  const label = formatSetLabel(plan.labelSpec, incl);
+  const set = {
+    label, trueShape: plan.trueShape, eff, z0, data, ann, axisDir: axis, incl,
+    labelSpec: plan.labelSpec,
+    // ADR-099: the exact TURN this Set applies (projectSequentialBothPlanesPose's own yaw
+    // magnitude, not a re-measurement) — for the both-planes Set 3 only. Distinct from `incl`:
+    // `incl.toVP` is the axis' true 3-D angle to the VP, which is NOT the same number as the
+    // yaw applied to get there (a yawed-then-tilted axis reads a different 3-D VP angle than
+    // the yaw itself). This is what the top-view turn arc actually sweeps.
+    turnDeg: plan.sequential ? plan.sequential.secondAngle : null,
+  };
   set.contentBeats = methodContentBeats(set);
   return set;
 }
 
-/** ADR-090 — per-Set, per-beat "does this beat actually add a mark to the sheet" table, computed
- *  once at begin() from the same harvested `data`/`ann` drawMethodSheet itself reads, so it can
- *  never drift from what actually gets drawn. Some poses have no hidden edge on a given view (a
- *  prism square-on to a plane casts no dashed generator there) — Next used to still spend a click
- *  on that beat and repaint an IDENTICAL frame, reading to a learner as a dead button. Index 0
- *  (the Set's caption reveal) is always true; the caller (methodController.js's goNext/goBack)
- *  treats it as such regardless of this table, since projectors/labels (index 6/13) legitimately
- *  read the same `ann.labels` source and would otherwise fall out in lockstep. */
+/** ADR-095 — sheet-local flattens used ONLY for the mark-novelty comparison below; the same
+ *  affine map drawMethodSheet's own flattenHP/flattenVP apply, minus the per-Set `dx` and the
+ *  projectSheet transform (both affine and identical for every beat of a Set, so neither can
+ *  change whether two segments coincide on screen). */
+function methodFlattenHP(x, y, z) { return { u: -z, v: -x }; }
+function methodFlattenVP(x, y, z) { return { u: -z, v: y }; }
+function methodQuantize(v) { return Math.round(v / 1e-3); } // same weld tolerance meshAnalyzer.js uses
+
+/** One key per non-degenerate flattened segment: order-normalized (A→B === B→A, so a segment
+ *  drawn from either end still dedupes) and plane-prefixed (HP and VP both flatten `u = -z`,
+ *  so an unprefixed key would false-match a top-view line against a coincidentally-aligned
+ *  front-view one). A segment whose two endpoints quantize to the same point is degenerate —
+ *  it flattens to nothing (e.g. a vertical generator viewed from directly above) and
+ *  contributes no key, matching what strokeMethodLines actually paints (a zero-length moveTo/
+ *  lineTo). Filters mirror strokeMethodLines' own `onlyHidden`/`onlyKind` exactly. */
+function methodSegmentKeys(plane, flattenFn, arr, onlyHidden, onlyKind) {
+  const keys = [];
+  for (const seg of arr) {
+    if (onlyHidden !== undefined && seg.hidden !== onlyHidden) continue;
+    if (onlyKind !== undefined && seg.kind !== onlyKind) continue;
+    for (let k = 0; k + 5 < seg.pts.length; k += 6) {
+      const a = flattenFn(seg.pts[k], seg.pts[k + 1], seg.pts[k + 2]);
+      const b = flattenFn(seg.pts[k + 3], seg.pts[k + 4], seg.pts[k + 5]);
+      const ax = methodQuantize(a.u), ay = methodQuantize(a.v);
+      const bx = methodQuantize(b.u), by = methodQuantize(b.v);
+      if (ax === bx && ay === by) continue; // degenerate — collapses to a point, draws nothing
+      const p1 = `${ax},${ay}`, p2 = `${bx},${by}`;
+      keys.push(`${plane}:${p1 < p2 ? `${p1}|${p2}` : `${p2}|${p1}`}`);
+    }
+  }
+  return keys;
+}
+
+/** ADR-090/-095 — per-Set, per-beat "does this beat actually add a NEW mark to the sheet"
+ *  table, computed once at begin() from the same harvested `data`/`ann` drawMethodSheet itself
+ *  reads, so it can never drift from what actually gets drawn. ADR-090's original test asked
+ *  only "is this beat's own array non-empty" — too weak: a beat can be non-empty and still
+ *  redraw exactly what an earlier beat already put on the sheet (Set 1, no inclination — the
+ *  top view's outline beat and visible-face beat trace the identical hexagon; a prism's
+ *  vertical generators flatten to points in that same top view). ADR-087's overlap between the
+ *  outline beat and later visible-face/generator beats is DELIBERATE and still draws in full
+ *  when shown (nothing here changes what strokeMethodLines paints) — this table only decides
+ *  whether Next spends a click-stop on a beat that would look identical to the one before it.
+ *  Index 0 (the Set's caption reveal) is always true. Beats 6 (projectors) and 13 (labels) are
+ *  never deduped — dashed construction lines and text marks respectively, neither ever
+ *  coincides meaningfully with view geometry. Beat 12 (axis) is never deduped against view
+ *  geometry either — a different colour/dash reads as a genuinely new mark even where it runs
+ *  collinear with a generator — but still goes `false` when truly degenerate (an upright axis
+ *  collapsing to a point in top view), so it doesn't reproduce the exact defect this exists to
+ *  fix at the one beat drawn last. */
 function methodContentBeats(set) {
-  const firstIsHP = set.trueShape !== 'front';
-  const viewA = firstIsHP
-    ? { outline: set.data.hpOutline, data: set.data.hp }
-    : { outline: set.data.vpOutline, data: set.data.vp };
-  const viewB = firstIsHP
-    ? { outline: set.data.vpOutline, data: set.data.vp }
-    : { outline: set.data.hpOutline, data: set.data.hp };
-  const hasKind = (arr, hidden, kind) => arr.some((seg) => seg.hidden === hidden && seg.kind === kind);
-  const hasAxis = set.ann.axis.length >= 6;
+  const { firstIsHP, viewA, viewB } = methodViewSplit(set);
+  const planeA = firstIsHP ? 'HP' : 'VP';
+  const planeB = firstIsHP ? 'VP' : 'HP';
+  const flattenA = firstIsHP ? methodFlattenHP : methodFlattenVP;
+  const flattenB = firstIsHP ? methodFlattenVP : methodFlattenHP;
   const hasLabels = set.ann.labels.length > 0;
-  return [
-    true,                                     // 0  caption reveal
-    viewA.outline.length > 0,                 // 1  outline(A)
-    hasKind(viewA.data, false, 'base'),       // 2  visible face(A)
-    hasKind(viewA.data, true, 'base'),        // 3  hidden face(A)
-    hasKind(viewA.data, false, 'generator'),  // 4  visible generators(A)
-    hasKind(viewA.data, true, 'generator'),   // 5  hidden generators(A)
-    hasLabels,                                // 6  projectors (one per labelled corner)
-    viewB.outline.length > 0,                 // 7  outline(B)
-    hasKind(viewB.data, false, 'base'),       // 8  visible face(B)
-    hasKind(viewB.data, true, 'base'),        // 9  hidden face(B)
-    hasKind(viewB.data, false, 'generator'),  // 10 visible generators(B)
-    hasKind(viewB.data, true, 'generator'),   // 11 hidden generators(B)
-    hasAxis,                                  // 12 axis
-    hasLabels,                                // 13 labels
-  ];
+
+  const seen = new Set();
+  const markNovel = (keys) => {
+    let novel = false;
+    for (const k of keys) {
+      if (!seen.has(k)) novel = true;
+      seen.add(k);
+    }
+    return novel;
+  };
+
+  const beats = new Array(14).fill(false);
+  beats[0] = true; // caption reveal
+
+  beats[1] = markNovel(methodSegmentKeys(planeA, flattenA, viewA.outline, undefined, undefined));
+  beats[2] = markNovel(methodSegmentKeys(planeA, flattenA, viewA.data, false, 'base'));
+  beats[3] = markNovel(methodSegmentKeys(planeA, flattenA, viewA.data, true, 'base'));
+  beats[4] = markNovel(methodSegmentKeys(planeA, flattenA, viewA.data, false, 'generator'));
+  beats[5] = markNovel(methodSegmentKeys(planeA, flattenA, viewA.data, true, 'generator'));
+
+  beats[6] = hasLabels; // projectors — dashed construction lines, never deduped
+
+  beats[7] = markNovel(methodSegmentKeys(planeB, flattenB, viewB.outline, undefined, undefined));
+  beats[8] = markNovel(methodSegmentKeys(planeB, flattenB, viewB.data, false, 'base'));
+  beats[9] = markNovel(methodSegmentKeys(planeB, flattenB, viewB.data, true, 'base'));
+  beats[10] = markNovel(methodSegmentKeys(planeB, flattenB, viewB.data, false, 'generator'));
+  beats[11] = markNovel(methodSegmentKeys(planeB, flattenB, viewB.data, true, 'generator'));
+
+  // Beat 12 — axis: true iff at least one segment is non-degenerate in HP OR VP (the axis
+  // draws into both flattens — strokeAxisInto's two passes — so it only reads as a genuine
+  // no-op when BOTH collapse to points).
+  let hasAxisMark = false;
+  for (let k = 0; k + 5 < set.ann.axis.length; k += 6) {
+    const aHP = methodFlattenHP(set.ann.axis[k], set.ann.axis[k + 1], set.ann.axis[k + 2]);
+    const bHP = methodFlattenHP(set.ann.axis[k + 3], set.ann.axis[k + 4], set.ann.axis[k + 5]);
+    const aVP = methodFlattenVP(set.ann.axis[k], set.ann.axis[k + 1], set.ann.axis[k + 2]);
+    const bVP = methodFlattenVP(set.ann.axis[k + 3], set.ann.axis[k + 4], set.ann.axis[k + 5]);
+    const degenHP = methodQuantize(aHP.u) === methodQuantize(bHP.u) && methodQuantize(aHP.v) === methodQuantize(bHP.v);
+    const degenVP = methodQuantize(aVP.u) === methodQuantize(bVP.u) && methodQuantize(aVP.v) === methodQuantize(bVP.v);
+    if (!degenHP || !degenVP) { hasAxisMark = true; break; }
+  }
+  beats[12] = hasAxisMark;
+
+  beats[13] = hasLabels; // vertex labels — text marks, never deduped
+
+  return beats;
 }
 
 /** ADR-094 — plain-English name for a plane in a walkthrough caption: HP is always "top view",
@@ -3051,31 +3433,73 @@ function planeViewWord(plane) { return plane === 'HP' ? 'top' : 'front'; }
  *  a learner landing on any of the 14 beats had no words for what just appeared, only the Set's
  *  own caption (painted once, beat 0) and mute Back/Next/Skip buttons. This is deliberately NOT
  *  the numeric counter ADR-089 removed — no position, no total, just what the beat drew — read
- *  by methodController.js's syncCaption() into both the visible `#method-caption` pill and the
- *  existing `#sim-status` announce channel. Reuses `methodContentBeats`' own `firstIsHP` split
- *  (same `set.trueShape !== 'front'` test) so view-A/view-B always name the same plane here as
- *  the content-gate does. */
+ *  by methodController.js's syncCaption() into `#method-caption` (ADR-095: a top-title row,
+ *  clear of the canvas' own Set caption — the two must never repeat each other, so beat 0
+ *  reads "Starting Set N" here rather than the canvas' "Set N — <label>") and the existing
+ *  `#sim-status` announce channel. Reuses `methodContentBeats`' own `firstIsHP` split (same
+ *  `set.trueShape !== 'front'` test) so view-A/view-B always name the same plane here as the
+ *  content-gate does. */
 function methodBeatLabel(set, beat) {
   const s = methodSets[set];
   if (!s) return '';
-  if (beat === 0) return `Set ${set + 1} — ${s.label}`;
+  // ADR-095: NOT the Set caption verbatim (that text lives on the canvas, under the block,
+  // beat 0's own reveal target) — the top-title row and the canvas caption must never repeat
+  // each other.
+  if (beat === 0) return `Starting Set ${set + 1}`;
   const firstIsHP = s.trueShape !== 'front';
   const wordA = planeViewWord(firstIsHP ? 'HP' : 'VP');
   const wordB = planeViewWord(firstIsHP ? 'VP' : 'HP');
   switch (beat) {
-    case 1: return `Outline of the ${wordA} view`;
+    // ADR-099: Sets 2+ name WHY this view is drawn first — it's the trueShape view, the one
+    // that shows the newly-introduced angle without foreshortening (see `methodArcEligible`'s
+    // reasoning for the same fact, used there to place the angle arc). Set 1 has no new angle
+    // yet, so its caption stays the plain original.
+    case 1: return set > 0
+      ? `Outline of the ${wordA} view — drawn first because it shows the new angle true`
+      : `Outline of the ${wordA} view`;
     case 2: return `Visible face lines — ${wordA} view`;
     case 3: return `Hidden face lines — ${wordA} view`;
     case 4: return `Visible generators — ${wordA} view`;
     case 5: return `Hidden generators — ${wordA} view`;
-    case 6: return 'Projectors linking the two views';
+    case 6: {
+      // ADR-099: Sets 2+ name what this beat's cross-Set derivation line actually carries —
+      // the previous Set's untouched view (wordB, same plane, same block row), unchanged in
+      // exactly the coordinate its own line holds constant (see drawMethodSheet's beat-6
+      // `prevFlattenUntouched` — heights for a carried front view, depths for a carried top
+      // view). `set` is this Set's 0-based index, which is also the previous Set's 1-based
+      // number (Set 2 is index 1, its predecessor is "Set 1").
+      if (set === 0) return 'Projectors linking the two views';
+      const carriedWord = firstIsHP ? 'heights' : 'depths';
+      return `Projectors — and Set ${set}'s ${wordB} view carried across, ${carriedWord} unchanged`;
+    }
     case 7: return `Outline of the ${wordB} view`;
     case 8: return `Visible face lines — ${wordB} view`;
     case 9: return `Hidden face lines — ${wordB} view`;
     case 10: return `Visible generators — ${wordB} view`;
     case 11: return `Hidden generators — ${wordB} view`;
-    case 12: return 'Axis of the solid';
-    case 13: return 'Vertex labels';
+    case 12: {
+      // ADR-099: names the arc drawMethodSheet draws in the same beat — 'plane'-kind Sets get
+      // the measured inclination, 'both'-kind Sets (both-planes Set 3) get the measured turn
+      // (only when firstIsHP — see `methodArcEligible` for why the arc itself skips a VP-first
+      // order here, and this caption stays generic to match).
+      const spec = s.labelSpec;
+      if (spec?.kind === 'plane') {
+        const deg = Math.round(spec.plane === 'HP' ? s.incl.toHP : s.incl.toVP);
+        return `Axis of the solid — ${deg}° to the ${spec.plane}`;
+      }
+      if (spec?.kind === 'both' && firstIsHP && s.turnDeg != null) {
+        return `Axis of the solid — turned ${Math.round(s.turnDeg)}° in the top view`;
+      }
+      return 'Axis of the solid';
+    }
+    case 13: {
+      // ADR-102 — names the restricted dims drawMethodSheet's own beat-13 block folds in
+      // alongside the vertex labels this beat already drew (never a beat of its own).
+      const dims = [];
+      if (s.data.hpDimLines.length) dims.push('base edge');
+      if (s.data.vpDimLines.length) dims.push('overall height');
+      return dims.length ? `Vertex labels and dimensions — ${dims.join(' and ')}` : 'Vertex labels';
+    }
     default: return '';
   }
 }
@@ -3099,7 +3523,7 @@ function beginShowMethod() {
   const plans = planMethodStages(computeEffectiveAngles(currentShapeData));
   if (plans.length < 2) return false;
   stopMethodBeatAnim(); // defensive — a prior session should have already torn this down
-  methodSets = plans.map(projectSet);
+  methodSets = plans.map((plan, i) => projectSet(plan, i));
   methodActive = true;
   methodSet = 0;
   methodBeat = 0;
@@ -3124,6 +3548,7 @@ function teardownShowMethod() {
   stopMethodBeatAnim();
   methodActive = false;
   methodSets = [];
+  methodGhost = null;
   methodSet = 0;
   methodBeat = 0;
   methodViewOpen = false;
@@ -3158,14 +3583,51 @@ function setMethodProgress(set, beat) {
   queueMethodRedraw();
 }
 
-/** Set-N focus (ADR-084 audit round 2, Decision 6/7; ADR-085: instant snap, no tween): purely
- *  visual, never touches methodSet/methodBeat. Target is the Set's INTRINSIC block centre (same
- *  E/GAP/showSideViewFlag inputs as `scale`/`anchorSX` themselves) — never a live bbox of what
+/** Reserve below the fitted band, in px: .method-controls' 24px (--space-5) bottom offset + the
+ *  pill's ~52px rendered height + 8px visual clearance. Re-verify against the pill's live rect
+ *  if either changes. */
+const METHOD_PILL_RESERVE_PX = 84;
+/** One caption line's box — captionFont is `12px --font-sans`, textBaseline 'top'. */
+const METHOD_CAPTION_LINE_PX = 16;
+
+/** Single source of Show Method's intrinsic sheet layout — was hand-duplicated between
+ *  drawMethodSheet and setMethodFocus (ADR-095), which is exactly how the two drifted out of
+ *  sync and let Set 2's caption (the one horizontally centred under .method-controls, since
+ *  .method-controls itself is `left:50%`) overlap the pill: the old fit only measured `blockH`
+ *  and left the caption's `captionY = -(blockH/2 + GAP*0.4)` offset to a flat marginBottomPx
+ *  guess. Folding `capGapS` into `nomHmm`/`anchorSY` here means BOTH call sites now fit the
+ *  block+caption band together, not the block alone — fixed once, for both. */
+function methodSheetLayout(w, h) {
+  const E = Math.max(solidSpanUnits, 1e-3);
+  const GAP = E * 0.35;
+  const STAGE_GAP = GAP;
+  const blockW = E + (METHOD_SHOW_SIDE_VIEW ? GAP + E : 0);
+  const blockH = E + GAP + E;
+  const capGapS = GAP * 0.4; // SAME offset drawMethodSheet's captionY uses — single source now
+  const n = methodSets.length || 1; // always the actual Set count (2 or 3) — no 1-wide state post-ADR-085
+  const marginPx = 40; // horizontal only — the block row is centred left-right
+  const marginTopPx = 40;
+  const marginBottomPx = METHOD_PILL_RESERVE_PX + METHOD_CAPTION_LINE_PX; // 100
+  const nomWmm = (n * blockW + (n - 1) * STAGE_GAP) * WORLD_TO_MM;
+  const nomHmm = (blockH + capGapS) * WORLD_TO_MM; // caption offset now INSIDE the fit
+  const scale = Math.min((w - 2 * marginPx) / nomWmm, (h - marginTopPx - marginBottomPx) / nomHmm);
+  const blockLocalCenterX = METHOD_SHOW_SIDE_VIEW ? (E + GAP) / 2 : 0;
+  const anchorSX = blockLocalCenterX + (n - 1) * (blockW + STAGE_GAP) / 2;
+  const anchorSY = -capGapS / 2; // centre the block+caption band, not the block alone
+  return {
+    E, GAP, STAGE_GAP, blockW, blockH, capGapS, n, marginPx, marginTopPx, marginBottomPx,
+    nomWmm, nomHmm, scale, blockLocalCenterX, anchorSX, anchorSY,
+    cx: w / 2, cy: marginTopPx + (h - marginTopPx - marginBottomPx) / 2,
+  };
+}
+
+/** Set-N focus (ADR-084 audit round 2, Decision 6/7; ADR-102 supersedes ADR-085's "instant snap,
+ *  no tween" clause — see startMethodFocusAnim below): visual pan/zoom only, never touches
+ *  methodSet/methodBeat. Target is the Set's INTRINSIC block centre (methodSheetLayout — same
+ *  E/GAP/showSideViewFlag inputs `scale`/`anchorSX` themselves use), never a live bbox of what
  *  that Set has actually drawn so far, which is exactly what keeps this from reopening the
  *  live-bbox coupling ADR-053 removed. Inverts drawMethodSheet's own project() formula for the
- *  block centre. ADR-085: the sim loop is paused while this view is open, so no anim.js tween
- *  can run here — a second, independent rAF-driven animation path for one interaction was
- *  rejected as worse than an instant jump, so methodPanX/Y/methodZoom are assigned directly. */
+ *  block centre. */
 function setMethodFocus(i) {
   if (!methodActive) return;
   focusSet = (i === null || i === undefined) ? null : Math.min(Math.max(i, 0), methodSets.length - 1);
@@ -3175,34 +3637,26 @@ function setMethodFocus(i) {
   const h = stage?.clientHeight || 0;
   if (!w || !h) return;
 
-  const E = Math.max(solidSpanUnits, 1e-3);
-  const GAP = E * 0.35;
-  const STAGE_GAP = GAP;
-  const blockW = E + (METHOD_SHOW_SIDE_VIEW ? GAP + E : 0);
-  const blockH = E + GAP + E;
-  const n = methodSets.length || 1; // always the actual Set count (2 or 3) — no 1-wide state post-ADR-085
-  const marginPx = 40;
-  const nomWmm = (n * blockW + (n - 1) * STAGE_GAP) * WORLD_TO_MM;
-  const nomHmm = blockH * WORLD_TO_MM;
-  const scale = Math.min((w - 2 * marginPx) / nomWmm, (h - 2 * marginPx) / nomHmm);
-  const blockLocalCenterX = METHOD_SHOW_SIDE_VIEW ? (E + GAP) / 2 : 0;
-  const anchorSX = blockLocalCenterX + (n - 1) * (blockW + STAGE_GAP) / 2;
+  const L = methodSheetLayout(w, h);
 
   let targetSX;
   let targetZoom;
   if (focusSet === null) {
-    targetSX = anchorSX;
+    targetSX = L.anchorSX;
     targetZoom = 1;
   } else {
-    targetSX = blockLocalCenterX + focusSet * (blockW + STAGE_GAP);
-    const zFitW = (w - 2 * marginPx) / (blockW * WORLD_TO_MM * scale);
-    const zFitH = (h - 2 * marginPx) / (blockH * WORLD_TO_MM * scale);
+    targetSX = L.blockLocalCenterX + focusSet * (L.blockW + L.STAGE_GAP);
+    const zFitW = (w - 2 * L.marginPx) / (L.blockW * WORLD_TO_MM * L.scale);
+    // Divides by (blockH + capGapS), not blockH alone — a focused Set must clear the caption
+    // exactly like the unfocused row does, or focusing re-introduces the overlap this fixes.
+    const zFitH = (h - L.marginTopPx - L.marginBottomPx) / ((L.blockH + L.capGapS) * WORLD_TO_MM * L.scale);
     targetZoom = Math.min(COMPARE_ZOOM_MAX, Math.max(COMPARE_ZOOM_MIN, Math.min(zFitW, zFitH)));
   }
-  methodPanX = -(targetSX - anchorSX) * WORLD_TO_MM * scale * targetZoom;
-  methodPanY = 0; // every Set is nominally centred about sheetY=0, same as anchorSY
-  methodZoom = targetZoom;
-  queueMethodRedraw();
+  startMethodFocusAnim(
+    -(targetSX - L.anchorSX) * WORLD_TO_MM * L.scale * targetZoom,
+    0, // every Set is nominally centred about sheetY=0, same as anchorSY
+    targetZoom,
+  );
 }
 
 /** Read-only chip-UI summary: a Set is `reached` once the walkthrough has drawn it at least
@@ -3274,6 +3728,97 @@ function drawMethodLabels(ctx, labels, flattenFn, color, font, paperColor) {
   }
 }
 
+/** Fill every harvested triangle-soup array (flat [x,y,z,x,y,z,…], world space, 3 verts/
+ *  triangle) — ADR-102's restricted dimension layer reuses this for the filled 3:1 arrowheads
+ *  harvestTriGroup copies out of the live Mesh before projectSet disposes it. Mirrors
+ *  drawCompare's fillArrowMesh over the harvested plain-array shape, the same relationship
+ *  strokeMethodLines/drawMethodLabels already have to strokeGroup/drawGroupText. */
+function fillMethodTris(ctx, tris, flattenFn, color) {
+  ctx.fillStyle = color;
+  for (let i = 0; i + 8 < tris.length; i += 9) {
+    const p0 = flattenFn(tris[i], tris[i + 1], tris[i + 2]);
+    const p1 = flattenFn(tris[i + 3], tris[i + 4], tris[i + 5]);
+    const p2 = flattenFn(tris[i + 6], tris[i + 7], tris[i + 8]);
+    ctx.beginPath();
+    ctx.moveTo(p0.x, p0.y);
+    ctx.lineTo(p1.x, p1.y);
+    ctx.lineTo(p2.x, p2.y);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+/** ADR-100: label sits a constant px GAP outside the arc, not a radius multiplier — a multiplier
+ *  drags the label along with every future radius tweak, where a fixed offset stays a readable,
+ *  predictable distance from the arc regardless of how big the arc itself is drawn. */
+const ARC_LABEL_GAP_PX = 10;
+const ARC_DEFAULT_PHASE = Object.freeze({ datumT: 1, arcT: 1, labelA: 1 });
+
+/** ADR-099/-100 — angle arc + degree label, textbook style: a thin horizontal datum from
+ *  `vertexPx`, an arc swept the SHORT way from that datum to the line toward `farPx`, and a
+ *  knockout-backed degree label just outside the arc's own bisector. Both points are
+ *  already-projected CANVAS points (the sheet's flattens bake in sign flips + the y-flip
+ *  already, so sweeping raw world angles here would draw a mirrored arc) — callers own the "is
+ *  this angle actually true in this view" question (see drawMethodSheet's `methodArcEligible`
+ *  guard); this primitive only draws what it's given. No-ops on a degenerate (zero-length) input
+ *  rather than drawing a stray dot.
+ *  ADR-100: `phase` ({datumT, arcT, labelA}, each 0..1, all default to 1 = fully drawn) lets the
+ *  caller reveal the mark progressively — datum ray first (endpoint lerp, the same technique
+ *  strokeMethodLines' `reveal` uses), then the arc sweep (partial `ctx.arc` end angle), then the
+ *  label cross-fades in via globalAlpha. Every existing call site that doesn't pass `phase` is
+ *  provably unchanged — same precedent ADR-091 set for `strokeMethodLines`' own optional `reveal`. */
+function strokeAngleArc(ctx, vertexPx, farPx, rPx, refCol, inkCol, font, paperColor, phase = ARC_DEFAULT_PHASE) {
+  const dx = farPx.x - vertexPx.x;
+  const dy = farPx.y - vertexPx.y;
+  if (Math.hypot(dx, dy) < 1e-6) return;
+  const axisAngle = Math.atan2(dy, dx);
+  const datumAngle = dx >= 0 ? 0 : Math.PI; // opens toward whichever side the axis actually leans
+  let diff = axisAngle - datumAngle;
+  while (diff > Math.PI) diff -= 2 * Math.PI;
+  while (diff < -Math.PI) diff += 2 * Math.PI;
+  if (Math.abs(diff) < 1e-3) return; // upright/flat — nothing to denote
+
+  const { datumT, arcT, labelA } = phase;
+
+  if (datumT > 0) {
+    ctx.strokeStyle = refCol;
+    ctx.lineWidth = 0.75;
+    ctx.setLineDash([1]);
+    const datumLen = rPx * 1.15 * datumT;
+    ctx.beginPath();
+    ctx.moveTo(vertexPx.x, vertexPx.y);
+    ctx.lineTo(vertexPx.x + Math.cos(datumAngle) * datumLen, vertexPx.y + Math.sin(datumAngle) * datumLen);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  if (arcT > 0) {
+    ctx.strokeStyle = refCol;
+    ctx.lineWidth = 0.75;
+    ctx.beginPath();
+    ctx.arc(vertexPx.x, vertexPx.y, rPx, datumAngle, datumAngle + diff * arcT, diff < 0);
+    ctx.stroke();
+  }
+
+  if (labelA > 0) {
+    const mid = datumAngle + diff / 2;
+    const lx = vertexPx.x + Math.cos(mid) * (rPx + ARC_LABEL_GAP_PX);
+    const ly = vertexPx.y + Math.sin(mid) * (rPx + ARC_LABEL_GAP_PX);
+    const text = `${Math.round(Math.abs(diff) * RAD2DEG)}°`;
+    ctx.font = font;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const half = ctx.measureText(text).width / 2 + 2;
+    ctx.save();
+    ctx.globalAlpha = labelA;
+    ctx.fillStyle = paperColor;
+    ctx.fillRect(lx - half, ly - 6, half * 2, 12);
+    ctx.fillStyle = inkCol;
+    ctx.fillText(text, lx, ly);
+    ctx.restore();
+  }
+}
+
 /**
  * ADR-087/-088 — draw every Show Method Set side by side, into Show Method's OWN independent
  * takeover canvas (called from drawMethodView(), never drawCompare()). Sizing follows the same
@@ -3298,24 +3843,21 @@ function drawMethodSheet(ctx, w, h) {
   const refCol = cssVar('--color-ink-secondary');
   const captionFont = `12px ${cssVar('--font-sans') || 'sans-serif'}`;
   const labelFont = `11px ${cssVar('--font-sans') || 'sans-serif'}`;
+  // ADR-102 — matches the live pane's own dimension-numeral font exactly (drawCompare's
+  // monoFont: `11px --font-mono`), so the restricted layer reads identically to the full one.
+  const dimFont = `11px ${cssVar('--font-mono') || 'monospace'}`;
 
   // ---- Sizing (ADR-085/-088, follows the ADR-053/054 intrinsic-only law) — always `n` Sets
-  // wide; no 1-wide state exists in this view, so there is nothing to morph from. ----
-  const E = Math.max(solidSpanUnits, 1e-3);
-  const GAP = E * 0.35;
-  const STAGE_GAP = GAP;
-  const blockW = E + (METHOD_SHOW_SIDE_VIEW ? GAP + E : 0);
-  const blockH = E + GAP + E;
-  const n = methodSets.length;
-  const marginPx = 40;
-  const nomWmm = (n * blockW + (n - 1) * STAGE_GAP) * WORLD_TO_MM;
-  const nomHmm = blockH * WORLD_TO_MM;
-  const scale = Math.min((w - 2 * marginPx) / nomWmm, (h - 2 * marginPx) / nomHmm);
-  const blockLocalCenterX = METHOD_SHOW_SIDE_VIEW ? (E + GAP) / 2 : 0;
-  const anchorSX = blockLocalCenterX + (n - 1) * (blockW + STAGE_GAP) / 2;
-  const anchorSY = 0;
-  const cx = w / 2;
-  const cy = h / 2;
+  // wide; no 1-wide state exists in this view, so there is nothing to morph from. ADR-102: the
+  // fit is the single shared methodSheetLayout — setMethodFocus fits the identical block+caption
+  // band, so a focused Set frames consistently with the unfocused row (previously hand-duplicated
+  // and the caption's own offset below blockH was left OUT of the fit entirely, which is why Set
+  // 2 — the one horizontally centred under .method-controls — could overlap the pill). ----
+  const L = methodSheetLayout(w, h);
+  const {
+    E, GAP, STAGE_GAP, blockW, blockH, n, marginPx, marginTopPx, marginBottomPx,
+    scale, blockLocalCenterX, anchorSX, anchorSY, cx, cy,
+  } = L;
 
   // Sheet-space projection with NO per-Set `dx` — the frame the sheet-wide XY line (ADR-088)
   // draws in; each per-Set `project()` below is this PLUS that Set's own `dx`.
@@ -3422,7 +3964,6 @@ function drawMethodSheet(ctx, w, h) {
     if (showProjectors) {
       ctx.strokeStyle = refCol;
       ctx.lineWidth = 1;
-      ctx.setLineDash([2, 2]);
       const reveal = revealFor(6);
       // Previous Set's SAME untouched-view flatten, rebuilt at ITS OWN dx — only used for i>0.
       // "Untouched" for THIS Set is viewB (firstIsHP ? VP : HP) — same split already computed
@@ -3446,6 +3987,7 @@ function drawMethodSheet(ctx, w, h) {
           vx = hp.x + (vp.x - hp.x) * reveal.t;
           vy = hp.y + (vp.y - hp.y) * reveal.t;
         }
+        ctx.setLineDash([2, 2]); // within-Set projector
         ctx.beginPath();
         ctx.moveTo(hp.x, hp.y);
         ctx.lineTo(vx, vy);
@@ -3464,6 +4006,12 @@ function drawMethodSheet(ctx, w, h) {
             ux = prevPt.x + (untouchedPt.x - prevPt.x) * reveal.t;
             uy = prevPt.y + (untouchedPt.y - prevPt.y) * reveal.t;
           }
+          // ADR-099: long dash, same colour/width as the within-Set projector above — visually
+          // distinguishes "carried from the previous Set" from "linking this Set's own two
+          // views" without introducing a second colour on a palette that deliberately keeps
+          // sheet linework off blue (--color-accent stays reserved for chrome/focus, see the
+          // --color-hp-line token comment in index.html).
+          ctx.setLineDash([8, 4]);
           ctx.beginPath();
           ctx.moveTo(prevPt.x, prevPt.y);
           ctx.lineTo(ux, uy);
@@ -3487,41 +4035,148 @@ function drawMethodSheet(ctx, w, h) {
     // thumb: "boundary → nearest visible face → hidden face/edges → axis line"), fixing ADR-084's
     // draw-2-beats-too-early divergence. Both views are already fully drawn by this point
     // (their own last beats, 5 and 11, are both < 12), so — unlike the old template — no showHP/
-    // showVP guard is needed here. ----
+    // showVP guard is needed here.
+    // ADR-100: reveal granularity is one unit per PASS (HP, then VP), not one per chain-line
+    // dash (methodBeatUnitCount's own comment has the "why" — dash-counting made this beat the
+    // walkthrough's one ~13s outlier). Each pass unit is cut by WORLD distance along the axis
+    // (not canvas px) so the fraction maps correctly however the active view foreshortens it,
+    // and a degenerate all-one-point projection can't produce a divide-by-zero. The angle arc
+    // (ADR-099) gets its own two units after both passes settle — see methodArcEligible/
+    // strokeAngleArc's `phase` param. ----
     if (showAxis) {
       ctx.strokeStyle = refCol;
       ctx.lineWidth = 1;
       ctx.setLineDash([]);
       const reveal = revealFor(12);
-      let idx = 0; // shared across both passes below — HP's units are drawn/counted before VP's
-      const strokeAxisInto = (flattenFn) => {
-        for (let k = 0; k + 5 < set.ann.axis.length; k += 6) {
-          if (reveal && idx > reveal.index) return;
-          const a = flattenFn(set.ann.axis[k], set.ann.axis[k + 1], set.ann.axis[k + 2]);
-          const b = flattenFn(set.ann.axis[k + 3], set.ann.axis[k + 4], set.ann.axis[k + 5]);
-          let bx = b.x, by = b.y;
-          if (reveal && idx === reveal.index) {
-            bx = a.x + (b.x - a.x) * reveal.t;
-            by = a.y + (b.y - a.y) * reveal.t;
+      const axisPts = set.ann.axis;
+      const ax0 = axisPts[0], ay0 = axisPts[1], az0 = axisPts[2];
+      const axN = axisPts[axisPts.length - 3], ayN = axisPts[axisPts.length - 2], azN = axisPts[axisPts.length - 1];
+      const axisWorldLen = Math.hypot(axN - ax0, ayN - ay0, azN - az0) || 1e-6;
+
+      const strokeAxisPass = (flattenFn, cutFrac) => {
+        if (cutFrac === 0) return;
+        const cutDist = cutFrac === null ? Infinity : cutFrac * axisWorldLen;
+        for (let k = 0; k + 5 < axisPts.length; k += 6) {
+          const sx = axisPts[k], sy = axisPts[k + 1], sz = axisPts[k + 2];
+          const ex = axisPts[k + 3], ey = axisPts[k + 4], ez = axisPts[k + 5];
+          const da = Math.hypot(sx - ax0, sy - ay0, sz - az0);
+          if (da >= cutDist) break; // this dash starts beyond the cut — nothing further is drawn
+          let tx = ex, ty = ey, tz = ez;
+          const db = Math.hypot(ex - ax0, ey - ay0, ez - az0);
+          if (db > cutDist) {
+            const segLen = db - da;
+            const localT = segLen > 1e-9 ? (cutDist - da) / segLen : 1;
+            tx = sx + (ex - sx) * localT;
+            ty = sy + (ey - sy) * localT;
+            tz = sz + (ez - sz) * localT;
           }
-          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(bx, by); ctx.stroke();
-          idx++;
+          const a = flattenFn(sx, sy, sz);
+          const b = flattenFn(tx, ty, tz);
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
         }
       };
-      strokeAxisInto(flattenHP);
-      strokeAxisInto(flattenVP);
+      let hpCut = null, vpCut = null;
+      if (reveal) {
+        if (reveal.index === 0) { hpCut = reveal.t; vpCut = 0; }
+        else if (reveal.index === 1) { vpCut = reveal.t; }
+        // reveal.index >= 2 (arc units): both passes are already settled — leave both null.
+      }
+      strokeAxisPass(flattenHP, hpCut);
+      strokeAxisPass(flattenVP, vpCut);
+
+      // ADR-099: angle arc + degree label, drawn in viewA's own flatten — but ONLY when that
+      // view actually shows a TRUE angle for this axis, not a foreshortened one. viewA drops Y
+      // (flattenHP/top) when firstIsHP, else drops X (flattenVP/front); a view is exact for a
+      // single line's own inclination exactly when the axis has zero component along the
+      // dropped axis. Proven true for the 'HP'-plane case: planMethodStages' own override holds
+      // angleVP at exactly 0 for that Set, so `axisDir.x` is exactly 0 there — always eligible.
+      // The mirror 'VP'-plane case is NOT exact: a manually-dialled angleVP-only pose (angleHP
+      // 0, no shipped problem exercises this — reachable only via free-explore) keeps
+      // `axisDir.z` constant instead, so it projects as a purely VERTICAL line — always
+      // measuring 90° — in BOTH available views (Show Method has no side view to show it true
+      // in, ADR-088). Caught live: the first version of this guard trusted `trueShapeForPlane`
+      // unconditionally and drew a "90°" arc beside a "40° to the VP" caption. Checked
+      // numerically now, not assumed (methodArcEligible, above). 'both'-kind (the both-planes
+      // Set 3) draws the TURN instead of a 3-D inclination, and only when firstIsHP: the yaw
+      // `projectSequentialBothPlanesPose` applies is always about world-Y, which a screen sweep
+      // only reads as a true angle in the TOP view (rotation-about-Y is angle-preserving ONLY
+      // under the projection that drops Y) — a future VP-first `method.order` entry would put
+      // viewA in the front view instead, where this same sweep would misrepresent the turn.
+      // ADR-100: the arc's own reveal — index 2 grows the datum ray only (arc/label held at 0),
+      // index 3 sweeps the arc with the label cross-fading in over the sweep's last 30% (so the
+      // number settles just after the arc finishes, not mid-sweep against a half-drawn angle).
+      if (methodArcEligible(set)) {
+        let phase = null;
+        if (!reveal || reveal.index > 3) {
+          phase = ARC_DEFAULT_PHASE;
+        } else if (reveal.index === 2) {
+          phase = { datumT: reveal.t, arcT: 0, labelA: 0 };
+        } else if (reveal.index === 3) {
+          phase = { datumT: 1, arcT: reveal.t, labelA: THREE.MathUtils.clamp((reveal.t - 0.7) / 0.3, 0, 1) };
+        }
+        // reveal.index 0 or 1 (still mid axis-pass): phase stays null — arc hasn't started yet.
+        if (phase) {
+          const aEnd = set.ann.axis;
+          const p0 = viewA.flatten(aEnd[0], aEnd[1], aEnd[2]);
+          const p1 = viewA.flatten(aEnd[aEnd.length - 3], aEnd[aEnd.length - 2], aEnd[aEnd.length - 1]);
+          const vertexPx = p0.y >= p1.y ? p0 : p1; // lower on screen — deterministic, no world guess
+          const farPx = p0.y >= p1.y ? p1 : p0;
+          const pxPerUnit = WORLD_TO_MM * scale * methodZoom; // intrinsic-only radius (ADR-053/054): tracks pan/zoom
+          strokeAngleArc(ctx, vertexPx, farPx, E * 0.14 * pxPerUnit, refCol, inkCol, labelFont, paper, phase);
+        }
+      }
     }
 
-    // ---- Beat 13: corner labels — its OWN beat now (ADR-087 fixes ADR-084's labels-welded-to-
-    // axis divergence; Method of Drawing.md's own 5 steps don't mention labels at all — a
-    // Module-2 pedagogical addition, placed after the axis rather than inside it). ----
+    // ---- Beat 13: corner labels + the restricted dimension layer (ADR-102 folds the two
+    // restricted dims into this EXISTING beat rather than adding a 15th one — no
+    // METHOD_BEAT_COUNT change, no extra click per Set, keeping ADR-089/090/098's click-budget
+    // reasoning intact). Its OWN beat (ADR-087 fixes ADR-084's labels-welded-to-axis divergence;
+    // Method of Drawing.md's own 5 steps don't mention labels at all — a Module-2 pedagogical
+    // addition, placed after the axis rather than inside it). ----
     if (showLabels) {
       drawMethodLabels(ctx, set.ann.labels, flattenHP, inkCol, labelFont, paper);
       drawMethodLabels(ctx, set.ann.labels, flattenVP, inkCol, labelFont, paper);
-    }
 
-    // ---- ADR-089: no dimensions beat — Show Method is the construction walkthrough only; BIS
-    // Type-B dimensioning stays behind the live pane's own "Show dimensions" toggle. ----
+      // ADR-102 (supersedes ADR-089 Decision 1) — base edge + overall height ONLY;
+      // projectSet's own restrictedDims gate already limited what got harvested into
+      // set.data.hpDim*/vpDim*, so drawing everything harvested here is correct by
+      // construction, nothing to filter a second time. Reveal granularity mirrors beat 12's
+      // axis: one unit per DIMENSION (ADR-100's "one unit per whole mark", not per line
+      // segment) — each unit grows its dimension LINE (reveal index 2 of that dim's own
+      // [ext, ext, dimline] 3-segment array; the two extension lines snap in immediately,
+      // same as every other beat's reveal treats its "connector" pieces), with the filled
+      // arrowheads + numeral appearing once that unit settles — nothing here pops in
+      // ahead of its own line, matching how every other mid-reveal mark on this sheet resolves.
+      const activeDims = [];
+      if (set.data.hpDimLines.length) {
+        activeDims.push({
+          lines: set.data.hpDimLines, tris: set.data.hpDimTris,
+          labels: set.data.hpDimLabels, flatten: flattenHP,
+        });
+      }
+      if (set.data.vpDimLines.length) {
+        activeDims.push({
+          lines: set.data.vpDimLines, tris: set.data.vpDimTris,
+          labels: set.data.vpDimLabels, flatten: flattenVP,
+        });
+      }
+      const dimReveal = revealFor(13);
+      for (let di = 0; di < activeDims.length; di++) {
+        const dim = activeDims[di];
+        let lineReveal;
+        let settled = true;
+        if (dimReveal) {
+          if (di < dimReveal.index) { lineReveal = undefined; settled = true; }
+          else if (di === dimReveal.index) { lineReveal = { index: 2, t: dimReveal.t }; settled = dimReveal.t >= 0.999; }
+          else break; // this dimension (and anything after it) hasn't been reached yet
+        }
+        strokeMethodLines(ctx, dim.lines, dim.flatten, inkCol, undefined, 1, undefined, lineReveal);
+        if (settled) {
+          fillMethodTris(ctx, dim.tris, dim.flatten, inkCol);
+          drawMethodLabels(ctx, dim.labels, dim.flatten, inkCol, dimFont, paper);
+        }
+      }
+    }
 
     // ---- Set caption: "Set N — <label>" replaces the per-view Top/Front/Side captions while
     // the method runs (ADR-084 — 9 view captions at ~1/3 scale collide with the dimension
@@ -3635,6 +4290,82 @@ function drawMethodView() {
   ctx.fillRect(0, 0, w, h);
 
   drawMethodSheet(ctx, w, h);
+  if (methodTiltActive) drawMethodGhost(ctx, w, h);
+}
+
+/** Per-frame draw for the Set-to-Set ghost (startMethodTilt) — lifts a faded copy of Set 2's own
+ *  top view off the sheet and rigidly rotates+translates it into Set 3's start position:
+ *  `ghostPx(P, t) = Rot(θ·t)·(Ppx − pivot2px) + pivot2px + t·(pivot3px − pivot2px)`, a pure rotate
+ *  +translate of Set 2's own already-flattened points — nothing reshaped, which is the literal
+ *  proof this IS Set 2's drawing, tilted (see DECISIONS.md). Lands pixel-exact because Set 3's
+ *  pose IS Set 2's yawed about world-Y (ADR-093) and the top view drops Y. θ is MEASURED between
+ *  the two Sets' own drawn axis directions in canvas px, never declared from `turnDeg`'s sign —
+ *  `projectSheet` below applies a y-flip, so a world rotation reads as the opposite sense on
+ *  canvas (main.js CLAUDE.md: re-derive every ported sign visually). Painted AFTER drawMethodSheet
+ *  so it overlays settled content, same ordering the old inset used — but ON the sheet, in sheet
+ *  space, so a pan/zoom mid-tilt keeps it locked to the drawing (the old screen-anchored inset
+ *  ignored methodPanX/Y/methodZoom entirely). Calls methodSheetLayout itself rather than threading
+ *  state out of drawMethodSheet — setMethodFocus already establishes that call-it-again precedent
+ *  for this single-source layout. Only ever called while `methodArcEligible` held true at ghost
+ *  start (startMethodTilt's own gate), so viewA is guaranteed the HP/top view here — `.hp`/
+ *  `.hpOutline` are read directly, not re-derived via methodViewSplit. */
+function drawMethodGhost(ctx, w, h) {
+  if (!methodGhost || !methodActive) return;
+  const set3 = methodSets[methodSet];
+  const set2 = methodSets[methodGhost.fromIndex];
+  const axis2 = set2?.ann?.axis, axis3 = set3?.ann?.axis;
+  if (!set2 || !set3 || !axis2 || !axis3 || axis2.length < 6 || axis3.length < 6) return;
+
+  const L = methodSheetLayout(w, h);
+  const projectSheet = (p) => ({
+    x: L.cx + (p.x - L.anchorSX) * WORLD_TO_MM * L.scale * methodZoom + methodPanX,
+    y: L.cy - (p.y - L.anchorSY) * WORLD_TO_MM * L.scale * methodZoom + methodPanY,
+  });
+  const flattenHPAt = (dx) => (x, y, z) => projectSheet({ x: -z + dx, y: -x });
+  const flatten2 = flattenHPAt(methodGhost.fromIndex * (L.blockW + L.STAGE_GAP));
+  const flatten3 = flattenHPAt(methodSet * (L.blockW + L.STAGE_GAP));
+
+  const vIdx = methodGhost.vertexIsFirst ? 0 : axis2.length - 3;
+  const fIdx = methodGhost.vertexIsFirst ? axis2.length - 3 : 0;
+  const pivot2px = flatten2(axis2[vIdx], axis2[vIdx + 1], axis2[vIdx + 2]);
+  const far2px = flatten2(axis2[fIdx], axis2[fIdx + 1], axis2[fIdx + 2]);
+  const pivot3px = flatten3(axis3[vIdx], axis3[vIdx + 1], axis3[vIdx + 2]);
+  const far3px = flatten3(axis3[fIdx], axis3[fIdx + 1], axis3[fIdx + 2]);
+  const theta = Math.atan2(far3px.y - pivot3px.y, far3px.x - pivot3px.x)
+              - Math.atan2(far2px.y - pivot2px.y, far2px.x - pivot2px.x);
+
+  const t = methodTiltMotionT;
+  const cosT = Math.cos(theta * t), sinT = Math.sin(theta * t);
+  const curPivotX = pivot2px.x + t * (pivot3px.x - pivot2px.x);
+  const curPivotY = pivot2px.y + t * (pivot3px.y - pivot2px.y);
+  const flattenGhost = (x, y, z) => {
+    const p = flatten2(x, y, z);
+    const rx = p.x - pivot2px.x, ry = p.y - pivot2px.y;
+    return { x: curPivotX + rx * cosT - ry * sinT, y: curPivotY + rx * sinT + ry * cosT };
+  };
+
+  const paper = cssVar('--color-paper');
+  const hpCol = cssVar('--color-hp-line');
+  const inkCol = cssVar('--color-ink');
+  const refCol = cssVar('--color-ink-secondary');
+  const labelFont = `11px ${cssVar('--font-sans') || 'sans-serif'}`;
+
+  ctx.save();
+  ctx.globalAlpha = GHOST_ALPHA * methodTiltAlpha;
+  strokeMethodLines(ctx, set2.data.hpOutline, flattenGhost, hpCol);
+  strokeMethodLines(ctx, set2.data.hp, flattenGhost, hpCol);
+  ctx.restore();
+
+  const pxPerUnit = WORLD_TO_MM * L.scale * methodZoom; // matches beat 12's own arc radius formula
+  ctx.save();
+  ctx.globalAlpha = methodTiltAlpha;
+  strokeAngleArc(
+    ctx,
+    flattenGhost(axis2[vIdx], axis2[vIdx + 1], axis2[vIdx + 2]),
+    flattenGhost(axis2[fIdx], axis2[fIdx + 1], axis2[fIdx + 2]),
+    L.E * 0.14 * pxPerUnit, refCol, inkCol, labelFont, paper,
+  );
+  ctx.restore();
 }
 
 function drawCompare() {
@@ -4111,6 +4842,7 @@ function setupMethodPan() {
   let lastY = 0;
 
   methodCanvas.addEventListener('pointerdown', (e) => {
+    stopMethodFocusAnim(false); // user input wins — freeze wherever a focus tween currently is
     dragging = true;
     lastX = e.clientX;
     lastY = e.clientY;
@@ -4143,6 +4875,7 @@ function setupMethodPan() {
 
   methodCanvas.addEventListener('wheel', (e) => {
     e.preventDefault();
+    stopMethodFocusAnim(false); // user input wins — freeze wherever a focus tween currently is
     const rect = methodCanvas.getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
@@ -4397,6 +5130,14 @@ const simController = {
      *  data `methodContentBeats` already derives its A/B view split from. Never guesses at a
      *  numeric position; out-of-range Set returns ''. */
     beatLabel: (set, beat) => methodBeatLabel(set, beat),
+    /** Whether the CURRENT Set is a Set-to-Set tilt's destination — true only for the
+     *  both-planes tier's Set 3 (ADR-093's `turnDeg`, non-null only there). methodController.js
+     *  gates the "Watch the turn" control's visibility on this, re-checked every renderProgress
+     *  so the button appears/disappears exactly when Set 3 becomes/stops being current. */
+    canTilt: () => methodSets[methodSet]?.turnDeg != null,
+    /** Play the tilt from the previous Set's pose into the current one (startMethodTilt's own
+     *  header has the full contract). Same boolean-return, no-op-on-false shape as begin(). */
+    playTilt: () => startMethodTilt(),
   },
 
   announce,
