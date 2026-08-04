@@ -5137,6 +5137,105 @@ by ADR-106, the clone by ADR-107, Glass Box by ADR-108, Sections of Solids here)
 
 ---
 
+## ADR-111: Show Method's on-sheet ghost extends to Set1→Set2 (a TILT, front view) — ADR-101/104's exclusion was over-broad, not wrong about the risk
+
+**Date:** 2026-08-04
+**Decision:** Audited whether ADR-104's ghost (currently Set2→Set3 only, both-planes tier) could
+safely extend to Set1→Set2, which ADR-101/104 had left out of scope on the grounds that its
+"combined-Euler pose pair has no proven angle-preserving invariant the way ADR-093's yaw does."
+Proved a class of Set1→Set2 (and, as a corollary, the both-planes tier's OWN Set1→Set2) IS
+provably a rigid 2D motion — riding the **front** view, not the top view ADR-104 uses — and
+extended the ghost to cover it. **Correction to the premise this audit started from:** ADR-093
+does not prove the combined-Euler Set2→Set3 is single-axis; it proves the opposite — ADR-093
+*replaced* that pose with a constructed sequential yaw precisely because the combined-Euler
+version was not height-preserving.
+
+**The proof.** Every Set's rotation is `R = Rz(-V)·Rx(H)·Ry(θ)` (`iShape.js` `applyShapeTransform`,
+order `'ZXY'`). Set 1 always has every mode forced off (`planMethodStages`), so `R_from = Ry(θ_from)`
+— not the identity, but exactly the right-hand factor of `R_to`. So `ΔR = R_to · R_from⁻¹ =
+Rz(-V_to)·Rx(H_to)·Ry(θ_to - θ_from)`, which collapses to a pure world-**X** rotation (a TILT) iff
+`V_to ≈ 0` **and** `θ_to ≈ θ_from` — both required, since a product of rotations about two distinct
+world axes has no single axis. (The premise "Set 1 is untilted so only one angle changes" is not
+what actually makes this work — it's that `R_from` cancels as a factor of `R_to`, which a mode
+that rewrites `rotationY` between the two Sets would break even though the learner still only sees
+one slider move.)
+
+`drawMethodSheet`'s front-view flatten is `(u,v) = (-z, y)`. Under `Rx(A)`: `y' = y·cosA - z·sinA`,
+`z' = y·sinA + z·cosA`; substituting `z=-u, y=v` gives `u' = u·cosA - v·sinA`, `v' = u·sinA +
+v·cosA` — exact SO(2), no scale/shear. The top view drops `y`, the very coordinate `Rx` mixes into
+`z`, so it foreshortens instead — the front view is *forced*, and it's the opposite view from
+ADR-104's turn. Seating adds a pure translation (`m`'s translation has `z=0` identically, and the
+front view's `u` reads `z`). The drawn line SET is unchanged too, not just its shape:
+`visibleInVP`/`onOutlineVP` (`projectionDrawer.js`) key off `worldNormal.x`, and `edgeKindOf` keys
+off a dot product with `axisDir` — both untouched by a rotation about that same world-X axis, by
+construction. This is the exact dual of ADR-093 with X and Y swapped, and stronger: ADR-093 had to
+construct a new pose to get its invariant; here the invariant falls out of the existing
+`projectSetPose` algebra unmodified.
+
+**Where it stays unsafe** (audited, not merely assumed): a VP-inclination 2-Set problem gives
+`ΔR = Rz(-V)`, rigid only in the side view — which `METHOD_SHOW_SIDE_VIEW` hard-disables (ADR-088)
+— unfixable by picking a different view, since the top view's `v'` would depend on `y`, the very
+coordinate the top view drops. `orientToCorner` combined with a tilt gives `Rx(H)·Ry(Δθ)` (two
+axes) since Set 1 forces the mode off while Set 2's live mode overwrites `rotationY` — reachable
+only in free-explore, no shipped problem hits it. `restingPlane:'VP'` is *itself* a pure `Rx`, but
+is independently excluded: its axis then points along world-X (⟂ VP), projecting to a POINT in the
+front view — `methodArcEligible`'s existing `|axisDir.x| < ARC_DIR_EPS` guard already rejects it.
+Explicitly **not** relying on `methodArcEligible` alone as the safety gate: `axisDir.x = cos(H)·sin(V)`
+is also ≈0 at `H≈±90°` for arbitrary `V`, a combination that can't arise inside the 2-Set tier's own
+data but would be an unrelated coincidence if that predicate were reused as the rigidity test
+itself, hence the new `methodStepIsXTilt` states the rigidity condition explicitly instead of
+inferring it from a view-degeneracy check built for something else.
+
+**Shipped-data check.** Of the `one-plane` tier's three problems, both `faceInclinationHP` ones
+(`Pyramid` 45°, `Cone` 30°) resolve to `V=0, Δθ=0` — eligible. The third
+(`TriangularPyramid`/`faceInclinationVP`) resolves to BOTH `H` and `V` non-zero, so
+`inclinationStageCount` returns 3 for it — it was never a 2-Set problem and was already excluded by
+every existing gate (`turnDeg` stays null on its Sets). **Bonus:** the both-planes tier's own
+Set1→Set2 (`{angleHP: eff.angleHP, angleVP: 0}` for the default HP-first `method.order`,
+`orientToCorner:false`) also satisfies the tilt condition — both shipped both-planes problems omit
+`method.order` and so both qualify, gaining a full "tilt then turn" walkthrough matching the
+textbook's own two-step narration. A `VP`-first `method.order` would instead give `ΔR = Rz(-V)`
+(the unsafe case above) and is rejected by the same guard automatically — no tier-specific
+carve-out needed.
+
+**Implementation.** New `methodStepIsXTilt(fromSet, toSet)` (`main.js`, beside `methodArcEligible`)
+states the rigidity condition directly against `eff.angleVP`/`eff.rotationY`, gated by
+`toSet.turnDeg == null` — the both-planes Set 3's `eff` is deliberately a COPY of Set 2's own
+(ADR-093, for labelling only) and would otherwise satisfy the same numeric test despite its actual
+motion being a yaw, not a tilt; `turnDeg` is the one field that tells the two cases apart.
+`startMethodTilt` now resolves `isTurn`/`isTilt` and stores `methodGhost.kind`; the pivot rule
+flips with the view (`flattenHP`'s canvas-y increases with world-x, `flattenVP`'s canvas-y
+*decreases* with world-y, so "lower on screen" — the existing deterministic pivot convention —
+picks the opposite raw comparison). `drawMethodGhost` picks `flattenHPAt`/`flattenVPAt` and
+`.hp`/`.vp` (+ outline, + line colour) off `methodGhost.kind`, and skips the angle arc entirely for
+a tilt: `strokeAngleArc`'s datum is horizontal, but a tilt's axis starts near-vertical in the front
+view, so the datum would flip sides mid-flight if reused unmodified — the destination Set's own
+beat-12 arc marks the settled angle a moment later instead. `canTilt()` widens to accept either
+case behind one predicate, same as ADR-105's own "one predicate backs everything" precedent.
+`goNext`'s trigger (`methodController.js`) needed no change — `crossedSet && sim.method.canTilt()`
+already fires on any forward crossing into a ghost-eligible Set, tilt or turn. The replay button's
+static label is generalized ("Replay the Set-to-Set motion") since which case applies now varies
+by Set; `startMethodTilt`'s own `announce()` still narrates the specific motion and Set numbers.
+
+**Alternatives rejected:**
+- **Ghost the angle arc too, sourced from a fixed datum captured at ghost start (shrinking
+  90°→settled) or swept from the ghost's own start direction (growing 0°→applied tilt).** Both
+  considered and rejected in favor of no arc during the tilt: either would show a DIFFERENT number
+  than the destination Set's own beat-12 caption at the moment they're both on screen together
+  (the face-inclination angle named in the problem statement vs. the derived axis angle
+  `axisInclinations` actually measures — a pre-existing, inherited caption mismatch this ADR does
+  not fix), and a mismatched number mid-animation is worse than no number.
+- **Reuse `methodArcEligible` as the sole gate for the tilt case, the same way it gates the turn
+  case.** Rejected — it is a view-degeneracy test (does the axis project at full length in this
+  view), not a rigidity test (is the pose delta actually a single-axis rotation); the two happen to
+  coincide for the turn case (ADR-093's construction guarantees both) but do not for an arbitrary
+  step, so stating the rigidity condition explicitly in `methodStepIsXTilt` is not redundant.
+**Status:** Active. Narrows ADR-101's and ADR-104's "no proven invariant, out of scope" scope
+clauses to the cases in this ADR's "where it stays unsafe" section; both ADRs stay Active
+otherwise (their own TURN mechanics are unchanged).
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*
