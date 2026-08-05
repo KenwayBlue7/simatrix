@@ -1,0 +1,6 @@
+{
+  "title": "Finding Angles & True Length",
+  "description": "Read a finished, textbook-accurate line drawing and work backward: given the drawing (and whichever facts the problem states), guess the missing true length, inclinations (θ/φ), or traces (H.T./V.T.) — the reverse of building the drawing yourself.",
+  "difficulty": "intermediate",
+  "tags": ["engineering-graphics", "projection-of-lines", "true-length", "traces", "inclinations", "first-angle", "reverse-problem"]
+}
