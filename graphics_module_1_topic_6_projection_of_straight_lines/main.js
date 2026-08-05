@@ -38,6 +38,7 @@ import { initOnboarding } from './src/onboarding.js';
 import { createCompareSheet } from './src/compareSheet.js';
 import { createTraces } from './src/traces.js';
 import { createTrueLength } from './src/trueLength.js';
+import { initConstructionStepper } from './src/constructionStepper.js';
 import { layout2D, computeTraces } from './src/sheet2DLayout.js';
 import { initProblemLibrary } from './src/problemLibrary.js';
 import { PROBLEMS as LINE_PROBLEMS, TIERS as LINE_TIERS, FIELD_LABELS as LINE_FIELD_LABELS } from './src/lineProblems.js';
@@ -171,8 +172,14 @@ const CON_DOCK_CONTROLS = ['truelength', 'traces'];
 
 // --- Constructions (Phase 4E): the Traces (HT/VT) + True-Length overlays on the ortho sheet ---
 let conMode = null;   // null | 'trace' | 'tl'
-let conLeaf = null;   // the active construction leaf { group, animate, duration }, or null
-let conRAF = null;    // the construction animation rAF handle
+let conLeaf = null;   // the active construction leaf { group, animate, duration, phases }, or null
+let conRAF = null;    // the construction animation rAF handle (continuous playback, runCon())
+// --- Construction step-through (Phase B): a thin Next/Back adapter over conLeaf.animate(p),
+// coexisting with the continuous runCon() rAF ramp above — see constructionStepper.js's own
+// header. conStepper is null whenever no step session is active (fresh construction, or still
+// on continuous playback); stepCon() below is what starts one. ---
+let conStepper = null;
+let conNav = null; // { row, caption, backBtn, nextBtn } — built once by ensureConNav()
 
 // --- Problem Library (ADR-015) — the textbook exercise selector; never auto-fills ---
 let problemLibrary = null;
@@ -967,6 +974,46 @@ function ensureConDock() {
   return conDock;
 }
 
+/** The step-through nav row (Phase B): a caption + Back/Next pair, living inside #con-dock
+ *  alongside the True Length/Traces launcher buttons. Built once, hidden until a construction
+ *  is active (enterCon()/teardownCon() toggle it) — re-appended on every enterCon() so it
+ *  always lands as #con-dock's LAST child regardless of whether the truelength/traces launcher
+ *  wrappers were re-parented in before or after it (appendChild moves an existing node). */
+function ensureConNav() {
+  const dock = ensureConDock();
+  if (conNav) { dock.appendChild(conNav.row); return conNav; } // re-append: always the LAST child
+  const row = document.createElement('div');
+  // Deliberately NOT '.ctrl' — #con-dock .ctrl[hidden] forces display:flex!important (ADR-051's
+  // rationale, so a stray reset can't re-hide the truelength/traces launchers) which would
+  // fight this row's own hidden toggle (enterCon()/teardownCon() below, no per-step disclosure
+  // concern applies to it).
+  row.className = 'con-nav';
+  row.hidden = true;
+  const caption = document.createElement('p');
+  caption.className = 'con-nav__caption';
+  caption.id = 'con-nav-caption';
+  caption.setAttribute('role', 'status');
+  const btnRow = document.createElement('div');
+  btnRow.className = 'con-nav__btns';
+  const backBtn = document.createElement('button');
+  backBtn.type = 'button';
+  backBtn.id = 'con-nav-back';
+  backBtn.className = 'btn';
+  backBtn.textContent = 'Back';
+  const nextBtn = document.createElement('button');
+  nextBtn.type = 'button';
+  nextBtn.id = 'con-nav-next';
+  nextBtn.className = 'btn';
+  nextBtn.textContent = 'Next step';
+  btnRow.append(backBtn, nextBtn);
+  row.append(caption, btnRow);
+  dock.appendChild(row);
+  backBtn.addEventListener('click', () => stepCon('back'));
+  nextBtn.addEventListener('click', () => stepCon('next'));
+  conNav = { row, caption, backBtn, nextBtn };
+  return conNav;
+}
+
 /** Collapse the wizard, span the canvas across both panes, and dock the drivers under
  *  both. Re-parents the existing [data-ctrl] wrappers (ADR-021 — not mirrored inputs).
  *  Idempotent. */
@@ -1233,12 +1280,35 @@ function runCon(duration) {
   conRAF = requestAnimationFrame(step);
 }
 
+/** Step-through mode (Phase B): cancels the continuous rAF ramp (same cancellation runCon()
+ *  itself does on every call, so switching FROM continuous TO stepped is always clean) and
+ *  hands off to constructionStepper.js — same conLeaf.animate(p) entry point, just called with
+ *  a discrete t per click instead of a ramping one. Lazily builds conStepper on the first
+ *  Next/Back click (not in enterCon()) so a plain launcher click still auto-plays continuously
+ *  by default; 'back' as that first click starts from the LAST checkpoint (mirrors arriving
+ *  here from continuous playback's own finished end), 'next' starts from the first. */
+function stepCon(dir) {
+  if (!conLeaf) return;
+  if (conRAF) { cancelAnimationFrame(conRAF); conRAF = null; }
+  if (!conStepper) {
+    const nav = ensureConNav();
+    conStepper = initConstructionStepper({
+      leaf: conLeaf, captionEl: nav.caption, backBtn: nav.backBtn, nextBtn: nav.nextBtn,
+      startIndex: dir === 'back' ? (conLeaf.phases?.length ?? 1) - 1 : 0,
+    });
+    return;
+  }
+  if (dir === 'next') conStepper.goNext(); else conStepper.goBack();
+}
+
 /** Tear the active construction down: stop the animation, dispose the overlay (disposal contract),
  *  and reset the launcher chrome. Idempotent. */
 function teardownCon() {
   if (conRAF) { cancelAnimationFrame(conRAF); conRAF = null; }
   compareSheet?.clearConstruction();
   conLeaf = null;
+  conStepper = null;
+  if (conNav) { conNav.row.hidden = true; conNav.caption.textContent = ''; }
   setConBtn('btn-traces', false); setConBtn('btn-tl', false);
   setConLabel('btn-traces', false); setConLabel('btn-tl', false);
   conMode = null;
@@ -1253,6 +1323,13 @@ function enterCon(mode, build, btnId) {
   compareSheet.mountConstruction(conLeaf.group);
   setConBtn(btnId, true); setConLabel(btnId, true);
   runCon(conLeaf.duration);
+  // Step nav shows alongside continuous playback from the start — Back/Next cancel it on
+  // first click (stepCon() above), rather than requiring a separate mode-switch control.
+  const nav = ensureConNav();
+  nav.row.hidden = false;
+  nav.backBtn.disabled = true;
+  nav.nextBtn.disabled = !((conLeaf.phases?.length ?? 0) > 1);
+  nav.caption.textContent = '';
 }
 const enterTrace = () => enterCon('trace', (r) => createTraces({ resolved: r }), 'btn-traces');
 // Art 10-11 (Traces.pdf p.212): projections ⟂ xy (θ+φ=90°) has no rotation locus for Method I —
@@ -1269,9 +1346,22 @@ const enterTL = () => enterCon('tl', (r) => createTrueLength({
  *  longer closes the construction). It still tears down via the other existing
  *  teardownCon() paths (switching to the other construction, a parameter edit, a step
  *  change, the fold) — there is no longer a click-to-close affordance on the button. */
+/** A repeat launcher click while already active replays from t=0 — same as before, but now
+ *  also drops any live step session back to continuous mode (a step click can resume from
+ *  wherever afterward, same lazy stepCon() path as a fresh construction). */
+function replayCon() {
+  conStepper = null;
+  if (conNav) {
+    conNav.backBtn.disabled = true;
+    conNav.nextBtn.disabled = !((conLeaf?.phases?.length ?? 0) > 1);
+    conNav.caption.textContent = '';
+  }
+  runCon(conLeaf?.duration ?? 0);
+}
+
 function setupConstructions() {
-  document.getElementById('btn-traces')?.addEventListener('click', () => (conMode === 'trace' ? runCon(conLeaf?.duration ?? 0) : enterTrace()));
-  document.getElementById('btn-tl')?.addEventListener('click', () => (conMode === 'tl' ? runCon(conLeaf?.duration ?? 0) : enterTL()));
+  document.getElementById('btn-traces')?.addEventListener('click', () => (conMode === 'trace' ? replayCon() : enterTrace()));
+  document.getElementById('btn-tl')?.addEventListener('click', () => (conMode === 'tl' ? replayCon() : enterTL()));
 }
 
 // ============================================================================

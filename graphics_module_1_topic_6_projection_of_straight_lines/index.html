@@ -650,6 +650,27 @@
       font-weight: 600;
     }
 
+    /* Step-through nav row (Phase B, main.js ensureConNav()) — sits below whichever launcher
+       is docked, same 180px column width as the .ctrl launchers beside it. Not '.ctrl' (see
+       main.js's own comment on why) so its [hidden] toggle isn't fought by the launcher
+       override two rules up. */
+    #con-dock .con-nav { flex: 0 0 auto; width: 180px; display: flex; flex-direction: column; gap: var(--space-2); }
+    #con-dock .con-nav[hidden] { display: none; }
+    .con-nav__caption {
+      margin: 0;
+      font-size: 0.8125rem;
+      line-height: 1.4;
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-2) var(--space-3);
+      min-height: 2.6em;
+    }
+    .con-nav__btns { display: flex; gap: var(--space-2); }
+    .con-nav__btns .btn { flex: 1 1 0; }
+    .con-nav__btns .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
     /* The docked driver rail — spans both panes, hosts the re-parented [data-ctrl]
        wrappers laid out as a horizontal instrument row. A paper-white rounded card
        matching the other two panes (DESIGN.md §5.13) on the grey shell; no shadow
