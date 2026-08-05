@@ -5317,6 +5317,102 @@ otherwise (their own TURN mechanics are unchanged).
 
 ---
 
+## ADR-112: "Development of Surfaces" (Diploma, prism/cylinder/two-piece elbow) is Diploma **Module 2**, Topic 1.1 — first module beyond ADR-096's Module 1 — and its single construction plate is Canvas2D, not this track's usual SVG
+
+**Date:** 2026-08-05
+**Decision:** A new Diploma Engineering Graphics topic, scoped to **rectangular prism, cylinder, and
+a symmetric two-piece 90° elbow only** (no pyramid, cone, sphere, or general truncation), is
+namespaced `graphics_diploma_module_2_topic_1_1_development_of_surfaces` — **Diploma Module 2**,
+Topic 1 (subtopic 1.1), per ADR-095's `graphics_diploma_module_<M>_topic_<M>_<N>_<slug>` decimal
+convention (the repeated `<M>` is deliberate, per that ADR — not collapsed to a bare `topic_1`).
+This is the first topic to grow this track past ADR-096's Module 1 ("Geometrical Constructions" +
+"Misc Curves"), settling ADR-095's own open note ("future module numbering... left fully open
+pending a future ADR") for this specific growth: Development of Surfaces is its own course module
+in the source syllabus, not a third topic bolted onto Module 1.
+
+Two further sub-decisions ride along:
+
+1. **Canvas2D single plate, not SVG.** Every other Diploma topic renders one inline SVG viewport
+   (`renderConstruction.js` emitting DOM nodes, ADR-095's inherited pattern). This topic instead
+   renders to one `<canvas>` (`#construction-canvas`) carrying the front view, the top-view
+   semicircle, the stretch-out development, and the horizontal transfer/projector lines connecting
+   them, as ONE continuous plate — matching how the source textbooks (Bhatt Fig. 15-8/15-10, K.C.
+   John Fig. 15.4–15.12) actually draw this subject: transfer lines cross freely between views on
+   one sheet, which an SVG-viewport-plus-separate-canvas split cannot do (an SVG `<line>` cannot
+   terminate inside a different DOM subtree's coordinate space without a second synced transform).
+   This is a **deliberate, on-record deviation** — a future contributor must not "fix" this topic
+   back onto the SVG pattern citing ADR-095/097 consistency; those ADRs chose SVG because their
+   subjects had no multi-view single-plate transfer-line requirement, not because SVG is mandatory
+   track-wide. `viewTransform.js` and `renderConstruction.js` are reimplemented against
+   `CanvasRenderingContext2D` (pan/zoom via a `{vx,vy,vw,vh}` view-state + redraw, draw-on animation
+   via partial-path progress instead of `stroke-dashoffset`) but keep the **same external contract**
+   (`initViewTransform() → {resetView, ensureVisible, dispose}`; `renderConstruction`'s
+   `clear/computeBounds/renderStatic/playSteps`) and the **same step-list data shape**
+   (`{kind, role, ...}` from `constructions.js`) — only the rendering backend changes, not the
+   authoring contract every other topic's `constructions.js` already uses.
+2. **`developmentEngine.js` (the KTU-track engine, `graphics_module_3_topic_2_development_of_surfaces/src/`)
+   is reused for its LAYOUT MATH only, copied into this topic's own `src/developmentEngine.js`.**
+   `parallelLayout()` (cylinder branch) and `computeCutDistances()` (parallel/cylinder branch) are
+   called from `constructions.js` as pure geometry calculators to produce step-list coordinates;
+   its own `drawDevelopment()`/`drawParallelDevelopment()`/`drawStringPath()` paint functions are
+   NOT called — they paint directly and non-animated, incompatible with this track's step-based
+   draw-on pedagogy (ruler-bar/compass-sweep reveal per role). They ship in the copied file as dead
+   code rather than being deleted, since the file is copied whole (simplest audit trail back to the
+   source engine) and may earn a use if this topic later grows a "final assembled pattern" snapshot
+   view. Radial-line math (`radialConeLayout`/`radialPyramidLayout`) and the string-path/"ant"
+   geodesic functions are likewise unused — out of this topic's scope (no pyramid/cone/shortest-path
+   problems). The rectangular prism (unequal base sides, unlike the KTU engine's equal-side
+   `PRISM_SIDES` table) gets its OWN stretch-out calc in this topic's `constructions.js`, not a
+   literal call into the copied `parallelLayout()`.
+
+**Elbow scope — a named simplification, not a textbook figure.** Neither reference PDF
+(`Development.pdf`, N.D. Bhatt Ch. 15; `KC-Development.pdf`, K.C. John Ch. 15) contains a worked
+TWO-piece 90° elbow example — both books' only worked pipe-bend example is a THREE-piece bend
+(Bhatt Problem 15-13/Fig. 15-15; K.C. John Example 15.18/Fig. 15-20–21, general form
+`θ = 90°/(n+1)` for `n` middle pieces). A two-piece elbow is confirmed audit-2026-08-05 to be a
+correct degenerate case: each half is a plain cylinder truncated ONCE at 45° (mitred, then
+mirrored) — exactly Bhatt Problem 15-8/Fig. 15-10 and K.C. John Example 15.9/Fig. 15.12's
+single-truncation cylinder construction, which `computeCutDistances()`'s existing parallel/cylinder
+branch already covers with zero new math (one `localPlane`, called twice — once mirrored). This
+topic's ADR/CLAUDE.md must cite that single-truncation math as the source, not a numbered elbow
+figure, since none exists at two-piece scope.
+
+**Why:** RULES.md §1.11/ADR-025's template-choice discipline applies to the module-number question
+the same way ADR-096 applied it; ADR-095's own placeholder note requires a real ADR before this
+track's first Module-2 topic, not silent folder creation. The Canvas2D call is a genuine
+architectural fork (this track's first) so it gets recorded rather than discovered later as an
+unexplained outlier against ADR-095/097/098's SVG precedent.
+
+**Alternatives rejected:**
+- *Fold this into Diploma Module 1 as a further Topic 3* — rejected: the source syllabus draws its
+  own module boundary here (a distinct course module, "Development of Surfaces"), the same
+  reasoning ADR-096 used in the other direction to keep Misc Curves inside Module 1.
+- *Keep the SVG viewport, fake cross-surface transfer lines with per-view stub ticks* — rejected
+  before this ADR (see the earlier Phase-A audit): breaks the textbook's actual single-plate
+  reading and would need its own future un-fix once a real transfer-line requirement showed up.
+- *Rewrite `developmentEngine.js`'s draw functions to emit SVG step nodes, keep the whole plate in
+  one SVG* — rejected: throws away the one part of the KTU engine that already works
+  (`computeCutDistances`) for no gain, since this topic needs the step-list contract either way to
+  get animated draw-on; Canvas2D is the more direct realization of "one continuous plate" as several
+  existing views on this platform (the Module 2 Compare sheet, ADR-066) already prove out.
+- *Build the Bhatt/K.C. John three-piece elbow verbatim* — rejected for THIS topic's stated scope
+  (two-piece symmetric only); left as a documented future-phase seam (this topic's
+  `computeCutDistances` call is structured to accept a middle double-truncated piece later without
+  an engine rework, since that piece is just two `localPlane` cuts on one cylinder instead of one).
+
+**Consequences:** Establishes Diploma Module 2 as a real, numbered thing — the next Diploma topic
+that is NOT Development of Surfaces stays in Module 1 unless it has its own equally genuine
+syllabus-module boundary (do not default new Diploma topics to Module 2 by proximity). Establishes
+that this track's SVG orchestrator is a strong default, not an absolute rule — citing THIS ADR's
+Canvas2D reasoning (multi-view single-plate transfer lines) is the bar for any future topic wanting
+the same deviation, not "SVG felt harder." `src/developmentEngine.js` in this topic's folder is an
+**independent copy**, not a byte-identical shared file under RULES §1.3/§1.4 — the KTU-track engine
+and this copy are permitted to drift (different `ShapeType` tables, different scope), so no
+cross-file sync obligation is created by this ADR.
+**Status:** Active.
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*

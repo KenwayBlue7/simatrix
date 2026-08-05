@@ -1,0 +1,6 @@
+{
+  "title": "Development of Surfaces",
+  "description": "Unroll a rectangular prism, a cylinder, and a two-piece 90° pipe elbow into their true-size flat patterns — front view, top view, and development on one continuous sheet, transfer lines carrying every true height across.",
+  "difficulty": "intermediate",
+  "tags": ["diploma-engineering-graphics", "development-of-surfaces", "parallel-line-method", "prism", "cylinder", "pipe-elbow", "first-angle-projection", "guided-stepper", "2d-canvas"]
+}
