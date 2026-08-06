@@ -12,11 +12,45 @@
 // VOICE: plain teaching language, no citations. The rules are unchanged in substance; only
 // the wording is. `ref` is a two-word tag for the option row, not a reference.
 
-import { PLATE, FEATURES } from './dimensionData.js';
+import { FIGURES, lanesFor } from './dimensionData.js';
 
-const F = FEATURES;
-const BELOW = -14;
-const LEFT = -14;
+// THE FIGURE THESE RULES ARE SET ON: the plate with one hole.
+//
+// Every one of the ten rules is about WHERE a part of a dimension may go, and none of them is
+// about the part. So the part is the simplest one that can put all ten arguments on the sheet:
+// an outline to run projection lines off, a centre line to be tempted to dimension along, one
+// dashed circle to be caught measuring from, and enough empty paper to crowd. On the Guide
+// Plate the same ten rules were argued next to a bore, a spigot, a square hole and a spherical
+// seat, none of which the learner had been taught yet.
+const FIG = FIGURES.hole;
+const P = FIG.plate;
+const H = FIG.features.hole;
+const CSK = H.countersink;
+const LANE = lanesFor(FIG);
+const BELOW = LANE.below1;
+const LEFT = LANE.left1;
+
+/** A point on the hole's rim at `deg`, for the leaders to land on. */
+const onRim = (deg) => [
+  H.at[0] + Math.cos(deg * Math.PI / 180) * (H.dia / 2),
+  H.at[1] + Math.sin(deg * Math.PI / 180) * (H.dia / 2),
+];
+
+/**
+ * The dimension the learner PLACES themselves, drawn alongside whichever rule is up. It states
+ * the one size no rule states — the gap from the hole to the right-hand face — so the sheet
+ * never shows the same measurement twice while they are dragging.
+ * @returns {object}
+ */
+export function dragDemo() {
+  return {
+    id: 'drag', kind: 'linear', axis: 'x',
+    from: [H.at[0], P.height], to: [P.length, P.height],
+    at: LANE.above1, text: String(P.length - H.at[0]),
+    draggable: true,
+    title: 'Drag me, or focus me and use the arrow keys',
+  };
+}
 
 /**
  * The rule demonstrations. `correct` and `wrong` are full spec lists — Step 2 shows one
@@ -39,8 +73,8 @@ export const RULES = Object.freeze([
     title: 'Projection lines run past the dimension line',
     rule: 'A projection line starts right on the feature — no gap — and runs 1 to 2 mm past the dimension line.',
     breaks: 'Stopped short, it no longer closes the measurement. You have to guess what the arrow is pointing at, and on a busy drawing you will guess wrong.',
-    correct: [{ id: 'r-len', kind: 'linear', axis: 'x', from: [0, 0], to: [PLATE.length, 0], at: BELOW, text: String(PLATE.length) }],
-    wrong: [{ id: 'r-len', kind: 'linear', axis: 'x', from: [0, 0], to: [PLATE.length, 0], at: BELOW, text: String(PLATE.length), extShort: true, tone: 'bad' }],
+    correct: [{ id: 'r-len', kind: 'linear', axis: 'x', from: [0, 0], to: [P.length, 0], at: BELOW, text: String(P.length) }],
+    wrong: [{ id: 'r-len', kind: 'linear', axis: 'x', from: [0, 0], to: [P.length, 0], at: BELOW, text: String(P.length), extShort: true, tone: 'bad' }],
   },
   {
     id: 'ext-perpendicular',
@@ -48,8 +82,8 @@ export const RULES = Object.freeze([
     title: 'Projection lines come off at a right angle',
     rule: 'A projection line leaves the feature square on. Slanted ones are allowed only in special cases, and then they all slant the same way.',
     breaks: 'A slanted line no longer says WHERE the measurement starts. It lands somewhere along an edge instead of at a point, so nobody can repeat it.',
-    correct: [{ id: 'r-ht', kind: 'linear', axis: 'y', from: [0, 0], to: [12, PLATE.height], at: LEFT, text: String(PLATE.height) }],
-    wrong: [{ id: 'r-ht', kind: 'linear', axis: 'y', from: [0, 0], to: [12, PLATE.height], at: LEFT, text: String(PLATE.height), extSkew: 22, tone: 'bad' }],
+    correct: [{ id: 'r-ht', kind: 'linear', axis: 'y', from: [0, 0], to: [0, P.height], at: LEFT, text: String(P.height) }],
+    wrong: [{ id: 'r-ht', kind: 'linear', axis: 'y', from: [0, 0], to: [0, P.height], at: LEFT, text: String(P.height), extSkew: 22, tone: 'bad' }],
   },
   {
     id: 'projline-reuse',
@@ -63,14 +97,14 @@ export const RULES = Object.freeze([
     okNote: 'The long way: two fresh projection lines carry the hole centre and the bottom face out to the dimension line.',
     centreLines: true,
     correct: [
-      { id: 'r-reuse', kind: 'linear', axis: 'y', from: [0, 0], to: [0, F.bore.at[1]], at: LEFT, text: String(F.bore.at[1]) },
+      { id: 'r-reuse', kind: 'linear', axis: 'y', from: [0, 0], to: [0, H.at[1]], at: LEFT, text: String(H.at[1]) },
     ],
     wrong: [
-      // The bore's own centre line and the bottom edge, run out to the dimension line, ARE
+      // The hole's own centre line and the bottom edge, run out to the dimension line, ARE
       // the projection lines. Nothing new is drawn but the extensions.
-      { id: 'r-reuse-c', kind: 'aid', from: [F.bore.at[0], F.bore.at[1]], to: [LEFT - 2, F.bore.at[1]] },
+      { id: 'r-reuse-c', kind: 'aid', from: [H.at[0], H.at[1]], to: [LEFT - 2, H.at[1]] },
       { id: 'r-reuse-o', kind: 'aid', from: [0, 0], to: [LEFT - 2, 0] },
-      { id: 'r-reuse', kind: 'linear', axis: 'y', from: [0, 0], to: [0, F.bore.at[1]], at: LEFT, text: String(F.bore.at[1]), noExtension: true },
+      { id: 'r-reuse', kind: 'linear', axis: 'y', from: [0, 0], to: [0, H.at[1]], at: LEFT, text: String(H.at[1]), noExtension: true },
     ],
   },
   {
@@ -78,9 +112,10 @@ export const RULES = Object.freeze([
     ref: 'Dimension lines',
     title: 'Keep dimension lines from crossing',
     rule: 'Dimension lines and projection lines should not cross other lines unless there is no way round it.',
-    breaks: 'Every crossing is a place where two lines can be read as one. Dropped inside the part, this one cuts across the chamfer and the slot, and your eye has to pick them apart.',
-    correct: [{ id: 'r-step', kind: 'linear', axis: 'y', from: [PLATE.length, 0], to: [PLATE.length, PLATE.stepHeight], at: PLATE.length + 40, text: String(PLATE.stepHeight) }],
-    wrong: [{ id: 'r-step', kind: 'linear', axis: 'y', from: [PLATE.length, 0], to: [PLATE.length, PLATE.stepHeight], at: 168, text: String(PLATE.stepHeight), tone: 'bad' }],
+    breaks: 'Every crossing is a place where two lines can be read as one. Dropped inside the part, this one cuts clean across the hole and its centre line, and your eye has to pick them apart.',
+    centreLines: true,
+    correct: [{ id: 'r-cross', kind: 'linear', axis: 'y', from: [P.length, 0], to: [P.length, P.height], at: LANE.right1, text: String(P.height) }],
+    wrong: [{ id: 'r-cross', kind: 'linear', axis: 'y', from: [P.length, 0], to: [P.length, P.height], at: H.at[0], text: String(P.height), tone: 'bad' }],
   },
   {
     id: 'not-on-centre',
@@ -89,8 +124,8 @@ export const RULES = Object.freeze([
     rule: 'Never put a value and arrow heads on a centre line, or on an edge of the part.',
     breaks: 'The chain line means "this is the axis of the hole". Load a measurement onto it and one line is saying two things — and it stops reading as an axis.',
     centreLines: true,
-    correct: [{ id: 'r-bore-x', kind: 'linear', axis: 'x', from: [0, 0], to: F.bore.at, at: BELOW, text: String(F.bore.at[0]) }],
-    wrong: [{ id: 'r-bore-x', kind: 'linear', axis: 'x', from: [0, 0], to: F.bore.at, at: F.bore.at[1], text: String(F.bore.at[0]), noExtension: true, tone: 'bad' }],
+    correct: [{ id: 'r-hole-x', kind: 'linear', axis: 'x', from: [0, 0], to: H.at, at: BELOW, text: String(H.at[0]) }],
+    wrong: [{ id: 'r-hole-x', kind: 'linear', axis: 'x', from: [0, 0], to: H.at, at: H.at[1], text: String(H.at[0]), noExtension: true, tone: 'bad' }],
   },
   {
     id: 'visible-outlines',
@@ -99,13 +134,13 @@ export const RULES = Object.freeze([
     rule: 'Take dimensions from visible edges, not from dashed ones.',
     breaks: 'That dashed circle is on the BACK of the plate. This view cannot show a back-face feature truly, so measuring to it measures a shadow. Locate the hole from the drilled circle you can see, and put the countersink in a note.',
     correct: [
-      { id: 'r-hole', kind: 'linear', axis: 'x', from: [0, 0], to: F.cskHole.at, at: BELOW, text: String(F.cskHole.at[0]) },
+      { id: 'r-visible', kind: 'linear', axis: 'x', from: [0, 0], to: H.at, at: BELOW, text: String(H.at[0]) },
     ],
     wrong: [
       {
-        id: 'r-hole', kind: 'linear', axis: 'x', tone: 'bad',
-        from: [0, 0], to: [F.cskHole.at[0] + F.cskHole.countersink.dia / 2, F.cskHole.at[1]],
-        at: BELOW, text: String(F.cskHole.at[0] + F.cskHole.countersink.dia / 2),
+        id: 'r-visible', kind: 'linear', axis: 'x', tone: 'bad',
+        from: [0, 0], to: [H.at[0] + CSK.dia / 2, H.at[1]],
+        at: BELOW, text: String(H.at[0] + CSK.dia / 2),
       },
     ],
   },
@@ -114,15 +149,15 @@ export const RULES = Object.freeze([
     ref: 'Shortened parts',
     title: 'A shortened drawing keeps its full dimension line',
     rule: 'When a long part is drawn with its middle cut out, the dimension line still runs straight across the break and states the real length.',
-    breaks: 'Break the dimension line too and the drawing states the length of the PICTURE. The workshop makes a plate 186 long, and the 200 you meant is nowhere on the sheet.',
+    breaks: 'Break the dimension line too and the drawing states the length of the PICTURE. The workshop makes a plate 122 long, and the 130 you meant is nowhere on the sheet.',
     correct: [
-      { id: 'r-brk-mark', kind: 'break', atMm: 150, fromMm: -1, toMm: 55 },
-      { id: 'r-brk', kind: 'linear', axis: 'x', from: [0, 0], to: [PLATE.length, 0], at: BELOW, text: String(PLATE.length) },
+      { id: 'r-brk-mark', kind: 'break', atMm: 100, fromMm: -1, toMm: P.height + 1 },
+      { id: 'r-brk', kind: 'linear', axis: 'x', from: [0, 0], to: [P.length, 0], at: BELOW, text: String(P.length) },
     ],
     wrong: [
-      { id: 'r-brk-mark', kind: 'break', atMm: 150, fromMm: -1, toMm: 55 },
-      { id: 'r-brk-a', kind: 'linear', axis: 'x', from: [0, 0], to: [146, 0], at: BELOW, text: '146', tone: 'bad' },
-      { id: 'r-brk-b', kind: 'linear', axis: 'x', from: [154, 0], to: [PLATE.length, 0], at: BELOW, text: '40', tone: 'bad' },
+      { id: 'r-brk-mark', kind: 'break', atMm: 100, fromMm: -1, toMm: P.height + 1 },
+      { id: 'r-brk-a', kind: 'linear', axis: 'x', from: [0, 0], to: [96, 0], at: BELOW, text: '96', tone: 'bad' },
+      { id: 'r-brk-b', kind: 'linear', axis: 'x', from: [104, 0], to: [P.length, 0], at: BELOW, text: '26', tone: 'bad' },
     ],
   },
   {
@@ -131,8 +166,8 @@ export const RULES = Object.freeze([
     title: 'Leaders come off at 30° or more',
     rule: 'A leader leaves its feature at 30° or steeper, and never runs parallel to a nearby dimension line. Give each note its own.',
     breaks: 'A shallow leader lying along the part reads as one more dimension line. At 8° this one is parallel to the dimension below it, so the note looks like it belongs to that measurement.',
-    correct: [{ id: 'r-sq', kind: 'leader', anchor: [F.square.at[0] + F.square.side / 2, F.square.at[1]], dirDeg: 55, lengthMm: 42, barMm: 14, head: 'arrow', text: `□${F.square.side}` }],
-    wrong: [{ id: 'r-sq', kind: 'leader', anchor: [F.square.at[0] + F.square.side / 2, F.square.at[1]], dirDeg: 8, lengthMm: 48, barMm: 14, head: 'arrow', text: `□${F.square.side}`, tone: 'bad' }],
+    correct: [{ id: 'r-note', kind: 'leader', anchor: onRim(60), dirDeg: 60, lengthMm: 34, barMm: 14, head: 'arrow', text: `ø${H.dia}` }],
+    wrong: [{ id: 'r-note', kind: 'leader', anchor: onRim(8), dirDeg: 8, lengthMm: 48, barMm: 14, head: 'arrow', text: `ø${H.dia}`, tone: 'bad' }],
   },
   {
     id: 'spacing',
@@ -141,12 +176,12 @@ export const RULES = Object.freeze([
     rule: 'Keep every dimension line at least 5 to 6 mm away from the part, and from the next dimension line.',
     breaks: 'Crowded against the edge, the dimension line merges with the part. The arrow heads touch the outline and the value has nowhere to sit.',
     correct: [
-      { id: 'r-a', kind: 'linear', axis: 'x', from: [0, 0], to: F.square.at, at: BELOW, text: String(F.square.at[0]) },
-      { id: 'r-b', kind: 'linear', axis: 'x', from: [0, 0], to: [PLATE.length, 0], at: BELOW - 14, text: String(PLATE.length) },
+      { id: 'r-a', kind: 'linear', axis: 'x', from: [0, 0], to: H.at, at: BELOW, text: String(H.at[0]) },
+      { id: 'r-b', kind: 'linear', axis: 'x', from: [0, 0], to: [P.length, 0], at: LANE.below2, text: String(P.length) },
     ],
     wrong: [
-      { id: 'r-a', kind: 'linear', axis: 'x', from: [0, 0], to: F.square.at, at: -2.5, text: String(F.square.at[0]), tone: 'bad' },
-      { id: 'r-b', kind: 'linear', axis: 'x', from: [0, 0], to: [PLATE.length, 0], at: -5.5, text: String(PLATE.length), tone: 'bad' },
+      { id: 'r-a', kind: 'linear', axis: 'x', from: [0, 0], to: H.at, at: -2.5, text: String(H.at[0]), tone: 'bad' },
+      { id: 'r-b', kind: 'linear', axis: 'x', from: [0, 0], to: [P.length, 0], at: -5.5, text: String(P.length), tone: 'bad' },
     ],
   },
   {
@@ -155,13 +190,14 @@ export const RULES = Object.freeze([
     title: 'Hatching stops short of the value',
     rule: 'If a value has to sit inside hatching, break the hatching around it and pick it up on the far side.',
     breaks: 'Hatching is thin evenly spaced lines — exactly the weight of the strokes in a numeral. Run it through a value and a 6 reads as an 8. This rule is purely about being able to read the number.',
+    // A cut face, drawn in the empty paper right of the hole and clear of its countersink.
     correct: [
-      { id: 'r-hatch', kind: 'hatch', rect: [102, 34, 143, 48], pitchMm: 3.4, angleDeg: 45, clear: [122.5, 43.6, 16, 9] },
-      { id: 'r-hatch-d', kind: 'linear', axis: 'x', from: [102, 41], to: [143, 41], at: 41, noExtension: true, text: '41' },
+      { id: 'r-hatch', kind: 'hatch', rect: [84, 12, 120, 26], pitchMm: 3.4, angleDeg: 45, clear: [102, 21.6, 16, 9] },
+      { id: 'r-hatch-d', kind: 'linear', axis: 'x', from: [84, 19], to: [120, 19], at: 19, noExtension: true, text: '36' },
     ],
     wrong: [
-      { id: 'r-hatch', kind: 'hatch', rect: [102, 34, 143, 48], pitchMm: 3.4, angleDeg: 45, tone: 'bad' },
-      { id: 'r-hatch-d', kind: 'linear', axis: 'x', from: [102, 41], to: [143, 41], at: 41, noExtension: true, text: '41', tone: 'bad' },
+      { id: 'r-hatch', kind: 'hatch', rect: [84, 12, 120, 26], pitchMm: 3.4, angleDeg: 45, tone: 'bad' },
+      { id: 'r-hatch-d', kind: 'linear', axis: 'x', from: [84, 19], to: [120, 19], at: 19, noExtension: true, text: '36', tone: 'bad' },
     ],
   },
 ]);

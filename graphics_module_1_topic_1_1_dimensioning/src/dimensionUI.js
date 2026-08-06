@@ -22,8 +22,12 @@
 // unrelated control clusters, and it puts the termination controls in the step that names
 // the termination as one of the five elements.
 
-import { STEPS, BIS_CHECKLIST, CLASSWORK_SYSTEM, LINE_TYPES, SHEET_SETTINGS } from './dimensionSteps.js';
-import { ELEMENTS, ARRANGEMENTS, COORDINATE_TABLE, MISTAKES } from './dimensionExamples.js';
+import {
+  STEPS, BIS_CHECKLIST, CLASSWORK_SYSTEM, LINE_TYPES, SHEET_SETTINGS, METHODS, METHOD_CHOICE,
+} from './dimensionSteps.js';
+import {
+  ELEMENTS, ARRANGEMENTS, METHOD_SHOWING_LAYOUTS, COORDINATE_TABLE, MISTAKES,
+} from './dimensionExamples.js';
 import { RULES, TERMINATIONS, LEADER_HEADS } from './dimensionRules.js';
 import { SYMBOLS, BIS_SYMBOL_IDS } from './dimensionSymbols.js';
 import { fitDecision } from './dimensionDraw.js';
@@ -308,8 +312,20 @@ export function initUI(sim) {
 
     arrangementId: ARRANGEMENTS[0].id,
     arrangementVariant: null,
-    /** Which layout is held BESIDE the current one. Any of them, never the current one. */
+    /**
+     * What is held BESIDE the current drawing: its own layout AND its own method. Any layout,
+     * INCLUDING the one already on screen — "same layout, other method" is the comparison that
+     * shows the two methods apart, and excluding it would make that impossible to ask for. The
+     * one pair that is forbidden is same layout AND same method, because that is two identical
+     * sheets; `keepPairDistinct()` moves whichever axis the learner did not just touch.
+     *
+     * It OPENS on a layout comparison, in one method, exactly as it did before the method axis
+     * existed. Opening on a method pair instead would be the wrong first impression: four of the
+     * six layouts measure only across the part, and the two methods draw a horizontal value
+     * identically, so the compare would open on two indistinguishable sheets.
+     */
     compareId: ARRANGEMENTS[1].id,
+    compareMethodId: 1,
     arrangementsSeen: new Set([ARRANGEMENTS[0].id]),
     compare: false,
 
@@ -664,26 +680,49 @@ export function initUI(sim) {
   const angularNote = $('angular-note');
 
   /**
-   * What each method IS, WHY, and WHERE it is used — three short lines, because switching
-   * between the two is what actually teaches the difference. The old copy told the learner to
-   * "watch values spin round as you pass the vertical", which only made sense alongside a
-   * rotate-the-drawing slider; the comparison itself now carries that.
+   * The card under the control. On its own it describes the ONE system the learner has picked;
+   * with the comparison up it puts the two side by side on the three questions that actually
+   * separate them, in the same left-to-right order as the two sheets on screen.
+   *
+   * WHY A TABLE AND NOT PROSE. The difference between the two systems is visual, and the drawing
+   * is where it should be read. Three short rows say what to look FOR; they do not describe what
+   * the learner can already see. The old card could only ever describe one system at a time, so
+   * the comparison had to be done from memory.
    */
-  const METHOD_COPY = {
-    1: {
-      title: 'Aligned',
-      body: 'Each value lies <b>along its own line</b>, just above it and in the middle.',
-      why: 'It reads with the feature it measures, so a sloping size never has to be hunted for.',
-      where: 'The usual choice on a hand-drawn sheet. Values are read from the bottom or the right.',
-    },
-    2: {
-      title: 'Upright',
-      body: 'Every value stays <b>level</b>, and a sloping or vertical line <b>breaks</b> to make room for it.',
-      why: 'Nothing on the sheet has to be read sideways, so it survives copying and printing.',
-      where: 'The usual choice on typed or CAD drawings. Every value is read from the bottom.',
-    },
-  };
+  function renderMethodDetail() {
+    if (!methodDetail) return;
+    const c = METHODS[state.method];
+    methodDetail.className = 'detail detail--verdict';
 
+    if (state.compare && currentStep === 3) {
+      const other = METHODS[state.method === 1 ? 2 : 1];
+      methodDetail.innerHTML = `
+        <h3>${other.name} <span class="detail__vs">vs</span> ${c.name}</h3>
+        <table class="data data--diff">
+          <thead><tr><th><span class="sr-only">Judged on</span></th><th>${other.name}</th><th>${c.name}</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Across and up</th><td>${other.across}</td><td>${c.across}</td></tr>
+            <tr><th scope="row">Sloping and angles</th><td>${other.sloping}</td><td>${c.sloping}</td></tr>
+            <tr><th scope="row">Read from</th><td>${other.read}</td><td>${c.read}</td></tr>
+          </tbody>
+        </table>
+        <p>${METHOD_CHOICE.note}</p>`;
+      return;
+    }
+
+    const alias = c.alias ? ` <span class="detail__alias">(${c.alias})</span>` : '';
+    methodDetail.innerHTML = `<h3>${c.name}${alias}</h3><p>${c.body}</p>
+      <dl><dt>Why</dt><dd>${c.why}</dd><dt>Where</dt><dd>${c.where}</dd></dl>
+      <p>Aligned and unidirectional are the two accepted systems for writing dimensions. Never mix them on one drawing.</p>`;
+  }
+
+  /**
+   * The value system the drawing is in. ONE piece of state with TWO controls on it — Step 3's
+   * segmented control and Step 4's method selector — because there is one drawing and one method
+   * on it, and two controls that could disagree would be two answers to one question. Both are
+   * repainted here whichever one was pressed, so moving between the steps never shows a control
+   * that has gone stale.
+   */
   function setMethod(m) {
     state.method = m;
     state.methodsSeen.add(m);
@@ -692,21 +731,26 @@ export function initUI(sim) {
       b.classList.toggle('is-active', active);
       b.setAttribute('aria-pressed', String(active));
     }
-    if (methodDetail) {
-      const c = METHOD_COPY[m];
-      methodDetail.className = 'detail detail--verdict';
-      methodDetail.innerHTML = `<h3>${c.title}</h3><p>${c.body}</p>
-        <dl><dt>Why</dt><dd>${c.why}</dd><dt>Where</dt><dd>${c.where}</dd></dl>
-        <p>Never mix the two on one drawing.</p>`;
-    }
-    // Fig. 4.11's a/b choice is a Method-1 question; Method-2 is upright by definition. The
-    // group stays put and explains itself instead of disappearing.
+    methodSelect?.setValue(String(m));
+    renderMethodNote();
+    renderMethodDetail();
+    // Fig. 4.11's a/b choice is a Method-1 question; Method-2 is unidirectional — level — by
+    // definition, so there is nothing to pick. The group stays put and explains itself instead
+    // of disappearing.
     const angles = m === 1;
     for (const b of angularBtns) b.disabled = !angles;
     if (angularNote) angularNote.hidden = angles;
     angularGroup?.classList.toggle('is-off', !angles);
     sim.setMethod(m);
-    sim.announce(`${METHOD_COPY[m].title}.`);
+    // Step 3's comparison SWAPS the two sheets over, so the control chooses which side is which
+    // and saying only the name would leave a screen-reader user unable to tell what moved. Step
+    // 4's does not: the two sheets carry independent methods, so only the right-hand one changed
+    // and `announceCompare()` (from the caller) says what the pair now holds.
+    if (!(currentStep === 4 && state.compare)) {
+      sim.announce(state.compare && currentStep === 3
+        ? `${METHODS[m === 1 ? 2 : 1].name} on the left, ${METHODS[m].name} on the right.`
+        : `${METHODS[m].label}.`);
+    }
     sync();
   }
 
@@ -743,33 +787,85 @@ export function initUI(sim) {
   // Step 4 — arrangement of dimension lines
   // ==========================================================================
   const arrangementSelectHost = $('arrangement-select');
+  const methodSelectHost = $('method-select');
+  const methodNote = $('method-note');
   const compareSelectHost = $('compare-select');
+  const compareMethodSelectHost = $('compare-method-select');
   const compareWithGroup = $('compare-with-group');
   const arrangementVariants = $('arrangement-variants');
   const arrangementDetail = $('arrangement-detail');
   const coordinateTable = $('coordinate-table');
   let arrangementSelect = null;
+  let methodSelect = null;
   let compareSelect = null;
+  let compareMethodSelect = null;
 
-  const arrangementItems = (exclude) => ARRANGEMENTS
-    .filter((a) => a.id !== exclude)
+  const arrangementItems = () => ARRANGEMENTS
     .map((a) => ({ value: a.id, label: a.name, ref: a.fig }));
+
+  /**
+   * The two methods, as a selector.
+   *
+   * BOTH NAMES, ALWAYS. The chapter numbers them and a lecturer says "Method 1" out loud, so
+   * the number has to be on the control; but the number alone says nothing about what changes
+   * on the paper, and the word is what an exam answer must contain. "Recommended" rides in the
+   * option list's `ref` column rather than in the label, so the trigger stays short and the
+   * marker still appears at the moment the learner is choosing.
+   */
+  const methodItems = () => [1, 2].map((n) => ({
+    value: String(n),
+    label: METHODS[n].label,
+    ref: n === METHOD_CHOICE.preferred ? 'Recommended' : undefined,
+  }));
 
   function paintArrangements() {
     if (!arrangementSelectHost || arrangementSelect) return;
     arrangementSelect = createSelect(arrangementSelectHost, {
       id: 'arr', label: 'Layout of the dimensions',
-      items: arrangementItems(null),
+      items: arrangementItems(),
       onPick: (id) => selectArrangement(id),
     });
+    if (methodSelectHost) {
+      methodSelect = createSelect(methodSelectHost, {
+        id: 'meth', label: 'Method the values are written in',
+        items: methodItems(),
+        onPick: (v) => selectStepMethod(Number(v)),
+      });
+    }
     if (compareSelectHost) {
       compareSelect = createSelect(compareSelectHost, {
         id: 'cmp', label: 'Layout to compare with',
-        items: arrangementItems(state.arrangementId),
+        items: arrangementItems(),
         // Only sheet B changes. The main drawing, its reveal animation and the camera are
         // untouched, so switching the comparison is instant and nothing re-animates.
         onPick: (id) => selectCompareWith(id),
       });
+    }
+    if (compareMethodSelectHost) {
+      compareMethodSelect = createSelect(compareMethodSelectHost, {
+        id: 'cmpm', label: 'Method to compare with',
+        items: methodItems(),
+        onPick: (v) => selectCompareMethod(Number(v)),
+      });
+    }
+  }
+
+  /**
+   * Keep the two sheets from being the same drawing twice.
+   *
+   * A pair is (layout, method) on each side, and only the pair being identical is forbidden —
+   * same layout with different methods, and same method with different layouts, are both real
+   * comparisons and are the two the step is for. Whichever axis the learner did NOT just touch
+   * is the one that moves, so a deliberate choice is never overwritten under their hand.
+   *
+   * @param {'layout'|'method'} justChanged Which axis the learner set.
+   */
+  function keepPairDistinct(justChanged) {
+    if (state.compareId !== state.arrangementId || state.compareMethodId !== state.method) return;
+    if (justChanged === 'method') {
+      state.compareId = ARRANGEMENTS.find((a) => a.id !== state.arrangementId).id;
+    } else {
+      state.compareMethodId = state.method === 1 ? 2 : 1;
     }
   }
 
@@ -777,23 +873,61 @@ export function initUI(sim) {
     state.arrangementId = id;
     state.arrangementVariant = null;
     state.arrangementsSeen.add(id);
-    // The comparison can never be the drawing it is being compared with.
-    if (state.compareId === id) {
-      state.compareId = ARRANGEMENTS.find((a) => a.id !== id).id;
-    }
+    keepPairDistinct('layout');
     renderArrangement();
     const a = ARRANGEMENTS.find((x) => x.id === id);
     sim.announce(`${a.name} dimensioning. ${a.use}`);
     sync();
   }
 
-  function selectCompareWith(id) {
-    state.compareId = id;
+  /** Step 4's own method control. It writes the SAME state Step 3's segmented control does —
+   *  there is one drawing and one value system on it, and two controls that disagreed about
+   *  which method the sheet is in would be two answers to one question. */
+  function selectStepMethod(m) {
+    state.method = m;              // set before the guard, so it judges the pair AFTER the change
+    keepPairDistinct('method');
+    setMethod(m);
     const { a, variant } = currentArrangement();
     renderArrangementDetail(a, variant);
-    sim.setCompare(id);   // sheet B only — sheet A and the camera are untouched
-    const other = ARRANGEMENTS.find((x) => x.id === id);
-    sim.announce(`${other.name} on the left, ${a.name} on the right. ${other.use}`);
+    if (state.compare) {
+      sim.setCompare(state.compareId, state.compareMethodId);
+      announceCompare();
+    }
+  }
+
+  function selectCompareWith(id) {
+    state.compareId = id;
+    keepPairDistinct('layout');
+    const { a, variant } = currentArrangement();
+    renderArrangementDetail(a, variant);
+    sim.setCompare(id, state.compareMethodId);   // sheet B only — sheet A and the camera untouched
+    announceCompare();
+  }
+
+  function selectCompareMethod(m) {
+    state.compareMethodId = m;
+    state.methodsSeen.add(m);
+    keepPairDistinct('method');
+    const { a, variant } = currentArrangement();
+    renderArrangementDetail(a, variant);
+    sim.setCompare(state.compareId, m);
+    announceCompare();
+    sync();
+  }
+
+  /** What the two sheets now hold, said once, in the order they appear on screen. */
+  function announceCompare() {
+    const { a } = currentArrangement();
+    const other = ARRANGEMENTS.find((x) => x.id === state.compareId);
+    const sameLayout = other.id === a.id;
+    sim.announce(sameLayout
+      // The point of a same-layout pair is that ONLY the method moved. Say so, or a
+      // screen-reader user hears two drawing names and no reason they are together — and where
+      // nothing moved at all, say THAT, because a blind learner cannot see two identical sheets.
+      ? (a.showsMethod
+        ? `Method ${state.compareMethodId} on the left, Method ${state.method} on the right. The same ${a.name.toLowerCase()} layout on both — only the way the values are written differs.`
+        : `The same ${a.name.toLowerCase()} layout in both methods, and the two drawings are identical: every dimension line here is horizontal, and both methods write a horizontal value the same way.`)
+      : `Method ${state.compareMethodId} ${other.name} on the left, Method ${state.method} ${a.name} on the right. ${other.use}`);
   }
 
   function selectArrangementVariant(vid) {
@@ -816,26 +950,45 @@ export function initUI(sim) {
    * the two side by side on the three axes the chapter judges them by, so the learner reads
    * the trade-off instead of inferring it from two drawings. No drawing is altered to say it.
    */
+  /**
+   * The concise "which method do I use?" card that sits under Step 4's method selector.
+   *
+   * TWO LINES, ALWAYS BOTH. Showing only the selected one would make the choice look like a
+   * preference setting; the learner has to be able to see, without touching the control, that
+   * there are two accepted methods and which of them this course draws in. The selected one is
+   * flagged, the recommendation is stated once, and nothing else is said here — the full
+   * argument is Step 3's, and repeating it would bury the layout question this step is about.
+   */
+  function renderMethodNote() {
+    if (!methodNote) return;
+    methodNote.className = 'detail';
+    const rows = [METHOD_CHOICE.preferred, METHOD_CHOICE.preferred === 1 ? 2 : 1].map((n) => {
+      const m = METHODS[n];
+      // TWO CUES on the live one, never colour alone: it is the row at full ink strength AND
+      // the row carrying the flag (§4.6 of the platform's own design rules).
+      const flag = n === state.method ? ' <span class="detail__flag">On the drawing</span>' : '';
+      return `<dt${n === state.method ? ' class="is-on"' : ''}>${m.label}${flag}</dt><dd>${m.use}</dd>`;
+    }).join('');
+    methodNote.innerHTML = `<dl>${rows}</dl>`;
+  }
+
   function renderArrangementDetail(a, variant) {
-    compareSelect?.setItems(arrangementItems(a.id));
+    // EVERY layout, including the one on screen: "same layout, other method" is precisely the
+    // pair that shows the two methods apart, and it is unreachable if the list excludes it.
+    compareSelect?.setItems(arrangementItems());
     compareSelect?.setValue(state.compareId);
+    compareMethodSelect?.setValue(String(state.compareMethodId));
+    methodSelect?.setValue(String(state.method));
+    renderMethodNote();
 
     const other = state.compare && currentStep === 4
       ? ARRANGEMENTS.find((x) => x.id === state.compareId)
       : null;
     if (!arrangementDetail) return;
     arrangementDetail.className = 'detail detail--verdict';
-    arrangementDetail.innerHTML = other
-      ? `<h3>${other.name} <span class="detail__vs">vs</span> ${a.name}</h3>
-         <table class="data data--diff">
-           <thead><tr><th><span class="sr-only">Judged on</span></th><th>${other.name}</th><th>${a.name}</th></tr></thead>
-           <tbody>
-             <tr><th scope="row">Space</th><td>${other.space}</td><td>${a.space}</td></tr>
-             <tr><th scope="row">Clarity</th><td>${other.clarity}</td><td>${a.clarity}</td></tr>
-             <tr><th scope="row">Making it</th><td>${other.making}</td><td>${a.making}</td></tr>
-           </tbody>
-         </table>`
-      : `<h3>${a.name} · ${a.fig}</h3>
+
+    if (!other) {
+      arrangementDetail.innerHTML = `<h3>${a.name} · ${a.fig}</h3>
          <p>${a.use}</p>
          <p><b>Used when:</b> ${a.when}</p>
          ${variant ? `<p><span class="detail__flag">${variant.label}</span><br>${variant.note}</p>` : ''}
@@ -844,6 +997,59 @@ export function initUI(sim) {
            <dt>Clarity</dt><dd>${a.clarity}</dd>
            <dt>Making it</dt><dd>${a.making}</dd>
          </dl>`;
+      return;
+    }
+
+    // WHICH TABLE depends on which axis actually moved, because a comparison should be judged on
+    // the thing that differs. Same layout, two methods → the method table (where the value sits,
+    // which way it turns, which way it is read). Same method, two layouts → the layout table
+    // (space, clarity, manufacture), exactly as before. Both moved → the layout table, with the
+    // pair named in full and a line saying two things changed at once, so the learner is not left
+    // to guess which difference they are looking at.
+    const otherM = METHODS[state.compareMethodId];
+    const thisM = METHODS[state.method];
+    const sameLayout = other.id === a.id;
+    const sameMethod = state.compareMethodId === state.method;
+    const head = sameLayout
+      ? `Method ${otherM.n} <span class="detail__vs">vs</span> Method ${thisM.n}`
+      : `${other.name} <span class="detail__vs">vs</span> ${a.name}`;
+
+    const methodTable = `
+      <table class="data data--diff">
+        <thead><tr><th><span class="sr-only">Judged on</span></th><th>Method ${otherM.n}</th><th>Method ${thisM.n}</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Across and up</th><td>${otherM.across}</td><td>${thisM.across}</td></tr>
+          <tr><th scope="row">Sloping and angles</th><td>${otherM.sloping}</td><td>${thisM.sloping}</td></tr>
+          <tr><th scope="row">Read from</th><td>${otherM.read}</td><td>${thisM.read}</td></tr>
+        </tbody>
+      </table>`;
+    const layoutTable = `
+      <table class="data data--diff">
+        <thead><tr><th><span class="sr-only">Judged on</span></th><th>${other.name}</th><th>${a.name}</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Space</th><td>${other.space}</td><td>${a.space}</td></tr>
+          <tr><th scope="row">Clarity</th><td>${other.clarity}</td><td>${a.clarity}</td></tr>
+          <tr><th scope="row">Making it</th><td>${other.making}</td><td>${a.making}</td></tr>
+        </tbody>
+      </table>`;
+
+    // THE HONEST CASE. Four of the six layouts measure only across the part, and both methods
+    // write a horizontal value the same way — so the two sheets really are identical, and the
+    // card has to say so. Pretending otherwise would leave the learner hunting for a difference
+    // that is not there; saying it turns a dead comparison into the rule it demonstrates.
+    const flat = sameLayout && !a.showsMethod;
+    const lead = !sameLayout
+      ? ''
+      : flat
+        ? `<p>The same ${a.name.toLowerCase()} layout in both methods — and the two sheets are <b>identical</b>. Every dimension line here is horizontal, and both methods write a horizontal value the same way: above the line, read from the bottom. The method only shows itself on a line that is <b>not</b> horizontal — try <b>${METHOD_SHOWING_LAYOUTS[0]}</b>.</p>`
+        : `<p>The same ${a.name.toLowerCase()} layout on both sheets — the same lines in the same places. Only the way the values are written differs.</p>`;
+
+    arrangementDetail.innerHTML = `<h3>${head}</h3>
+      ${sameLayout
+        ? `${lead}${methodTable}`
+        : `${layoutTable}${sameMethod
+            ? ''
+            : `<p>Both sheets also differ in method — Method ${otherM.n} on the left, Method ${thisM.n} on the right. Hold one of the two still to read the other.</p>`}`}`;
   }
 
   /** The live arrangement and its variant, for the light repaint paths. */
@@ -885,7 +1091,7 @@ export function initUI(sim) {
 
     renderCompare();
     sim.setArrangement(a.id, variant?.id ?? null);
-    sim.setCompare(state.compare ? state.compareId : null);
+    sim.setCompare(state.compare ? state.compareId : null, state.compareMethodId);
   }
 
   // --- The persistent compare ------------------------------------------------
@@ -895,7 +1101,7 @@ export function initUI(sim) {
   // — two different affordances for the same idea, in two different positions. Now both steps
   // paint the same toggle into a fixed slot directly under the step's own primary control, so
   // the learner never has to look for it.
-  const compareSlots = [$('compare-slot-4'), $('compare-slot-6')].filter(Boolean);
+  const compareSlots = [$('compare-slot-3'), $('compare-slot-4'), $('compare-slot-6')].filter(Boolean);
   const compareToggles = compareSlots.map((slot) => createToggle(slot, {
     label: 'Compare side by side',
     onToggle: (on) => toggleCompare(on),
@@ -904,6 +1110,18 @@ export function initUI(sim) {
   function toggleCompare(on) {
     state.compare = on;
     renderCompare();
+    if (currentStep === 3) {
+      // The two value systems, on the SAME drawing: the one not selected on the left, the one
+      // selected on the right. Nothing else differs between the two sheets, which is the whole
+      // reason the comparison teaches anything.
+      renderMethodDetail();
+      sim.setMethodCompare(on);
+      const other = METHODS[state.method === 1 ? 2 : 1];
+      sim.announce(on
+        ? `${other.name} on the left, ${METHODS[state.method].name} on the right. The same plate, the same sizes — only the way the values are written differs.`
+        : 'Single drawing shown.');
+      return;
+    }
     if (currentStep === 6) {
       setReviewView(state.reviewView);
       sim.announce(on
@@ -913,24 +1131,25 @@ export function initUI(sim) {
     }
     // The LIGHT path: only sheet B appears or goes, and only the card is repainted. Going back
     // through `sim.setArrangement` would re-run the main drawing's reveal animation.
+    if (on) keepPairDistinct('layout');   // the pair may have gone identical while the compare was down
     const { a, variant } = currentArrangement();
     renderArrangementDetail(a, variant);
-    sim.setCompare(on ? state.compareId : null);
-    const other = ARRANGEMENTS.find((x) => x.id === state.compareId);
-    sim.announce(on
-      ? `${other.name} on the left, ${a.name} on the right. ${other.use}`
-      : 'Single drawing shown.');
+    sim.setCompare(on ? state.compareId : null, state.compareMethodId);
+    if (on) announceCompare(); else sim.announce('Single drawing shown.');
   }
 
   /** Push the compare state into whichever slot the current step owns. Split out so main.js
    *  can drop the compare (see `compareDropped`) without repainting a whole step. */
   function renderCompare() {
-    // Step 6 compares the faulty drawing with the corrected one — a fixed pair, no second
-    // list. Step 4 compares ANY layout with any other, so it discloses a second selector.
+    // Step 6 compares the faulty drawing with the corrected one — a fixed pair, no second list.
+    // Step 4 compares ANY layout in EITHER method with any other, so it discloses two more
+    // selectors: one per axis, in the same order as the two above them.
     const inStep4 = currentStep === 4;
-    const note = inStep4
-      ? 'Hold any other layout beside this one'
-      : 'The faulty drawing beside the corrected one';
+    const note = currentStep === 3
+      ? 'The same drawing in both value systems, side by side'
+      : inStep4
+        ? 'Hold any layout, in either method, beside this one'
+        : 'The faulty drawing beside the corrected one';
     for (const t of compareToggles) t.set(state.compare, { disabled: false, note });
     if (compareWithGroup) compareWithGroup.hidden = !(inStep4 && state.compare);
   }
@@ -1353,7 +1572,16 @@ export function initUI(sim) {
      */
     compareDropped() {
       if (!state.compare) return;
+      // Step 3's card changes shape with the compare — it is a two-column table while both
+      // sheets are up and a single verdict when they are not.
+      if (currentStep === 3) { state.compare = false; renderMethodDetail(); }
       state.compare = false;
+      // Step 4's card does the same: a diff table while both sheets are up, a single layout
+      // verdict when they are not. Repainting the CARD is not repainting the drawing.
+      if (currentStep === 4) {
+        const { a, variant } = currentArrangement();
+        renderArrangementDetail(a, variant);
+      }
       renderCompare(); // not sync(): the drawing itself must not be repainted from here
     },
 

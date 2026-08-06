@@ -31,7 +31,17 @@ import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
-import { toWorld, toUnits, HALF_DEPTH } from './dimensionData.js';
+import { toUnits, HALF_DEPTH } from './dimensionData.js';
+import {
+  SPACING, TERMINATION, planLayout, linearEnds, textPlacement,
+  W, sub, add, mul, len, norm, perp, lerp2,
+} from './dimensionLayout.js';
+
+// Re-exported so the rest of the module keeps importing its drafting constants from the
+// renderer, which is where they were first published. They LIVE in dimensionLayout.js now,
+// because the layout pass has to reason about the same proportions the renderer strokes with
+// and two copies of Fig. 4.6 would be one copy too many.
+export { SPACING, TERMINATION };
 
 const DEG = Math.PI / 180;
 
@@ -51,29 +61,6 @@ const WIDTH_PX = Object.freeze({ thin: 1.0, thick: 2.5 });
 
 /** Dash pattern for the dashed AID strokes — identical to the rig's and to Foundations'. */
 const AID_DASH = Object.freeze({ size: 0.12, gap: 0.08 });
-
-/** Termination geometry, in MILLIMETRES, straight out of Figs. 4.5/4.6 and §4.5. */
-export const TERMINATION = Object.freeze({
-  open:    { length: 4,   includedDeg: 15,  fill: false, stroke: 'thick' },
-  closed:  { length: 3.5, width: 1.75,      fill: false, stroke: 'thin'  },
-  filled:  { length: 3.5, width: 1.75,      fill: true,  stroke: 'thin'  },
-  oblique: { length: 3.5, angleDeg: 45,     fill: false, stroke: 'thin'  },
-  dot:     { diameter: 1.5,                 fill: true,  stroke: 'thin'  },
-});
-
-/** Textbook spacings in mm. */
-export const SPACING = Object.freeze({
-  // ZERO. Fig. 4.1 carries an explicit leader annotation — "No gap is left here" — pointing
-  // at the junction where the projection line meets the object outline. Some drawing offices
-  // do leave a small gap; this textbook is the source of truth for this topic and it does
-  // not. A projection line therefore springs directly off the feature it carries.
-  extGap: 0,
-  extOvershoot: 1.5,  // §4.6 rule 2 — 1 to 2 mm past the dimension line
-  offFirst: 6,        // §4.3 — 5 to 6 mm clear of the object boundary
-  offStep: 6,         // …and of the previous dimension line
-  textGap: 1.0,       // §4.5 item 3 — 0.5 to 1 mm above the dimension line
-  textHeight: 3.5,    // §4.5 item 3 / "Dimensional Text" — 3 to 4 mm
-});
 
 /**
  * The included angle currently in force for OPEN and CLOSED arrow heads, in degrees.
@@ -147,17 +134,6 @@ function phase(t, [a, b]) {
 // ============================================================================
 
 const ZP = HALF_DEPTH + PROUD;
-
-/** mm point → world {x, y}. */
-const W = (p) => toWorld(p[0], p[1]);
-
-const sub = (a, b) => ({ x: a.x - b.x, y: a.y - b.y });
-const add = (a, b) => ({ x: a.x + b.x, y: a.y + b.y });
-const mul = (a, k) => ({ x: a.x * k, y: a.y * k });
-const len = (a) => Math.hypot(a.x, a.y);
-const norm = (a) => { const l = len(a) || 1; return { x: a.x / l, y: a.y / l }; };
-const perp = (a) => ({ x: -a.y, y: a.x });
-const lerp2 = (a, b, t) => ({ x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t });
 
 /** Push a straight segment a→b into a flat positions buffer. */
 function seg(out, a, b) { out.push(a.x, a.y, ZP, b.x, b.y, ZP); }
@@ -237,50 +213,6 @@ function termination(buffers, style, tip, dir, k = 1) {
   if (style === 'closed') seg(into, p1, p2); // closed = outlined triangle, not filled
 }
 
-/**
- * Where the dimensional text sits and how it is turned, for the two BIS methods.
- * Returns { at:{x,y}, rotationDeg, interrupt:boolean }.
- *
- * Method-1 (§4.2): parallel to the dimension line, ABOVE it, not touching, at the middle,
- * and readable from the bottom or the right — so a line whose direction points into the
- * left/lower half of the circle is read from the other end (a 180° flip).
- * Method-2 (§4.2): always horizontal, read from the bottom; above a HORIZONTAL dimension
- * line, and placed at the middle by INTERRUPTING a vertical or inclined one.
- */
-function textPlacement(a, b, method, gapMm = SPACING.textGap + SPACING.textHeight / 2, viewRotationDeg = 0) {
-  const dir = norm(sub(b, a));
-  const mid = lerp2(a, b, 0.5);
-  // Readability is judged on the SHEET, not in the part's own frame: when the drawing is
-  // turned (Step 3), a dimension line that was horizontal is no longer horizontal to the
-  // reader, and Method-1's "read from the bottom or the right" has to be re-decided.
-  // CSS2DRenderer never rotates a label's DOM node, so the returned rotation is the full
-  // screen-space angle while the text's OFFSET stays in the part's frame (it rides the
-  // rotated group).
-  let angle = Math.atan2(dir.y, dir.x) / DEG + viewRotationDeg;
-
-  if (method === 2) {
-    const horizontal = Math.abs(Math.sin(angle * DEG)) < 0.08;
-    if (horizontal) {
-      // "Above" means above ON THE SHEET, so take screen-up and rotate it back into the
-      // part's frame (the label rides the rotated group).
-      const th = viewRotationDeg * DEG;
-      const up = { x: Math.sin(th), y: Math.cos(th) };
-      return { at: add(mid, mul(up, toUnits(gapMm))), rotationDeg: 0, interrupt: false };
-    }
-    return { at: mid, rotationDeg: 0, interrupt: true };
-  }
-
-  // Method-1: fold the reading direction into (−90°, 90°] so the value reads from the
-  // bottom edge or, for a vertical dimension line, from the right-hand edge.
-  let flip = false;
-  while (angle > 180) angle -= 360;
-  while (angle <= -180) angle += 360;
-  if (angle > 90 || angle <= -90) { angle += 180; flip = true; }
-  while (angle > 180) angle -= 360;
-  const outward = flip ? mul(perp(dir), -1) : perp(dir);
-  return { at: add(mid, mul(outward, toUnits(gapMm))), rotationDeg: angle, interrupt: false };
-}
-
 // ============================================================================
 // Spec rendering — one function per dimension KIND
 // ============================================================================
@@ -297,21 +229,10 @@ function drawLinear(spec, ctx) {
   // `only` renders a single ELEMENT of the dimension (Step 1's anatomy inspector isolates
   // the projection lines, the dimension line, the termination and the text one at a time).
   const want = (k) => !spec.only || spec.only === k;
-  const A = W(spec.from);
-  const B = W(spec.to);
-
-  let p, q;                 // the ends of the dimension line
-  if (spec.axis === 'y') {
-    const x = toWorld(spec.at, 0).x;
-    p = { x, y: A.y }; q = { x, y: B.y };
-  } else if (spec.axis === 'aligned') {
-    const n = perp(norm(sub(B, A)));
-    const o = mul(n, toUnits(spec.at ?? SPACING.offFirst));
-    p = add(A, o); q = add(B, o);
-  } else {
-    const y = toWorld(0, spec.at).y;
-    p = { x: A.x, y }; q = { x: B.x, y };
-  }
+  // The dimension line's two ends, worked out by the SAME function the layout pass reasons
+  // about them with (dimensionLayout.js), so a projection line can never be drawn to one place
+  // and have its clearance measured at another.
+  const { A, B, p, q } = linearEnds(spec);
 
   // --- Projection (extension) lines. §4.6 rule 2: they run from just clear of the feature
   //     to 1–2 mm PAST the dimension line. `extShort` renders the classic mistake — a
@@ -388,9 +309,13 @@ function drawLinear(spec, ctx) {
       : spec.textAt === 'far'
         ? add(q, mul(perp(dir), toUnits(SPACING.textGap + SPACING.textHeight)))
         : placement.at;
+    // `textAlongMm` slides the value ALONG its own dimension line, without moving the line or
+    // either of its limits. It is the layout pass's last resort when the middle of the line is
+    // the one place a crowded corner has no room for (dimensionLayout.js).
+    const along = spec.textAlongMm ? mul(dir, toUnits(spec.textAlongMm)) : { x: 0, y: 0 };
     labels.push({
       id: spec.id, text: spec.text, tone: spec.tone,
-      position: new THREE.Vector3(base.x + nudge.x, base.y + nudge.y, ZP),
+      position: new THREE.Vector3(base.x + along.x + nudge.x, base.y + along.y + nudge.y, ZP),
       rotationDeg: turned ? 90 : placement.rotationDeg,
       boxed: placement.interrupt,
       draggable: !!spec.draggable,
@@ -542,7 +467,14 @@ function drawRadius(spec, ctx) {
 /**
  * An angular dimension (Figs. 4.11/4.13): a circular dimension line about a vertex with a
  * head at each end. Method-1 turns the value with the arc; Method-2 keeps it horizontal.
- * spec: { vertex:[mm], radiusMm, fromDeg, toDeg, text }
+ *
+ * `legs` names the sides whose PROJECTION LINE has to be drawn — §4.1: a projection line
+ * carries a feature out to where the dimension is, and an angular dimension is no different.
+ * A leg that runs along an edge the part already has needs nothing; a leg that ends in mid-air
+ * because the arc is bigger than the feature needs its side extended out to meet the arc, or
+ * the arrow head lands on nothing at all.
+ *
+ * spec: { vertex:[mm], radiusMm, fromDeg, toDeg, text, legs:'from'|'to'|'both' }
  */
 function drawAngular(spec, ctx) {
   const { buffers, labels, t, method, term, viewRotationDeg } = ctx;
@@ -551,6 +483,15 @@ function drawAngular(spec, ctx) {
   const a0 = spec.fromDeg * DEG;
   const a1 = spec.toDeg * DEG;
   const tLine = phase(t, PHASE.line);
+
+  if (spec.legs && spec.legs !== 'none') {
+    const reach = r + toUnits(SPACING.extOvershoot);
+    const tExt = phase(t, PHASE.extension);
+    for (const [which, ang] of [['from', a0], ['to', a1]]) {
+      if (spec.legs !== 'both' && spec.legs !== which) continue;
+      segGrow(buffers.thin, v, { x: v.x + Math.cos(ang) * reach, y: v.y + Math.sin(ang) * reach }, tExt);
+    }
+  }
   const steps = 28;
   const aMid = (a0 + a1) / 2;
   for (let i = 0; i < steps; i++) {
@@ -573,12 +514,15 @@ function drawAngular(spec, ctx) {
   termination(buffers, term, endB, a1 > a0 ? tanB : mul(tanB, -1), tTerm);
 
   if (t >= PHASE.text) {
-    const at = { x: v.x + Math.cos(aMid) * (r + toUnits(4)), y: v.y + Math.sin(aMid) * (r + toUnits(4)) };
+    // How far outside its own arc the value sits. 4 mm is the default; the layout pass may push
+    // it further out when the corner between the two legs is too tight to letter in.
+    const tr = r + toUnits(spec.textGapMm ?? 4);
+    const at = { x: v.x + Math.cos(aMid) * tr, y: v.y + Math.sin(aMid) * tr };
     // §4.2 Method-1 condition 7: an angular value is indicated "either as in Fig. 4.11(a) or
     // in Fig. 4.11(b). Here, the second one is simple, hence suggested for class work."
     //   (a) ALIGNED  — the value lies along its own arc, like every other Method-1 value.
-    //   (b) SIMPLE   — the value is written upright wherever it sits on the circle.
-    // Method-2 is always upright by definition (Fig. 4.13).
+    //   (b) SIMPLE   — the value is written horizontal wherever it sits on the circle.
+    // Method-2 (unidirectional) is always horizontal by definition (Fig. 4.13).
     const style = spec.angularStyle || ctx.angularStyle || 'a';
     let rot = 0;
     if (method === 1 && style === 'a') {
@@ -843,6 +787,51 @@ export function createDimensionLayer(options = {}) {
   /** One set of fat-line + triangle batches per tone, rebuilt on every draw(). */
   let built = [];
 
+  // THE LAYOUT PASS'S MEMO. `draw()` runs on every animation frame of a reveal, but the layout
+  // depends only on the specs and the drafting options — never on how far the reveal has got —
+  // so the whole pass is skipped unless one of those actually changed. The signature covers
+  // exactly the fields `planLayout` reads.
+  let memoKey = null;
+  let memoOut = null;
+  let lastLayout = { moves: [], unresolved: [] };
+  const LAYOUT_FIELDS = [
+    'id', 'kind', 'axis', 'at', 'from', 'to', 'text', 'mode', 'centre', 'diaMm', 'dirDeg',
+    'lengthMm', 'barMm', 'anchor', 'head', 'radiusMm', 'vertex', 'fromDeg', 'toDeg', 'offsetMm',
+    'textGapMm', 'textAlongMm', 'textOffsetMm', 'textAt', 'textStyle', 'noExtension',
+    'arrowsOutside', 'terminationEnds', 'termination', 'tone', 'pinned', 'only', 'hidden',
+    'extShort', 'extSkew', 'textNudgeMm', 'falseCentre', 'onArcDeg', 'jogMm', 'fromCentre',
+    'leadMm', 'priority',
+  ];
+  const signature = (specs, opts) => {
+    let s = `${opts.termination || 'open'}|${opts.terminationAngleDeg ?? ''}|${opts.angularStyle || 'a'}|${opts.layout === false ? 'off' : 'on'}`;
+    for (const spec of specs) {
+      if (!spec) { s += ';-'; continue; }
+      s += ';';
+      for (const f of LAYOUT_FIELDS) if (spec[f] !== undefined) s += `${f}=${spec[f]},`;
+    }
+    return s;
+  };
+
+  /**
+   * Run the annotation layout pass, or hand back the previous answer when nothing that could
+   * change it has changed. Returns the specs actually to be drawn.
+   */
+  function laidOut(specs, opts) {
+    // Step 1 renders ONE ELEMENT of a dimension at a time (`only`). Half a dimension's boxes
+    // are not the dimension's boxes, so the pass stands down rather than lay out a fiction.
+    if (opts.layout === false || specs.some((s) => s && s.only)) {
+      lastLayout = { moves: [], unresolved: [], skipped: true };
+      return specs;
+    }
+    const sig = signature(specs, opts);
+    if (sig === memoKey) return memoOut;
+    const plan = planLayout(specs, opts);
+    memoKey = sig;
+    memoOut = plan.specs;
+    lastLayout = { moves: plan.moves, unresolved: plan.unresolved };
+    return plan.specs;
+  }
+
   function clear() {
     for (const obj of built) {
       obj.geometry?.dispose();
@@ -896,8 +885,13 @@ export function createDimensionLayer(options = {}) {
      * @param {Record<string, number>} [opts.progress] Per-spec reveal in 0..1 (default 1).
      * @returns {object[]} label descriptors
      */
-    draw(specs, opts = {}) {
+    draw(rawSpecs, opts = {}) {
       clear();
+      // THE SECOND LOOK. Before a single stroke is emitted, the annotations are checked against
+      // one another and whichever of a touching pair matters less is moved clear
+      // (dimensionLayout.js). Nothing about WHAT is measured changes — only where the
+      // apparatus that says so is drawn.
+      const specs = laidOut(rawSpecs, opts);
       const method = opts.method === 2 ? 2 : 1;
       const defaultTerm = opts.termination || 'open';
       const progress = opts.progress || null;
@@ -937,6 +931,10 @@ export function createDimensionLayer(options = {}) {
       }
       return labels;
     },
+
+    /** What the layout pass did on the last draw — every move it made, and anything it could
+     *  not resolve. Read by the verification harness; the lesson never consults it. */
+    layoutReport() { return lastLayout; },
 
     setResolution(w, h) {
       resolution.set(w, h);

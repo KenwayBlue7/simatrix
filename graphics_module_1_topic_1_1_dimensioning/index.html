@@ -368,6 +368,41 @@
     }
 
     /*
+      WHICH FIGURE IS ON THE SHEET. Top RIGHT — the one free corner: the view chips are top
+      left under the panel toggle, the orbit hint is bottom left and the caption band bottom
+      right. Deliberately quiet: it is a caption, not a control, and the drawing is the thing
+      being looked at. It states the figure and what it teaches, because the lesson's
+      progression from a plain rectangle to the Guide Plate is part of what is being taught —
+      a drawing that silently changes under the learner just looks like a bug.
+    */
+    .vp-figure {
+      position: absolute;
+      top: var(--space-4);
+      /* Clear of the 44 px panel toggle, which is pinned to this same corner. */
+      right: calc(44px + var(--space-4));
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      text-align: right;
+      gap: 2px;
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--color-paper) 88%, transparent);
+      border: 1px solid var(--color-border);
+      pointer-events: none;
+      z-index: 5;
+      max-width: min(46ch, 42%);
+    }
+    .vp-figure__name {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-ink);
+    }
+    .vp-figure__teaches { font-size: var(--text-xs); color: var(--color-ink-secondary); }
+
+    /*
       The name of a drawing, anchored in that drawing's OWN world space and therefore sitting
       directly beneath it. This replaces a strip of names pinned to the top of the viewport,
       which left the learner matching a label at the top of the screen to a drawing in the
@@ -391,6 +426,19 @@
       white-space: nowrap;
       color: var(--color-ink-secondary);
     }
+
+    /* Two things tell a Step-4 sheet apart — its method and its layout — so the caption stacks
+       them. Same pill, same type; the second line is quieter because the method is the axis the
+       step has just introduced and the layout is the one it already taught. */
+    .vp-sheet-name--stacked {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1px;
+      line-height: 1.25;
+    }
+    .vp-sheet-name__main { color: var(--color-ink); }
+    .vp-sheet-name__sub { opacity: 0.75; }
 
     /*
       Caption band — §4.5 item 6. The name of the object and the views, below the drawing, in
@@ -903,6 +951,9 @@
     .seg + .toggle,
     .select + .toggle { margin-top: var(--space-3); }
     .btn + .detail { margin-top: var(--space-3); }
+    /* Two selectors that answer ONE question — Step 4's "compare with", which needs a layout and
+       a method — sit closer than two separate questions do. Same reasoning as stacked accordions. */
+    .select + .select { margin-top: var(--space-2); }
     /* A fold that FOLLOWS ordinary content starts a new section; a fold that follows another
        fold is the next row of one list (see `.fold + .fold` above). */
     .detail + .fold, .compare-slot + .fold { margin-top: var(--space-4); }
@@ -1173,6 +1224,8 @@
     .detail dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: var(--space-2) var(--space-3); }
     .detail dt { font-weight: 700; color: var(--color-ink); }
     .detail dd { margin: 0; }
+    /* A closing line after a Why/Where list is a new thought, not another row of it. */
+    .detail dl + p { margin-top: var(--space-3); }
     .detail--verdict { background: var(--color-accent-soft); border-color: var(--color-accent); }
     .detail--wrong { background: var(--color-flag-wrong-soft); border-color: var(--color-flag-wrong); }
     .detail--right { background: var(--color-success-soft); border-color: var(--color-success); }
@@ -1183,6 +1236,20 @@
       font-weight: 700;
       color: var(--color-ink);
     }
+    /*
+      Step 4's method note. The shared `.detail dl` is a two-column grid, which is right for a
+      Why/Where pair of short labels and wrong here: these terms carry both names and a flag, so
+      the label column would take most of the width and squeeze the sentence beside it. Stacked
+      instead — term, then its one line — and the method NOT on the drawing is set quieter so the
+      live one reads first without either disappearing.
+    */
+    #method-note dl { display: block; }
+    #method-note dt { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; }
+    #method-note dd { color: var(--color-ink-secondary); }
+    #method-note dt + dd { margin-bottom: var(--space-3); }
+    #method-note dd:last-child { margin-bottom: 0; }
+    #method-note dt:not(.is-on) { color: var(--color-ink-secondary); }
+
     /* The line-type / figure reference under a detail heading. */
     .detail__meta {
       font-family: var(--font-mono);
@@ -1326,6 +1393,9 @@
     table.data--diff td:last-child, table.data--diff th:last-child { font-family: inherit; }
     /* The two sides of a comparison heading, held apart without a colour of their own. */
     .detail__vs { font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 400; color: var(--color-ink-secondary); }
+    /* The everyday word for a term whose official name is the heading. Quieter than the heading
+       and never bold, so the standard's term stays the one that reads as the name of the thing. */
+    .detail__alias { font-size: var(--text-xs); font-weight: 400; color: var(--color-ink-secondary); white-space: nowrap; }
 
     /* The BIS checklist that closes the lesson. */
     ol.checklist { margin: 0; padding-left: 1.3em; font-size: var(--text-sm); line-height: 1.5; color: var(--color-ink-secondary); }
@@ -1515,7 +1585,7 @@
   <!-- ============================================================
        Viewport — the Guide Plate drawing (canvas + CSS2D overlay)
        ============================================================ -->
-  <main id="sim-viewport" aria-label="Engineering drawing viewport. The Guide Plate, dimensioned. Drag to orbit into three dimensions.">
+  <main id="sim-viewport" aria-label="Engineering drawing viewport. The figure being dimensioned. Drag to orbit into three dimensions.">
     <button id="wizard-toggle" class="wizard-toggle" type="button" aria-controls="wizard" aria-expanded="true" title="Hide steps panel">
       <svg class="wizard-toggle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
         <path d="M9 6l6 6-6 6" />
@@ -1538,6 +1608,16 @@
       <button type="button" class="vp-chip" id="btn-hidden" aria-pressed="false" disabled
               title="Turn the plate first — the flat drawing already shows its hidden detail dashed">Reveal hidden lines</button>
     </div>
+
+    <!--
+      Which figure is on the sheet, and what it is here to teach. The lesson works through five
+      of them, simplest first, and a learner who is not told that just sees the drawing change
+      under them. Painted by main.js's updateFigureBadge().
+    -->
+    <p class="vp-figure" id="vp-figure">
+      <span class="vp-figure__name" id="vp-figure-name">Plain plate</span>
+      <span class="vp-figure__teaches" id="vp-figure-teaches"></span>
+    </p>
 
     <!-- §4.5 item 6 — the caption a finished class-work sheet carries. -->
     <div class="vp-caption" id="vp-caption" hidden>
@@ -1671,8 +1751,16 @@
                 <span class="group__label">How values are written</span>
                 <div class="seg" role="group" aria-label="How values are written">
                   <button type="button" class="seg__btn is-active" id="method-1" data-method="1" aria-pressed="true">Aligned</button>
-                  <button type="button" class="seg__btn" id="method-2" data-method="2" aria-pressed="false">Upright</button>
+                  <!-- "Unidirectional" is the term the standards, the textbook and the exam use.
+                       The learner-friendly synonym "upright" survives only inside the explanation
+                       card below, never as the label. -->
+                  <button type="button" class="seg__btn" id="method-2" data-method="2" aria-pressed="false">Unidirectional</button>
                 </div>
+                <!-- Same compare component, same fixed position under the step's own primary
+                     control, as Steps 4 and 6. Here it holds the SAME drawing in both value
+                     systems, which is the only honest way to compare them: switching between
+                     two drawings makes the learner remember the first one. -->
+                <div class="compare-slot" id="compare-slot-3"></div>
                 <!-- The verdict sits with the control that produces it, not at the end of the
                      panel — that is the module's rhythm everywhere else. -->
                 <div class="detail" id="method-detail" role="status"></div>
@@ -1683,7 +1771,7 @@
                 </span>
                 <span class="toggle__switch" aria-hidden="true"></span>
               </button>
-              <!-- Angles are an ALIGNED-only question — upright is level by definition. The group
+              <!-- Angles are an ALIGNED-only question — unidirectional is level by definition. The group
                    stays in place and says so rather than vanishing: a control that disappears
                    makes the learner wonder what they did, which is the same fault the compare
                    button had. -->
@@ -1693,7 +1781,7 @@
                   <button type="button" class="seg__btn is-active" data-angular="a" aria-pressed="true">Follow the curve</button>
                   <button type="button" class="seg__btn" data-angular="b" aria-pressed="false">Keep level</button>
                 </div>
-                <p class="step-hint" id="angular-note" hidden>Upright values are already level, so there is nothing to choose here.</p>
+                <p class="step-hint" id="angular-note" hidden>Unidirectional values are already level, so there is nothing to choose here.</p>
               </div>
             </div>
 
@@ -1705,14 +1793,26 @@
                      question, so they must not answer it with two different controls. -->
                 <div id="arrangement-select"></div>
               </div>
+              <div>
+                <!-- The SECOND axis of the same drawing. A layout says where the dimension lines
+                     go; a method says how the values on them are written, and the two choices are
+                     independent — which is exactly what a learner has to see. Same selector
+                     component again, directly under Layout, so the pair reads as one question
+                     asked twice. -->
+                <span class="group__label">Method</span>
+                <div id="method-select"></div>
+                <div class="detail" id="method-note" role="status"></div>
+              </div>
               <div class="chips" id="arrangement-variants" role="group" aria-label="Ways of drawing this layout" hidden></div>
               <!-- The compare control's fixed slot. Same component, same place, in Step 6 too. -->
               <div class="compare-slot" id="compare-slot-4"></div>
-              <!-- Which layout to hold beside the current one. Any of them, except the one
-                   already on the drawing. Same selector component as Layout above. -->
+              <!-- What to hold beside the current drawing: its own layout AND its own method, so
+                   the learner can hold one still and move the other. Same two selectors as above,
+                   in the same order. -->
               <div id="compare-with-group" hidden>
                 <span class="group__label">Compare with</span>
                 <div id="compare-select"></div>
+                <div id="compare-method-select"></div>
               </div>
               <div class="detail" id="arrangement-detail" role="status"></div>
               <div class="table-wrap" id="coordinate-table" hidden></div>

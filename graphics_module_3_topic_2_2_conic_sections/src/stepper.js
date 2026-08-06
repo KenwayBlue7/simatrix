@@ -20,10 +20,13 @@
  */
 const STEPS = [
   { n: 1, title: 'Meet the cone', lead: 'Picture an ice-cream cone. Spin it, stretch it, squash it — and notice one thing: how steeply its side slopes. That single angle decides everything that follows.' },
-  { n: 2, title: 'Cut it', lead: 'Now slice through it with a flat sheet, like a knife through the cone. The pink face left behind is the shape we are here to study. Tilt the cut and watch that shape change.' },
+  { n: 2, title: 'Cut it', lead: 'Now slice through it with a flat sheet, like a knife through the cone. The red face left behind is the shape we are here to study.' },
   { n: 3, title: 'Different cuts, different curves', lead: 'Six ways to cut, six shapes — and one turning point between them: the slope of the cone’s own side. Press each name and watch the plane travel there.' },
-  { n: 4, title: 'Why they differ', lead: 'Forget the cone for a moment. Every one of these curves is the path of a point that keeps its distance from a fixed point and a fixed line in the same ratio. Change the ratio, change the curve.' },
-  { n: 5, title: 'Drawing it on paper', lead: 'An engineer cannot slice a cone on a drawing sheet, so they plot a handful of points that obey that ratio and join them up. Watch it happen, then try the other standard methods.' },
+  { n: 4, title: 'Why they differ', lead: 'Where do the focus and the directrix actually come from? They are already inside the cone — a ball dropped in finds both. Walk the proof one press at a time; the drawing sheet follows it.' },
+  // The why → how hand-over is made ONCE, by the note at the head of the dock. This lead used
+  // to say the same thing again in different words, and the two together pushed the playback
+  // control off the foot of the panel (ADR-102).
+  { n: 5, title: 'Engineering drawing', lead: 'Watch each construction draw itself line by line, then step it at your own pace.' },
   { n: 6, title: 'Your turn', lead: 'The plane moves somewhere you did not choose. Look at the cut, decide which curve it is, then check yourself — and take on the chapter’s own exercises when you are ready.' },
 ];
 
@@ -91,9 +94,14 @@ export function initStepper(sim) {
     // problem", which still opens the library to choose a challenge).
     if (btnCompleteNext) {
       btnCompleteNext.hidden = currentStep !== TOTAL;
-      btnCompleteNext.textContent = sim.isProblemActive?.()
-        ? 'Complete & next problem'
-        : 'Pick a problem';
+      const solving = !!sim.isProblemActive?.();
+      btnCompleteNext.textContent = solving ? 'Complete & next problem' : 'Pick a problem';
+      // ONE loud action per step (DESIGN.md §5.1). On the last step "Set up a cut" is the
+      // exercise, so it owns the accent; this control is loud only when it COMPLETES something.
+      // Mid-problem it is the payoff and takes the accent back. In free play it is one of three
+      // routes to the same library (the card header and the body copy are the others), and three
+      // full-width blue buttons on one panel means none of them is the primary.
+      btnCompleteNext.classList.toggle('btn--primary', solving);
     }
   }
 

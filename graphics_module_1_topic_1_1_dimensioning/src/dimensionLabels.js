@@ -57,7 +57,7 @@ import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
  *   setLabels: (list: LabelDescriptor[]) => void,
  *   setHotspots: (list: { id: string, label: string, position: THREE.Vector3, state?: string }[]) => void,
  *   setCallout: (descriptor: CalloutDescriptor|null) => void,
- *   setSheetCaption: (descriptor: CalloutDescriptor|null) => void,
+ *   setSheetCaption: (descriptor: (CalloutDescriptor & { sub?: string })|null) => void,
  *   setFocus: (ids: Set<string>|null) => void,
  *   setVisible: (on: boolean) => void,
  *   setResolution: (w: number, h: number) => void,
@@ -238,7 +238,22 @@ export function createLabelLayer(scene, options = {}) {
       if (!descriptor) return;
       const el = document.createElement('span');
       el.className = 'vp-sheet-name';
-      el.textContent = descriptor.text;
+      // TWO LINES when the sheet is told apart by two things at once — Step 4 holds a method
+      // AND a layout, and "Method 1 · Parallel" on one line reads as a single compound name
+      // rather than as the two independent choices it is. Stacked, the learner can see at a
+      // glance which of the two is the same on both sheets and which is not.
+      if (descriptor.sub) {
+        el.classList.add('vp-sheet-name--stacked');
+        const main = document.createElement('span');
+        main.className = 'vp-sheet-name__main';
+        main.textContent = descriptor.text;
+        const sub = document.createElement('span');
+        sub.className = 'vp-sheet-name__sub';
+        sub.textContent = descriptor.sub;
+        el.append(main, sub);
+      } else {
+        el.textContent = descriptor.text;
+      }
       el.style.pointerEvents = 'none';
       const obj = new CSS2DObject(el);
       obj.position.copy(descriptor.position);

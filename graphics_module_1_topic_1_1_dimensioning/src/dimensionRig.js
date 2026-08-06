@@ -1,5 +1,12 @@
-// The subject of the lesson (Module 1 Topic 1.1 — Dimensioning): the Guide Plate solid
-// and its BIS line-alphabet linework.
+// The subject of the lesson (Module 1 Topic 1.1 — Dimensioning): ONE figure's solid and its
+// BIS line-alphabet linework.
+//
+// WHICH figure is an argument, not a decision this file makes. The lesson runs through five of
+// them, simplest first (see `FIGURES` in dimensionData.js), and every one is built by the code
+// below from the same three inputs — an outline, a feature map and a thickness. That is what
+// keeps a plain plate and the Guide Plate looking like the same drawing office drew them: one
+// set of line widths, one dash pattern, one chain pattern, one corner threshold. A figure that
+// has no slot simply never enters the slot branch; nothing is special-cased by figure id.
 //
 // This layer answers "what is the part?" — nothing about dimensions lives here. It builds:
 //   • the SOLID — one closed, manifold, hard-edged mesh generated from dimensionData's
@@ -8,10 +15,11 @@
 //     REAL geometry, not drawn-on circles, so orbiting the part never exposes a lie.
 //   • TYPE A linework — continuous wide: the visible outline + every feature opening on the
 //     front and back faces, plus the vertical corner edges of the prism.
-//   • TYPE E/F linework — dashed narrow: the ONE genuinely hidden outline in the front
-//     elevation, the countersink sunk in the FAR face. Rule 5 of the textbook's §4.6
-//     ("dimensions are to be given from visible outlines rather than from hidden lines")
-//     needs a real hidden line to argue against, so the part is designed to have exactly one.
+//   • TYPE E/F linework — dashed narrow: the genuinely hidden outline of a front elevation,
+//     which on both figures that have one is a countersink sunk in the FAR face. Rule 5 of the
+//     textbook's §4.6 ("dimensions are to be given from visible outlines rather than from
+//     hidden lines") needs a real hidden line to argue against, so those figures are designed
+//     to have exactly one and no more.
 //   • TYPE G linework — chain thin: the centre lines of every circular / symmetrical feature.
 //
 // Layering (ADR-007 / RULES.md §3.6): leaf module. It imports THREE, the fat-line addons,
@@ -29,8 +37,7 @@ import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
 import {
-  PLATE, FEATURES, HALF_DEPTH, BORE_MOUTH_DIA, SPIGOT_RECT,
-  outlinePoints, featurePoints, toWorld, toUnits,
+  DEFAULT_FIGURE, halfDepthOf, outlinePoints, featurePoints, toWorld, toUnits,
 } from './dimensionData.js';
 
 const rootStyle = getComputedStyle(document.documentElement);
@@ -196,9 +203,10 @@ function buildLines(positions, color, widthPx, resolution, { dashed = false } = 
 // ============================================================================
 
 /**
- * Build the Guide Plate rig: the solid + its Type A / E-F / G linework.
+ * Build one figure's rig: the solid + its Type A / E-F / G linework.
  *
  * @param {Object} [options]
+ * @param {object} [options.figure]   Which figure (see `FIGURES` in dimensionData.js).
  * @param {number} [options.width=1]  Drawing-buffer width  (LineMaterial.resolution)
  * @param {number} [options.height=1] Drawing-buffer height
  * @returns {{
@@ -218,39 +226,250 @@ function buildLines(positions, color, widthPx, resolution, { dashed = false } = 
  * }}
  */
 export function createRig(options = {}) {
-  const { width = 1, height = 1 } = options;
+  const { figure = DEFAULT_FIGURE, width = 1, height = 1 } = options;
   const resolution = new THREE.Vector2(width, height);
 
-  const zF = HALF_DEPTH;   // front face
-  const zB = -HALF_DEPTH;  // back face
+  const zF = halfDepthOf(figure);   // front face
+  const zB = -zF;                   // back face
 
   // --- Loops -----------------------------------------------------------------
-  const contour = toWorldLoop(outlinePoints());
-  const boreLoop = toWorldLoop(featurePoints(FEATURES.bore, CIRCLE_STEPS));
-  // The bore's front mouth is opened out by an internal chamfer (Fig. 4.26c): ø46 at the
-  // face, dropping back at 45° to the ø40 bore.
-  const boreMouthLoop = circleLoop(FEATURES.bore.at, BORE_MOUTH_DIA / 2);
-  const boreChamferDrop = toUnits(FEATURES.bore.chamfer.width); // 45° ⇒ axial = radial
-  const squareLoop = toWorldLoop(featurePoints(FEATURES.square));
-  const slotLoop = toWorldLoop(featurePoints(FEATURES.slot, CIRCLE_STEPS));
-  const drillLoop = circleLoop(FEATURES.cskHole.at, FEATURES.cskHole.dia / 2);
-  const cskLoop = circleLoop(FEATURES.cskHole.at, FEATURES.cskHole.countersink.dia / 2);
-  const sphereRim = circleLoop(FEATURES.sphere.at, FEATURES.sphere.dia / 2);
+  const contour = toWorldLoop(outlinePoints(figure));
 
-  // Countersink depth from the included angle: a 90° cone has 45° flanks, so the axial
-  // drop equals the radial step (textbook Fig. 4.27 — angle stated with the diameter).
-  const cskDepth = toUnits(
-    (FEATURES.cskHole.countersink.dia - FEATURES.cskHole.dia) / 2
-    / Math.tan((FEATURES.cskHole.countersink.angle / 2) * Math.PI / 180),
-  );
+  /**
+   * Openings punched through the FRONT cap and through the BACK cap, as separate lists.
+   *
+   * A feature machined from one side only appears in ONE of them, and that asymmetry is the
+   * whole reason the drawing has hidden detail at all: a countersink opened in the back face
+   * pierces the back cap and not the front, so from the front it lies behind solid material
+   * and is drawn dashed. Both figures that carry one are built by exactly this code.
+   */
+  const frontHoles = [];
+  const backHoles = [];
+  /** Wall builders, deferred so every cap can be triangulated before any wall is pushed. */
+  const wallJobs = [];
+  const visiblePos = [];     // Type A — continuous wide
+  const farSidePos = [];     // detail on the FAR face: dashed from the front, continuous turned over
+  const silhouettePos = [];  // lines that are edges in the elevation only (see below)
+  const centrePos = [];      // Type G — chain thin
+
+  /** A centre cross over one round or symmetrical feature. */
+  const chainCross = (atMm, halfMm) => {
+    const c = toWorld(atMm[0], atMm[1]);
+    const h = toUnits(halfMm) + CENTRE_OVERSHOOT;
+    pushChain(centrePos, c.x - h, c.y, c.x + h, c.y, zF);
+    pushChain(centrePos, c.x, c.y - h, c.x, c.y + h, zF);
+  };
+
+  for (const f of Object.values(figure.features || {})) {
+    // ---- a drilled or bored hole, in any of its three forms --------------------
+    if (f.kind === 'circle') {
+      const loop = toWorldLoop(featurePoints(f, CIRCLE_STEPS));
+
+      if (f.chamfer) {
+        // An internal chamfer at the FRONT mouth (Fig. 4.26c): the hole opens out at the face
+        // and drops back at 45° to its full depth, so it reads as TWO concentric circles.
+        const mouthDia = f.dia + f.chamfer.width * 2;
+        const mouthLoop = circleLoop(f.at, mouthDia / 2);
+        const drop = toUnits(f.chamfer.width);   // 45° ⇒ axial drop = radial step
+        frontHoles.push(reversed(mouthLoop));
+        backHoles.push(reversed(loop));
+        wallJobs.push((tris) => {
+          pushWall(tris, reversed(mouthLoop), zF, reversed(loop), zF - drop);
+          pushWall(tris, reversed(loop), zF - drop, reversed(loop), zB);
+        });
+        pushLoop(visiblePos, mouthLoop, zF);
+        pushLoop(visiblePos, loop, zF - drop);
+        pushLoop(visiblePos, loop, zB);
+        chainCross(f.at, mouthDia / 2);
+        continue;
+      }
+
+      if (f.countersink) {
+        // A cone widening the mouth on ONE face. Depth comes from the included angle: a 90°
+        // cone has 45° flanks, so the axial drop equals the radial step (Fig. 4.27).
+        const cs = f.countersink;
+        const cskLoop = circleLoop(f.at, cs.dia / 2);
+        const cskDepth = toUnits(
+          (cs.dia - f.dia) / 2 / Math.tan((cs.angle / 2) * Math.PI / 180),
+        );
+        const onBack = cs.side !== 'front';
+        frontHoles.push(reversed(onBack ? loop : cskLoop));
+        backHoles.push(reversed(onBack ? cskLoop : loop));
+        wallJobs.push((tris) => {
+          const drill = reversed(loop);
+          const csk = reversed(cskLoop);
+          if (onBack) {
+            pushWall(tris, drill, zF, drill, zB + cskDepth);
+            pushWall(tris, drill, zB + cskDepth, csk, zB);
+          } else {
+            pushWall(tris, csk, zF, drill, zF - cskDepth);
+            pushWall(tris, drill, zF - cskDepth, drill, zB);
+          }
+        });
+        if (onBack) {
+          // The drill is what you see from the front; the cone is what you do not. The two
+          // circles of the cone go in their own batch so the "Turn over" chip can swap them
+          // from dashed to continuous — if they did not change, that chip would be lying.
+          pushLoop(visiblePos, loop, zF);
+          pushLoop(farSidePos, cskLoop, zB);
+          pushLoop(farSidePos, loop, zB + cskDepth);
+        } else {
+          pushLoop(visiblePos, cskLoop, zF);
+          pushLoop(visiblePos, loop, zF - cskDepth);
+          pushLoop(visiblePos, loop, zB);
+        }
+        chainCross(f.at, cs.dia / 2);
+        continue;
+      }
+
+      // A plain through hole.
+      frontHoles.push(reversed(loop));
+      backHoles.push(reversed(loop));
+      wallJobs.push((tris) => pushWall(tris, reversed(loop), zF, reversed(loop), zB));
+      pushLoop(visiblePos, loop, zF);
+      pushLoop(visiblePos, loop, zB);
+      chainCross(f.at, f.dia / 2);
+      continue;
+    }
+
+    // ---- a square hole, and a slot: both straight through ----------------------
+    if (f.kind === 'square' || f.kind === 'slot') {
+      const loop = toWorldLoop(featurePoints(f, CIRCLE_STEPS));
+      frontHoles.push(reversed(loop));
+      backHoles.push(reversed(loop));
+      wallJobs.push((tris) => pushWall(tris, reversed(loop), zF, reversed(loop), zB));
+      pushLoop(visiblePos, loop, zF);
+      pushLoop(visiblePos, loop, zB);
+      if (f.kind === 'square') {
+        chainCross(f.at, f.side / 2);
+      } else {
+        // The slot gets one axis through both centres plus a cross at each end.
+        const [a, b] = f.centres;
+        const wa = toWorld(a[0], a[1]);
+        const wb = toWorld(b[0], b[1]);
+        const h = toUnits(f.width / 2) + CENTRE_OVERSHOOT;
+        pushChain(centrePos, wa.x - h, wa.y, wb.x + h, wb.y, zF);
+        pushChain(centrePos, wa.x, wa.y - h, wa.x, wa.y + h, zF);
+        pushChain(centrePos, wb.x, wb.y - h, wb.x, wb.y + h, zF);
+      }
+      continue;
+    }
+
+    // ---- a spherical seat: a blind bowl sunk into the FRONT face ---------------
+    if (f.kind === 'sphere') {
+      const rim = circleLoop(f.at, f.dia / 2);
+      frontHoles.push(reversed(rim));   // …and NOT the back cap: the bowl is blind
+      wallJobs.push((tris) => {
+        // Rings from the rim down to a small ring, then a triangle fan onto the pole — so
+        // there is never a zero-area triangle at the bottom (RULES.md §3.30).
+        const R = toUnits(f.radius);
+        const c = toWorld(f.at[0], f.at[1]);
+        const ringAt = (theta) => {
+          const r = R * Math.sin(theta);
+          const n = rim.length;
+          const ring = [];
+          for (let i = 0; i < n; i++) {
+            const a = (i / n) * Math.PI * 2;
+            ring.push({ x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a) * r });
+          }
+          return ring;
+        };
+        const zAt = (theta) => zF - R * Math.cos(theta);
+        let prevTheta = Math.PI / 2;
+        let prevLoop = reversed(ringAt(prevTheta));
+        for (let k = 1; k <= SPHERE_RINGS; k++) {
+          const theta = (Math.PI / 2) * (1 - k / SPHERE_RINGS);
+          if (k === SPHERE_RINGS) {
+            const pole = { x: c.x, y: c.y, z: zAt(0) };
+            for (let i = 0; i < prevLoop.length; i++) {
+              const j = (i + 1) % prevLoop.length;
+              pushTri(
+                tris,
+                { x: prevLoop[i].x, y: prevLoop[i].y, z: zAt(prevTheta) },
+                pole,
+                { x: prevLoop[j].x, y: prevLoop[j].y, z: zAt(prevTheta) },
+              );
+            }
+            break;
+          }
+          const loop = reversed(ringAt(theta));
+          pushWall(tris, prevLoop, zAt(prevTheta), loop, zAt(theta));
+          prevLoop = loop;
+          prevTheta = theta;
+        }
+      });
+      pushLoop(visiblePos, rim, zF);
+      chainCross(f.at, f.dia / 2);
+      continue;
+    }
+
+    // ---- a cylindrical spigot standing off the RIGHT end face ------------------
+    // Its axis lies IN the drawing plane, so the front elevation shows it as a RECTANGLE
+    // (textbook Fig. 4.21). Its base is sunk 1 mm INTO the plate so no face of the spigot is
+    // coincident with the plate's end wall (RULES.md §3.29 — coincident faces z-fight and are
+    // not manifold).
+    if (f.kind === 'cylinderX') {
+      const r = toUnits(f.dia / 2);
+      const cy = toWorld(0, f.at[1]).y;
+      const x0 = toWorld(f.at[0] - 1, 0).x;               // 1 mm embedded
+      const x1 = toWorld(f.at[0] + f.length, 0).x;
+      const faceX = toWorld(f.at[0], 0).x;                // where it breaks the plate's face
+      wallJobs.push((tris) => {
+        const ring = (x) => {
+          const out = [];
+          for (let i = 0; i < CIRCLE_STEPS; i++) {
+            const a = (i / CIRCLE_STEPS) * Math.PI * 2;
+            out.push({ x, y: cy + Math.cos(a) * r, z: Math.sin(a) * r });
+          }
+          return out;
+        };
+        const a = ring(x0);
+        const b = ring(x1);
+        for (let i = 0; i < CIRCLE_STEPS; i++) {
+          const j = (i + 1) % CIRCLE_STEPS;
+          // Wound so the generated normal points OUT of the cylinder. `ring()` walks θ
+          // anticlockwise in the (y, z) plane with the axis along +x, which is the opposite
+          // hand to pushWall's z-ordered convention — so the obvious winding here comes out
+          // inside-out. That is not cosmetic: an inward normal makes lineDrawer's sample bias
+          // push the silhouette's probe point INTO the metal, and the two long edges of the
+          // cylinder then classify as hidden from every direction.
+          pushTri(tris, a[i], b[j], b[i]);
+          pushTri(tris, a[i], a[j], b[j]);
+        }
+        // Free end cap (a fan), and a base cap so the solid stays closed.
+        const capB = { x: x1, y: cy, z: 0 };
+        const capA = { x: x0, y: cy, z: 0 };
+        for (let i = 0; i < CIRCLE_STEPS; i++) {
+          const j = (i + 1) % CIRCLE_STEPS;
+          pushTri(tris, capB, b[i], b[j]);
+          pushTri(tris, capA, a[j], a[i]);
+        }
+      });
+      // Its free end circle, which projects to the end line of the rectangle in the front view.
+      for (let i = 0; i < CIRCLE_STEPS; i++) {
+        const a0 = (i / CIRCLE_STEPS) * Math.PI * 2;
+        const a1 = ((i + 1) / CIRCLE_STEPS) * Math.PI * 2;
+        visiblePos.push(
+          x1, cy + Math.cos(a0) * r, Math.sin(a0) * r,
+          x1, cy + Math.cos(a1) * r, Math.sin(a1) * r,
+        );
+      }
+      // A cylinder has no edge along its length: those two lines are its SILHOUETTE, and a
+      // silhouette belongs to one direction of sight. Looking along the plate's axis they are
+      // exactly the long sides of the rectangle it projects to, and the drawing needs them.
+      // Swung into the pictorial they become a crease down a smooth surface, so they come off.
+      // That is a named-POSE switch, not per-edge classification — nothing is recomputed on
+      // orbit, so ADR-078 stands.
+      for (const s of [1, -1]) {
+        silhouettePos.push(faceX, cy + s * r, 0, x1, cy + s * r, 0);
+      }
+      // Its axis runs ALONG the rectangle — the giveaway that the rectangle is a cylinder.
+      pushChain(centrePos, faceX - CENTRE_OVERSHOOT, cy, x1 + CENTRE_OVERSHOOT, cy, 0);
+      continue;
+    }
+  }
 
   // --- Solid -----------------------------------------------------------------
-  // The FRONT cap is pierced by the Ø14 drill and the spherical seat's rim; the BACK cap is
-  // pierced by the Ø24 countersink mouth and NOT by the seat (it is blind). That asymmetry
-  // is the whole point: it puts exactly one hidden outline in the front elevation.
-  const frontHoles = [boreMouthLoop, drillLoop, squareLoop, slotLoop, sphereRim].map(reversed);
-  const backHoles = [boreLoop, cskLoop, squareLoop, slotLoop].map(reversed);
-
   const toVec2 = (loop) => loop.map((p) => new THREE.Vector2(p.x, p.y));
   const frontVerts = [contour, ...frontHoles].flat();
   const backVerts = [contour, ...backHoles].flat();
@@ -260,108 +479,8 @@ export function createRig(options = {}) {
   const tris = [];
   pushCap(tris, frontVerts, frontFaces, zF, false); // faces +Z
   pushCap(tris, backVerts, backFaces, zB, true);    // faces −Z
-
-  // Outer wall + the straight-through feature walls.
-  pushWall(tris, contour, zF, contour, zB);
-  for (const loop of [squareLoop, slotLoop].map(reversed)) {
-    pushWall(tris, loop, zF, loop, zB);
-  }
-  // The bore: chamfer cone at the front mouth (ø46 → ø40 over 3 mm), then the plain bore.
-  {
-    const mouth = reversed(boreMouthLoop);
-    const bore = reversed(boreLoop);
-    pushWall(tris, mouth, zF, bore, zF - boreChamferDrop);
-    pushWall(tris, bore, zF - boreChamferDrop, bore, zB);
-  }
-  // Countersunk hole: Ø14 cylinder from the front face down to the cone, then the 90° cone
-  // opening out to Ø24 at the back face.
-  {
-    const drill = reversed(drillLoop);
-    const csk = reversed(cskLoop);
-    pushWall(tris, drill, zF, drill, zB + cskDepth);
-    pushWall(tris, drill, zB + cskDepth, csk, zB);
-  }
-  // Spherical seat: a bowl of radius SR sunk into the FRONT face. Rings from the rim down
-  // to a small ring, then a triangle fan onto the pole — no zero-area triangles (§3.30).
-  {
-    const R = toUnits(FEATURES.sphere.radius);
-    const c = toWorld(FEATURES.sphere.at[0], FEATURES.sphere.at[1]);
-    const ringAt = (theta) => {
-      const r = R * Math.sin(theta);
-      const n = sphereRim.length;
-      const ring = [];
-      for (let i = 0; i < n; i++) {
-        const a = (i / n) * Math.PI * 2;
-        ring.push({ x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a) * r });
-      }
-      return ring;
-    };
-    const zAt = (theta) => zF - R * Math.cos(theta);
-    let prevTheta = Math.PI / 2;
-    let prevLoop = reversed(ringAt(prevTheta));
-    for (let k = 1; k <= SPHERE_RINGS; k++) {
-      const theta = (Math.PI / 2) * (1 - k / SPHERE_RINGS);
-      if (k === SPHERE_RINGS) {
-        // Fan onto the pole.
-        const pole = { x: c.x, y: c.y, z: zAt(0) };
-        for (let i = 0; i < prevLoop.length; i++) {
-          const j = (i + 1) % prevLoop.length;
-          pushTri(
-            tris,
-            { x: prevLoop[i].x, y: prevLoop[i].y, z: zAt(prevTheta) },
-            pole,
-            { x: prevLoop[j].x, y: prevLoop[j].y, z: zAt(prevTheta) },
-          );
-        }
-        break;
-      }
-      const loop = reversed(ringAt(theta));
-      pushWall(tris, prevLoop, zAt(prevTheta), loop, zAt(theta));
-      prevLoop = loop;
-      prevTheta = theta;
-    }
-  }
-
-  // Cylindrical spigot standing off the RIGHT end face, axis lying IN the drawing plane, so
-  // the front elevation shows it as a rectangle (textbook Fig. 4.21). Its base is sunk 1 mm
-  // INTO the plate so that no face of the spigot is coincident with the plate's end wall
-  // (RULES.md §3.29 — coincident faces z-fight and are not manifold).
-  const spigotR = toUnits(FEATURES.spigot.dia / 2);
-  const spigotCy = toWorld(0, FEATURES.spigot.at[1]).y;
-  const spigotX0 = toWorld(SPIGOT_RECT.x0 - 1, 0).x;   // 1 mm embedded
-  const spigotX1 = toWorld(SPIGOT_RECT.x1, 0).x;
-  const spigotFaceX = toWorld(SPIGOT_RECT.x0, 0).x;    // where it breaks the plate's face
-  {
-    const ring = (x) => {
-      const out = [];
-      for (let i = 0; i < CIRCLE_STEPS; i++) {
-        const a = (i / CIRCLE_STEPS) * Math.PI * 2;
-        out.push({ x, y: spigotCy + Math.cos(a) * spigotR, z: Math.sin(a) * spigotR });
-      }
-      return out;
-    };
-    const a = ring(spigotX0);
-    const b = ring(spigotX1);
-    for (let i = 0; i < CIRCLE_STEPS; i++) {
-      const j = (i + 1) % CIRCLE_STEPS;
-      // Wound so the generated normal points OUT of the cylinder. `ring()` walks θ
-      // anticlockwise in the (y, z) plane with the axis along +x, which is the opposite hand
-      // to pushWall's z-ordered convention — so the obvious winding here comes out inside-out.
-      // That is not cosmetic: an inward normal makes lineDrawer's sample bias push the
-      // silhouette's probe point INTO the metal, and the two long edges of the cylinder then
-      // classify as hidden from every direction — a permanently dashed spigot in the 3-D view.
-      pushTri(tris, a[i], b[j], b[i]);
-      pushTri(tris, a[i], a[j], b[j]);
-    }
-    // Free end cap (a fan), and a base cap so the solid stays closed.
-    const capB = { x: spigotX1, y: spigotCy, z: 0 };
-    const capA = { x: spigotX0, y: spigotCy, z: 0 };
-    for (let i = 0; i < CIRCLE_STEPS; i++) {
-      const j = (i + 1) % CIRCLE_STEPS;
-      pushTri(tris, capB, b[i], b[j]);
-      pushTri(tris, capA, a[j], a[i]);
-    }
-  }
+  pushWall(tris, contour, zF, contour, zB);         // the outer wall
+  for (const job of wallJobs) job(tris);            // …and every feature's own
 
   const geometry = new THREE.BufferGeometry(); // non-indexed, hard edges (RULES.md §3.14)
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(tris, 3));
@@ -390,38 +509,15 @@ export function createRig(options = {}) {
   mesh.renderOrder = 0;
   mesh.castShadow = false;
   mesh.receiveShadow = false;
-  mesh.name = 'Guide Plate';
+  mesh.name = figure.name;
 
   // --- Type A — continuous wide (visible outlines) ----------------------------
-  const visiblePos = [];
+  // Every feature has already contributed its own circles above; what is left is the outline
+  // itself, front and back, and the vertical edges of the prism between them.
   pushLoop(visiblePos, contour, zF);
   pushLoop(visiblePos, contour, zB);
-  for (const loop of [squareLoop, slotLoop]) {
-    pushLoop(visiblePos, loop, zF);
-    pushLoop(visiblePos, loop, zB);
-  }
-  // The bore reads as TWO concentric visible circles from the front: the ø46 chamfer mouth
-  // at the face, and the ø40 bore where the 3 × 45° chamfer runs out (Fig. 4.26c).
-  pushLoop(visiblePos, boreMouthLoop, zF);
-  pushLoop(visiblePos, boreLoop, zF - boreChamferDrop);
-  pushLoop(visiblePos, boreLoop, zB);
-  pushLoop(visiblePos, drillLoop, zF);      // the Ø14 drill, visible from the front
-  pushLoop(visiblePos, sphereRim, zF);      // the spherical seat's rim
-  // The spigot: its free end circle (which projects to the end line of the rectangle in the
-  // front view) plus the two silhouette generatrices that ARE that rectangle's long edges.
-  {
-    const n = CIRCLE_STEPS;
-    for (let i = 0; i < n; i++) {
-      const a0 = (i / n) * Math.PI * 2;
-      const a1 = ((i + 1) / n) * Math.PI * 2;
-      visiblePos.push(
-        spigotX1, spigotCy + Math.cos(a0) * spigotR, Math.sin(a0) * spigotR,
-        spigotX1, spigotCy + Math.cos(a1) * spigotR, Math.sin(a1) * spigotR,
-      );
-    }
-  }
-  // Vertical corner edges of the prism — only at genuine corners, so the fillet and the
-  // corner radius stay smooth instead of sprouting one edge per tessellation point.
+  // Vertical corner edges — only at genuine corners, so a fillet or a corner radius stays
+  // smooth instead of sprouting one edge per tessellation point.
   for (let i = 0; i < contour.length; i++) {
     const p = contour[i];
     const prev = contour[(i - 1 + contour.length) % contour.length];
@@ -434,61 +530,12 @@ export function createRig(options = {}) {
     if (Math.abs(turn) * 180 / Math.PI >= CORNER_DEG) visiblePos.push(p.x, p.y, zF, p.x, p.y, zB);
   }
 
-  // --- SILHOUETTE — the spigot's two long edges --------------------------------
-  // A cylinder has no edge along its length: those two lines are its SILHOUETTE, and a
-  // silhouette belongs to one direction of sight. Looking along the axis of the plate — the
-  // elevation, either way round — they are exactly the long sides of the rectangle the
-  // cylinder projects to, and the drawing needs them. Swung into the pictorial they become a
-  // crease down a smooth surface, so they come off. That is a named-POSE switch, not per-edge
-  // classification: nothing is recomputed on orbit, so ADR-078 stands.
-  const silhouettePos = [];
-  for (const s of [1, -1]) {
-    silhouettePos.push(spigotFaceX, spigotCy + s * spigotR, 0, spigotX1, spigotCy + s * spigotR, 0);
-  }
-
-  // --- The far-side countersink, drawn BOTH ways --------------------------------
-  // The same two circles either dashed or continuous. From the front they lie behind solid
-  // material and are hidden; turned over they are the near face and are visible. Swapping
-  // between them is the entire point of the "Turn over" chip — if the drawing did not change,
-  // the chip would be telling the learner something the sheet contradicts.
-  const farSidePos = [];
-  pushLoop(farSidePos, cskLoop, zB);              // the countersink mouth
-  pushLoop(farSidePos, drillLoop, zB + cskDepth); // where the cone runs out into the drill
-
   // --- Type E/F — dashed narrow -------------------------------------------------
-  // The far-side countersink is this part's only hidden detail, and it lives in its own
-  // batch above so it can be swapped; nothing else on the plate is ever hidden.
+  // Nothing else on any figure is ever hidden: the one genuinely hidden outline a front
+  // elevation carries is a feature machined in the FAR face, and that lives in `farSidePos`
+  // above so the "Turn over" chip can swap it from dashed to continuous. This batch stays
+  // empty, and `buildLines` returns null for it.
   const hiddenPos = [];
-
-  // --- Type G — chain thin (centre lines) -------------------------------------
-  const centrePos = [];
-  const chainCross = (atMm, halfMm) => {
-    const c = toWorld(atMm[0], atMm[1]);
-    const h = toUnits(halfMm) + CENTRE_OVERSHOOT;
-    pushChain(centrePos, c.x - h, c.y, c.x + h, c.y, zF);
-    pushChain(centrePos, c.x, c.y - h, c.x, c.y + h, zF);
-  };
-  chainCross(FEATURES.bore.at, BORE_MOUTH_DIA / 2);
-  {
-    // The spigot's axis lies in the drawing plane, so its centre line runs ALONG the
-    // rectangle — the giveaway that the rectangle is a cylinder (Fig. 4.21).
-    const y = spigotCy;
-    pushChain(centrePos, spigotFaceX - CENTRE_OVERSHOOT, y, spigotX1 + CENTRE_OVERSHOOT, y, 0);
-  }
-  chainCross(FEATURES.cskHole.at, FEATURES.cskHole.countersink.dia / 2);
-  chainCross(FEATURES.square.at, FEATURES.square.side / 2);
-  chainCross(FEATURES.sphere.at, FEATURES.sphere.dia / 2);
-  {
-    // The slot gets one axis through both centres plus a cross at each end.
-    const [a, b] = FEATURES.slot.centres;
-    const wa = toWorld(a[0], a[1]);
-    const wb = toWorld(b[0], b[1]);
-    const ov = toUnits(FEATURES.slot.width / 2) + CENTRE_OVERSHOOT;
-    pushChain(centrePos, wa.x - ov, wa.y, wb.x + ov, wb.y, zF);
-    const h = toUnits(FEATURES.slot.width / 2) + CENTRE_OVERSHOOT;
-    pushChain(centrePos, wa.x, wa.y - h, wa.x, wa.y + h, zF);
-    pushChain(centrePos, wb.x, wb.y - h, wb.x, wb.y + h, zF);
-  }
 
   const inkColor = cssColor('--color-ink');
   const hiddenColor = cssColor('--color-bench-grey');
@@ -502,7 +549,7 @@ export function createRig(options = {}) {
   const centre = buildLines(centrePos, centreColor, WIDTH_PX.centre, resolution);
 
   const group = new THREE.Group();
-  group.name = 'Guide Plate rig';
+  group.name = `${figure.name} rig`;
   group.add(mesh);
   for (const l of [outline, silhouette, hidden, farHidden, farVisible]) if (l) group.add(l);
   if (centre) { centre.visible = false; group.add(centre); }
@@ -666,9 +713,9 @@ export function createRig(options = {}) {
   };
 }
 
-/** Overall envelope of the rig in world units — used by main.js to frame the camera. */
-export const RIG_EXTENTS = Object.freeze({
-  halfLength: PLATE.length / 2 / 10,
-  halfHeight: PLATE.height / 2 / 10,
-  halfDepth: HALF_DEPTH,
+/** Overall envelope of one figure's rig in world units. */
+export const rigExtents = (figure) => Object.freeze({
+  halfLength: figure.plate.length / 2 / 10,
+  halfHeight: figure.plate.height / 2 / 10,
+  halfDepth: halfDepthOf(figure),
 });

@@ -63,8 +63,10 @@ export const TERMS = {
     def: 'The value lies along its own dimension line and turns with it, always staying readable from the bottom or the right of the sheet.',
   },
   method2: {
-    label: 'upright values',
-    def: 'Every value is written level, read from the bottom of the sheet. On a sloping or vertical line it breaks the line and sits in the gap.',
+    label: 'unidirectional values',
+    // The popover prints the DEFINITION alone, so the official term has to lead it — `label`
+    // is metadata and never reaches the learner. The everyday synonym closes the entry.
+    def: 'Unidirectional values stay horizontal whatever the angle of the dimension line, and are read from the bottom of the sheet. On a sloping or vertical line the value breaks the line and sits in the gap. You will also hear this called upright.',
   },
   chain: {
     label: 'chain',
@@ -128,6 +130,73 @@ export const LINE_TYPES = Object.freeze([
   { id: 'hidden', name: 'Hidden edge', type: 'Dashed line', use: 'An edge behind the surface. Never measure from one.' },
   { id: 'centre', name: 'Centre line', type: 'Chain line', use: 'The middle of a hole or a round feature.' },
 ]);
+
+/**
+ * THE TWO ACCEPTED SYSTEMS for writing a value (§4.2), and everything said about them.
+ *
+ * One source, because the same words have to appear in four places and must not drift: the
+ * segmented control, the explanation card, the side-by-side comparison, and the caption under
+ * each sheet when the two are held up together.
+ *
+ * `name` is the official term and the one the control is labelled with. `alias` is the everyday
+ * synonym, and it appears in exactly one place — quietly, beside the heading — because a learner
+ * who leaves knowing only the friendly word has been taught a term they cannot use in an exam.
+ *
+ * `across` / `sloping` / `read` are the three rows of the comparison. They are deliberately the
+ * SAME three questions for both systems, so the table can be read down a column or across a row
+ * and the difference falls out of the drawing rather than out of the prose.
+ *
+ * `label` is BOTH names — "Method 1 · Aligned" — and it is what a selector and a sheet caption
+ * are labelled with. The chapter itself numbers them (§4.2 Method-1 / Method-2) and a lecturer
+ * asks for "Method 1" out loud, so the number cannot be hidden; but a number alone says nothing
+ * about what changes on the paper, and the word is what the exam answer has to contain. Both,
+ * always, in that order. `use` is the one-line answer to "which do I use?" — see METHOD_CHOICE
+ * for the honest long form.
+ *
+ * @type {Record<1|2, { n:number, name:string, label:string, alias?:string, body:string,
+ *                      why:string, where:string, use:string, across:string, sloping:string,
+ *                      read:string }>}
+ */
+export const METHODS = Object.freeze({
+  1: Object.freeze({
+    n: 1,
+    name: 'Aligned',
+    label: 'Method 1 · Aligned',
+    use: 'The one most commonly used, and the one to draw in this course.',
+    body: 'Each value lies <b>along its own line</b>, just above it and in the middle.',
+    why: 'It reads with the feature it measures, so a sloping size never has to be hunted for.',
+    where: 'The usual choice on a hand-drawn sheet. Values are read from the bottom or the right.',
+    across: 'Above the line.',
+    sloping: 'Turns with the line.',
+    read: 'Bottom or right.',
+  }),
+  2: Object.freeze({
+    n: 2,
+    name: 'Unidirectional',
+    label: 'Method 2 · Unidirectional',
+    use: 'An accepted alternative. You will meet it on typed and CAD drawings.',
+    alias: 'also called upright',
+    body: 'Every value stays <b>horizontal</b> whatever the angle of its dimension line, and a sloping or vertical line <b>breaks</b> to make room for it. Read the whole sheet from the bottom.',
+    why: 'Nothing on the sheet has to be read sideways, so it survives copying and printing.',
+    where: 'The usual choice on typed or CAD drawings. Every value is read from the bottom.',
+    across: 'Above the line.',
+    sloping: 'Stays level; the line breaks.',
+    read: 'Bottom only.',
+  }),
+});
+
+/**
+ * Which system this course draws in, and the honest reason — shown under the comparison.
+ *
+ * BOTH ARE CORRECT, and the wording has to keep saying so: a student who is told one is "right"
+ * will mark the other wrong in an exam that accepts it. What is true is that the textbook, the
+ * board work and the worked examples they will be set are all aligned, so that is the one to
+ * practise; and that every CAD package they will later touch is unidirectional.
+ */
+export const METHOD_CHOICE = Object.freeze({
+  preferred: 1,
+  note: 'Both are accepted. This course — like the textbook and the examples you will be set — draws <b>aligned</b>, so that is the one to practise. Unidirectional is not a lesser method: it is what typed and CAD drawings use, and you will read plenty of it. What you must never do is mix the two on one drawing.',
+});
 
 /**
  * The six guided steps.
@@ -207,7 +276,7 @@ export const STEPS = [
     lead: 'Two ways to place a number. Pick one and stay with it.',
     body: {
       open: [
-        `<b>What it is:</b> values are written either <button type="button" class="term" data-t="method1">aligned</button> — lying along their own line — or <button type="button" class="term" data-t="method2">upright</button>, all level.`,
+        `<b>What it is:</b> values are written either <button type="button" class="term" data-t="method1">aligned</button> — lying along their own line — or <button type="button" class="term" data-t="method2">unidirectional</button> — all level, whatever the line does.`,
         `<b>Why we use it:</b> the reader has to know which way up a number will be before they start.`,
         `Switch between the two and watch every value on the plate change with you.`,
       ],
@@ -219,7 +288,7 @@ export const STEPS = [
       title: 'Remember',
       points: [
         'Aligned: the value lies along its line and turns with it, always read from the bottom or the right.',
-        'Upright: every value stays level, and breaks a sloping or vertical line to sit in the gap.',
+        'Unidirectional (upright): every value stays horizontal, and breaks a sloping or vertical line to sit in the gap.',
         'Angles can follow the curve, or simply be written level — level is easier.',
         'Never mix the two on one drawing.',
       ],
@@ -234,10 +303,10 @@ export const STEPS = [
       open: [
         `<b>What it is:</b> the standard ways of laying dimensions out — end to end, side by side from one edge, a mix of both, stacked on one line, or moved off the drawing into a table.`,
         `<b>Why we use it:</b> the layout is chosen for the job, not for looks. One of them lets errors add up.`,
-        `Pick a layout and watch the same features get re-measured.`,
+        `Pick a layout and watch the same features get re-measured. The method — how the values themselves are written — is a separate choice, and it is here too.`,
       ],
       postBody: [
-        `<b>How it is drawn:</b> hold two layouts side by side and judge them on space, clarity, and how the part will actually be made.`,
+        `<b>How it is drawn:</b> hold two drawings side by side and judge them on space, clarity, and how the part will actually be made. Change one thing at a time: the same layout in both methods, or the same method in two layouts.`,
       ],
     },
     summary: {
@@ -248,6 +317,7 @@ export const STEPS = [
         'Combined — the everyday choice: parallel where it matters, chain where it does not.',
         'Running — parallel squeezed onto one line. Mark the start, arrow only the far end.',
         'Co-ordinates — no dimension lines; the numbers move to a table.',
+        'Layout and method are independent. Any layout can be drawn in either method — Method 1 for this course.',
       ],
     },
   },

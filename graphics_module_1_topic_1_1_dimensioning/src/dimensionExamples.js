@@ -19,21 +19,28 @@
 // outline), the same frame `dimensionData.js` describes the geometry in.
 
 import {
-  PLATE, FEATURES, SLOT_LENGTH, BORE_MOUTH_DIA, SPIGOT_RECT, CROWN_CENTRE,
+  FIGURES, PLATE, FEATURES, SLOT_LENGTH, BORE_MOUTH_DIA, SPIGOT_RECT, CROWN_CENTRE, lanesFor,
 } from './dimensionData.js';
 
 const F = FEATURES;
 const CSK = F.cskHole.countersink;
 
-/** Where dimension lines are parked, in mm, measured off the part. §4.3 asks for at least
- *  5–6 mm of clearance; these rows are generously outside that so the sheet reads calmly.
- *  `right1` clears the cylindrical spigot, which stands 26 mm off the right end face. */
-export const LANE = Object.freeze({
-  below1: -14, below2: -28, below3: -42, below4: -56, below5: -70,
-  left1: -14, left2: -28, left3: -42,
-  above1: PLATE.height + 14,
-  right1: PLATE.length + F.spigot.length + 14,
-});
+// The figures the earlier steps are set on, and their dimension lanes. Every drawing below
+// reads its sizes off the figure it is drawn on, so moving a hole moves its dimension too and
+// no number in this file is ever typed twice.
+const PLAIN = FIGURES.plate;         // Step 1 — the anatomy and the space study
+const HOLED = FIGURES.hole;          // Step 1's leader study; Step 2's rules
+const SLOTTED = FIGURES.slot;        // Step 4 — the layouts
+const CHAMFERED = FIGURES.chamfer;   // Step 3 — the two value systems
+
+const L1 = lanesFor(PLAIN);
+const L2 = lanesFor(HOLED);
+const L3 = lanesFor(SLOTTED);
+const L4 = lanesFor(CHAMFERED);
+
+/** The GUIDE PLATE's lanes — Steps 5 and 6. `right1` clears the cylindrical spigot, which
+ *  stands 26 mm off the right end face. */
+export const LANE = lanesFor(FIGURES.guide);
 
 /** A point on a circle of radius r about `c`, at `deg`. */
 const onCircle = (c, r, deg) => [
@@ -49,29 +56,33 @@ const SPIGOT_MID_X = (SPIGOT_RECT.x0 + SPIGOT_RECT.x1) / 2;
 // ============================================================================
 
 /**
- * The small starter drawing Step 1 animates onto the undimensioned plate. Four dimensions,
- * chosen so that between them they contain every element §4.1 lists.
+ * The small starter drawing Step 1 animates onto the undimensioned PLAIN PLATE. Three
+ * dimensions, chosen so that between them they contain every element §4.1 lists — and no more
+ * than three, because this is the first dimensioned drawing the learner ever reads.
+ *
+ * WHY A NOTE ON A PLAIN RECTANGLE. §4.1 counts the note among the elements, and the chapter's
+ * own examples of one are "a chamfer, a countersink, a MATERIAL" — so a plate with no features
+ * at all can still carry an honest one, on a leader that ends in a dot because the note is
+ * about the face itself. Nothing is added to the geometry to make the point.
  * @returns {object[]}
  */
 export function anatomyDrawing() {
+  const P = PLAIN.plate;
   return [
     {
       id: 'a-len', kind: 'linear', axis: 'x',
-      from: [0, 0], to: [PLATE.length, 0], at: LANE.below1, text: String(PLATE.length),
+      from: [0, 0], to: [P.length, 0], at: L1.below1, text: String(P.length),
     },
     {
       id: 'a-ht', kind: 'linear', axis: 'y',
-      from: [0, 0], to: [12, PLATE.height], at: LANE.left1, text: String(PLATE.height),
+      from: [0, 0], to: [0, P.height], at: L1.left1, text: String(P.height),
     },
     {
-      id: 'a-bore', kind: 'diameter', mode: 'leader',
-      centre: F.bore.at, diaMm: F.bore.dia, dirDeg: 55, lengthMm: 26, barMm: 14,
-      text: `ø${F.bore.dia}`,
-    },
-    {
-      id: 'a-chamfer', kind: 'leader',
-      anchor: [195, 45], dirDeg: 40, lengthMm: 26, barMm: 14, head: 'arrow',
-      text: `${PLATE.chamfer} × 45°`,
+      // Dot, knee, bar and note all INSIDE the outline: a dot has to sit clearly on the face
+      // it is about, and a bar that ran out past the right-hand edge would cross it.
+      id: 'a-note', kind: 'leader',
+      anchor: [66, 46], dirDeg: 40, lengthMm: 24, barMm: 14, head: 'dot',
+      text: `MS PLATE\n${P.thickness} THICK`,
     },
   ];
 }
@@ -97,14 +108,14 @@ export const ELEMENTS = Object.freeze([
   {
     id: 'leader', name: 'Leader line', type: 'Thin line',
     blurb: 'Points at something a dimension line cannot reach — a hole, a chamfer, a note. Comes off at 30° or steeper.',
-    parts: [{ specId: 'a-bore', only: 'leader' }, { specId: 'a-chamfer', only: 'leader' }],
+    parts: [{ specId: 'a-note', only: 'leader' }],
   },
   {
     id: 'termination', name: 'Arrow head', type: 'Thick line',
     blurb: 'How each end of the dimension line is closed — an arrow, a slash or a dot. One style per drawing, and the only thick thing here.',
     parts: [
       { specId: 'a-len', only: 'termination' }, { specId: 'a-ht', only: 'termination' },
-      { specId: 'a-bore', only: 'termination' }, { specId: 'a-chamfer', only: 'termination' },
+      { specId: 'a-note', only: 'termination' },
     ],
   },
   {
@@ -115,7 +126,7 @@ export const ELEMENTS = Object.freeze([
   {
     id: 'note', name: 'Note', type: 'Lettering on a leader',
     blurb: 'A few words a dimension line cannot carry — a chamfer, a countersink, a material. It sits on a short bar at the end of its leader.',
-    parts: [{ specId: 'a-chamfer', only: 'note' }, { specId: 'a-bore', only: 'note' }],
+    parts: [{ specId: 'a-note', only: 'note' }],
   },
 ]);
 
@@ -123,57 +134,68 @@ export const ELEMENTS = Object.freeze([
 export const ELEMENT_PARTS = Object.freeze(['extension', 'dimline', 'leader', 'termination', 'note', 'text']);
 
 /**
- * Step 1's leader-head study (Fig. 4.4). The SAME note is taken to three different things,
- * and each thing demands a different head: a surface wants a dot, an edge wants an arrow,
- * a dimension line wants neither.
+ * Step 1's leader-head study (Fig. 4.4), on the PLATE WITH A HOLE. The same kind of note is
+ * taken to three different things, and each thing demands a different head: a surface wants a
+ * dot, an edge wants an arrow, a dimension line wants neither.
+ *
+ * The study borrows the holed figure because two of its three cases need a feature: an arrow
+ * has to land on an EDGE, and the no-head case has to land on a DIMENSION LINE — which means
+ * there has to be a size on the sheet worth qualifying. A plain rectangle can only show the dot.
+ *
  * @param {'dot'|'arrow'|'none'} head
  * @returns {object[]}
  */
 export function leaderDemo(head) {
+  const H = HOLED.features.hole;
   const base = { id: 'ld', kind: 'leader', barMm: 14, dirDeg: 55, text: 'note' };
   if (head === 'dot') {
     return [{
       ...base, head: 'dot', text: 'GROUND',
-      anchor: [150, 40], lengthMm: 34,
+      anchor: [96, 24], lengthMm: 34,
     }];
   }
   if (head === 'none') {
+    // The note qualifies the SIZE, not the feature — which is exactly why it lands on the
+    // dimension line and takes no head there. The dimension line already has its own two ends.
     return [
       {
         id: 'ld-dim', kind: 'linear', axis: 'x',
-        from: [F.slot.centres[0][0] - F.slot.width / 2, F.slot.at[1]],
-        to: [F.slot.centres[1][0] + F.slot.width / 2, F.slot.at[1]],
-        at: LANE.below1, text: String(SLOT_LENGTH),
+        from: [0, 0], to: H.at, at: L2.below1, text: String(H.at[0]),
       },
       {
-        ...base, head: 'none', text: '2 SLOTS',
-        anchor: [F.slot.at[0], LANE.below1], lengthMm: 34, dirDeg: -50, barMm: 14,
+        ...base, head: 'none', text: 'AFTER\nPLATING',
+        anchor: [H.at[0] / 2, L2.below1], lengthMm: 30, dirDeg: -55, barMm: 14,
       },
     ];
   }
   return [{
-    ...base, head: 'arrow', text: `ø${F.bore.dia}`,
-    anchor: onCircle(F.bore.at, F.bore.dia / 2, 55), lengthMm: 30,
+    ...base, head: 'arrow', text: `ø${H.dia}`,
+    anchor: onCircle(H.at, H.dia / 2, 55), lengthMm: 30,
   }];
 }
 
 /**
- * Step 1's space study (Figs. 4.7 and 4.8). One dimension whose two projection lines the
- * learner can squeeze together, so the termination has to change to survive it. The specs
- * are built from `fitDecision()`'s verdict in dimensionUI, which is the actual rule.
+ * Step 1's space study (Figs. 4.7 and 4.8), on the PLAIN PLATE. One dimension whose two
+ * projection lines the learner can squeeze together, so the termination has to change to
+ * survive it. The specs are built from `fitDecision()`'s verdict in dimensionUI, which is the
+ * actual rule.
+ *
+ * It is parked above the top edge, where it is the only thing on the sheet: watching an arrow
+ * head give way is hard enough without a second dimension in the frame.
  *
  * @param {number} spanMm     How far apart the projection lines are.
  * @param {object} decision   The verdict from dimensionDraw's `fitDecision()`.
  * @returns {object[]}
  */
 export function spaceDemo(spanMm, decision) {
-  const cx = 150;
+  const P = PLAIN.plate;
+  const cx = P.length / 2;
   const half = spanMm / 2;
   return [
     {
       id: 'sp', kind: 'linear', axis: 'x',
-      from: [cx - half, PLATE.stepHeight], to: [cx + half, PLATE.stepHeight],
-      at: PLATE.stepHeight + 16, text: String(Math.round(spanMm)),
+      from: [cx - half, P.height], to: [cx + half, P.height],
+      at: P.height + 16, text: String(Math.round(spanMm)),
       arrowsOutside: decision.arrowsOutside,
       termination: decision.termination,
     },
@@ -185,23 +207,68 @@ export function spaceDemo(spanMm, decision) {
 // ============================================================================
 
 /**
- * A compact set that contains a horizontal, a vertical, an inclined and an angular
- * dimension — the four cases where Method-1 and Method-2 visibly differ (§4.2).
+ * The CHAMFERED plate, measured five ways — a horizontal, a vertical, an inclined and an
+ * angular dimension plus a note on a leader. Those are exactly the cases where the two value
+ * systems differ, and the reason this step is set on this figure: on a horizontal dimension
+ * line the two systems draw the identical thing, so a plain rectangle cannot show the
+ * difference at all.
+ *
+ * The same list is drawn on BOTH sheets of the step's comparison, in the two systems, so the
+ * only difference between the two drawings is the one the step is about.
+ *
+ * WHERE EACH ONE SITS, AND WHY. Four dimensions want the bottom-right corner of this sheet and
+ * the corner the chamfer cuts away is only 20 mm square, so the cluster is laid out in the
+ * order of how little freedom each annotation has:
+ *   1 the chamfer face's own INCLINED dimension can only lie parallel to that face, a set
+ *     distance off it — it stays where it is, at the textbook's own offset;
+ *   2 the ANGLE has to live in the wedge between the two faces, so its arc is drawn small
+ *     enough to sit wholly inside that wedge and clear of the inclined dimension line;
+ *   3 the RISE moves out to the second right-hand lane, leaving the inclined dimension's far
+ *     arrow head the room it needs;
+ *   4 the OVERALL LENGTH moves ABOVE the part. Measured from below, its right-hand projection
+ *     line has to spring from [130, 0] — a point in the empty air the chamfer removed — and run
+ *     straight down through the one place the inclined dimension has to pass. Above the part
+ *     it springs off the real top corners, crosses nothing, and gives the sheet the top-edge
+ *     weight it was missing.
  * @returns {object[]}
  */
 export function methodDrawing() {
+  const P = CHAMFERED.plate;
+  const H = CHAMFERED.features.hole;
+  const chamferStart = P.length - P.chamfer;   // where the bottom edge stops
   return [
-    { id: 'm-len', kind: 'linear', axis: 'x', from: [0, 0], to: [PLATE.length, 0], at: LANE.below1, text: String(PLATE.length) },
-    { id: 'm-ht', kind: 'linear', axis: 'y', from: [0, 0], to: [12, PLATE.height], at: LANE.left1, text: String(PLATE.height) },
-    { id: 'm-step', kind: 'linear', axis: 'y', from: [PLATE.length, 0], to: [PLATE.length, PLATE.stepHeight], at: LANE.right1, text: String(PLATE.stepHeight) },
+    { id: 'm-len', kind: 'linear', axis: 'x', from: [0, P.height], to: [P.length, P.height], at: L4.above1, text: String(P.length) },
+    { id: 'm-ht', kind: 'linear', axis: 'y', from: [0, 0], to: [0, P.height], at: L4.left1, text: String(P.height) },
+    { id: 'm-rise', kind: 'linear', axis: 'y', from: [P.length, 0], to: [P.length, P.chamfer], at: L4.right1, text: String(P.chamfer) },
     {
       // The chamfer face itself — an INCLINED dimension line, the case Fig. 4.10 is about.
+      //
+      // WHY 30 AND NOT THE USUAL 14. A dimension line parallel to a 45° face crosses the bottom
+      // edge's own level at x = 110 + offset × √2, and from x = 130 outwards that level belongs
+      // to the rise's lower projection line. There are therefore only two offsets that do not
+      // cross it: hard in against the face, or clear out past the end of that projection line.
+      // Hard in leaves the 45° nowhere to be lettered — the corner the chamfer removed is only
+      // 20 mm square, and an arc, a value and a dimension line will not fit in it three deep.
+      // So this one goes out. Its two projection lines run long and parallel into the empty
+      // paper below the plate, and the whole wedge is left to the angle.
       id: 'm-chamfer', kind: 'linear', axis: 'aligned',
-      from: [PLATE.length, 40], to: [PLATE.length - PLATE.chamfer, PLATE.stepHeight], at: -14,
-      text: String(Math.round(Math.SQRT2 * PLATE.chamfer)),
+      from: [chamferStart, 0], to: [P.length, P.chamfer], at: -30,
+      text: String(Math.round(Math.SQRT2 * P.chamfer)),
     },
-    { id: 'm-angle', kind: 'angular', vertex: [PLATE.length, 40], radiusMm: 26, fromDeg: 90, toDeg: 135, text: '45°' },
-    { id: 'm-bore', kind: 'diameter', mode: 'inside', centre: F.bore.at, diaMm: F.bore.dia, dirDeg: 30, text: `ø${F.bore.dia}` },
+    // The 45° between the chamfer face and the bottom face it cuts away from. The arc falls
+    // OUTSIDE the material, in the corner the chamfer removed — and at R17 it stays inside that
+    // corner: it stops 6 mm short of the rise's lower projection line rather than landing an
+    // arrow head on it, and leaves room outside itself for the value.
+    // `legs: 'from'` extends the BOTTOM edge out to meet the arc. The chamfer face carries the
+    // other end of the arc itself, so only this one needs a projection line — without it the
+    // 0° arrow head would terminate on nothing, the bottom edge having stopped 14 mm short.
+    {
+      id: 'm-angle', kind: 'angular', vertex: [chamferStart, 0], radiusMm: 14,
+      fromDeg: 0, toDeg: 45, legs: 'from', text: '45°',
+    },
+    // The note is kept short so its bar and lettering stay well inside the top edge rather than
+    // printing across it (§4.6 rule 3 — a note crosses nothing, least of all an outline).
+    { id: 'm-hole', kind: 'diameter', mode: 'leader', centre: H.at, diaMm: H.dia, dirDeg: 125, lengthMm: 20, barMm: -14, text: `ø${H.dia}` },
   ];
 }
 
@@ -213,7 +280,7 @@ export function methodDrawing() {
  * @returns {object[]}
  */
 export function obliqueClock() {
-  const c = [PLATE.length / 2, PLATE.stepHeight + 6];
+  const c = [CHAMFERED.plate.length / 2, CHAMFERED.plate.height / 2];
   const r = 34;
   const out = [];
   for (let i = 0; i < 8; i++) {
@@ -232,15 +299,21 @@ export function obliqueClock() {
 // STEP 4 — arrangements of dimension lines (§4.3)
 // ============================================================================
 
+// Step 4 is set on the SLOTTED plate. A layout question needs several features strung along
+// one edge before chain, parallel, running and co-ordinates mean anything at all — and three
+// features plus the two end faces is the fewest that tells all five layouts apart. The Guide
+// Plate would answer the same question with nine features and a spigot in the way.
+const S4 = SLOTTED.features;
+
 /** The x station of every located feature, plus the two faces, left to right. */
 const STATIONS = Object.freeze([
   { x: 0, label: 'left face' },
-  ...[F.cskHole, F.square, F.slot, F.sphere].map((f) => ({ x: f.at[0], y: f.at[1], label: f.label })),
-  { x: PLATE.length, label: 'right face' },
+  ...[S4.holeA, S4.slot, S4.holeB].map((f) => ({ x: f.at[0], y: f.at[1], label: f.label })),
+  { x: SLOTTED.plate.length, label: 'right face' },
 ]);
 
 /** Vertical stations for the two-direction running case. */
-const Y_STATIONS = Object.freeze([0, F.cskHole.at[1], F.bore.at[1], PLATE.height]);
+const Y_STATIONS = Object.freeze([0, S4.slot.at[1], S4.holeA.at[1], SLOTTED.plate.height]);
 
 function chainSpecs() {
   const out = [];
@@ -250,14 +323,14 @@ function chainSpecs() {
     out.push({
       id: `ch-${i}`, kind: 'linear', axis: 'x',
       from: [a.x, a.y ?? 0], to: [b.x, b.y ?? 0],
-      at: LANE.below1, text: String(Math.round(b.x - a.x)),
+      at: L3.below1, text: String(Math.round(b.x - a.x)),
     });
   }
   return out;
 }
 
 function parallelSpecs() {
-  const lanes = [LANE.below1, LANE.below2, LANE.below3, LANE.below4, LANE.below5];
+  const lanes = [L3.below1, L3.below2, L3.below3, L3.below4, L3.below5];
   return STATIONS.slice(1).map((s, i) => ({
     id: `pl-${i}`, kind: 'linear', axis: 'x',
     from: [0, 0], to: [s.x, s.y ?? 0],
@@ -266,13 +339,13 @@ function parallelSpecs() {
 }
 
 function combinedSpecs() {
-  // Fig. 4.16 — chain and parallel used together where each suits the feature.
+  // Fig. 4.16 — chain and parallel used together where each suits the feature. The two holes
+  // go on the datum because their positions matter; the slot rides the chain off the first.
   return [
-    { id: 'cb-0', kind: 'linear', axis: 'x', from: [0, 0], to: [F.cskHole.at[0], F.cskHole.at[1]], at: LANE.below1, text: String(F.cskHole.at[0]) },
-    { id: 'cb-1', kind: 'linear', axis: 'x', from: [F.cskHole.at[0], F.cskHole.at[1]], to: [F.square.at[0], F.square.at[1]], at: LANE.below1, text: String(F.square.at[0] - F.cskHole.at[0]) },
-    { id: 'cb-2', kind: 'linear', axis: 'x', from: [0, 0], to: [F.slot.at[0], F.slot.at[1]], at: LANE.below2, text: String(F.slot.at[0]) },
-    { id: 'cb-3', kind: 'linear', axis: 'x', from: [0, 0], to: [F.sphere.at[0], F.sphere.at[1]], at: LANE.below3, text: String(F.sphere.at[0]) },
-    { id: 'cb-4', kind: 'linear', axis: 'x', from: [0, 0], to: [PLATE.length, 0], at: LANE.below4, text: String(PLATE.length) },
+    { id: 'cb-0', kind: 'linear', axis: 'x', from: [0, 0], to: [S4.holeA.at[0], S4.holeA.at[1]], at: L3.below1, text: String(S4.holeA.at[0]) },
+    { id: 'cb-1', kind: 'linear', axis: 'x', from: [S4.holeA.at[0], S4.holeA.at[1]], to: [S4.slot.at[0], S4.holeA.at[1]], at: L3.below1, text: String(S4.slot.at[0] - S4.holeA.at[0]) },
+    { id: 'cb-2', kind: 'linear', axis: 'x', from: [0, 0], to: [S4.holeB.at[0], S4.holeB.at[1]], at: L3.below2, text: String(S4.holeB.at[0]) },
+    { id: 'cb-3', kind: 'linear', axis: 'x', from: [0, 0], to: [SLOTTED.plate.length, 0], at: L3.below3, text: String(SLOTTED.plate.length) },
   ];
 }
 
@@ -283,11 +356,11 @@ function combinedSpecs() {
  */
 function runningSpecs(twoDirection, style = 'b') {
   const turned = style === 'a';
-  const out = [{ id: 'rn-origin', kind: 'origin', at: [0, LANE.below1] }];
+  const out = [{ id: 'rn-origin', kind: 'origin', at: [0, L3.below1] }];
   STATIONS.slice(1).forEach((s, i) => {
     out.push({
       id: `rn-${i}`, kind: 'linear', axis: 'x',
-      from: [0, 0], to: [s.x, s.y ?? 0], at: LANE.below1,
+      from: [0, 0], to: [s.x, s.y ?? 0], at: L3.below1,
       text: String(Math.round(s.x)),
       terminationEnds: 'far', textAt: 'far',
       textStyle: turned ? 'rotated' : undefined,
@@ -295,11 +368,11 @@ function runningSpecs(twoDirection, style = 'b') {
   });
   if (!twoDirection) return out;
 
-  out.push({ id: 'rn-vorigin', kind: 'origin', at: [LANE.left1, 0] });
+  out.push({ id: 'rn-vorigin', kind: 'origin', at: [L3.left1, 0] });
   Y_STATIONS.slice(1).forEach((y, i) => {
     out.push({
       id: `rnv-${i}`, kind: 'linear', axis: 'y',
-      from: [0, 0], to: [y === PLATE.height ? 12 : 0, y], at: LANE.left1,
+      from: [0, 0], to: [0, y], at: L3.left1,
       text: String(Math.round(y)),
       terminationEnds: 'far', textAt: 'far',
       textStyle: turned ? 'rotated' : undefined,
@@ -313,7 +386,7 @@ function runningSpecs(twoDirection, style = 'b') {
  * @param {'a'|'b'|'c'} form  Which of the figure's three representations to draw.
  */
 function coordinateSpecs(form = 'a') {
-  const pts = [F.cskHole, F.square, F.slot, F.sphere];
+  const pts = [S4.holeA, S4.slot, S4.holeB];
   const out = [{ id: 'co-origin', kind: 'origin', at: [0, 0] }];
   pts.forEach((f, i) => {
     out.push(form === 'b'
@@ -335,6 +408,7 @@ function coordinateSpecs(form = 'a') {
  *   id:string, name:string, fig:string, use:string, when:string,
  *   space:string, clarity:string, making:string,
  *   build:() => object[],
+ *   showsMethod?:boolean,
  *   table?:'full'|'xy'|null,
  *   variants?:Array<{ id:string, label:string, fig:string, note:string,
  *                     build:() => object[], table?:'full'|'xy'|null }>,
@@ -374,13 +448,15 @@ export const ARRANGEMENTS = Object.freeze([
     build: () => runningSpecs(false, 'b'),
     variants: [
       {
-        id: 'b', label: 'Values upright',
-        note: 'Numbers the normal way up, clear above the line. Easier to read, but they need room before they start colliding.',
+        // Step 3's two systems, met again on a layout: the same vocabulary, so the learner
+        // sees that "unidirectional" and "aligned" are choices they carry from step to step.
+        id: 'b', label: 'Unidirectional values',
+        note: 'Numbers horizontal, clear above the line. Easier to read, but they need room before they start colliding.',
         build: () => runningSpecs(false, 'b'),
       },
       {
-        id: 'a', label: 'Values turned',
-        note: 'Numbers turned on their side, just past each arrow. This is what buys the layout its space — turned numbers pack far closer.',
+        id: 'a', label: 'Aligned values',
+        note: 'Numbers turned to lie along their own line, just past each arrow. This is what buys the layout its space — turned numbers pack far closer.',
         build: () => runningSpecs(false, 'a'),
       },
     ],
@@ -394,13 +470,13 @@ export const ARRANGEMENTS = Object.freeze([
     build: () => runningSpecs(true, 'b'),
     variants: [
       {
-        id: 'b', label: 'Values upright',
-        note: 'Both directions read from the one corner at the bottom left.',
+        id: 'b', label: 'Unidirectional values',
+        note: 'Numbers horizontal in both directions, all read from the one corner at the bottom left.',
         build: () => runningSpecs(true, 'b'),
       },
       {
-        id: 'a', label: 'Values turned',
-        note: 'Turned numbers on both axes — the tightest layout there is, and the one that most needs an unmistakable starting corner.',
+        id: 'a', label: 'Aligned values',
+        note: 'Numbers lying along their own lines on both axes — the tightest layout there is, and the one that most needs an unmistakable starting corner.',
         build: () => runningSpecs(true, 'a'),
       },
     ],
@@ -434,11 +510,39 @@ export const ARRANGEMENTS = Object.freeze([
 ]);
 
 /**
+ * DOES THE METHOD SHOW ON THIS LAYOUT? — derived, never declared.
+ *
+ * Aligned and unidirectional values are IDENTICAL on a horizontal dimension line: both sit
+ * above it, both read from the bottom. So a layout that measures only across the part draws the
+ * same sheet under either method, and four of the six here do exactly that. That is a true fact
+ * about dimensioning and the lesson says so out loud rather than hiding it — but it has to be
+ * WORKED OUT from each layout's own specs, because a hand-written list of "these four look the
+ * same" would be a second source of truth that goes stale the first time a spec is edited.
+ *
+ * A layout shows the two methods apart when it carries a dimension line that is not horizontal:
+ * a vertical linear one, a sloping one, or an angular one.
+ */
+const showsMethodApart = (specs) => specs.some((s) => (
+  s.kind === 'angular'
+  || s.kind === 'aligned'
+  || (s.kind === 'linear' && s.axis && s.axis !== 'x')
+));
+for (const a of ARRANGEMENTS) {
+  a.showsMethod = (a.variants ?? [a]).some((v) => showsMethodApart(v.build()));
+  Object.freeze(a);
+}
+
+/** The layouts that DO show the method apart, named, for a card that has to point at one. */
+export const METHOD_SHOWING_LAYOUTS = Object.freeze(
+  ARRANGEMENTS.filter((a) => a.showsMethod).map((a) => a.name),
+);
+
+/**
  * The table that accompanies the co-ordinate arrangement (Fig. 4.19a). ø carries the shape
  * indication of each feature, exactly as the textbook's own table carries ø for its holes.
  */
 export const COORDINATE_TABLE = Object.freeze(
-  [F.cskHole, F.square, F.slot, F.sphere].map((f, i) => ({
+  [S4.holeA, S4.slot, S4.holeB].map((f, i) => ({
     n: i + 1,
     x: f.at[0],
     y: f.at[1],

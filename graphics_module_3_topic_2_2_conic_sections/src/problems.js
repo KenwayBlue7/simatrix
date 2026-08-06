@@ -1,7 +1,7 @@
 // Textbook Problem Library — DATA LAYER (Conic Sections).
 //
 // The chapter's own EXERCISES, verbatim (Chapter 6, questions 1–15). Every problem asks
-// the learner to SET UP the construction BY HAND: choose the method (Step 6) or the
+// the learner to SET UP the construction BY HAND: choose the method (Step 5) or the
 // eccentricity model (Steps 3 + 5) and dial the quantities the statement gives. The
 // self-check (src/problemLibrary.js) compares the live sim.conicState() against `target`
 // with tolerances — it matches the RAW input the student dials and never auto-fills
@@ -34,9 +34,14 @@ export const TIERS = Object.freeze([
 
 /**
  * The single clone-scope switch — the tiers this build can actually solve.
+ *
+ * 'hyperbola' is OFF (ADR-115). Exercises 12–15 stay in PROBLEMS below, verbatim, because the
+ * chapter has them; three of them are answered with §6.9's constructions, and this module no
+ * longer offers those, so dealing them would set a problem the dock cannot express. This is the
+ * one-line lever the tier mechanism exists for — putting 'hyperbola' back restores all four.
  * @type {ReadonlyArray<string>}
  */
-export const ENABLED_TIERS = Object.freeze(['ellipse', 'parabola', 'hyperbola']);
+export const ENABLED_TIERS = Object.freeze(['ellipse', 'parabola']);
 
 /**
  * Problem TYPES that are structurally banned from the library (the ADR-062 / ADR-069
@@ -99,7 +104,7 @@ export const PROBLEMS = Object.freeze([
     statement: 'The focus of an ellipse is 50 mm away from its directrix. If the eccentricity is 2/3, draw the curve and measure its major and minor axes. A point P is located 45 mm from the second vertex. Draw tangent and normal to the curve at that point.',
     hints: [
       'An eccentricity less than 1 means the curve is an ellipse, and a focus with a directrix is the eccentricity method — Step 5.',
-      'Set the eccentricity to 0.67 and the focus-to-directrix distance to 50 mm in Step 3; the construction in Step 5 then divides FA into 2 + 3 = 5 parts for you to read.',
+      'Set the eccentricity to 0.67 and the focus-to-directrix distance to 50 mm in Step 5; the construction then divides FA into 2 + 3 = 5 parts for you to read.',
       'Switch the tangent and normal on. The construction reports the major axis as VV′ — with e = 2/3 and FA = 50 it comes out at 120 mm.',
     ],
     target: { e: 2 / 3, fa: 50, showTangent: true },
@@ -112,7 +117,7 @@ export const PROBLEMS = Object.freeze([
     statement: 'The major and minor axes of an ellipse are 100 mm and 70 mm respectively. Construct the curve using the method of auxiliary circles. Draw a tangent and normal at a point P on the curve located at 35 mm from the top end of the minor axis.',
     hints: [
       'Two axes given and "auxiliary circles" named: this is the concentric-circles construction of §6.5, Example 6.2.',
-      'In Step 6 choose “Concentric (auxiliary) circles”; the two dimension fields relabel themselves to Major axis and Minor axis.',
+      'In Step 5 choose “Concentric (auxiliary) circles”; the two dimension fields relabel themselves to Major axis and Minor axis.',
       'Dial 100 mm and 70 mm, then switch the tangent and normal on and slide P to the point the question asks for.',
     ],
     target: { curve: CurveType.Ellipse, method: 'ellipse-concentric', dim1: 100, dim2: 70, showTangent: true },
@@ -125,7 +130,7 @@ export const PROBLEMS = Object.freeze([
     statement: 'Draw the largest possible ellipse in a rectangle of 120 × 80 mm and mark its focus and axes using the oblong method. A point P on the lower half of the curve is at a distance of 20 mm from the left end of the major axis. Mark the point and draw tangent to the curve at that point.',
     hints: [
       'The largest ellipse inside a rectangle touches all four sides, so the rectangle’s sides ARE the major and minor axes.',
-      'In Step 6 choose “Rectangular (oblong) method” — Example 6.3 — and dial 120 mm and 80 mm.',
+      'In Step 5 choose “Rectangular (oblong) method” — Example 6.3 — and dial 120 mm and 80 mm.',
       'The construction divides half the major axis and half the side into the same number of parts; the joins from C and D cross on the curve. Switch the tangent on for the marked point.',
     ],
     target: { curve: CurveType.Ellipse, method: 'ellipse-oblong', dim1: 120, dim2: 80 },
@@ -138,7 +143,7 @@ export const PROBLEMS = Object.freeze([
     statement: 'The conjugate diameters of the ellipse are 130 mm and 90 mm with an included angle 65°. Draw the ellipse by parallelogram method and determine its axes.',
     hints: [
       'Conjugate diameters are not the axes — they are a pair of diameters each parallel to the tangents at the ends of the other (§6.4, item 8).',
-      'In Step 6 choose “Parallelogram method (conjugate diameters)” — Example 6.4. Three fields appear: the two diameters and the angle between them.',
+      'In Step 5 choose “Parallelogram method (conjugate diameters)” — Example 6.4. Three fields appear: the two diameters and the angle between them.',
       'Dial 130 mm, 90 mm and 65°. The construction draws the circumscribing parallelogram and then reports the true major and minor axes it produces.',
     ],
     target: { curve: CurveType.Ellipse, method: 'ellipse-parallelogram', dim1: 130, dim2: 90, dim3: 65 },
@@ -152,7 +157,7 @@ export const PROBLEMS = Object.freeze([
     hints: [
       'The intersecting-arc construction is given the distance between the foci and the SUM of the two focal distances — and that sum is the major axis (§6.4).',
       'The minor semi-axis is 35 and half the focal distance is 50, so the semi-major axis is √(50² + 35²) ≈ 61 mm: the sum is about 122 mm.',
-      'In Step 6 choose “Intersecting-arc method (foci)” and dial 100 mm and 122 mm. Every plotted point then satisfies P F + P F′ = 122.',
+      'In Step 5 choose “Intersecting-arc method (foci)” and dial 100 mm and 122 mm. Every plotted point then satisfies P F + P F′ = 122.',
     ],
     target: { curve: CurveType.Ellipse, method: 'ellipse-arcs', dim1: 100, dim2: 122 },
   },
@@ -165,7 +170,7 @@ export const PROBLEMS = Object.freeze([
     hints: [
       '"The sum of the distances from two fixed points is constant" is the ellipse’s second definition (§6.4) — the fixed points are its foci.',
       'That is exactly what the intersecting-arc method is given, so no eccentricity is needed here.',
-      'In Step 6 choose “Intersecting-arc method (foci)”, dial 110 mm and 150 mm, then switch the tangent on and slide P into the top-right quarter.',
+      'In Step 5 choose “Intersecting-arc method (foci)”, dial 110 mm and 150 mm, then switch the tangent on and slide P into the top-right quarter.',
     ],
     target: { curve: CurveType.Ellipse, method: 'ellipse-arcs', dim1: 110, dim2: 150, showTangent: true },
   },
@@ -179,8 +184,8 @@ export const PROBLEMS = Object.freeze([
     statement: 'Construct a conic when the distance between its focus and directrix is equal to 40 mm and its eccentricity is one. Draw a tangent at a point on the upper half of the curve located 60 mm from the focus.',
     hints: [
       'Eccentricity exactly one is the parabola (§6.3) — the curve whose every point is as far from the focus as from the directrix.',
-      'In Step 3 set the eccentricity to 1.00 and the focus-to-directrix distance to 40 mm; the vertex then falls at the midpoint of AF, 20 mm from each.',
-      'Move to Step 5 to plot the points, switch the tangent and normal on, and slide P onto the upper half of the curve.',
+      'In Step 5 set the eccentricity to 1.00 and the focus-to-directrix distance to 40 mm; the vertex then falls at the midpoint of AF, 20 mm from each.',
+      'Then plot the points, switch the tangent and normal on, and slide P onto the upper half of the curve.',
     ],
     target: { e: 1, fa: 40, showTangent: true },
   },
@@ -193,7 +198,7 @@ export const PROBLEMS = Object.freeze([
     hints: [
       'A double ordinate is a chord perpendicular to the axis (§6.2, item 10); the abscissa is the distance from the vertex to it (item 12).',
       'Given a double ordinate and an abscissa, the chapter reaches for the tangent method — Example 6.8: extend the axis to E with VE = CV, join AE and BE, then divide and join.',
-      'In Step 6 choose “Tangent method” and dial 110 mm and 80 mm. The construction marks the focus and draws the directrix for you to read off.',
+      'In Step 5 choose “Tangent method” and dial 110 mm and 80 mm. The construction marks the focus and draws the directrix for you to read off.',
     ],
     target: { curve: CurveType.Parabola, method: 'parabola-tangent', dim1: 110, dim2: 80 },
   },
@@ -206,7 +211,7 @@ export const PROBLEMS = Object.freeze([
     hints: [
       'A 1200 mm span will not fit a drawing sheet, so it is drawn to a suitable scale — the chapter’s own Fig. 6.14 uses 1:10.',
       'At 1:10 the span becomes 120 mm and the rise 88 mm; the shape of the curve is unchanged, which is the whole point of a scale.',
-      'In Step 6 choose “Rectangle method”, dial 120 mm and 88 mm, and switch the tangent and normal on.',
+      'In Step 5 choose “Rectangle method”, dial 120 mm and 88 mm, and switch the tangent and normal on.',
     ],
     target: { curve: CurveType.Parabola, method: 'parabola-rectangle', dim1: 120, dim2: 88, showTangent: true },
   },
@@ -218,7 +223,7 @@ export const PROBLEMS = Object.freeze([
     statement: 'Construct a parabola in a parallelogram of side 100 mm (chord) × 60 mm and with an inclined angle of 120°. Find the axis, focus and directrix of the curve.',
     hints: [
       'The parallelogram method is the rectangle method run in a leaning frame — the divisions are the same, only the enclosing figure is skewed (Example 6.10).',
-      'In Step 6 choose “Parallelogram method” under the parabola; three fields appear — the chord, the side, and the angle between them.',
+      'In Step 5 choose “Parallelogram method” under the parabola; three fields appear — the chord, the side, and the angle between them.',
       'Dial 100 mm, 60 mm and 120°. The construction then draws the axis through the vertex and marks the focus and directrix.',
     ],
     target: { curve: CurveType.Parabola, method: 'parabola-parallelogram', dim1: 100, dim2: 60, dim3: 120 },
@@ -231,7 +236,7 @@ export const PROBLEMS = Object.freeze([
     statement: 'By offset method, construct a parabola having base equal to 120 mm and axis 112 mm. Draw the tangents to the curve from a point P outside the curve such that the point P is located 20 mm towards the left of the axis and 5 mm below the directrix.',
     hints: [
       'The offset method plots the curve from the SQUARES of the divisions: divide the half base into 4 and the axis into 4² = 16 parts (Example 6.11).',
-      'In Step 6 choose “Offset method” and dial 120 mm and 112 mm.',
+      'In Step 5 choose “Offset method” and dial 120 mm and 112 mm.',
       'Read the offsets on the sheet: at 1, 2, 3 and 4 divisions along the base the curve has dropped 1, 4, 9 and 16 of those sixteenths.',
     ],
     target: { curve: CurveType.Parabola, method: 'parabola-offset', dim1: 120, dim2: 112 },
@@ -246,8 +251,8 @@ export const PROBLEMS = Object.freeze([
     statement: 'Construct a conic when the eccentricity is 5/4 and the distance between directrix and the focus is 54 mm. Draw tangent and normal to the curve at a point on the lower half of the curve measuring 45 mm from the focus.',
     hints: [
       'An eccentricity greater than 1 is a hyperbola (§6.3) — the same construction as the ellipse and the parabola, only the ratio changes.',
-      'In Step 3 set the eccentricity to 1.25 and the focus-to-directrix distance to 54 mm. FA then divides into 5 + 4 = 9 parts, with the vertex 4 of them from A.',
-      'Move to Step 5, switch the tangent and normal on, and slide P down to the lower half of the branch.',
+      'In Step 5 set the eccentricity to 1.25 and the focus-to-directrix distance to 54 mm. FA then divides into 5 + 4 = 9 parts, with the vertex 4 of them from A.',
+      'Switch the tangent and normal on, and slide P down to the lower half of the branch.',
     ],
     target: { e: 1.25, fa: 54, showTangent: true },
   },
@@ -259,7 +264,7 @@ export const PROBLEMS = Object.freeze([
     statement: 'The foci of the two branches of a hyperbola are located at a distance of 80 mm. A point P on the curve moves such that the difference of its distances from the foci always remain 40 mm. Find the focus of the two branches of the curve, mark the asymptotes and measure the angle between them.',
     hints: [
       '"The difference of the distances from two fixed points is constant" is the hyperbola’s own definition (§6.8), and that difference IS the transverse axis V₁V₂.',
-      'In Step 6 choose “Foci and the difference of the distances” — Example 6.13 — and dial 80 mm and 40 mm.',
+      'In Step 5 choose “Foci and the difference of the distances” — Example 6.13 — and dial 80 mm and 40 mm.',
       'The construction draws the circle of radius equal to half the focal distance; the asymptotes are the lines from the centre through where the tangents at V₁ and V₂ meet it.',
     ],
     target: { curve: CurveType.Hyperbola, method: 'hyperbola-foci', dim1: 80, dim2: 40 },
@@ -272,7 +277,7 @@ export const PROBLEMS = Object.freeze([
     statement: 'Draw a hyperbola when the transverse axis is equal to 90 mm, double ordinate = 144 mm and abscissa is equal to 48 mm.',
     hints: [
       'A double ordinate is twice the ordinate (§6.2, item 10), so a 144 mm double ordinate means a 72 mm ordinate.',
-      'In Step 6 choose “Ordinate, abscissa and transverse axis” — Example 6.14 — and three fields appear.',
+      'In Step 5 choose “Ordinate, abscissa and transverse axis” — Example 6.14 — and three fields appear.',
       'Dial the transverse axis 90 mm, the abscissa 48 mm and the ordinate 72 mm; the joins from V₁ and V₂ then cross on the curve.',
     ],
     target: { curve: CurveType.Hyperbola, method: 'hyperbola-ordinate', dim1: 90, dim2: 48, dim3: 72 },
@@ -285,7 +290,7 @@ export const PROBLEMS = Object.freeze([
     statement: 'The asymptotes of a hyperbola are at an angle of 75°. A point P on the curve is 25 mm away from the horizontal asymptote and 40 mm away from the inclined asymptote, when measured horizontally. Construct the curve and draw tangent and normal at a point M on the curve, 50 mm above the horizontal asymptote.',
     hints: [
       'An asymptote is a tangent to the curve at infinity (§6.8, item 5); the product of a point’s distances from the two asymptotes is constant.',
-      'In Step 6 choose “Asymptotes and a point on the curve” — Example 6.15 — and dial the angle 75°.',
+      'In Step 5 choose “Asymptotes and a point on the curve” — Example 6.15 — and dial the angle 75°.',
       'Then dial P’s two distances: 25 mm from the horizontal asymptote and 40 mm from the inclined one. Every other point on the curve keeps the same product, 25 × 40.',
     ],
     target: { curve: CurveType.Hyperbola, method: 'hyperbola-asymptotes', dim1: 75, dim2: 25, dim3: 40 },

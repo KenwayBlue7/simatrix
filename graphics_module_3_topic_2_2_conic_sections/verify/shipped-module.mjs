@@ -89,6 +89,19 @@ await send('Page.addScriptToEvaluateOnNewDocument', {
 await send('Page.navigate', { url: `http://127.0.0.1:${PORT}${TOPIC}` });
 await wait(6000);
 
+// Wait until the page stops allocating: a snapshot taken while a tween is running measures
+// the phase of an animation, not a leak. Hoisted — two sections need it.
+const quiet = async () => {
+  let last = -1;
+  for (let i = 0; i < 40; i++) {
+    const g = await evaluate('window.__gl.made + window.__gl.freed');
+    if (g === last) return true;
+    last = g;
+    await wait(250);
+  }
+  return false;
+};
+
 let fails = 0;
 const ok = (name, cond, detail = '') => {
   if (!cond) { fails++; console.log(`FAIL ${name} ${detail}`); }
@@ -144,8 +157,26 @@ ok('sheet canvas painted', await evaluate(`(() => {
 })()`));
 
 // --- 4. Every construction draws, through the real select --------------------------
-const methods = await evaluate('[...document.querySelectorAll("#ctl-method option")].map(o=>o.value)');
-ok('12 constructions offered (the general one first)', methods.length === 12 && methods[0] === 'eccentricity', methods.join(','));
+// Since ADR-100 the list holds ONE curve's constructions at a time, the syllabus tier first.
+// Walk both curves to see the whole catalogue: §6.5's four worked ellipse methods and its
+// four-centre approximation, §6.7's four, plus the general one on each. §6.9's three are out of
+// scope (ADR-115), so the picker offers two curves and the catalogue is ten, not thirteen.
+const methods = [];
+for (const curve of ['Ellipse', 'Parabola']) {
+  await evaluate(`[...document.querySelectorAll('#curve-picker button')].find(b => b.dataset.curve === '${curve}').click()`);
+  await wait(500);
+  const opts = await evaluate('[...document.querySelectorAll("#ctl-method option")].map(o=>o.value)');
+  for (const o of opts) if (!methods.includes(o)) methods.push(o);
+}
+ok('10 constructions offered across the two curves', methods.length === 10, methods.join(','));
+ok('…and none of them constructs a hyperbola',
+  !methods.some((m) => /^hyperbola-/.test(m)), methods.join(','));
+// The syllabus tier leads its curve's list — a Diploma student should not have to hunt.
+await evaluate(`[...document.querySelectorAll('#curve-picker button')].find(b => b.dataset.curve === 'Ellipse').click()`);
+await wait(500);
+ok('…the syllabus group is listed first',
+  (await evaluate('document.querySelector("#ctl-method optgroup").label')).includes('Diploma'),
+  await evaluate('document.querySelector("#ctl-method optgroup").label'));
 for (const m of methods) {
   await evaluate(`(() => { const s = document.getElementById('ctl-method'); s.value = ${JSON.stringify(m)}; s.dispatchEvent(new Event('change')); })()`);
   await wait(90);
@@ -204,20 +235,31 @@ ok('GPU buffers flat across 50 rebuilds', net === 0,
   `net +${net} live buffers (made ${after.made - before.made}, freed ${after.freed - before.freed})`);
 
 // --- 5b. Step 3 tours the six cuts; Step 6 marks a prediction ----------------------
+// The plane TRAVELS to a cut over a 700 ms tween, and under SwiftShader the rAF clock runs
+// well behind wall time — so wait on the RESULT, never on a fixed sleep. A fixed sleep here
+// failed about one run in two while the product was behaving correctly.
+const until = async (expression, timeout = 8000) => {
+  const deadline = Date.now() + timeout;
+  for (;;) {
+    if (await evaluate(expression)) return true;
+    if (Date.now() > deadline) return false;
+    await wait(150);
+  }
+};
+
 ok('six "show me" chips', (await evaluate('document.querySelectorAll("#tour-chips [data-cut]").length')) === 6);
 await evaluate(`document.querySelector('#tour-chips [data-cut="Parabola"]').click()`);
-// The plane TRAVELS to the cut (a 700 ms tween). Under SwiftShader the rAF clock runs well
-// behind wall time, so give the animation room to land before reading the readout.
-await wait(2500);
 ok('a chip travels the plane to its cut',
-  (await evaluate('document.getElementById("section-readout").textContent')).includes('Parabola'));
+  await until('document.getElementById("section-readout").textContent.includes("Parabola")'));
+ok('Step 3 names the cut it travelled to',
+  (await evaluate('document.getElementById("tour-readout").textContent')).startsWith('Parabola (section plane'));
 
 await evaluate('document.querySelector(\'#step-rail .rail__item[data-step="6"] .rail__btn\').click()');
 await wait(400);
 ok('six answer chips, dead until a cut is dealt',
   (await evaluate('[...document.querySelectorAll("#predict-chips [data-answer]")].every((c) => c.disabled)')));
 await evaluate('document.getElementById("btn-deal-cut").click()');
-await wait(2500);
+await until('[...document.querySelectorAll("#predict-chips [data-answer]")].some((c) => !c.disabled)');
 ok('dealing a cut arms the answers',
   (await evaluate('[...document.querySelectorAll("#predict-chips [data-answer]")].some((c) => !c.disabled)')));
 ok('the cut is not named before the answer',
@@ -230,38 +272,109 @@ const truth = await evaluate(`(() => {
 await wait(300);
 ok('answering marks it and states the rule', /Correct|Not this time/.test(truth), truth.slice(0, 80));
 
-// --- 6b. The workbench split must not starve the viewport --------------------------
-// The rail is a wrapping row sized `auto` against the viewport's `minmax(0,1fr)` row, so
-// every group docked into it is taken straight out of the 3D pane's height. Docking the
-// whole topic's controls once drove the rail to 1340 px and collapsed the viewport to 2 px.
-// Reach the split deterministically: open the sheet if it is closed, then expand it.
-await evaluate(`(() => { if (document.getElementById('compare-card').hidden) document.getElementById('compare-chip').click(); })()`);
-await wait(700);
-await evaluate(`(() => { if (!document.body.classList.contains('compare-split')) document.getElementById('compare-expand').click(); })()`);
+// --- 6a. The focal-sphere apparatus must not leak either (ADR-089) -----------------
+// Step 4's first act adds a sphere, a wireframe, a fat ring, a plane and a fat line to the
+// scene graph on EVERY rebuild, and the cut's tilt rebuilds. A sphere that is not disposed is
+// the fastest way there is to exhaust the context, so hammer it with the apparatus fully out.
+await evaluate('document.querySelector(\'#step-rail .rail__item[data-step="4"] .rail__btn\').click()');
 await wait(900);
-const split = await evaluate(`(() => {
-  const r = (sel) => { const e = document.querySelector(sel); const b = e && !e.hidden ? e.getBoundingClientRect() : null; return b ? Math.round(b.height) : 0; };
-  const canvas = [...document.querySelectorAll('#sim-viewport canvas')].filter((c) => c.id !== 'compare-canvas')[0];
+// Step 6 dealt a RANDOM cut, and three of §6.1's six sections have a shorter reveal than a
+// conic does (ADR-090) — the circle's ends on the cone and the apex cut has two stages. Pin an
+// ordinary ellipse first, or this assertion is a coin toss.
+await quiet();   // Step 6's deal is a tween; setting the cut while it runs is a race
+await evaluate(`(() => {
+  const o = document.getElementById('rng-sec-offset'); o.value = -12; o.dispatchEvent(new Event('input'));
+  const t = document.getElementById('rng-cut-tilt'); t.value = 35; t.dispatchEvent(new Event('input'));
+})()`);
+await wait(800);
+ok('the cut is where the test put it',
+  (await evaluate('document.getElementById("rng-cut-tilt").value')) === '35',
+  `tilt = ${await evaluate('document.getElementById("rng-cut-tilt").value')}`);
+// Seven stages since ADR-097 split the two tangencies apart, so six presses.
+for (let i = 0; i < 6; i++) {
+  await evaluate('document.getElementById("btn-proof-next").click()');
+  await until('document.getElementById("btn-proof-next").disabled === false'
+    + ' || document.getElementById("proof-stage").textContent.includes("Stage 7")', 8000);
+  await wait(200);
+}
+const proofSaid = await evaluate('document.getElementById("proof-stage").textContent');
+ok('the proof walks to its last stage under the learner\'s own presses',
+  proofSaid.startsWith('Stage 7 of 7'), proofSaid);
+// Settle: the proof's own stage animations allocate and free while they run, so both
+// snapshots have to be taken with the scene at rest and in the SAME stage — otherwise the
+// count measures the phase of a fade rather than a leak.
+// Back to stage 5, where every part of the apparatus is VISIBLE. Three.js uploads a buffer
+// the first time an object is rendered, so a stage that deliberately hides objects (the
+// bridge) legitimately holds fewer live buffers than one that shows them — measuring across
+// the two reports a phantom −15 that is lazy upload, not a leak.
+await evaluate('document.getElementById("btn-proof-prev").click()');
+await wait(600);
+const tilt = async (deg) => {
+  await evaluate(`(() => { const a = document.getElementById('rng-cut-tilt'); a.value = '${deg}'; a.dispatchEvent(new Event('input')); })()`);
+  await wait(1200);
+};
+await tilt(35);
+await quiet();
+const beforeFocal = await evaluate('({ ...window.__gl })');
+await evaluate(`(async () => {
+  const a = document.getElementById('rng-cut-tilt');
+  for (let i = 0; i < 40; i++) {
+    a.value = String(20 + (i % 50));
+    a.dispatchEvent(new Event('input'));
+    await new Promise((r) => setTimeout(r, 8));
+  }
+})()`);
+await wait(1200);
+await tilt(35);
+await quiet();
+const afterFocal = await evaluate('({ ...window.__gl })');
+const netFocal = (afterFocal.made - afterFocal.freed) - (beforeFocal.made - beforeFocal.freed);
+ok('GPU buffers flat across 40 rebuilds with the focal sphere out', netFocal === 0,
+  `net +${netFocal} (made ${afterFocal.made - beforeFocal.made}, freed ${afterFocal.freed - beforeFocal.freed})`);
+
+// --- 6b. Promoting a view must not starve the other, or the page ------------------
+// The invariant this has always guarded: no control may collapse a pane to nothing or push the
+// document into a scrollbar. It used to be checked on the 50/50 workbench split, whose entry
+// point (the thumbnail's Fullscreen button) was removed in ADR-106 — so it is checked here on
+// the layout that actually ships: one full-bleed main view with the other floating over it.
+await evaluate(`document.querySelector('#step-rail .rail__item[data-step="5"] .rail__btn').click()`);
+await wait(1200);
+const panes = () => evaluate(`(() => {
+  const r = (id) => { const e = document.getElementById(id);
+    const b = e && !e.hidden ? e.getBoundingClientRect() : null;
+    return b ? { w: Math.round(b.width), h: Math.round(b.height) } : { w: 0, h: 0 }; };
+  const canvas = [...document.querySelectorAll('#view-box canvas')][0];
   return {
-    docked: [...document.querySelectorAll('#workbench-rail [data-ctrl]')].map((n) => n.dataset.ctrl),
-    railH: r('#workbench-rail'),
-    viewportH: r('#sim-viewport'),
-    stageH: r('.compare-card__stage'),
+    main: r('compare-card'), thumb: r('view-box'), wizard: r('wizard'),
     canvasH: canvas ? Math.round(canvas.getBoundingClientRect().height) : 0,
-    pageOverflow: document.body.scrollHeight > document.documentElement.clientHeight
+    overflow: document.body.scrollHeight > document.documentElement.clientHeight
       || document.body.scrollWidth > document.documentElement.clientWidth,
   };
 })()`);
-ok('split docks only the value drivers', split.docked.length === 2, split.docked.join(','));
-ok('split leaves the viewport its share',
-  split.viewportH >= 300 && split.viewportH >= 0.4 * (split.viewportH + split.railH),
-  `viewport ${split.viewportH}px vs rail ${split.railH}px `
-  + `(${Math.round((100 * split.viewportH) / (split.viewportH + split.railH))}% of the column)`);
-ok('split renderer fills the pane', Math.abs(split.canvasH - (split.viewportH - 2)) <= 2, `canvas ${split.canvasH}px`);
-ok('split sheet stage is real', split.stageH > 300, `${split.stageH}px`);
-ok('split does not overflow the page', split.pageOverflow === false);
-await evaluate(`(() => { if (!document.getElementById('compare-card').hidden) document.getElementById('compare-chip').click(); })()`);
-await wait(500);
+
+const step5 = await panes();
+ok('Step 5 gives the drawing the main panel',
+  step5.main.w > step5.thumb.w * 1.5 && step5.main.h > 300,
+  `main ${step5.main.w}x${step5.main.h}, thumb ${step5.thumb.w}x${step5.thumb.h}`);
+ok('…the 3D thumbnail keeps a real size', step5.thumb.w >= 200 && step5.thumb.h >= 150,
+  `${step5.thumb.w}x${step5.thumb.h}`);
+ok('…its renderer fills the thumbnail', Math.abs(step5.canvasH - step5.thumb.h) <= 4,
+  `canvas ${step5.canvasH}px in ${step5.thumb.h}px`);
+ok('…the step panel is untouched', step5.wizard.w >= 300, `${step5.wizard.w}px`);
+ok('…and nothing overflows the page', step5.overflow === false);
+
+// Switching swaps which one is starved of nothing — the same invariant, mirrored.
+await evaluate('document.getElementById("switch-view").click()');
+await wait(1100);
+const swapped = await panes();
+ok('switching gives the 3D the main panel and the drawing the thumbnail',
+  swapped.thumb.w > swapped.main.w * 1.5,
+  `main ${swapped.main.w}, thumb ${swapped.thumb.w}`);
+ok('…the step panel survives the swap', swapped.wizard.w === step5.wizard.w,
+  `${swapped.wizard.w} vs ${step5.wizard.w}`);
+ok('…and still nothing overflows', swapped.overflow === false);
+await evaluate('document.getElementById("switch-view").click()');
+await wait(900);
 
 // --- 7. Reset routes through the single path ---------------------------------------
 await evaluate('window.simAPI.reset()');
@@ -273,8 +386,15 @@ ok('reset closes the sheet', await evaluate('document.getElementById("compare-ca
 // --- 8. Problem library ---------------------------------------------------------------
 await evaluate('document.getElementById("open-problem-library").click()');
 await wait(250);
-ok('library lists 15 problems', (await evaluate('document.querySelectorAll(".problem-card").length')) === 15);
-ok('library groups by curve', (await evaluate('document.querySelectorAll(".problem-group").length')) === 3);
+// Eleven of the chapter's fifteen: the hyperbola tier is off (ADR-115) because three of its four
+// exercises are answered with §6.9's constructions, which this module no longer offers. All
+// fifteen are still in src/problems.js verbatim — ENABLED_TIERS decides which are dealt.
+ok('library lists the 11 problems this module can answer',
+  (await evaluate('document.querySelectorAll(".problem-card").length')) === 11,
+  await evaluate('String(document.querySelectorAll(".problem-card").length)'));
+ok('library groups by curve', (await evaluate('document.querySelectorAll(".problem-group").length')) === 2);
+ok('…and sets no problem it cannot answer',
+  (await evaluate(`[...document.querySelectorAll('.problem-group')].every(g => !/hyperbola/i.test(g.textContent))`)) === true);
 await evaluate('document.getElementById("problem-library-close").click()');
 
 const lateErrors = errorEntries();

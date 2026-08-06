@@ -2,6 +2,195 @@
 
 All notable changes to this topic. Platform-wide entries live in `../CHANGELOG.md`.
 
+## 2026-08-06 — the annotation layout pass: a second look before anything is inked
+
+A graphical-quality change only. **Six steps, the educational flow, the interaction logic, the
+rendering pipeline, the dimension rules, the values and the geometry are all unchanged.**
+
+**The faults found on the chamfered plate (Step 3), measured.** The 45° value and the 20 rise
+value overlapped by 7.7 × 6.4 px. The angular arc crossed the inclined 28 dimension line. The
+arc's 0° arrow head landed on the rise's projection line — and its other leg was never drawn, so
+that head terminated on nothing at all. The inclined dimension line passed 0.14 mm from the point
+where the overall length's projection line began. The ø24 note printed across the top outline.
+
+**Re-laid out in the order of how little freedom each annotation has.** The inclined dimension
+that DEFINES the chamfer keeps its place, moved out to 30 mm off its face — the only offset that
+neither crowds the wedge nor crosses the rise's projection line. The 45° arc came down from R26
+to R14 so it sits wholly inside the corner the chamfer removed, and gained `legs: 'from'`, a
+projection line carrying the bottom edge out to meet it. The overall length moved ABOVE the part:
+measured from below, its right-hand projection line has to spring from a point in the empty air
+the chamfer removed, straight through the one place the inclined dimension can pass. Above the
+part it springs off the real top corners, crosses nothing, and gives the sheet the top-edge
+weight it was missing. The ø24 note was shortened so its lettering stays inside the outline.
+
+**Added `src/dimensionLayout.js` (ADR-126) — the general pass, not a fix for one figure.** Before
+a single stroke is emitted it works out where every projection line, dimension line, arrow head,
+arc, leader and value will fall, finds the pairs closer than 3 mm — one letter height, §4.5's own
+lower bound — and moves the lower-priority one clear. Five knobs, each a freedom the chapter
+already grants: a lane moves out, a sloping offset changes, an arc shrinks, a leader lengthens or
+is re-aimed within 20°, a value slides along its own line. A nudge is kept only if the whole
+sheet gets less crowded, so it can never cure one clash by causing another.
+
+**Five contacts are lawful and are not collisions** — same spec; two dimensions sharing a limit
+in the same row (Figs. 4.15 / 4.17); two strokes along one line; a projection line crossing a
+dimension line (Fig. 4.16 does it four rows deep, and forbidding it would forbid parallel
+dimensioning); and a leader's landing. Two values are exempt from none of it.
+
+**Drawings that are MEANT to be wrong stay wrong.** Step 2's ten broken rules and Step 6's twelve
+seeded faults take no part in the pass — `faultyDrawing()` now stamps `pinned` on every merged
+fault, so the mistake hunt cannot tidy itself away in front of the learner.
+
+- Added: `verify/clearance.mjs` — audits all 27 drawings in Node, with no browser.
+- Changed: `SPACING`, `TERMINATION`, the vector helpers, `linearEnds()` and `textPlacement()` now
+  live in `dimensionLayout.js` and are re-exported by `dimensionDraw.js`, so the pass and the
+  renderer cannot compute the same proportion two different ways.
+- Added: `textAlongMm` (slide a value along its own dimension line), `textGapMm` (how far an
+  angular value sits outside its arc) and `legs` (extend an angular dimension's sides out to the
+  arc). All three move annotation only.
+- Result: Step 3 is clear of every clearance under both methods, verified in the browser at 0 px
+  of pill overlap. The Guide Plate went from 20 tight contacts to 5 — all of them either a note
+  that has to cross a projection line to reach clear paper, or a near-miss of 1.8 mm or more.
+
+## 2026-08-05 — Step 4 compares on two axes: layout AND method
+
+An extension of the existing comparison system, not a new lesson. **Six steps, unchanged. No
+change to the rendering engine, the graphics pipeline or the educational flow.**
+
+- **Step 4 gains a method selector**, directly under Layout and using the same component.
+  `Method 1 · Aligned` (marked **Recommended**) and `Method 2 · Unidirectional`. Method 1 is the
+  default. It writes the same state Step 3's segmented control does — one drawing, one method on
+  it, two controls that can never disagree.
+- **Both names, always.** The chapter numbers the methods and a lecturer asks for "Method 1" out
+  loud, so the number has to be on the control; the number alone says nothing about what changes
+  on the paper, and the word is what an exam answer must contain. `METHODS[n].label` is the
+  single source of that string.
+- **The comparison now works on two axes.** Each sheet carries its own layout *and* its own
+  method, so the learner can hold one still and move the other: the same layout in both methods,
+  or the same method in two layouts. Two selectors per sheet, in the same order both times.
+- **No renderer change was needed.** `method` was already a per-draw option and a spec could
+  already override it, so sheet B simply draws with its own value:
+  `layerB.draw(specs, { ...opts, method })`. No geometry, no sizes and no values differ between
+  the two sheets — only the drafting convention the values are written under.
+- **Each sheet's caption names both.** `METHOD 1 / PARALLEL`, stacked in the pill that already
+  sits under its own drawing. One line would read as a single compound name rather than as the
+  two independent choices it is.
+- **The compare list now holds EVERY layout, including the one on the drawing** — "same layout,
+  other method" is precisely the pair that shows the two methods apart, and the old exclusion
+  made it unaskable. What is forbidden now is the whole *pair* colliding, and `keepPairDistinct()`
+  moves whichever axis the learner did **not** just touch, so a deliberate choice is never
+  overwritten under their hand.
+- **The step is honest about where the method does not show.** Aligned and unidirectional are
+  identical on a horizontal dimension line — both above it, both read from the bottom — so five
+  of the six layouts draw the same sheet either way. Only *Running, both ways* has vertical
+  dimension lines. `showsMethod` is **derived from each layout's own specs**, never declared, and
+  the card says plainly that the two sheets are identical here, why, and which layout to try.
+  Measured, not assumed: on Running-both-ways the three vertical values turn under Method 1 and
+  stay level under Method 2, while all four horizontal values are written identically under both.
+- **The compare still opens on a layout pair in one method**, exactly as before. Opening on a
+  method pair would have put two indistinguishable sheets on screen five times out of six.
+- Fixed, found while testing this: the slotted plate's sheet caption printed straight through the
+  parallel layout's lowest dimension line. Its frame reach is 122 rather than 106 — the caption
+  sits 10 mm inside the bottom of the frame, and the lane it collided with is at −56. Measured
+  after the fix: 0 px² of overlap between any caption and any value.
+- Verified headlessly: a 26-assertion Step-4 walk with **zero console errors and zero warnings**,
+  plus a re-pass of the figure walk, the lesson regression, the control-vocabulary audit, the
+  six-step layout table, the any-to-any compare and both terminology suites.
+
+## 2026-08-04 — five figures, simple to complex; and the two methods side by side
+
+Pedagogical redesign, from a review by Engineering Graphics lecturers. **The six-step structure,
+the orchestrator pattern, the leaf layering, the render order and the graphics engine are all
+unchanged** — what changed is which object each step teaches on.
+
+- **The lesson no longer runs entirely on the Guide Plate.** `dimensionData.js` now exports a
+  `FIGURES` catalogue and each step uses the **simplest figure that can teach its concept**:
+  a **plain plate** (130 × 80 × 20) for Step 1's anatomy and space study; a **plate with a
+  hole** for Step 1's line legend and leader study and for all ten of Step 2's rules; a
+  **chamfered plate** for Step 3; a **slotted plate** for Step 4; and the **Guide Plate** for
+  Step 5 and the Step-6 review. A beginner meeting their first dimension on a fourteen-feature
+  stepped part spends their attention reading the object instead of the dimension.
+- **No step was added, and none was split.** Every figure enters by being *swapped into* an
+  existing step. Steps are still Elements · Rules · Values · Arrange · Symbols · Review.
+- **The complex part is now the destination, not the starting point.** Step 6 is unchanged —
+  the complete engineering drawing with its twelve seeded faults — but the learner now arrives
+  at it having practised each idea on a figure that carried nothing else.
+- **Each figure carries only what its step teaches.** The plain plate is a rectangle. The holed
+  plate adds one hole, its centre line and one hidden outline — and nothing else. There is one
+  deliberate exception, documented in the source: the holed plate keeps a **far-face
+  countersink**, because Step 1's line legend has to name a dashed line and Step 2's *measure
+  from visible outlines* rule has to argue against a hidden one.
+- **The first four figures are the same 130 × 80 × 20 blank.** Step 1 swaps plain ↔ holed as the
+  learner opens a study, and an identical blank means that swap moves not one dimension on the
+  sheet — the figure changes under the annotation, which is the point.
+- **Step 3 now presents the two methods side by side.** `Compare side by side` splits the
+  viewport into the *same chamfered plate drawn both ways*, each sheet named — Aligned and
+  Unidirectional — so the difference is **seen** before it is read. Under it, a three-row table:
+  across and up · sloping and angles · read from. The cells are fragments, not sentences,
+  because the panel is ~320 px wide and a table of sentences wraps into mush.
+- **The chamfered plate was chosen for Step 3 for one reason:** it carries a horizontal, a
+  vertical, a **sloping** and an **angular** dimension. Those are the only four cases the two
+  methods differ on; a value that reads identically under both teaches nothing about either.
+- **The card now answers "which one do I use?" without dismissing the other.** A closing note
+  says this course — like the textbook and the examples set in class — draws **aligned**, so
+  that is the one to practise, that unidirectional is not a lesser method but what typed and CAD
+  drawings use and will be read plenty of, and that the one forbidden thing is mixing them on
+  one drawing. `METHODS` + `METHOD_CHOICE` in `dimensionSteps.js` are the single source of that
+  copy; `dimensionUI.js`'s duplicate `METHOD_COPY` is deleted.
+- **The live figure names itself.** A quiet badge in the top-right of the viewport prints the
+  figure's name and the concepts it carries, so a learner who looks up after a swap is never
+  wondering what they are looking at.
+- **`dimensionRig.js` builds any figure.** It was hardcoded to the Guide Plate's feature names;
+  it now loops over `figure.features` with a branch per kind (circle · square/slot · sphere ·
+  cylinderX). Same solid-construction rules, same winding convention, same authored-linework
+  batches, same two-linework-systems switch — the geometry pipeline itself is untouched.
+- **The figure is data, not code.** `main.js` holds one `currentFigure` and one `setFigure(id)`
+  that runs the ordinary path — `rebuild()` → resize → re-pose → re-caption. A figure change is
+  a geometry change like any other and still happens in exactly one place (RULES.md §3.1).
+  `toWorld` stays ONE fixed mm→world map for every figure, so two sheets of a comparison are
+  always in the same space; only the camera is per-figure, through `figure.frame`. `HALF_DEPTH`
+  stays a constant sheet plane while each solid gets its own thickness, so the dimension
+  apparatus never steps toward the viewer on a thinner figure.
+- **Step 1's note leader is anchored inside the outline.** Figure 1 has no feature to point at,
+  so the leader carries the material note §4.1 lists — `MS PLATE / 20 THICK` — from a dot on the
+  face. Anchoring it further out ran the bar across the plate's right-hand edge; it now sits
+  wholly inside.
+- Verified headlessly: an 18-assertion figure walk (right figure on every step and inside every
+  Step-1 study, two named sheets in the method compare, Step 3's six labels, Step 6's twelve
+  markers) with **zero console errors and zero warnings**, plus a re-pass of the full lesson
+  regression, the device-pixel-ratio sweep, the control-vocabulary audit, the six-step layout
+  table, the any-to-any layout compare and both terminology suites.
+
+## 2026-08-03 — Method-2 is "Unidirectional", not "Upright"
+
+Terminology only. No change to the graphics, the geometry or the six-step structure.
+
+- **The control now says what the exam says.** Step 3's segmented control reads
+  **Aligned · Unidirectional**. "Upright" was our own informal coinage; the standards, the
+  textbook and the question paper all say *unidirectional*, and a learner who leaves knowing
+  only the friendly word has been taught a term they cannot use. Measured at every width from
+  1280 to 2560 px: the longer label takes 93 px of a 146 px segment at its tightest, on one
+  line, unclipped.
+- **The everyday word survives as a gloss, in exactly one place.** The explanation card is
+  headed `Unidirectional (also called upright)`, the parenthetical set in `.detail__alias` —
+  smaller, unbolded, muted — so the standard's term is the one that reads as the name of the
+  thing. Nowhere else in the live DOM does "upright" appear except as such a gloss; a
+  tree-walk over the whole document asserts it.
+- **The card now states the rule the term encodes.** Values stay *horizontal whatever the angle
+  of the dimension line*, read from the bottom of the sheet — and a closing line names aligned
+  and unidirectional as the two accepted systems, which is the fact the chapter is actually
+  testing.
+- **The glossary entry leads with the official term.** The popover prints the definition alone —
+  `label` is metadata and never reaches the learner — so the definition itself now opens
+  "Unidirectional values stay horizontal…" and closes with "You will also hear this called
+  upright."
+- **Step 4 borrows the same vocabulary.** The running-dimension variant chips were "Values
+  upright" / "Values turned"; they are now **Unidirectional values** / **Aligned values**, so
+  Fig. 4.20's choice is visibly the same choice Step 3 taught rather than a second, unrelated
+  pair of words.
+- Also updated: the angle group's helper text under a disabled control, the Step-3 summary
+  bullet, the screen-reader announcement, and the `Method-2 is upright by definition` comments
+  in `dimensionDraw.js` and `dimensionUI.js`.
+
 ## 2026-07-28 — any-to-any comparison
 
 Comparison workflow only. No change to the rendering engine, the drawing logic or the lesson

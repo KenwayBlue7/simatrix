@@ -118,6 +118,11 @@
 
       /* --- Mid neutral --- */
       --color-bench-grey:   #938b7b; /* oklch(0.62 0.012 88) — hidden-edge linework, inactive, slider rest */
+      /* The step panel's width. Step 5's two fixed panes both measure against it (ADR-105). */
+      --wizard-w: clamp(340px, 34vw, 460px);
+      /* --sheet-col / --sheet-row were ADR-120's docked column and row. Removed with the mode
+         they sized (ADR-125): the thumbnail's box now comes from one rule and one rule only,
+         `.compare-card[data-size="compact"]`. */
       --color-border:       #e0e1e5; /* clinical cool grey (LAB) — crisp 1px structural seams (Ink Border Rule) */
       --color-track:        #e0e1e5; /* clinical cool grey (LAB) — recessed slider groove, now == --color-border for slider↔scrollbar parity (ADR-040) */
 
@@ -239,8 +244,10 @@
       user-select: none;
     }
 
-    /* Vertex labels (Step 3) — CSS2DObject DOM pills positioned at 3D points by
-       main.js. Themed from tokens; never intercept pointer events (orbit through). */
+    /* Anatomy labels (Step 1) — CSS2DObject DOM pills held at a screen-space offset from
+       the feature they name, with a leader line drawn back to it (main.js). The overlay
+       they sit in is pointer-events:none so the orbit drag passes through; each pill opts
+       back IN, because hovering one for a beat explains the term (#vlabel-tip). */
     .vlabel {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
@@ -253,7 +260,53 @@
       padding: 2px 5px;
       white-space: nowrap;
       user-select: none;
+      pointer-events: auto;
+      cursor: help;
     }
+    .vlabel:hover,
+    .vlabel:focus-visible {
+      background: var(--color-paper);
+      border-color: var(--color-ink-secondary);
+      outline: none;
+    }
+
+    /* The label tooltip: ONE shared node, placed by main.js. Plain-English, one sentence,
+       and above every piece of viewport chrome so it is never half-covered. */
+    .vlabel-tip {
+      position: absolute;
+      z-index: 6;
+      max-width: 240px;
+      padding: var(--space-2) var(--space-3);
+      font-size: var(--text-xs);
+      line-height: 1.45;
+      color: var(--color-ink);
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      pointer-events: none;
+    }
+    .vlabel-tip[hidden] { display: none; }
+
+    /* The drawing sheet's own hover explanation. Same voice and same chrome as .vlabel-tip,
+       but positioned inside the Compare card (its stage is the positioned ancestor) and
+       opened instantly: the learner is reading a drawing, and a construction line means
+       nothing until something says what it is for. */
+    .sheet-tip {
+      position: absolute;
+      z-index: 3;
+      max-width: 260px;
+      padding: var(--space-2) var(--space-3);
+      font-size: var(--text-xs);
+      line-height: 1.45;
+      color: var(--color-ink);
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      pointer-events: none;
+    }
+    .sheet-tip[hidden] { display: none; }
 
     /* ---- Wizard hide/show toggle: a floating control pinned to the viewport's
        top-right. Present in BOTH states (it overlays the canvas), so the learner
@@ -315,6 +368,8 @@
       pointer-events: none;
     }
     .vp-cluster > * { pointer-events: auto; }
+    /* The cluster keeps its own corner in both steps: the pane it sits in is full size in
+       both, because Step 5 shrinks the canvas box rather than the pane (ADR-105). */
 
     /* ---- Compare chip (ADR-012 family): same pill shell as the connector toggle, but a
        real button whose aria-pressed mirrors the Compare card's open state (filled accent
@@ -343,6 +398,16 @@
                   transform var(--dur-fast) var(--ease-standard);
     }
     .compare-chip[hidden] { display: none; }
+
+    /* The chip a minimized thumbnail collapses INTO. Quieter than the Compare button, because
+       it is a restore affordance rather than the step's own control. */
+    .compare-chip--ghost {
+      color: var(--color-ink-secondary);
+      background: var(--color-paper);
+      box-shadow: none;
+      border: 1px solid var(--color-border);
+    }
+    .compare-chip--ghost[hidden] { display: none; }
     .compare-chip svg { flex: none; width: 16px; height: 16px; }
     .compare-chip:active { transform: scale(0.97); }
     .compare-chip:focus-visible { outline: none; box-shadow: var(--ring-focus); }
@@ -478,9 +543,85 @@
        Synced to the Module 2 master's floating-card chrome 2026-07-16: the split's own
        background is the gray --color-panel surface, with a --space-4 gap/padding so the three
        panes read as floating rounded cards, not flush edge-to-edge regions. */
+    /* Step 5 is Step 4's layout with the primary view swapped, and nothing else (ADR-105).
+       Step 4: full-bleed 3-D with the drawing floating over it, top-right. Step 5: full-bleed
+       drawing with the 3-D floating in the SAME rect. The pane keeps its place in the flex row
+       in both — only the box holding the canvas changes size. */
+    #view-box { position: absolute; inset: 0; }
+    body.drawing-main #view-box {
+      inset: calc(var(--space-3) + 44px + var(--space-2)) var(--space-3) auto auto;
+      width: min(420px, 38vw);
+      height: min(320px, 42vh);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+      overflow: hidden;
+      z-index: calc(var(--z-compare) + 1);   /* floats over the drawing, as Step 4's card does */
+    }
+    /* The MAIN view is a panel, not a floating window: no title bar, and none of the window
+       controls that go with one (ADR-106). Only the thumbnail is a window. */
+    body.drawing-main #compare-card .compare-card__head { display: none; }
+    /* The drawing takes the pane it was floating in. Same element, same parent — only its box. */
+    body.drawing-main #compare-card {
+      inset: 0;
+      width: auto;
+      height: auto;
+      min-height: 0;
+      transform: none;
+      border: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    /* The thumbnail's own title bar, built from the SAME rules as the drawing card's head so
+       the two thumbnails are one object to a learner. It anchors to the box it titles. */
+    .view-head {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 2;
+      border-radius: var(--radius-md) var(--radius-md) 0 0;
+    }
+    .view-head[hidden] { display: none; }
+
+    /* The drawing fills the pane at --z-compare, so the Compare cluster has to sit above it —
+       it is the one control that must never be behind a view (ADR-105). */
+    body.drawing-main .vp-cluster { z-index: calc(var(--z-compare) + 2); }
+
+    /* Minimized, the thumbnail is simply not there — its restore chip is. Whichever view is
+       floating is the one that goes. */
+    /* …but never in Compare Mode: that layout always shows both panes, whatever the lesson's
+       thumbnail was doing when it was entered (ADR-109). */
+    body.drawing-main.thumb-min:not(.compare-split) #view-box,
+    body:not(.drawing-main).thumb-min:not(.compare-split) #compare-card { display: none; }
+
+    /* ---- There is ONE thumbnail box, and it is `.compare-card[data-size="compact"]` above
+       (ADR-125, superseding ADR-120) ---------------------------------------------------------
+       ADR-120 gave Steps 4 and 6 a second sizing mode, `body.sheet-docked`: a full-height column
+       beside the solid rather than a card floating over it, on the reasoning that those two steps
+       relate a solid to its drawing so both are subjects. It cost the sim a consistent thumbnail
+       — the same panel was 420 x 320 on four steps and 403 x 876 on two — and a consistent
+       thumbnail is what the product owner asked for, twice.
+
+       So the mode is GONE rather than narrowed, and with it the `--sheet-col` / `--sheet-row`
+       tokens, the two `#view-box` re-rects, the shadow suppression and the four `.vp-note` /
+       `.vp-hint` re-anchors that only existed to dodge a column that is no longer there. Deleting
+       the mode is the fix; leaving it in place and adding a third selector to defeat it would
+       have been the bug. Every step that shows a thumbnail now reads its box from ONE rule, and
+       the only thing a step changes is what is drawn inside it.
+
+       What this knowingly gives back: on Steps 4 and 6 the card again overlaps the box the camera
+       framed the cone into. `verify/interaction.mjs` section 7 now MEASURES that overlap and
+       prints it rather than asserting it away, so the trade stays visible instead of quietly
+       becoming the new normal. Do not re-add a per-step sizing mode to fix it — reframe the
+       camera, which is the other lever and does not fork the chrome. */
+
     body.compare-split {
       display: grid;
       grid-template-columns: 1fr 1fr;
+      /* The two views, and one centred control strip beneath them (ADR-109). No lesson
+         sidebar: in Compare Mode the two pictures and the drivers that change them are the
+         whole of it. */
       grid-template-rows: minmax(0, 1fr) auto;
       grid-template-areas:
         "view compare"
@@ -497,7 +638,6 @@
       overflow: hidden; /* clip the WebGL canvas to the rounded corners */
     }
     body.compare-split #compare-card { grid-area: compare; }
-    body.compare-split #workbench-rail { grid-area: rail; }
     /* The wizard is collapsed BY the split; the chevron (main.js) exits it to bring it back. */
     body.compare-split #wizard { display: none; }
     /* In the 50/50 split the drawing head + the viewport chevron are redundant chrome — the
@@ -511,11 +651,17 @@
        platform-level part — the internal control FLOW below is a generic row and is meant to
        be re-tuned per module once you know your own driver count (Module 2's tuned
        column-major grid is domain-specific, not copied here). */
+    /* Compare Mode's control panel (ADR-109): the cone and the cut, CENTRED beneath both
+       viewports rather than down one side, so the two pictures stay the subject and the
+       controls read as one strip serving both. Rules taken from the sibling topic
+       graphics_module_3_topic_2_development_of_surfaces, which is the design reference. */
     #workbench-rail { display: none; }
     body.compare-split #workbench-rail {
+      grid-area: rail;              /* spans BOTH columns: one strip serving both panes */
       display: flex;
       flex-wrap: wrap;
       align-items: flex-start;
+      justify-content: center;      /* centred beneath the panes, not pushed to one edge */
       gap: var(--space-6) var(--space-5);
       padding: var(--space-4) var(--space-5);
       background: var(--color-paper);
@@ -523,8 +669,20 @@
       border-radius: var(--radius-md);
     }
     #workbench-rail .field { margin: 0; gap: var(--space-1); }
-    /* A per-step reveal used `hidden`; in the rail every driver is live. */
+    /* A per-step reveal used `hidden`; in the rail every driver is live… */
     #workbench-rail .field[hidden] { display: flex !important; }
+    /* …except "slide it past the tip" (ADR-110). Which conic a cut makes is decided by the
+       TILT; sliding the plane along its own normal moves the same curve up and down the cone
+       without changing what it is, so in a mode whose whole subject is how the tilt makes the
+       curve it is one dial too many. Two ids, to outrank the rule above. */
+    body.compare-split #workbench-rail #fld-sec-offset { display: none !important; }
+    /* The docked groups SHARE the rail rather than hugging its left edge. Left to their
+       intrinsic widths this topic's two groups used 775 px of a 1392 px rail and left 617 px
+       of dead space on the right; the sibling topic's happened to be wide enough to look
+       balanced by accident. Equal flex basis + a centred remainder gives both topics the
+       same balanced pair of columns at any rail width, and the cap stops a wide monitor
+       stretching a slider to absurdity. */
+    #workbench-rail > [data-ctrl] { flex: 1 1 0; min-width: 240px; max-width: 560px; }
 
     /* ---- Rail hide/reveal toggle: a dedicated control, independent of the wizard chevron,
        for a full-screen 3D/2D read of the split. A labelled "Hide"/"Show" pill: it claims
@@ -551,13 +709,8 @@
                   color var(--dur-fast) var(--ease-standard),
                   transform var(--dur-fast) var(--ease-standard);
     }
-    body.compare-split #rail-toggle {
-      display: inline-flex;
-      grid-area: view;
-      align-self: end;
-      justify-self: start;
-      margin: var(--space-4);
-    }
+    /* The rail toggle showed and hid the docked-controls rail. Compare Mode has no rail
+       (ADR-108), so the control has nothing to toggle and stays out of the way. */
     .rail-toggle:active { transform: scale(0.97); }
     .rail-toggle:focus-visible { outline: none; box-shadow: var(--ring-focus); }
     .rail-toggle__icon {
@@ -581,19 +734,44 @@
       grid-template-areas: "view compare";
     }
 
-    /* Narrow viewports: the compare card becomes a full-width bottom sheet (no room to float). */
+    /* ---- Phone: ONE PANE AT A TIME (ADR-123) ---------------------------------------------
+       A phone has no second pane to give. The bottom-sheet treatment this replaces put a
+       70%-height card over a viewport that was already only 42% of a 640px screen, so the
+       solid was left a 96,769px² occlusion and an 81px sliver — the same mistake ADR-120
+       fixed on the desktop, made worse by having a tenth of the room to fix it in.
+
+       So below 768px the drawing is not a window at all: it is the OTHER VIEW. It takes the
+       whole viewport, its own head's Minimize hands the bench back to the cone, and
+       #thumb-restore in the corner cluster brings it back — the switch the learner already
+       knows from Step 5, at the one width where it is the only honest layout. Neither pane is
+       ever partly covered, because only one of them is ever painted. */
     @media (max-width: 767px) {
-      .compare-card[data-size="compact"],
-      .compare-card[data-size="expanded"] {
-        top: auto;
-        bottom: 0;
-        left: 0;
-        right: 0;
+      body.sheet-solo #compare-card {
+        inset: 0;
+        width: auto;
+        height: auto;
+        min-height: 0;
         transform: none;
-        width: 100%;
-        height: 70%;
-        border-radius: var(--radius-md) var(--radius-md) 0 0;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
       }
+      /* The cluster is the SWITCH between the two views, so it has to outrank the view it is
+         switching away from — the same lift body.drawing-main gives it (ADR-105). */
+      body.sheet-solo .vp-cluster { z-index: calc(var(--z-compare) + 2); }
+      /* The pane that is not on screen is not RENDERED behind the one that is. The sheet's
+         paper fill already covers it, but "covered" and "gone" are different things to a CSS2D
+         label, which is a DOM node that would keep painting its leader over the drawing; and a
+         cheap phone should not be compositing a WebGL canvas nobody can see. visibility rather
+         than display, so #view-box keeps its box and the renderer keeps its size. */
+      body.sheet-solo #view-box { visibility: hidden; }
+      /* Both of these name something on the SOLID, so they leave with it. */
+      body.sheet-solo .vp-note,
+      body.sheet-solo .vp-hint { display: none; }
+
+      /* Nothing floats over the solid here, so the chevron that hides the step panel would be
+         under the sheet. It belongs to the 3D pane; it goes with it. */
+      body.sheet-solo #wizard-toggle { display: none; }
     }
     /* ---- Orbit-discovery hint: one-time, dismissible chip shown when the first
        solid appears; auto-dismisses on the first view drag (onboarding.js). ---- */
@@ -709,6 +887,10 @@
       border-bottom: 1px solid var(--color-border);
     }
     #mobile-notice[hidden] { display: none; }
+    /* The banner is fixed, so the bench underneath has to step down for it or the top of the
+       viewport — the sheet's own title bar, and the Minimize inside it — lands behind it
+       (ADR-123). main.js measures the banner and sets --notice-h; dismissing it returns 0. */
+    body.notice-up { padding-top: var(--notice-h, 0px); }
     .notice__text { margin: 0; font-size: var(--text-sm); }
     .notice__dismiss {
       flex: none;
@@ -836,7 +1018,7 @@
        ============================================================ */
     #wizard {
       flex: 0 0 auto;
-      width: clamp(340px, 34vw, 460px);
+      width: var(--wizard-w);
       height: 100%;
       display: flex;
       flex-direction: column; /* [library entry] / [problem header] stacked ABOVE the [card | rail] row */
@@ -981,6 +1163,16 @@
       overflow-y: auto;
       overflow-x: hidden;
       padding-right: var(--space-3); /* +12px scrollbar gutter (ADR-032) — keep the floating pill clear of the content */
+      /* Cut content has to ANNOUNCE itself. Step 1's hint ended mid-sentence at the fold with
+         nothing to say there was more, and the floating scrollbar pill only appears on hover in
+         this browser. A paper-to-transparent fade riding the scroll port says "there is more
+         below" and disappears at the end of the run — pure paint, no layout, and it costs the
+         content nothing because the gradient is a background, not a box. */
+      background:
+        linear-gradient(var(--color-paper) 30%, transparent) top / 100% 20px no-repeat local,
+        linear-gradient(transparent, var(--color-paper) 70%) bottom / 100% 20px no-repeat local,
+        radial-gradient(farthest-side at 50% 0, color-mix(in srgb, var(--color-ink) 12%, transparent), transparent) top / 100% 8px no-repeat scroll,
+        radial-gradient(farthest-side at 50% 100%, color-mix(in srgb, var(--color-ink) 12%, transparent), transparent) bottom / 100% 8px no-repeat scroll;
     }
     /* Floating padded scrollbar pill — platform standard (DESIGN.md §5.11, ADR-032). A 10px WebKit
        channel with a ~4px thumb that floats clear of both edges via a 3px transparent border +
@@ -1029,6 +1221,29 @@
 
     /* Step panels — only the active step's controls are present (progressive
        disclosure). Hidden ones are display:none via [hidden]. */
+    /* Step 5's manual stage stepper — two equal buttons under the playback. */
+    .build-nav { display: flex; gap: var(--space-2); }
+    /* Holds four lines of stage narration, so stepping through a construction never moves the
+       controls underneath it (the brief's "no jumping during playback"). */
+    #build-readout { min-height: calc(4 * 1.5em + 2 * var(--space-2)); }
+    /* The proof's stage counter: an eyebrow, not a heading — it tells the learner where they
+       are in the six without competing with the sentence underneath it. */
+    /* A counter AND a title. "STAGE 1 OF 7 · THE CUTTING PLANE" set 32 characters of sentence
+       in capitals; uppercase is for labels of a few words. The counter keeps the label treatment
+       because that is what it is, and the stage name is set beside it in sentence case. */
+    .proof-stage {
+      margin: 0;
+      font-size: var(--text-xs);
+      color: var(--color-accent);
+    }
+    .proof-stage__count {
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+    }
+    .proof-stage__name { font-weight: 700; }
+    .build-nav .btn { flex: 1 1 0; min-width: 0; }
+
     .step-panel { display: flex; flex-direction: column; gap: var(--space-5); }
     .step-panel[hidden] { display: none; }
     @keyframes panelIn {
@@ -1040,7 +1255,12 @@
     .card__nav {
       display: flex;
       align-items: center;
-      gap: var(--space-3);
+      /* Reset + Back + Next want 261px of content and the wizard's card gives 193px at the
+         340px floor, so below ~1000px the footer was clipping Next off its right edge — the
+         one control every step depends on. Wrapping is the content-driven answer: the row
+         falls to two lines rather than stealing width from the viewport (ADR-123). */
+      flex-wrap: wrap;
+      gap: var(--space-2) var(--space-3);
       margin-top: var(--space-5);
       padding-top: var(--space-4);
       border-top: 1px solid var(--color-border);
@@ -1075,7 +1295,12 @@
        sliders, numeric fields, selects, toggles, and buttons — unchanged from
        the Live-Sandbox dock, only relocated into the wizard. (DESIGN.md)
        ============================================================ */
+    /* `display: flex` on the class beats the UA's `[hidden] { display: none }`, so a group
+       hidden from script stayed on screen while the DOM insisted it was hidden — the two
+       groups added in 2026-08 are the first here to be hidden CONDITIONALLY, which is why
+       nothing had caught it. The attribute wins back explicitly. */
     .dock__group { display: flex; flex-direction: column; gap: var(--space-3); }
+    .dock__group[hidden] { display: none; }
     .dock__group-title {
       margin: 0 0 var(--space-1);
       padding-bottom: var(--space-2);
@@ -1107,6 +1332,185 @@
       color: var(--color-ink);
       background: var(--color-accent-soft);
       border-radius: var(--radius-sm);
+    }
+
+    /* --- The methodology card (ADR-098): Method / Purpose / Instruments / Output. A label
+           column and a value column, on the same 4px rhythm as everything else, with a readable
+           measure. NOT `.measure`, which is a numeric readout. --- */
+    .method-info { margin: 0; display: grid; gap: var(--space-2); }
+    .method-info div {
+      display: grid;
+      grid-template-columns: 6.5rem 1fr;
+      gap: var(--space-1) var(--space-3);
+      align-items: baseline;
+    }
+    .method-info dt {
+      font-size: var(--text-xs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-ink-secondary);
+    }
+    /* The live eccentricity of the cut on the bench, beside the tilt that drives it. */
+    .ecc-badge {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-2);
+      margin: 0;
+      padding: var(--space-2) var(--space-3);
+      background: var(--color-panel);
+      border-radius: var(--radius-sm);
+    }
+    .ecc-badge__label { font-size: var(--text-xs); color: var(--color-ink-secondary); }
+    .ecc-badge__value {
+      font-family: var(--font-mono);
+      font-size: var(--text-lg);
+      font-weight: 700;
+      color: var(--color-ink);
+      font-variant-numeric: tabular-nums;
+    }
+    .ecc-badge__curve { font-size: var(--text-xs); font-weight: 700; color: var(--color-accent); }
+
+    /* The four names and the number each one owns. A reference table, not a control. */
+    .ecc-table { margin: 0; display: flex; flex-direction: column; gap: 1px; background: var(--color-border); border: 1px solid var(--color-border); border-radius: var(--radius-sm); overflow: hidden; }
+    .ecc-table > div { padding: var(--space-2) var(--space-3); background: var(--color-paper); }
+    .ecc-table dt { display: flex; justify-content: space-between; gap: var(--space-2); font-size: var(--text-sm); font-weight: 700; color: var(--color-ink); }
+    .ecc-table dd { margin: var(--space-1) 0 0; font-size: var(--text-xs); color: var(--color-ink-secondary); }
+    .ecc-table__e { font-family: var(--font-mono); font-weight: 600; color: var(--color-ink-secondary); }
+    /* The row the cut on the bench is currently in — the table reads as a live position, not a list. */
+    .ecc-table > div[data-here="true"] { background: var(--color-accent-soft); }
+    .ecc-table > div[data-here="true"] dt,
+    .ecc-table > div[data-here="true"] .ecc-table__e { color: var(--color-accent); }
+
+    /* CHANGE 2 — the curve picker: three segmented buttons on one grid. */
+    .curve-picker { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
+    .curve-picker button {
+      min-height: 44px;
+      padding: var(--space-2);
+      font: inherit;
+      font-size: var(--text-xs);
+      font-weight: 700;
+      color: var(--color-ink-secondary);
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+    }
+    .curve-picker button[aria-checked="true"] {
+      color: var(--color-accent);
+      background: var(--color-accent-soft);
+      border-color: var(--color-accent);
+    }
+    .curve-picker button:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 2px; }
+
+    .method-info dd {
+      margin: 0;
+      max-width: 42ch;          /* the same readable measure the step copy uses */
+      font-size: var(--text-xs);
+      line-height: 1.5;
+      color: var(--color-ink);
+    }
+
+    /* --- Engineering Terms (ADR-098): a disclosure, closed by default, so a learner who
+           wants the vocabulary can have it without it crowding the construction. --- */
+    /* The summary carries the same eyebrow as a .dock__group-title, so a collapsed panel reads
+       as one more section of the dock rather than as a box dropped into it. */
+    .terms-panel__summary {
+      margin: 0 0 var(--space-1);
+      padding-bottom: var(--space-2);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--color-ink-secondary);
+      border-bottom: 1px solid var(--color-border);
+      cursor: pointer;
+    }
+    .terms-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      display: grid;
+      gap: var(--space-1);
+    }
+    .terms-list li {
+      padding: var(--space-1) var(--space-2);
+      font-size: var(--text-xs);
+      line-height: 1.5;
+      border-radius: var(--radius-sm);
+      cursor: help;
+    }
+    .terms-list li:hover, .terms-list li:focus-visible {
+      background: var(--color-accent-soft);
+      outline: none;
+    }
+    .terms-list b { color: var(--color-conic-mark); font-weight: 700; }
+    .terms-list span { display: block; color: var(--color-ink-secondary); }
+
+    /* --- Syllabus badge (ADR-098). Two states, each carrying a glyph as well as a colour,
+           so the distinction survives a colour-vision difference (DESIGN.md Two-Cue Rule). --- */
+    .method-badge {
+      margin: 0;
+      display: flex;
+      flex-wrap: wrap;               /* the reference drops to its own line before it clips */
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-1) var(--space-2);
+      padding: var(--space-1) var(--space-2);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      border-radius: var(--radius-sm);
+      border: 1px solid transparent;
+    }
+    .method-badge[data-scope="required"] {
+      color: var(--color-success);
+      background: var(--color-success-soft);
+      border-color: var(--color-success);
+    }
+    .method-badge[data-scope="beyond"] {
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border-color: var(--color-border);
+    }
+    .method-badge__ref { font-weight: 400; opacity: 0.85; }
+
+    /* --- The results block (ADR-091): what the finished construction measures. A
+           definition list, because that is what it is — a quantity and its value. The value
+           is monospaced and right-aligned so a column of numbers can be scanned, and the
+           "read it here" note under each is the drawing's own lettering. --- */
+    .measure {
+      margin: 0;
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0 var(--space-3);
+      align-items: baseline;
+    }
+    .measure dt {
+      font-size: var(--text-xs);
+      color: var(--color-ink);
+      padding: var(--space-1) 0;
+    }
+    .measure dt small {
+      display: block;
+      color: var(--color-ink-secondary);
+      font-size: 0.92em;
+    }
+    .measure dd {
+      margin: 0;
+      padding: var(--space-1) 0;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-variant-numeric: tabular-nums;
+      color: var(--color-conic-mark);
+      text-align: right;
+      white-space: nowrap;
+    }
+    .measure div {
+      display: contents;
+    }
+    .measure div + div dt,
+    .measure div + div dd {
+      border-top: 1px solid var(--color-border);
     }
 
     /* --- Slider + numeric field --- */
@@ -1288,6 +1692,9 @@
       min-height: 44px;
       cursor: pointer;
     }
+    /* A class selector outranks the UA's `[hidden] { display: none }`, so a hidden toggle stayed
+       on screen. Every display-setting component here needs its own hidden rule. */
+    .toggle[hidden] { display: none; }
     .toggle input {
       flex: none;
       width: 18px;
@@ -1460,6 +1867,9 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      /* "STEP 6 OF 6 · Your turn" beside "Practice problems" needs 280px and the narrow card
+         gives 272, so the entry was clipping at the card's edge. It wraps instead (ADR-123). */
+      flex-wrap: wrap;
       gap: var(--space-2);
       margin: 0 0 var(--space-1);
     }
@@ -1773,13 +2183,29 @@
     @media (max-width: 767px) {
       body { flex-direction: column; }
 
-      /* 1) Viewport on top — give it a fixed slice so it always stays visible. */
+      /* 1) Viewport on top — give it a fixed slice so it always stays visible.
+         A PERCENTAGE slice was the wrong unit: 42% of a 640px phone is 269px of picture and
+         leaves the step card a 99px scroll port, about one line of usable height, which is
+         what made Step 6's "Set up a cut" unreachable (ADR-123). The picture needs a floor
+         and a ceiling, not a share — the panel below it is where the lesson is read, and its
+         content does not shrink with the screen. clamp() gives the solid a fair 34vh between
+         190 and 300px and hands every pixel above that to the card. */
       #sim-viewport {
         order: 0;
         width: 100%;
-        flex: 0 0 42%;
+        flex: 0 0 clamp(190px, 34vh, 300px);
         height: auto;
         min-height: 0;
+      }
+
+      /* A 30rem note centred in a 360px pane cannot clear a cluster pinned to that pane's left
+         edge, so it stacks below the corner rather than running through it — the resolution
+         ADR-120 already reached for the docked layout, at the width where the collision is
+         unavoidable. The offset is the cluster's own top plus its two 44px chips, so the two
+         move together if that stack is ever re-spaced. */
+      .vp-note {
+        top: calc(44px + var(--space-5) + 44px + var(--space-2) + 44px + var(--space-2));
+        max-width: min(32ch, calc(100% - var(--space-5)));
       }
 
       /* Wizard folded away → viewport reclaims the freed height (overrides the 42%
@@ -1803,18 +2229,26 @@
         flex-direction: column;
         border-left: none;
         border-top: 1px solid var(--color-border);
+        /* Desktop chrome padding (20/16) spends 72px of a phone's vertical budget on nothing.
+           Tighten it, and clear the home indicator on a notched device — the step rail is the
+           bottom-most thing on screen here and the gesture bar sits on top of it. */
+        padding: var(--space-3);
+        padding-bottom: max(var(--space-3), env(safe-area-inset-bottom));
       }
 
       /* Stack the card above the rail on mobile (their order props carry the
          card-first reading order set below). */
-      .wizard-main { flex-direction: column; }
+      .wizard-main { flex-direction: column; gap: var(--space-3); }
 
       /* 2) Parameter card — first within the wizard, takes the scrollable space. */
       #step-card {
         order: 1;
         flex: 1 1 auto;
         min-height: 0;
+        padding: var(--space-4) var(--space-3);
       }
+      /* The pinned footer keeps its separator but not its desktop breathing room. */
+      .card__nav { margin-top: var(--space-3); padding-top: var(--space-3); }
 
       /* 3) Step rail — last, reflowed from a vertical spine into a horizontal
          strip spanning the full width beneath the parameters. */
@@ -1823,17 +2257,90 @@
         flex: 0 0 auto;
         flex-direction: row;
         width: 100%;
-        padding: var(--space-3) 0 0;
+        padding: var(--space-2) 0 0;
       }
+      /* Markers only. The rail is a progress spine, and the step it is pointing at is already
+         spelled out one line above it in the card's eyebrow ("STEP 6 OF 6 · Your turn"); a
+         second copy in 11px type cost 26px of the height the card needed. The buttons keep
+         their full 44px targets and their accessible names, so nothing is lost but the echo. */
+      .rail__label { display: none; }
+      /* …and with the label gone the button is sized by the 34px marker alone, so the floor
+         has to be stated rather than inherited from the content it just lost. */
+      .rail__btn { min-height: 44px; }
       /* Spine runs horizontally, threading through the marker centres. */
       #step-rail::before {
         left: 30px;
         right: 30px;
-        top: calc(var(--space-3) + 17px);
+        top: calc(var(--space-2) + 17px);
         bottom: auto;
         width: auto;
         height: 2px;
         transform: translateY(-50%);
+      }
+    }
+
+    /* ---- Phone in LANDSCAPE: the scarce axis flips (ADR-123) -------------------------------
+       Stacking assumes height is the axis with room in it. Turned sideways a phone has 375px
+       of height and 667 of width, and stacking there gives the solid a 190px band and the step
+       card what is left of 185. So below 768px AND under 520px tall the two go back to being
+       columns — the desktop relationship at phone scale, with the wizard on a narrower clamp so
+       neither column starves. The rules restate the desktop defaults rather than relying on
+       cascade order, because the stacking block above is what they have to beat. */
+    @media (max-width: 767px) and (max-height: 520px) {
+      body { flex-direction: row; }
+      #sim-viewport { flex: 1 1 0; width: auto; height: 100%; }
+      #wizard {
+        width: clamp(260px, 50vw, 360px);
+        height: 100%;
+        flex: 0 0 auto;
+        border-left: 1px solid var(--color-border);
+        border-top: none;
+        padding-left: max(var(--space-3), env(safe-area-inset-right));
+      }
+      .wizard-main { flex-direction: row; gap: var(--space-3); }
+      /* Height is the scarce axis here, so the footer must not spend a second row on a width
+         floor set for a 460px panel. The labels are two words; let them be two words. */
+      .card__nav .btn--nav { min-width: 0; }
+      /* The advisory is 18% of a sideways phone's height. It keeps its 44px dismiss target and
+         gives up the padding around it. */
+      #mobile-notice { padding-top: var(--space-2); padding-bottom: var(--space-2); }
+      #step-rail {
+        flex-direction: column;
+        width: 44px;
+        padding: var(--space-2) 0;
+      }
+      #step-rail::before {
+        left: 50%; right: auto; top: 30px; bottom: 30px;
+        width: 2px; height: auto;
+        transform: translateX(-50%);
+      }
+      .wizard-toggle__icon { transform: none; }
+      body.wizard-collapsed .wizard-toggle__icon { transform: rotate(180deg); }
+    }
+
+    /* ---- Coarse pointers: the 44px floor is not a desktop-only promise ---------------------
+       Screen width does not tell you the input method, so these are gated on the POINTER, not
+       on a breakpoint: a touch laptop gets them at 1440px and a phone with a stylus does not
+       lose them at 360. The three treatments below are the only ones in the sheet that paint
+       below 44px, and each one is a control a learner presses to move the lesson on: Reset,
+       the Compare / Switch view / Restore chips, and the numeric entries beside the sliders.
+       (The 32px window glyphs already carry a centred 44px ::before hit area.) */
+    @media (pointer: coarse) {
+      .btn--ghost { min-height: 44px; }
+      .compare-chip { min-height: 44px; }
+      .field__num { min-height: 44px; }
+      /* Inline glossary terms sit in running prose, so they cannot take a 44px box without
+         opening holes in the paragraph — they get a padded band instead, which lifts the strike
+         area to ~32px without moving a line of type. */
+      .term { padding-block: var(--space-1); }
+    }
+
+    /* Notched devices: the advisory banner is fixed to the very top of the screen. */
+    @supports (padding: max(0px)) {
+      #mobile-notice {
+        padding-top: max(var(--space-3), env(safe-area-inset-top));
+        padding-left: max(var(--space-4), env(safe-area-inset-left));
+        padding-right: max(var(--space-4), env(safe-area-inset-right));
       }
     }
   </style>
@@ -1985,21 +2492,29 @@
             </label>
             <p class="dock__readout" id="cone-readout"></p>
           </div>
-          <p class="dock__note">The line that sweeps the surface is the
-              <button type="button" class="term" aria-describedby="def-generator">generator<span class="term__pop" role="tooltip" id="def-generator">The straight line that sweeps out the cone: one end pinned at the apex, the other running round the base circle. Its angle is the one number the whole chapter turns on.</span></button>;
-              the tip it turns about is the
-              <button type="button" class="term" aria-describedby="def-apex">apex<span class="term__pop" role="tooltip" id="def-apex">The fixed point the generator turns about, also called the vertex of the cone. Careful: the vertex of the CONE and the vertex of the CURVE are different things.</span></button>.
-              Each half is a
-              <button type="button" class="term" aria-describedby="def-nappe">nappe<span class="term__pop" role="tooltip" id="def-nappe">The surface does not stop at the tip — it carries on the other way. Each half of that double cone is a nappe.</span></button>.</p>
+          <p class="dock__note">Hover any label on the cone to see what it means. The sloping side is called the
+              <button type="button" class="term" aria-describedby="def-generator">generator<span class="term__pop" role="tooltip" id="def-generator">The straight sloping line that sweeps out the cone’s surface. How steep it is decides every curve in this chapter.</span></button>,
+              the sharp tip is the
+              <button type="button" class="term" aria-describedby="def-apex">apex<span class="term__pop" role="tooltip" id="def-apex">The sharp tip where all the sloping lines meet.</span></button>,
+              and each half of the double cone is called a
+              <button type="button" class="term" aria-describedby="def-nappe">nappe<span class="term__pop" role="tooltip" id="def-nappe">One half of the double cone. The surface does not stop at the tip — it carries on the other way.</span></button>.</p>
         </section>
 
         <!-- STEP 2 — cut it (§6.1). ONE control: the tilt. The plane is switched on by
              setStage(), because turning it on IS what this step means; the offset stays out
              of the way until Step 3 needs it for the apex cut. -->
         <section class="step-panel" data-step="2" hidden>
-          <p class="dock__note"><strong>Drag the tilt slider</strong> slowly from 0° upward. Watch the shape of the pink face — that face is the whole subject of this chapter.</p>
+          <p class="dock__note"><strong>Tick “Cut the cone”</strong>, then drag the tilt slider slowly from 0° upward. Watch the shape of the red cut face — that face is the whole subject of this chapter.</p>
           <div class="dock__group" data-ctrl="section">
             <h3 class="dock__group-title">The cut</h3>
+            <!-- The reference topic's interaction (graphics_module_3_topic_1_sections_of_solids
+                 #tgl-section): the plane is placed first and the learner decides when it bites.
+                 Unticked the cone is whole and the plane is a knife being aimed; ticked, the
+                 clipper truncates each nappe and the cap becomes the section face. -->
+            <label class="toggle" for="tgl-cut">
+              <input type="checkbox" id="tgl-cut" />
+              <span class="toggle__text">Cut the cone</span>
+            </label>
             <div class="field">
               <label class="field__label" for="rng-sec-angle"><span class="field__name">Tilt of the cut (°)</span></label>
               <div class="field__row">
@@ -2024,7 +2539,6 @@
         <section class="step-panel" data-step="3" hidden>
           <div class="dock__group" data-ctrl="tour">
             <h3 class="dock__group-title">Show me</h3>
-            <p class="dock__note">Six cuts, six shapes. Press one and watch the plane travel there.</p>
             <div class="tour-chips" id="tour-chips" role="group" aria-label="Show me each cut"></div>
             <p class="dock__readout" id="tour-readout"></p>
             <div class="hint">
@@ -2038,17 +2552,50 @@
              eccentricity. The comparison toggle answers "why is an ellipse not a parabola",
              and the names toggle holds §6.2/§6.4/§6.8's vocabulary back until asked for. -->
         <section class="step-panel" data-step="4" hidden>
+          <!-- THE PROOF (ADR-095). Six stages, walked BY HAND with the same two-button stepper
+               Step 5 uses for its construction: one press, one idea, then it waits. Nothing
+               plays by itself, and nothing reaches the drawing sheet before the cone has
+               explained it. Next is disabled while a stage's own animation is running. -->
+          <div class="dock__group" data-ctrl="proof">
+            <h3 class="dock__group-title">Focus and directrix</h3>
+            <p class="dock__note">Watch the cone. Each press shows one more step of the proof — and you can step back at any time.</p>
+            <p class="proof-stage" id="proof-stage"></p>
+            <p class="dock__readout" id="proof-readout"></p>
+            <div class="build-nav" id="proof-nav">
+              <button id="btn-proof-prev" class="btn btn--nav" type="button">‹ Back</button>
+              <button id="btn-proof-next" class="btn btn--primary btn--nav" type="button">Next ›</button>
+            </div>
+          </div>
+
+          <!-- CHANGE 1 — the same four cuts Step 3 offers, so the two questions this step asks
+               can be compared side by side without walking back a step. The chips are built by
+               uiManager from sim.sectionTour() and press sim.tourCut(), the SAME data and the
+               same call Step 3 uses — no second implementation (ADR-107). -->
+          <div class="dock__group" data-ctrl="whichcut">
+            <h3 class="dock__group-title">Try each cut</h3>
+            <div class="tour-chips" id="why-chips" role="group" aria-label="Try each named cut"></div>
+          </div>
+
           <div class="dock__group" data-ctrl="conic">
-            <h3 class="dock__group-title">Try this</h3>
-            <p class="dock__note">On the sheet, <strong>P</strong> is a point on the curve. Two distances are marked: <strong>PF</strong> to the fixed point, and <strong>PQ</strong> to the fixed line. Drag the slider and watch what their ratio does to the shape.</p>
+            <h3 class="dock__group-title">Why this curve</h3>
+            <!-- Step 4's driver is the CUT, not an abstract ratio: the sheet draws the curve of
+                 the live section (e = sin θ ÷ sin g, ADR-088), so tilting the plane changes both
+                 panes at once and the learner never has to relate two independent pictures. -->
             <div class="field">
-              <label class="field__label" for="rng-ecc"><span class="field__name">The ratio PF ÷ PQ</span></label>
+              <label class="field__label" for="rng-cut-tilt"><span class="field__name">Tilt of the cut (°)</span></label>
               <div class="field__row">
-                <input class="field__range" type="range" id="rng-ecc" min="0.2" max="2.5" step="0.05" />
-                <input class="field__num" type="text" id="num-ecc" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="The ratio of the distance from the focus to the distance from the directrix" />
+                <input class="field__range" type="range" id="rng-cut-tilt" min="0" max="90" step="1" />
+                <input class="field__num" type="text" id="num-cut-tilt" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Tilt of the cutting plane, exact value in degrees" />
               </div>
             </div>
             <p class="dock__readout" id="conic-readout"></p>
+            <!-- CHANGE 4 — the live value. This is the REAL eccentricity of the cut on the
+                 bench (e = sin θ ÷ sin g, ADR-088), not an approximation keyed off the name. -->
+            <p class="ecc-badge" id="ecc-badge">
+              <span class="ecc-badge__label">Eccentricity <em>e</em></span>
+              <span class="ecc-badge__value" id="ecc-value">—</span>
+              <span class="ecc-badge__curve" id="ecc-curve"></span>
+            </p>
             <label class="toggle" for="tgl-show-all">
               <input type="checkbox" id="tgl-show-all" />
               <span class="toggle__text">Show all three together</span>
@@ -2057,14 +2604,44 @@
               <input type="checkbox" id="tgl-show-names" />
               <span class="toggle__text">Label the engineering names</span>
             </label>
-            <div class="hint">
+          </div>
+
+          <!-- CHANGE 2/3/5 — the second question this step exists to answer: not just why the
+               curves differ, but why they have the names they do (ADR-107). -->
+          <div class="dock__group" data-ctrl="ecc">
+            <h3 class="dock__group-title">Why the curve changes</h3>
+            <p class="dock__note">Engineers describe every one of these curves with a single number — the <strong>eccentricity</strong>. It says how far the cutting plane has leaned away from the base. Tilt the plane and that number changes, and when it passes certain values the curve becomes a different kind of curve altogether. That is where the four names come from.</p>
+            <!-- Updated on every cut: the sentence belongs to the curve on the bench. -->
+            <p class="dock__readout" id="ecc-why"></p>
+            <dl class="ecc-table" id="ecc-table">
+              <div data-curve="Circle">
+                <dt>Circle <span class="ecc-table__e">e = 0</span></dt>
+                <dd>The plane cuts parallel to the base. Perfectly round.</dd>
+              </div>
+              <div data-curve="Ellipse">
+                <dt>Ellipse <span class="ecc-table__e">0 &lt; e &lt; 1</span></dt>
+                <dd>The plane is tilted, but not past the cone's own sloping side. The curve closes.</dd>
+              </div>
+              <div data-curve="Parabola">
+                <dt>Parabola <span class="ecc-table__e">e = 1</span></dt>
+                <dd>The plane is parallel to one side of the cone. The curve never closes.</dd>
+              </div>
+              <div data-curve="Hyperbola">
+                <dt>Hyperbola <span class="ecc-table__e">e &gt; 1</span></dt>
+                <dd>The plane is steeper still and reaches the second half of the cone. Two branches.</dd>
+              </div>
+            </dl>
+            <!-- The vocabulary arrives LAST, and only once the reveal has put the thing each
+                 word names on the sheet (RULES.md §6.27). uiManager unhides this block at the
+                 final locus stage. -->
+            <div class="hint" id="hint-locus-terms" hidden>
               <svg class="hint__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/></svg>
-              <span>In the exam this ratio is the
-                <button type="button" class="term" aria-describedby="def-ecc">eccentricity<span class="term__pop" role="tooltip" id="def-ecc">e = PF ÷ PQ, the same for every point on one curve. Less than 1 an ellipse, exactly 1 a parabola, more than 1 a hyperbola.</span></button>, <em>e</em>;
-                the fixed point is the
-                <button type="button" class="term" aria-describedby="def-focus">focus<span class="term__pop" role="tooltip" id="def-focus">Drop a sphere into the cone until it touches the cutting plane. The point where it touches is the focus of the curve.</span></button>
+              <span>Now the names. That ratio is the
+                <button type="button" class="term" aria-describedby="def-ecc">eccentricity<span class="term__pop" role="tooltip" id="def-ecc">A single number that decides which curve you get: below 1 an ellipse, exactly 1 a parabola, above 1 a hyperbola.</span></button>, written <em>e</em>.
+                The fixed point is the
+                <button type="button" class="term" aria-describedby="def-focus">focus<span class="term__pop" role="tooltip" id="def-focus">The fixed point every point on the curve is measured from. On the cone it is where a sphere inscribed in the cone touches the cutting plane; on the sheet it is marked F.</span></button>
                 and the fixed line the
-                <button type="button" class="term" aria-describedby="def-directrix">directrix<span class="term__pop" role="tooltip" id="def-directrix">The line where the cutting plane meets the plane that touches the cone all round. Every distance PQ is measured square to it.</span></button>.</span>
+                <button type="button" class="term" aria-describedby="def-directrix">directrix<span class="term__pop" role="tooltip" id="def-directrix">The fixed line every point on the curve is measured to. On the cone it is where the tangent plane — the plane holding the circle the sphere touches the cone in — crosses the cutting plane. Distances to it are measured square on.</span></button>.</span>
             </div>
           </div>
         </section>
@@ -2074,33 +2651,67 @@
              only other control, and its dimension fields appear only for the method that
              is given them. -->
         <section class="step-panel" data-step="5" hidden>
+          <!-- The WHY → HOW hand-over (ADR-098/100). Steps 1-4 answered why the curves differ;
+               from here the same curve is drawn with instruments, and the learner should feel
+               the change of gear rather than just find different controls. -->
+          <p class="dock__note">You have understood <strong>why</strong> the curve forms. Now learn <strong>how</strong> it is constructed on paper — scale, compass, set square. No cone from here.</p>
+
+          <!-- CHANGE 2 — pick the curve here. A learner comparing the three constructions should
+               never have to walk back to Step 3 and forward again to do it. -->
+          <div class="dock__group" data-ctrl="curve">
+            <h3 class="dock__group-title">Draw this curve</h3>
+            <div class="curve-picker" id="curve-picker" role="radiogroup" aria-label="Which curve to construct"></div>
+          </div>
+          <!-- The methodology card (ADR-098). The syllabus's own words for this subtopic are
+               "Conic Sections — Methodology and terminology", and this is the methodology half:
+               what the method is for, what it needs, what it leaves you with. One line each. -->
+          <!-- IMPROVEMENT 4 — the hierarchy a learner works down: which curve, then which
+               construction, then that construction's own givens, then the drawing controls.
+               The method was buried five controls into the playback group (ADR-102). -->
+          <div class="dock__group" data-ctrl="method">
+            <h3 class="dock__group-title">Construction method</h3>
+            <div class="field">
+              <label class="field__label" for="ctl-method"><span class="field__name">Method</span></label>
+              <!-- Rebuilt by uiManager from methodsByTier(): the syllabus tier first, the rest
+                   under "Additional methods". Nothing is removed, only ordered. -->
+              <select id="ctl-method" class="field__select"></select>
+            </div>
+          </div>
+
           <div class="dock__group" data-ctrl="construct">
             <h3 class="dock__group-title">Watch it drawn</h3>
-            <p class="dock__note">A draughtsman cannot trace a cone. Instead they plot a few points that obey the ratio, then join them — which is exactly what the sheet is doing.</p>
             <button id="btn-play-build" class="btn btn--primary btn--block" type="button">Draw it step by step</button>
+            <!-- Pause holds the playback where it stands (ADR-098). Hidden until there is a
+                 playback to pause, so it is never a dead control. -->
+            <button id="btn-pause-build" class="btn btn--nav btn--block" type="button" disabled>Pause</button>
+            <!-- Step through the same stages by hand. Play is the demonstration; these are how
+                 a learner re-reads one line they did not follow. -->
+            <div class="build-nav" id="build-nav">
+              <button id="btn-build-prev" class="btn btn--nav" type="button">‹ Back a line</button>
+              <button id="btn-build-next" class="btn btn--nav" type="button">Next line ›</button>
+            </div>
             <p class="dock__readout" id="build-readout"></p>
-            <div class="field">
-              <label class="field__label" for="ctl-method"><span class="field__name">Construction</span></label>
-              <select id="ctl-method" class="field__select">
-                <option value="eccentricity">Focus &amp; directrix (works for all three)</option>
-                <optgroup label="Ellipse only">
-                  <option value="ellipse-concentric">Concentric circles</option>
-                  <option value="ellipse-oblong">Rectangle (oblong)</option>
-                  <option value="ellipse-parallelogram">Parallelogram</option>
-                  <option value="ellipse-arcs">Intersecting arcs</option>
-                </optgroup>
-                <optgroup label="Parabola only">
-                  <option value="parabola-tangent">Tangent method</option>
-                  <option value="parabola-rectangle">Rectangle method</option>
-                  <option value="parabola-parallelogram">Parallelogram method</option>
-                  <option value="parabola-offset">Offset method</option>
-                </optgroup>
-                <optgroup label="Hyperbola only">
-                  <option value="hyperbola-foci">From the two foci</option>
-                  <option value="hyperbola-ordinate">From the axis &amp; an ordinate</option>
-                  <option value="hyperbola-asymptotes">From the asymptotes</option>
-                </optgroup>
-              </select>
+            <label class="toggle" for="tgl-construction">
+              <input type="checkbox" id="tgl-construction" checked />
+              <span class="toggle__text">Show the construction lines</span>
+            </label>
+            <!-- The two quantities every eccentricity-method exercise in the chapter is GIVEN.
+                 They live here, with the constructions and the problem library, because from
+                 Step 5 the learner is drawing from given data rather than reading their own
+                 cut (ADR-088). -->
+            <div class="field" id="fld-ecc">
+              <label class="field__label" for="rng-ecc"><span class="field__name">Eccentricity <em>e</em></span></label>
+              <div class="field__row">
+                <input class="field__range" type="range" id="rng-ecc" min="0.2" max="2.5" step="0.05" />
+                <input class="field__num" type="text" id="num-ecc" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Eccentricity, the ratio of the distance from the focus to the distance from the directrix" />
+              </div>
+            </div>
+            <div class="field" id="fld-fa">
+              <label class="field__label" for="rng-fa"><span class="field__name">Focus to directrix (mm)</span></label>
+              <div class="field__row">
+                <input class="field__range" type="range" id="rng-fa" min="20" max="90" step="1" />
+                <input class="field__num" type="text" id="num-fa" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Distance from the focus to the directrix, exact value in millimetres" />
+              </div>
             </div>
             <div class="field" id="fld-dim1">
               <label class="field__label" for="rng-dim1"><span class="field__name" id="lbl-dim1">Dimension</span></label>
@@ -2130,10 +2741,10 @@
                 <input class="field__num" type="text" id="num-points" inputmode="decimal" autocomplete="off" spellcheck="false" aria-label="Number of points plotted, exact value" />
               </div>
             </div>
-            <label class="toggle" for="tgl-tangent">
+            <label class="toggle" for="tgl-tangent" id="fld-tangent">
               <input type="checkbox" id="tgl-tangent" checked />
               <span class="toggle__text">Add the
-                <button type="button" class="term" aria-describedby="def-tangent">tangent<span class="term__pop" role="tooltip" id="def-tangent">A line that just touches the curve at one point. The normal is the line square to it at that same point. Exam questions ask for both.</span></button>
+                <button type="button" class="term" aria-describedby="def-tangent">tangent<span class="term__pop" role="tooltip" id="def-tangent">A line that just touches the curve at one point. The normal is the line at right angles to it there.</span></button>
                 at P</span>
             </label>
             <div class="field" id="fld-point">
@@ -2144,6 +2755,47 @@
               </div>
             </div>
           </div>
+          <!-- §6.6's three properties of the parabola (ADR-093), shown only while a parabola is
+               the curve on the sheet. The chapter states each in a sentence and then uses them
+               in the constructions; a sentence is not a reason to believe a claim about a curve,
+               and all three are exact, so each is drawn instead. -->
+          <!-- IMPROVEMENT 4 — reference material, BELOW the controls that act. This card is
+               seven rows of prose read once; sitting above the playback it pushed "Draw it
+               step by step" nearly a thousand pixels down the scroller (ADR-102). -->
+          <div class="dock__group" data-ctrl="methodology">
+            <h3 class="dock__group-title">About this method</h3>
+            <p class="method-badge" id="method-badge"></p>
+            <dl class="method-info" id="method-info"></dl>
+          </div>
+
+          <div class="dock__group" id="props-group" hidden>
+            <h3 class="dock__group-title">The parabola’s own three</h3>
+            <!-- A toggle (ADR-116): pressing it again puts the construction back exactly as it
+                 was. uiManager keeps the label and aria-pressed in step with the sheet. -->
+            <button id="btn-props" class="btn btn--primary btn--block" type="button" aria-pressed="false">Show its three properties</button>
+            <p class="dock__readout" id="props-readout"></p>
+            <div class="hint">
+              <svg class="hint__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 7.5h.01"/></svg>
+              <span>This is the shape of a headlamp reflector, a solar concentrator, a bridge arch, and the path of anything thrown — which is why the chapter spends five methods on drawing it.</span>
+            </div>
+          </div>
+          <!-- Engineering Terms (ADR-098). Collapsible, and built from the terms the CURRENT
+               drawing actually contains — so hovering one always lights something up. The
+               highlight is the same `sheetHover` the cursor uses; drawHighlight() is not
+               duplicated. -->
+          <details class="dock__group terms-panel" id="terms-panel">
+            <summary class="terms-panel__summary">Engineering terms</summary>
+            <ul class="terms-list" id="terms-list"></ul>
+          </details>
+          <!-- What the finished drawing YIELDS (ADR-091). Six of the chapter's fifteen exercises
+               end in "measure", "determine", "find" or "locate", and a construction that draws
+               the answer without stating it leaves the learner guessing at what to read off.
+               Populated by uiManager from sim.sheetResults(); hidden when there is no drawing. -->
+          <div class="dock__group" id="measure-group" hidden>
+            <h3 class="dock__group-title">What the drawing gives you</h3>
+            <dl class="measure" id="measure-list"></dl>
+            <p class="dock__note">Read each one off the sheet to check it — the letters name where it is.</p>
+          </div>
         </section>
 
         <!-- STEP 6 — predict, then verify (the assessment step). The sim deals a cut the
@@ -2152,8 +2804,7 @@
              stay one click away in the card header. -->
         <section class="step-panel" data-step="6" hidden>
           <div class="dock__group" data-ctrl="predict">
-            <h3 class="dock__group-title">Your turn</h3>
-            <p class="dock__note">The plane moves somewhere you did not choose. Turn the view, look at the cut, and say which curve it is — <em>before</em> you check.</p>
+            <h3 class="dock__group-title">Name the cut</h3>
             <button id="btn-deal-cut" class="btn btn--primary btn--block" type="button">Set up a cut</button>
             <div class="tour-chips" id="predict-chips" role="group" aria-label="Name this cut"></div>
             <p class="match-status" id="predict-status"></p>
@@ -2200,17 +2851,48 @@
       <span class="sr-only">Toggle steps panel</span>
     </button>
 
+    <!-- The 3D pane's own thumbnail head (ADR-103). Present only while the 3D is the small
+         viewer, and styled from the SAME .compare-card__head rules as the drawing's, so the two
+         thumbnails are the same object in the learner's eyes. -->
+    <div class="compare-card__head view-head" id="view-head" hidden>
+      <span class="compare-card__tab">3D reference</span>
+      <button id="view-min" class="compare-card__btn" type="button" aria-label="Minimize the 3D view to a chip" title="Minimize">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true">
+          <path d="M6 12h12"/>
+        </svg>
+      </button>
+      <!-- ONE control (ADR-115). Close is gone: it did the same thing minimize does, and two
+           buttons for one outcome is what made this head read as a window rather than a
+           reference. Minimize collapses to #thumb-restore, which brings it back as it was. -->
+    </div>
+
     <!-- Top-left viewport cluster: the chip that opens the drawing sheet. The container
          is click-through; only the controls inside it take pointer events. -->
     <div class="vp-cluster">
-      <!-- Drawing-sheet chip: opens/toggles the sheet (the Compare card below).
-           aria-pressed mirrors the card's open state. Always visible — the sheet is
-           meaningful from Step 1, and Step 3 opens it for the learner. -->
+      <!-- ONE control (item 7). "Compare" opens a compact menu naming the two viewers; picking
+           one makes it the large pane and the other the thumbnail. That single menu replaces the
+           old Open/Hide chip, the Swap-views button and the Reset-view button (ADR-103). -->
       <button id="compare-chip" class="compare-chip" type="button" aria-pressed="false">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="3" y="5" width="8" height="14" rx="1.5"/><rect x="13" y="5" width="8" height="14" rx="1.5"/>
         </svg>
-        <span class="chip__label">Drawing sheet</span>
+        <span class="chip__label" id="compare-chip-label">Compare</span>
+      </button>
+
+
+      <!-- ISSUE 3/7 — Compare OPENS the menu; this one swaps, with no menu in the way. Two
+           different actions, so two buttons (ADR-106). -->
+      <button id="switch-view" class="compare-chip compare-chip--ghost" type="button" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M7 16H3m0 0 3-3m-3 3 3 3M17 8h4m0 0-3-3m3 3-3 3"/>
+        </svg>
+        <span class="chip__label">Switch view</span>
+      </button>
+
+      <!-- A minimized thumbnail collapses to THIS, never to nothing. It names what it brings
+           back, so recovering it never means leaving the step. -->
+      <button id="thumb-restore" class="compare-chip compare-chip--ghost" type="button" hidden>
+        <span class="chip__label" id="thumb-restore-label">Restore thumbnail</span>
       </button>
     </div>
 
@@ -2221,21 +2903,26 @@
     <div id="compare-card" class="compare-card" data-size="compact" role="region" aria-label="The 2D drawing sheet" hidden>
       <div class="compare-card__head">
         <span class="compare-card__tab">Drawing sheet</span>
-        <button id="compare-expand" class="compare-card__btn" type="button" aria-label="Expand compare view" title="Expand">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M9 3H5a2 2 0 0 0-2 2v4M15 3h4a2 2 0 0 1 2 2v4M9 21H5a2 2 0 0 1-2-2v-4M15 21h4a2 2 0 0 0 2-2v-4"/>
+        <button id="compare-min" class="compare-card__btn" type="button" aria-label="Minimize the drawing to a chip" title="Minimize">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 12h12"/>
           </svg>
         </button>
-        <button id="compare-close" class="compare-card__btn" type="button" aria-label="Close compare view" title="Close">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M6 6l12 12M18 6L6 18"/>
-          </svg>
-        </button>
+        <!-- ONE control (ADR-115), same as the 3D thumbnail's head above. -->
       </div>
       <div class="compare-card__stage">
         <canvas id="compare-canvas" aria-label="Drawing sheet: the conic and its construction"></canvas>
+        <!-- What the cursor is pointing at on the drawing, in one plain sentence. Placed by
+             main.js showSheetTip(); the element it names is ringed on the canvas at the same
+             moment, so the words and the line are unmistakably the same thing. -->
+        <div id="sheet-tip" class="sheet-tip" role="tooltip" hidden></div>
       </div>
     </div>
+
+    <!-- Explanation for the 3D anatomy labels: one plain-English sentence, opened after a
+         short hover (or at once on keyboard focus) and placed by main.js showLabelTip().
+         One shared node — there is never more than one label being explained. -->
+    <div id="vlabel-tip" class="vlabel-tip" role="tooltip" hidden></div>
 
     <!-- One-time orbit hint: appears with the first solid, dismisses on first drag. -->
     <div id="vp-orbit-hint" class="vp-hint" role="status" hidden>

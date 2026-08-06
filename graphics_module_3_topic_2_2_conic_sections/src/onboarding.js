@@ -36,7 +36,9 @@ const SPOTLIGHTS = {
   },
   'drawing-sheet': {
     tone: 'ink',
-    text: 'The drawing sheet builds the same curve with instruments — no cone needed, only a focus and a directrix.',
+    // The sheet can be opened from Step 1, so this chip must not name apparatus the lesson
+    // has not reached yet — "focus" and "directrix" belong to Step 4 (RULES.md §6.27).
+    text: 'The drawing sheet is the same curve again, drawn flat on paper the way an engineer would.',
   },
 };
 
@@ -183,5 +185,21 @@ export function initOnboarding(controls) {
     present = on;
   }
 
-  return { setSolidPresent, spotlight, cue };
+  /**
+   * Clear the chip slot: whatever is showing goes, and anything queued behind it is dropped.
+   *
+   * A chip is anchored to the moment it describes. "Orbit until you face it square-on" is the
+   * right instruction on Step 3 and the wrong one on Step 4, where the camera faces the section
+   * for the learner — so a step change retires the slot rather than letting a 4.5-second hold
+   * carry the previous step's instruction into the next one. Nothing is lost by going early:
+   * `markSeen` already fires when a spotlight is SHOWN, so a learner who moves on inside the
+   * hold had spent their one showing either way.
+   */
+  function retire() {
+    queue.length = 0;
+    if (hint && !hint.hidden) dismissOrbitHint();
+    dismissSpot();
+  }
+
+  return { setSolidPresent, spotlight, cue, retire };
 }

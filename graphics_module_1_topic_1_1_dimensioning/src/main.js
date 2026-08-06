@@ -35,13 +35,13 @@ import { createDimensionLayer, SPACING, fitDecision } from './dimensionDraw.js';
 import { createLabelLayer } from './dimensionLabels.js';
 import { initUI } from './dimensionUI.js';
 import { initTerms } from './terms.js';
-import { TERMS, SHEET_SETTINGS } from './dimensionSteps.js';
-import { MM_PER_UNIT, PLATE, toWorld, HALF_DEPTH } from './dimensionData.js';
+import { TERMS, SHEET_SETTINGS, METHODS } from './dimensionSteps.js';
+import { MM_PER_UNIT, FIGURES, DEFAULT_FIGURE, toWorld, HALF_DEPTH } from './dimensionData.js';
 import {
   anatomyDrawing, ELEMENTS, ELEMENT_PARTS, methodDrawing, obliqueClock,
-  leaderDemo, spaceDemo, ARRANGEMENTS, completeDrawing, MISTAKES, LANE,
+  leaderDemo, spaceDemo, ARRANGEMENTS, completeDrawing, MISTAKES,
 } from './dimensionExamples.js';
-import { RULES, validatePlacement } from './dimensionRules.js';
+import { RULES, dragDemo, validatePlacement } from './dimensionRules.js';
 import { SYMBOLS } from './dimensionSymbols.js';
 import { TIMING, VIEWS, staggered, uniform } from './dimensionAnimations.js';
 import { tween, tick as tickTweens, cancelAll as cancelTweens, easeStandard, easeCamera, easeDraw } from './anim.js';
@@ -69,45 +69,47 @@ const rootStyle = getComputedStyle(document.documentElement);
 const cssColor = (name) => new THREE.Color(rootStyle.getPropertyValue(name).trim());
 
 /**
- * How the sheet is framed, in the plate's own millimetres.
+ * HOW THE SHEET IS FRAMED. Each figure carries its own `frame` — a centre and a symmetric
+ * REACH out from it, both in that figure's own millimetres — and this file turns it into the
+ * ortho frustum. It is the shape of the sibling Foundations topic's `frontViewPose`, which
+ * fits its elevation as reaches from the bore axis rather than as a box around everything drawn.
  *
- * The camera is centred on the PART and the frame is measured as a symmetric REACH from
- * there — the same shape as the sibling Foundations topic's `frontViewPose`, which fits its
- * elevation as reaches out from the bore axis rather than as a box around everything drawn.
+ * WHY NOT A BOUNDING BOX. Centring the combined bounding box is what produced the old
+ * off-centre picture: the dimension lanes fall much further BELOW the part than they rise above
+ * it (five stacked lanes under the drawing against one over it), so the box's centre sits well
+ * under the plate and the plate rides high in the viewport. The lanes are hairlines; the part is
+ * the visual mass, and the visual mass is what has to look centred. So every figure's centre is
+ * its PART's middle, nudged only where the ink is genuinely one-sided.
  *
- * Centring the combined bounding box instead is what produced the old off-centre picture: the
- * dimension lanes fall much further BELOW the part than they rise above it (five stacked lanes
- * under the drawing against one over it), so the box's centre sits ~27 mm under the plate and
- * the plate rides high in the viewport. The lanes are hairlines; the plate is the visual mass,
- * and the visual mass is what has to look centred.
- *
- * The reaches are the furthest ink any step puts on the sheet — Step 4's parallel arrangement
- * and Step 6's finished drawing reach lowest, the leader notes reach furthest right — plus a
- * margin for the value text that rides above each line. Measured, not guessed.
- *
- * The centre is the plate's own middle nudged 13 mm right, because the ink is not symmetric
- * about the part: the leader notes and the spigot's dimensions all sit off the right-hand end
- * and nothing balances them on the left. 13 mm is the measured offset of the drawn ink from
- * the part's centre, and it is the same at every step, so correcting it once here leaves the
- * picture centred throughout instead of re-framing under the learner.
+ * The reaches are the furthest ink any step puts on that figure — Step 4's parallel arrangement
+ * reaches lowest, the leader notes reach furthest right — plus a margin for the value text that
+ * rides above each line. Measured, not guessed; re-measure before changing one.
  */
-const SHEET_CENTRE_MM = Object.freeze({ x: PLATE.length / 2 + 13, y: PLATE.height / 2 });
-const SHEET_REACH_MM = Object.freeze({ x: 152, y: 145 });
+/**
+ * The figure now on the sheet. The lesson runs through five of them, simplest first, and every
+ * step asks for the simplest one that can carry what it teaches (see `FIGURES` in
+ * dimensionData.js). `setFigure()` is the ONLY way this changes, because a new figure is new
+ * geometry and geometry changes only inside `rebuild()` (RULES.md §3.1).
+ */
+let currentFigure = DEFAULT_FIGURE;
 
-/** The sheet in centred world units, as a centre + half-extents. */
-const FRAME = (() => {
-  const c = toWorld(SHEET_CENTRE_MM.x, SHEET_CENTRE_MM.y);
+/** One figure's sheet in centred world units, as a centre + half-extents. */
+function frameOf(figure) {
+  const c = toWorld(figure.frame.centre.x, figure.frame.centre.y);
   return {
     cx: c.x, cy: c.y,
-    halfW: SHEET_REACH_MM.x / MM_PER_UNIT,
-    halfH: SHEET_REACH_MM.y / MM_PER_UNIT,
+    halfW: figure.frame.reach.x / MM_PER_UNIT,
+    halfH: figure.frame.reach.y / MM_PER_UNIT,
   };
-})();
+}
 
 /** Gap between the two sheets in the before/after compare (world units). */
 const COMPARE_GAP = 3;
-/** How far each sheet slides off centre in compare mode. */
-const COMPARE_DX = FRAME.halfW + COMPARE_GAP / 2;
+
+/** The live frame, and how far each sheet slides off centre in compare mode. Both are
+ *  re-derived by `setFigure()` and by nothing else. */
+let FRAME = frameOf(currentFigure);
+let COMPARE_DX = FRAME.halfW + COMPARE_GAP / 2;
 
 /** Camera standoff. Irrelevant to framing under parallel projection — it only has to clear
  *  the near plane and keep the whole part inside the depth range. */
@@ -163,6 +165,29 @@ const drawing = {
   unitFactor: 1,
   hotspots: [],
 };
+
+/**
+ * The method sheet B is drawn in while a comparison is up. Null means "whatever sheet A is
+ * using".
+ *
+ * TWO STEPS SET THIS, for two different questions.
+ *   • Step 3 holds ONE drawing in BOTH value systems — the layout is fixed, the method is the
+ *     variable, and `setMethodCompare()` always puts the system the learner did NOT pick on the
+ *     left. That is a demonstration: the learner does not choose sheet B, the step does.
+ *   • Step 4 holds any layout+method pair beside any other. Both axes are the learner's to set,
+ *     and the interesting comparison is usually one axis held still while the other moves —
+ *     same layout, two methods, or the reverse.
+ * They are mutually exclusive, and `compareKind` is what says which is live: inferring it from
+ * `compareMethod !== null` cannot distinguish "Step 4, both sheets in Method 1" from "no
+ * comparison at all", and a Step-4 method change would then repaint the wrong sheet.
+ */
+let compareMethod = null;
+
+/** @type {'method'|'layout'|'review'|null} Which comparison is on screen; null when none. */
+let compareKind = null;
+
+/** Step 4 only: which LAYOUT sheet B is showing, so a method change can rename it. */
+let compareLayoutId = null;
 
 /**
  * The rig's LESSON-level state, held here rather than only inside the rig, because a rebuild
@@ -433,7 +458,7 @@ function rebuild() {
   contentA.position.x = 0;
   contentA.updateMatrixWorld(true);
 
-  rigA = createRig({ width, height });
+  rigA = createRig({ figure: currentFigure, width, height });
   contentA.add(rigA.group);
 
   // --- The live classifier: edge topology once, BVH once, both camera-invariant. ---
@@ -451,7 +476,7 @@ function rebuild() {
 
   // Sheet B carries the "before" drawing of a Step-4 / Step-6 comparison. It is built with
   // the sheet so a compare never has to touch geometry outside rebuild().
-  rigB = createRig({ width, height });
+  rigB = createRig({ figure: currentFigure, width, height });
   contentB.add(rigB.group);
   layerB = createDimensionLayer({ width, height });
   contentB.add(layerB.group);
@@ -459,6 +484,43 @@ function rebuild() {
 
   setCompareOffsets(false);
   applyViewMode(); // fresh rigs start in whatever pose the camera is already in
+}
+
+/**
+ * Put a different FIGURE on the sheet.
+ *
+ * The lesson's teaching order is a geometry order: a plain plate for the elements, a plate with
+ * one hole for the placement rules, a chamfered plate for the two value systems, a slotted plate
+ * for the layouts, the Guide Plate for the symbols and the review. Swapping between them is a
+ * geometry change and therefore goes through `rebuild()` — the one path — and re-derives the
+ * frame, because a 130 mm plate framed like a 200 mm one would sit adrift in the viewport.
+ *
+ * No-op when the figure is already up, so a step that re-enters costs nothing.
+ *
+ * @param {string} id A key of `FIGURES`.
+ * @returns {boolean} Whether the sheet actually changed.
+ */
+function setFigure(id) {
+  const next = FIGURES[id] || DEFAULT_FIGURE;
+  if (next === currentFigure) return false;
+  currentFigure = next;
+  FRAME = frameOf(next);
+  COMPARE_DX = FRAME.halfW + COMPARE_GAP / 2;
+  rebuild();                // the single geometry path
+  handleResize(viewport);   // the frustum is a function of the frame, which just moved
+  applyPose(true);          // …and so is the camera target
+  updateCaption();
+  updateFigureBadge();
+  return true;
+}
+
+/** Name the live figure on the drawing, and say in four words what it is here to teach. The
+ *  progression is the lesson's spine, so the learner is told where on it they are. */
+function updateFigureBadge() {
+  const name = document.getElementById('vp-figure-name');
+  const teaches = document.getElementById('vp-figure-teaches');
+  if (name) name.textContent = currentFigure.name;
+  if (teaches) teaches.textContent = currentFigure.teaches;
 }
 
 // ============================================================================
@@ -537,7 +599,7 @@ function redraw() {
     : null);
 
   if (compareSpecs && layerB && labelsB) {
-    const b = layerB.draw(compareSpecs, opts);
+    const b = layerB.draw(compareSpecs, { ...opts, method: compareMethod ?? opts.method });
     for (const l of b) l.text = inUnits(l.text);
     labelsB.setLabels(b);
   }
@@ -550,18 +612,18 @@ function setHotspots(list) {
   labelsA?.setHotspots(list);
 }
 
-/** Where the callout pill sits: the empty band above the sheet, clear of the topmost
+/** Where the callout pill sits: the empty band above the live figure, clear of the topmost
  *  dimension lane (§4.3's 5–6 mm clearance puts nothing up here). */
-const CALLOUT_AT = (() => {
-  const w = toWorld(PLATE.length / 2, PLATE.height + 26);
+function calloutAt() {
+  const w = toWorld(currentFigure.plate.length / 2, currentFigure.plate.height + 26);
   return new THREE.Vector3(w.x, w.y, HALF_DEPTH + 0.8);
-})();
+}
 
 /** Name, ON the drawing, whatever the step is currently pointing at. Null takes it off.
  *  Kept OUT of redraw(): the callout tracks the learner's selection, not the spec list, and
  *  rebuilding a DOM node every animation frame would make it flicker. */
 function setCallout(text) {
-  labelsA?.setCallout(text ? { text, position: CALLOUT_AT } : null);
+  labelsA?.setCallout(text ? { text, position: calloutAt() } : null);
 }
 
 /** Slide the two sheets apart for a before/after compare — the BEFORE drawing on the left
@@ -571,13 +633,15 @@ function setCallout(text) {
  * the sheet's OWN space, so it travels with the sheet instead of floating at the top of the
  * viewport with nothing to attach it to.
  */
-const CAPTION_AT = (() => {
-  // Centred on the DRAWING's own centre of ink (SHEET_CENTRE_MM), not on the part's midpoint —
-  // the frame is nudged right to balance the leader notes, and a caption hung off the part
-  // instead would sit 13 mm left of the drawing it names, breaking the pair's symmetry.
-  const w = toWorld(SHEET_CENTRE_MM.x, -88);
+function captionAt() {
+  // Centred on the DRAWING's own centre of ink (the figure's frame centre), not on the part's
+  // midpoint — a frame nudged right to balance leader notes would otherwise hang the caption
+  // left of the drawing it names, breaking the pair's symmetry in a comparison. The 10 mm lifts
+  // it just inside the bottom of the frame, under the lowest lane whatever that figure's is.
+  const { centre, reach } = currentFigure.frame;
+  const w = toWorld(centre.x, centre.y - reach.y + 10);
   return new THREE.Vector3(w.x, w.y, HALF_DEPTH + 0.8);
-})();
+}
 
 function setCompareOffsets(on) {
   const changed = contentB.visible !== on;
@@ -607,10 +671,38 @@ function setCompareOffsets(on) {
   if (changed) handleResize(viewport);
 }
 
-/** Name the two drawings, each under its own sheet. Null on either side takes that name off. */
+/**
+ * Name the two drawings, each under its own sheet. Null on either side takes that name off.
+ * A name is either a plain string or `{ text, sub }` — the second form for a sheet that is
+ * told apart by two things at once (Step 4's method AND layout), which stacks in the pill.
+ * @param {string|{text:string,sub?:string}|null} nameB
+ * @param {string|{text:string,sub?:string}|null} nameA
+ */
 function setSheetNames(nameB, nameA) {
-  labelsA?.setSheetCaption(nameA ? { text: nameA, position: CAPTION_AT } : null);
-  labelsB?.setSheetCaption(nameB ? { text: nameB, position: CAPTION_AT } : null);
+  const at = captionAt();
+  const desc = (n) => {
+    if (!n) return null;
+    return typeof n === 'string' ? { text: n, position: at } : { ...n, position: at };
+  };
+  labelsA?.setSheetCaption(desc(nameA));
+  labelsB?.setSheetCaption(desc(nameB));
+}
+
+/**
+ * Step 4's sheet captions: the METHOD on top, the layout under it. Both sheets are named from
+ * one function so the pair can never be labelled by two different rules, and so a change to
+ * either axis on either sheet repaints both — which is what makes "only the method changed"
+ * legible at a glance.
+ */
+function setLayoutSheetNames() {
+  const nameOf = (layoutId, method) => {
+    const a = ARRANGEMENTS.find((x) => x.id === layoutId);
+    return a ? { text: `Method ${method}`, sub: a.name } : null;
+  };
+  setSheetNames(
+    nameOf(compareLayoutId, compareMethod ?? drawing.method),
+    nameOf(currentArrangementId, drawing.method),
+  );
 }
 
 /**
@@ -712,6 +804,9 @@ function applyViewMode() {
     // It comes down, and the wizard is told, so its control does not stay latched over a
     // viewport showing one sheet.
     compareSpecs = null;
+    compareMethod = null;
+    compareKind = null;
+    compareLayoutId = null;
     setCompareOffsets(false);
     ui?.compareDropped?.();
   }
@@ -799,8 +894,8 @@ function setView(name, { announce: speak = true } = {}) {
   if (!speak) return;
   announce({
     front: 'Front view — the true orthographic elevation the dimensions describe.',
-    pictorial: 'Three-quarter view. The plate is 30 thick, and the spherical seat is a real bowl sunk into the front face.',
-    rear: 'The plate is turned over. You are looking at the back face, where the countersink is machined.',
+    pictorial: `Three-quarter view of the ${currentFigure.name.toLowerCase()}. It is ${currentFigure.plate.thickness} thick, and every feature on the drawing is real geometry.`,
+    rear: 'The plate is turned over. You are looking at the back face.',
   }[name] || '');
 }
 
@@ -834,15 +929,23 @@ function restoreView() {
 const idsOf = (specs) => specs.map((s) => s.id);
 
 /**
- * Step 1's drawing surface. The step teaches how a dimension is DRAWN, which is three
- * separate studies on the same plate: the anatomy itself, the space between the projection
- * lines (Figs. 4.7–4.8), and where a leader may put its head (Fig. 4.4).
+ * Step 1's drawing surface. The step teaches how a dimension is DRAWN, which is several
+ * separate studies: the anatomy itself, the space between the projection lines (Figs. 4.7–4.8),
+ * where a leader may put its head (Fig. 4.4), and the line alphabet.
+ *
+ * TWO FIGURES, chosen by what is being studied. The anatomy and the space study are set on the
+ * PLAIN PLATE, because the first dimension a student ever reads should be the only thing on the
+ * sheet. Two of the studies cannot be done there and say so honestly: a leader head is a choice
+ * between a dot on a face and an arrow on an edge, which needs a feature with an edge; and the
+ * line alphabet's third and fourth entries are the hidden line and the centre line, which need a
+ * figure that HAS one of each. Both borrow the plate-with-a-hole.
  *
  * @param {Object} [options]
  * @param {boolean} [options.revealed=true] Whether Step 1's dimensions are already on.
  * @param {boolean} [options.animate=false] Redraw the study from nothing.
  */
 function showStudy({ revealed = true, animate = false } = {}) {
+  setFigure(step1.study === 'leader' || drawing.lineTypeFocus ? 'hole' : 'plate');
   setHotspots([]);
   setCallout(null);
   drawing.focusElement = null;
@@ -874,16 +977,14 @@ function showStudy({ revealed = true, animate = false } = {}) {
 }
 
 function showRule(ruleId, variant) {
+  // Every placement rule is legible on the plate with one hole — it has an outline, a centre
+  // line and one dashed circle, which between them are everything the ten rules argue about.
+  setFigure('hole');
   const rule = RULES.find((r) => r.id === ruleId) || RULES[0];
   const set = variant === 'wrong' ? rule.wrong : rule.correct;
   // The drag exercise rides alongside the rule demo on a dimension no rule uses, so the two
   // never interfere.
-  const dragSpec = {
-    id: 'drag', kind: 'linear', axis: 'x',
-    from: [0, 88], to: [95, 100], at: LANE.above1, text: '95',
-    draggable: true, textNudgeMm: dragNudge.slice(),
-    title: 'Drag me, or focus me and use the arrow keys',
-  };
+  const dragSpec = { ...dragDemo(), textNudgeMm: dragNudge.slice() };
   drawing.specs = [...set.map((s) => ({ ...s })), dragSpec];
   setHotspots([]);
   drawing.focusElement = null;
@@ -894,16 +995,58 @@ function showRule(ruleId, variant) {
   animateIn(idsOf(drawing.specs), TIMING.morph, { stagger: false });
 }
 
+/**
+ * Step 3's drawing. The CHAMFERED plate, and the chamfer is the reason: aligned and
+ * unidirectional values are identical on a horizontal dimension line, so a figure that can only
+ * be measured across and up cannot show the difference at all. A 45° chamfer supplies both cases
+ * the two systems disagree about — a sloping dimension line and an angular one.
+ */
 function showMethods() {
+  setFigure('chamfer');
   drawing.specs = obliqueOn ? obliqueClock() : methodDrawing();
   setHotspots([]);
   drawing.focusElement = null;
   // The clock is about the VALUES, so the part steps back behind them.
   setRig({ centreLines: false, dimmed: obliqueOn });
   animateIn(idsOf(drawing.specs), TIMING.morph, { stagger: false });
+  // Re-state the comparison on the new spec list, so switching study or method keeps it.
+  if (compareKind === 'method') setMethodCompare(true);
+}
+
+/**
+ * Hold the two value systems side by side: the method the learner has NOT selected on the left
+ * sheet, the one they have on the right. Same figure, same layout, same sizes — the ONLY
+ * difference between the two drawings is the thing the step is about, which is what makes the
+ * comparison worth looking at rather than a second drawing to decode.
+ *
+ * It follows Step 4's rule exactly: switching either side never re-runs the main drawing's
+ * reveal animation, because that would throw away the comparison the learner is reading.
+ *
+ * @param {boolean} on
+ */
+function setMethodCompare(on) {
+  if (!on) {
+    compareKind = null;
+    compareMethod = null;
+    compareSpecs = null;
+    setCompareOffsets(false);
+    redraw();
+    return;
+  }
+  compareKind = 'method';
+  compareLayoutId = null;
+  compareMethod = drawing.method === 1 ? 2 : 1;
+  compareSpecs = (obliqueOn ? obliqueClock() : methodDrawing()).map((s) => ({ ...s }));
+  setCompareOffsets(true);
+  setSheetNames(METHODS[compareMethod].name, METHODS[drawing.method].name);
+  redraw();
 }
 
 function showArrangement(id, variantId) {
+  // Five layouts of the same sizes, on the SLOTTED plate: a layout question needs several
+  // features strung along one edge before chain, parallel and running mean anything, and three
+  // features plus two faces is the fewest that shows all five apart.
+  setFigure('slot');
   const a = ARRANGEMENTS.find((x) => x.id === id) || ARRANGEMENTS[0];
   currentArrangementId = a.id;
   const variant = a.variants
@@ -918,6 +1061,11 @@ function showArrangement(id, variantId) {
 }
 
 function showSymbol(id, variantId) {
+  // The Guide Plate, and only here does the lesson need it: the five symbols exist BECAUSE the
+  // features differ — a ball is not a hole is not a square — and no simpler figure carries one
+  // clean instance of each. By this point every element, rule, value system and layout has
+  // already been met somewhere with nothing else on the sheet.
+  setFigure('guide');
   const sym = SYMBOLS.find((s) => s.id === id);
   const variant = sym
     ? (sym.variants.find((v) => v.id === variantId) ?? sym.variants[0])
@@ -935,13 +1083,18 @@ function showSymbol(id, variantId) {
   }
 }
 
-/** The Step-6 drawing: the complete dimensioning with every un-found fault still in place. */
+/** The Step-6 drawing: the complete dimensioning with every un-found fault still in place.
+ *
+ *  A dimension carrying a seeded fault is PINNED, which takes it out of the annotation layout
+ *  pass altogether (dimensionLayout.js) — neither moved nor avoided. The fault is the lesson:
+ *  a pass that quietly tidied a badly placed dimension back into line would delete the very
+ *  thing the learner is hunting for, and the hotspot would point at nothing. */
 function faultyDrawing() {
   const byId = new Map(completeDrawing().map((s) => [s.id, { ...s }]));
   for (const m of MISTAKES) {
     if (found.has(m.id)) continue;
-    if (m.add) byId.set(m.target, { id: m.target, ...m.wrong });
-    else byId.set(m.target, { ...byId.get(m.target), ...m.wrong });
+    if (m.add) byId.set(m.target, { id: m.target, ...m.wrong, pinned: true });
+    else byId.set(m.target, { ...byId.get(m.target), ...m.wrong, pinned: true });
   }
   return [...byId.values()];
 }
@@ -974,6 +1127,13 @@ function reviewHotspots() {
 }
 
 function showReview(view) {
+  // The complete engineering drawing, exactly as the lecturers asked: the review is where the
+  // learner applies everything the simple figures taught them to the part they will be examined
+  // on. Nothing here is new except the number of features at once.
+  setFigure('guide');
+  compareMethod = null;
+  compareKind = view === 'compare' ? 'review' : null;
+  compareLayoutId = null;
   drawing.focusElement = null;
   setRig({ centreLines: false, dimmed: false });
 
@@ -1015,7 +1175,7 @@ function updateCaption() {
   const name = document.getElementById('vp-caption-name');
   const scaleEl = document.getElementById('vp-caption-scale');
   const noteEl = document.getElementById('vp-caption-note');
-  if (name) name.textContent = 'GUIDE PLATE — FRONT ELEVATION';
+  if (name) name.textContent = currentFigure.caption;
   if (scaleEl) scaleEl.textContent = `SCALE ${sheet.scale}`;
   if (noteEl) {
     noteEl.textContent = unit?.titleNote || '';
@@ -1279,6 +1439,9 @@ window.simAPI = {
     drawing.hotspots = [];
     drawing.progress = null;
     compareSpecs = null;
+    compareMethod = null;
+    compareKind = null;
+    compareLayoutId = null;
     dragNudge = [0, 0];
     dimensionsRevealed = false;
     currentArrangementId = ARRANGEMENTS[0].id;
@@ -1302,10 +1465,16 @@ window.simAPI = {
     camera.zoom = 1;
     setPoseName('front');
     setCompareOffsets(false);
+    // Back to the figure the lesson opens on, and to its frame, before the one geometry path.
+    currentFigure = DEFAULT_FIGURE;
+    FRAME = frameOf(currentFigure);
+    COMPARE_DX = FRAME.halfW + COMPARE_GAP / 2;
     rebuild();          // the single geometry path
+    handleResize(viewport);
     applyPose(true);
+    updateFigureBadge();
     ui?.reset();        // wizard chrome back to Step 1 (no second engine path)
-    announce('Simulation reset. The Guide Plate is drawn but undimensioned, at Step 1.');
+    announce('Simulation reset. The plain plate is drawn but undimensioned, at Step 1.');
   },
 };
 
@@ -1316,6 +1485,7 @@ window.simAPI = {
 const simController = {
   addDimensions() {
     dimensionsRevealed = true;
+    setFigure('plate');
     drawing.specs = anatomyDrawing();
     animateIn(idsOf(drawing.specs), TIMING.reveal, { stagger: true });
   },
@@ -1332,6 +1502,10 @@ const simController = {
   /** Step 1's line-type legend: hold one weight of line, fade everything else. */
   focusLineType(id) {
     drawing.lineTypeFocus = id;
+    // The alphabet's third and fourth entries are the hidden line and the centre line, so the
+    // legend borrows the plate WITH a hole — which has one of each. Both figures share the same
+    // 130 × 80 envelope, so not one dimension on the sheet moves as it swaps.
+    setFigure(step1.study === 'leader' || id ? 'hole' : 'plate');
     // Holding the APPARATUS means dimming the part; holding a line type of the part means
     // holding that one batch. The rig resolves both wants together, so order does not matter.
     setRig({ dimmed: id === 'apparatus', lineFocus: id === 'apparatus' ? null : id });
@@ -1389,27 +1563,52 @@ const simController = {
 
   setMethod(method) {
     drawing.method = method === 2 ? 2 : 1;
+    // Step 3's comparison always holds the OTHER system beside the chosen one, so picking a
+    // method while the two sheets are up swaps them over rather than leaving both the same.
+    if (compareKind === 'method') { setMethodCompare(true); return; }
+    // Step 4's is not a swap: the two sheets carry independent methods, and changing sheet A's
+    // only renames and redraws sheet A. Sheet B stays exactly where the learner put it.
+    if (compareKind === 'layout') setLayoutSheetNames();
     redraw();
   },
+
+  /** Step 3 — hold aligned and unidirectional side by side. */
+  setMethodCompare(on) { setMethodCompare(on); },
 
   setArrangement(id, variantId) { showArrangement(id, variantId); },
 
   /**
-   * Hold ANY arrangement beside the current one — `otherId` is whichever the learner picked
-   * from the "compare with" list, or null for a single sheet. Only sheet B is rebuilt, and
-   * only from its spec list: sheet A's drawing, its reveal animation and the camera are all
-   * left exactly as they are, so switching either side is instant and nothing re-animates.
+   * Hold ANY arrangement, in EITHER method, beside the current one — `otherId` is whichever
+   * layout the learner picked from the "compare with" list and `otherMethod` whichever method,
+   * or null for a single sheet. Only sheet B is rebuilt, and only from its spec list: sheet A's
+   * drawing, its reveal animation and the camera are all left exactly as they are, so switching
+   * either side is instant and nothing re-animates.
+   *
+   * THE TWO SHEETS CARRY INDEPENDENT METHODS. `method` is already a per-draw option, and a spec
+   * may override it, so this needed no change to the renderer: sheet B is simply drawn with its
+   * own value. The geometry, the sizes and the values themselves are untouched — only the
+   * drafting convention the values are written under differs, which is exactly what the two
+   * methods are.
+   *
+   * @param {string|null} otherId
+   * @param {1|2} [otherMethod] Defaults to sheet A's method, i.e. a pure layout comparison.
    */
-  setCompare(otherId) {
+  setCompare(otherId, otherMethod) {
     const other = otherId ? ARRANGEMENTS.find((a) => a.id === otherId) : null;
     if (!other) {
+      compareKind = null;
+      compareLayoutId = null;
+      compareMethod = null;
       compareSpecs = null;
       setCompareOffsets(false);
       return;
     }
+    compareKind = 'layout';
+    compareLayoutId = other.id;
+    compareMethod = otherMethod === 2 ? 2 : otherMethod === 1 ? 1 : drawing.method;
     compareSpecs = other.build();
     setCompareOffsets(true);
-    setSheetNames(other.name, ARRANGEMENTS.find((a) => a.id === currentArrangementId)?.name || null);
+    setLayoutSheetNames();
     redraw();
   },
 
@@ -1422,6 +1621,9 @@ const simController = {
   /** The wizard has moved to step `n`: hand it its drawing. */
   enterStep(n) {
     compareSpecs = null;
+    compareMethod = null;
+    compareKind = null;
+    compareLayoutId = null;
     setCompareOffsets(false);
     setCallout(null);
     // The caption band belongs to the finished sheet, which is what Step 6 is about.
@@ -1486,6 +1688,7 @@ function init() {
 
     rebuild();
     setPoseName('front');
+    updateFigureBadge();
     ui = initUI(simController);          // paints Step 1 and calls enterStep(1)
     initTerms({ terms: TERMS, root: '#wizard' });
 
