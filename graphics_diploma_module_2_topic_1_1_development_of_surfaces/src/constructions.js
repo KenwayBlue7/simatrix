@@ -19,6 +19,26 @@
 // THIN. This is a stroke-WEIGHT axis, independent of a step's `role` (given/move/result
 // already means something else — pedagogical significance). Every outline step below
 // carries `weight: OUTLINE_W`; every fold/generator line carries `weight: FOLD_W`.
+//
+// Phase 1 rebuild (../DECISIONS.md ADR for this topic's Module2-parity pass) — three
+// content additions on top of the same geometry, all consumed by the new step kinds
+// renderConstruction.js gained the same day:
+//   - `numeral` steps number every corner/generator this construction cares about, on
+//     BOTH the views and the development (K.C. John Fig. 15.4/15.7, Bhatt Fig. 15-10 all
+//     do this) — station identifiers reuse the SAME numbers/letters across regions
+//     (the top view's own corner "1" is the same "1" that appears on the development),
+//     which is the actual pedagogical thread these figures are teaching.
+//   - `note` steps are the leader callouts every source figure carries (`Seam`,
+//     `Fold line`, `Inside pattern` — Bhatt Fig. 15.1/15-10, K.C. John Fig. 15.4/15.7).
+//   - `caption` steps are the "(i) ..." / "(ii) ..." region captions under each block.
+// A `dash` tag on a 'move'-role `L(...)` line distinguishes a same-region projector
+// (default, DASH_PROJECT) from a cross-region transfer/derivation line
+// (`dash: 'carry'`, DASH_CARRY) — see renderConstruction.js's file header for the full
+// dash vocabulary. Only `buildPrism` below has been rebuilt to this standard; the
+// cylinder/elbow builders keep their pre-rebuild content shape until their own phase
+// (this rebuild's own plan is solid-by-solid) — they still render correctly through the
+// new renderConstruction.js (same step-kind contract), just without the numeral/note/
+// caption annotation layer yet.
 
 import { computeCutDistances } from './developmentEngine.js';
 
@@ -29,15 +49,29 @@ const deg2rad = (d) => (d * Math.PI) / 180;
 // ----------------------------------------------------------------------------
 
 const P = (p, role, label, duration) => ({ kind: 'point', role, p, label, duration });
-const L = (a, b, role, weight, duration) => ({ kind: 'line', role, a, b, weight, duration });
+/** `dash` ('carry'|'hidden'|'datum', optional) — see file header; only meaningful on a
+ *  'move'-role line, ignored otherwise. */
+const L = (a, b, role, weight, duration, dash) => ({ kind: 'line', role, a, b, weight, duration, dash });
 /** Straight-segment path (sharp corners) — new this topic, see file header. */
 const POLY = (points, role, closed, weight, duration) => ({ kind: 'polyline', role, points, closed, weight, duration });
 const CIRC = (center, radius, role) => ({ kind: 'circle', role, center, radius });
-const dim = (a, b, text, role, offset = 10) => ({ kind: 'dim', role, a, b, text, offset });
+/** extA/extB (optional): the true drawn corner each extension line/tick should terminate
+ * at, when it differs from the point that defines the dim LINE's own placement/angle (a/b
+ * stay the dim-line-defining pair, e.g. both at one clean level; see renderConstruction.js's
+ * paintDim header comment). Defaults to a/b — the common, level-matched case. */
+const dim = (a, b, text, role, offset = 10, extA, extB) => ({ kind: 'dim', role, a, b, text, offset, extA, extB });
 const LABEL = (p, text, dx, dy) => ({ kind: 'label', p, text, dx, dy });
+/** Station numeral — always ink (identifiers aren't part of the given/move/result colour
+ *  axis); `place` ('above'|'below'|'left'|'right') picks a fixed-px offset direction. */
+const NUM = (p, text, place, duration) => ({ kind: 'numeral', p, text, place, duration });
+/** Leader callout ('Seam' / 'Fold line' / 'Inside pattern') — `p` is the text anchor,
+ *  `to` the point being named; always the auxiliary tier. */
+const NOTE = (p, to, text, duration) => ({ kind: 'note', p, to, text, duration });
+/** Region caption under a block ("(i) Front view & top view"). */
+const CAPTION = (p, text, duration) => ({ kind: 'caption', p, text, duration });
 
-const OUTLINE_W = 1.8; // K.C. John Ch.15 note #4: pattern outline, THICK
-const FOLD_W = 0.6;    //   ...fold / generator lines, THIN
+const OUTLINE_W = 1.6; // K.C. John Ch.15 note #4: pattern outline, THICK — Module2-parity px value (renderConstruction.js file header)
+const FOLD_W = 0.9;    //   ...fold / generator lines, THIN
 
 // A construction with a dozen generators means a dozen projector/fold lines during Play —
 // at renderConstruction.js's 1800ms default "watch it happen" pace, that alone is 20+
@@ -56,22 +90,99 @@ const MARGIN = 18;
 const GAP_TOP = 18; // between front view's bottom edge and the top view/circle below it
 const GAP_DEV = 30; // between front view's right edge and the development's left edge
 
+// Reserve bands (drawing-space units, same axis the block sizes below already use) for
+// annotation that lives OUTSIDE a block's own geometric bbox — the above-view width dim,
+// the left-of-top-view depth dim, station numerals placed 'right' of the front view /
+// development, and the bottom band's region captions + numeral row + stretch-out dim.
+// Subtracted from the fit BEFORE `scale` is derived, so `scale` already accounts for them
+// — constants, never a measured bbox of what's actually been drawn (ADR-053/054's
+// intrinsic-only law; Module2 hit this exact bug class in ADR-102, a Set caption's own
+// offset left out of its own fit, overlapping its nav pill — these bands are this topic's
+// fix for the same class of bug, see ../DECISIONS.md's ADR for this rebuild).
+// LEFT/RIGHT bumped from an initial 16/20 after live verification: a long dim STRING
+// (e.g. the elbow's "100 mm (short leg)" at its slider max) is now a fixed-px width
+// regardless of the plate's own intrinsic scale (Phase 1's actual fix — see
+// renderConstruction.js's file header), so a construction with a small intrinsic scale
+// (the elbow's wide-legs-but-tall-bbox front view, `planPlate`'s own comment) can no
+// longer rely on its dim text shrinking to fit the way it did under the old baked-in
+// ctx.scale(). Caught live: "70 mm (short leg)" clipped its leading digit at the old 16.
+const RESERVE_TOP = 16;
+const RESERVE_BOTTOM = 36;
+const RESERVE_LEFT = 30;
+const RESERVE_RIGHT = 30;
+
 /**
  * @param {number} frontW  front view's own width (its local x-extent, in mm)
  * @param {number} frontH  front view's own height (its local y-extent, in mm)
  * @param {number} topDepth  top view/auxiliary-circle's extent below the front view (mm)
  * @param {number} devW  development's total width (its stretch-out extent, in mm)
+ * @param {number} [devExtra]  extra mm the DEVELOPMENT column alone needs above AND below
+ *  the front view's own [0,frontH] z-range (e.g. the prism's end-cap rectangles, hinged at
+ *  z=0 and z=frontH and folding out by this same amount each way — see buildPrism()).
+ *  Default 0 — every other construction's dev column is exactly frontH tall, same as
+ *  before this param existed (cylinder/elbow callers below pass nothing, unaffected).
+ * @param {number|null} [fixedScale]  Bug-2 fix: when given, this OVERRIDES the derived
+ *  fit-to-frame scale below with a caller-supplied constant px/mm ratio — the plate then
+ *  letterboxes (extraX/extraY grows) instead of re-stretching content to fill the frame, so
+ *  two different mm sizes actually render at two different on-screen sizes. Default null
+ *  preserves the original fit-to-frame behaviour untouched (cylinder/elbow callers below
+ *  don't pass this — out of this rebuild's phased scope, see this file's header). See
+ *  buildPrism()'s PRISM_SCALE for how a construction derives a safe constant to pass here.
  */
-function planPlate(frontW, frontH, topDepth, devW) {
-  const availW = CANVAS.w - MARGIN * 2 - GAP_DEV;
-  const availH = CANVAS.h - MARGIN * 2 - GAP_TOP;
+function planPlate(frontW, frontH, topDepth, devW, devExtra = 0, fixedScale = null) {
+  const availW = CANVAS.w - MARGIN * 2 - GAP_DEV - RESERVE_LEFT - RESERVE_RIGHT;
+  const availH = CANVAS.h - MARGIN * 2 - GAP_TOP - RESERVE_TOP - RESERVE_BOTTOM;
   const scaleX = availW / Math.max(frontW + devW, 1e-6);
-  const scaleY = availH / Math.max(frontH + topDepth, 1e-6);
-  const scale = Math.min(scaleX, scaleY, 4);
+  // scaleY must fit BOTH columns: the front+top-view column (frontH+topDepth, unchanged)
+  // AND the dev column, which is frontH + devExtra ABOVE + devExtra BELOW when end caps are
+  // present — whichever column is taller at a given scale is the real constraint. Taking
+  // the max here (not just frontH+topDepth) is the actual fix for the "cap clips past the
+  // canvas edge" failure mode devExtra exists to prevent.
+  const scaleY = availH / Math.max(frontH + topDepth, frontH + 2 * devExtra, 1e-6);
+  const scale = fixedScale != null ? Math.min(fixedScale, 4) : Math.min(scaleX, scaleY, 4);
 
-  const front = { x0: MARGIN, y0: MARGIN, w: frontW * scale, h: frontH * scale };
+  // Centering fix: `scale` binds to whichever axis is tighter (scaleX or scaleY) — the
+  // OTHER axis then has leftover room in avail{W,H} that used to just sit unused past the
+  // plate's bottom/right edge, because front.x0/y0 were pinned to a hardcoded MARGIN. Split
+  // that leftover evenly onto x0/y0 instead, so the whole plate centers inside CANVAS on
+  // BOTH axes. Matters most when a construction's (frontW+devW) : (frontH+topDepth) aspect
+  // diverges sharply from CANVAS's own — the elbow's wide-legs-but-tall-bbox front view is
+  // the worst case (was ~35% dead space on one axis before this fix).
+  //
+  // UNDER A FIXED SCALE, this same split becomes a position-drift bug, not centering: extra
+  // now varies with the CURRENT slider values (small content = big leftover = big offset),
+  // so front.x0/y0 — and everything anchored off them, including the Given step's front+top
+  // view, which never even draws the dev block this leftover is nominally shared with — visibly
+  // shifts as sliders move, even though nothing about "centered" should depend on which slider
+  // moved. Root-caused 2026-08-06 (see DECISIONS.md ADR-114's followup): NOT the same
+  // leftover-redistribution math correctly doing its job — the combined-plate split was never
+  // designed for a regime where extra stops being ≈0. Fixed by skipping the split entirely
+  // when `fixedScale` is set (extra pinned to 0) — x0/y0 become the plate's fixed top-left
+  // corner, identical at every slider value; only the drawn shapes' own size changes, matching
+  // a real drafting sheet anchored to its corner rather than auto-centered. Fit-to-frame
+  // constructions (cylinder/elbow, fixedScale null) are UNCHANGED — extra is still computed and
+  // still ≈0 there by construction (scale flexes to fill the frame), so this branch is a no-op
+  // for them; the elbow's own centering fix above still applies.
+  const extraX = fixedScale != null ? 0 : Math.max(availW - (frontW + devW) * scale, 0);
+  const extraY = fixedScale != null ? 0 : Math.max(availH - (frontH + topDepth) * scale, 0);
+  const x0 = MARGIN + RESERVE_LEFT + extraX / 2;
+  // + devExtra*scale: unconditional headroom above front.y0 for a dev-column end cap
+  // folding UP past z=frontH (see devExtra jsdoc above). devExtra=0 everywhere except the
+  // prism makes this a no-op for cylinder/elbow. For the drift fix above to hold (y0 constant
+  // across sliders), a fixed-scale caller must pass a CONSTANT devExtra here too — buildPrism()
+  // below passes its own base-width slider's MAX, not the live value, for exactly this reason
+  // (see PRISM_CAP_RESERVE_MM). Worked through by hand for that worst case (scaleY the binding
+  // axis, so extraY=0 regardless): the top cap's outer edge lands exactly on RESERVE_TOP, and —
+  // because topDepth's own worst case and devExtra are the SAME value there (both derive from
+  // the prism's base-width slider's max) — the front+top-view column's bottom edge AND the base
+  // cap's bottom edge both land exactly on the canvas's bottom margin too, at that one worst
+  // case; every smaller slider combination just gets more (never less) headroom above front.y0
+  // than it strictly needs, which is the deliberate trade this fix makes for a stable origin.
+  const y0 = MARGIN + RESERVE_TOP + extraY / 2 + devExtra * scale;
+
+  const front = { x0, y0, w: frontW * scale, h: frontH * scale };
   const top = { x0: front.x0, y0: front.y0 + front.h + GAP_TOP, w: frontW * scale, h: topDepth * scale };
-  const dev = { x0: front.x0 + front.w + GAP_DEV, y0: front.y0, w: devW * scale };
+  const dev = { x0: front.x0 + front.w + GAP_DEV, y0: front.y0, w: devW * scale, h: frontH * scale };
 
   return {
     scale, front, top, dev,
@@ -96,16 +207,46 @@ function planPlate(frontW, frontH, topDepth, devW) {
 // 1. Rectangular prism — K.C. John Example 15.1 / Bhatt Problem 15-1 (Fig. 15.4/15-3)
 // ============================================================================
 
+// Bug-2 fix: a FIXED px/mm ratio, not planPlate()'s default fit-to-frame — a true-to-scale
+// engineering drawing must render a 16mm and a 32mm base width at genuinely different
+// on-screen widths, not auto-stretch both to fill the same frame. Derived ONCE from this
+// construction's own worst case (every slider at its max simultaneously — the `given` ranges
+// on CONSTRUCTIONS[0] below: baseLength≤40, baseWidth≤32, height≤60), through the SAME two
+// fit-budget ratios planPlate() itself computes, so it's provably small enough to fit at
+// EVERY reachable slider combination, not just the default:
+//   scaleX_worst = availW / (Lf_max + devW_max)      = 294 / (40 + 2×(40+32))  = 294/184 ≈ 1.598
+//   scaleY_worst = availH / (H_max + 2×Wd_max)        = 154 / (60 + 2×32)      = 154/124 ≈ 1.242
+// (availW/availH from this file's own MARGIN/GAP_*/RESERVE_* constants; the 2×Wd_max term is
+// the end-cap devExtra budget added above — recompute this if those constants, this
+// construction's `given` ranges, or the end-cap scope ever change.) Floored to 2dp, smaller
+// of the two, for headroom.
+const PRISM_SCALE = 1.24;
+
+// Position-drift fix (DECISIONS.md ADR-114 followup): planPlate()'s devExtra*scale headroom
+// must be a CONSTANT for the plate's origin to stay put across slider changes (see planPlate()'s
+// own y0 comment) — this is that constant, the SAME baseWidth_max=32 PRISM_SCALE was already
+// derived from above, so it's provably enough room for the end cap at every reachable baseWidth,
+// not just the current one. NOT the live `Wd` (that was the bug: reserving exactly-live headroom
+// made front.y0 itself a function of the baseWidth slider, shifting the Given step's front+top
+// view — which doesn't even draw the cap yet — every time baseWidth moved).
+const PRISM_CAP_RESERVE_MM = 32;
+
 function buildPrism(params) {
   const Lf = params.baseLength ?? 30; // the base edge parallel to VP (shown true in front view)
   const Wd = params.baseWidth ?? 24;  // the base edge running back (plan depth)
   const H = params.height ?? 40;
-  // Going around the base, front → right → back → left → (seam): edges alternate Lf/Wd.
+  // Going around the base, rear → right → front → left → (seam): edges alternate Lf/Wd.
+  // ("rear" = toTop's y=0, nearest the fold line/VP in this first-angle layout — stations 1→2;
+  // "front" = y=Wd, nearest the observer — stations 3→4. See DECISIONS.md ADR-112's 2026-08-06
+  // addendum: a prior version of this comment had front/back backwards.)
   const edges = [Lf, Wd, Lf, Wd];
   const stretchOut = edges.reduce((a, b) => a + b, 0);
 
-  const plate = planPlate(Lf, H, Wd, stretchOut);
-  const { toFront, toTop, toDev } = plate;
+  // devExtra=PRISM_CAP_RESERVE_MM (NOT the live Wd — see that constant's own comment: a fixed-
+  // scale plate needs a CONSTANT reserve for its origin to stay stable across slider changes).
+  // fixedScale=PRISM_SCALE: Bug-2 fix, see that constant's own comment above.
+  const plate = planPlate(Lf, H, Wd, stretchOut, PRISM_CAP_RESERVE_MM, PRISM_SCALE);
+  const { toFront, toTop, toDev, front, top, dev } = plate;
 
   // Front/top outlines are the STATED problem (visible immediately, before Play) —
   // role 'given', matching topOutline; only the development is the constructed 'result'.
@@ -117,37 +258,154 @@ function buildPrism(params) {
     [toTop(0, 0), toTop(Lf, 0), toTop(Lf, Wd), toTop(0, Wd)],
     'given', true, OUTLINE_W,
   );
-  // Vertical projector, front view's seam corner down to the top view's own corner —
-  // first-angle fold-line convention (RULES §4), ties the two views together.
-  const projector = L(toFront(0, 0), toTop(0, 0), 'given');
+  // Vertical projectors — first-angle fold-line convention (RULES §4), auxiliary tier
+  // (Module2 parity: a projector is scaffolding, not stated geometry, so it is NOT
+  // 'given'). The top view's own y-axis (depth) is invisible to the front view, so each
+  // projector runs the FULL depth of its x-column, touching every corner that shares that
+  // x — front view's left edge (x=0) legitimately projects to BOTH corner 1 (y=0, nearest
+  // the fold line) and corner 4 (y=Wd, the far corner), which is why this is one line to
+  // the FAR corner rather than two — same principle for the right edge (x=Lf) to corners
+  // 2/3. Only 2 lines needed: front view has only 2 distinct verticals (depth collapses
+  // there), matching topOutline's own 4 distinct corners exactly.
+  const projectorLeft = L(toFront(0, 0), toTop(0, Wd), 'move');
+  const projectorRight = L(toFront(Lf, 0), toTop(Lf, Wd), 'move');
 
   let x = 0;
   const foldXs = [];
   for (let i = 0; i < edges.length - 1; i++) { x += edges[i]; foldXs.push(x); }
+  // Outline: NOT a plain stretch-out rectangle — K.C. John Fig. 15.4 (Example 15.1, this
+  // construction's own cited source) hinges the base rectangle and the top rectangle onto
+  // the FIRST panel (the Lf-wide wall nearest the seam, x:0→Lf) of the lateral strip, one
+  // folding down from z=0, one folding up from z=H, turning the cut-out pattern into a
+  // cross offset toward the seam end — not a strip, not a centred plus. Traced as ONE
+  // closed outer boundary (10 vertices) starting at the base cap's outer corner, walking
+  // the base cap → the strip's own bottom-right/right/top-right → the top cap → back down
+  // the strip's genuinely-outer left wall (x=0, the seam, full height — the ONE strip edge
+  // this shape keeps) → the base cap's left edge, closing the loop. The two segments this
+  // routing SKIPS (x:0→Lf at z=0 and at z=H) are exactly where the caps hinge — drawn below
+  // as fold lines (thin), not outline (thick), matching K.C. John Ch.15 note #4.
   const devOutline = POLY(
-    [toDev(0, 0), toDev(stretchOut, 0), toDev(stretchOut, H), toDev(0, H)],
+    [
+      toDev(0, -Wd), toDev(Lf, -Wd), toDev(Lf, 0),
+      toDev(stretchOut, 0), toDev(stretchOut, H), toDev(Lf, H),
+      toDev(Lf, H + Wd), toDev(0, H + Wd), toDev(0, H), toDev(0, 0),
+    ],
     'result', true, OUTLINE_W,
   );
-  const foldLines = foldXs.map((fx) => L(toDev(fx, 0), toDev(fx, H), 'result', FOLD_W, FAST_MS));
+  const foldLines = [
+    ...foldXs.map((fx) => L(toDev(fx, 0), toDev(fx, H), 'result', FOLD_W, FAST_MS)),
+    // Cap hinges — the two segments devOutline's own path deliberately skips (see above).
+    L(toDev(0, 0), toDev(Lf, 0), 'result', FOLD_W, FAST_MS),
+    L(toDev(0, H), toDev(Lf, H), 'result', FOLD_W, FAST_MS),
+  ];
   // A plain (uncut) prism's every vertical edge is already a TRUE length (K.C. John
   // Ch.15 note #1) — only the base line (z=0) and top line (z=H) ever need transferring.
-  const transferBase = L(toFront(0, 0), toDev(stretchOut, 0), 'move');
-  const transferTop = L(toFront(0, H), toDev(stretchOut, H), 'move');
+  // Cross-region (front view → development): DASH_CARRY, not the projectors' DASH_PROJECT
+  // (see renderConstruction.js's file header dash vocabulary).
+  const transferBase = L(toFront(0, 0), toDev(stretchOut, 0), 'move', undefined, undefined, 'carry');
+  const transferTop = L(toFront(0, H), toDev(stretchOut, H), 'move', undefined, undefined, 'carry');
+
+  // ---- Station numerals — K.C. John Fig. 15.4 numbers every corner of the top view AND
+  // both edges of the development (top row AND bottom row), reusing the SAME four numbers
+  // across both regions: this is the actual thread the figure is teaching ("this fold line
+  // is where corner 2 lands"), not decoration. The front view's own 4 drawn corners are
+  // each a COINCIDENCE of two real corners (depth collapses there — corners 1&4 share the
+  // front view's left edge, 2&3 its right) — labelling that ambiguity correctly needs a
+  // second, disambiguating view convention this topic doesn't otherwise use, so front-view
+  // corner numerals are scoped OUT here (see this file's own header note); the two
+  // projectors above already carry that correspondence visually. ----
+  const topNumerals = [
+    NUM(toTop(0, 0), '1', 'left'),
+    NUM(toTop(Lf, 0), '2', 'right'),
+    NUM(toTop(Lf, Wd), '3', 'right'),
+    NUM(toTop(0, Wd), '4', 'left'),
+  ];
+  const stationXs = [0, Lf, Lf + Wd, Lf + Wd + Lf, stretchOut];
+  const stationLabels = ['1', '2', '3', '4', '1'];
+  const devNumeralsTop = stationXs.map((sx, i) => NUM(toDev(sx, H), stationLabels[i], 'above'));
+  const devNumeralsBottom = stationXs.map((sx, i) => NUM(toDev(sx, 0), stationLabels[i], 'below'));
+  // End-cap far corners — folding the top-view's own 1,2,3,4 rectangle up/down about the
+  // 1-2 hinge (x:0→Lf) carries corner 4 (0,Wd) to directly above/below corner 1, and corner
+  // 3 (Lf,Wd) to directly above/below corner 2 (Fig. 15.4 verified: same "3"/"4" reused, not
+  // a new letter/number alphabet) — matching this file's own reuse-across-regions rule.
+  const devNumeralsCap = [
+    NUM(toDev(0, H + Wd), '4', 'above'), NUM(toDev(Lf, H + Wd), '3', 'above'),
+    NUM(toDev(0, -Wd), '4', 'below'), NUM(toDev(Lf, -Wd), '3', 'below'),
+  ];
+
+  // ---- Leader callouts — every source figure in this chapter carries these three
+  // (Bhatt Fig. 15.1/15-10, K.C. John Fig. 15.4/15.7). Anchors are offset a small
+  // constant amount in the SAME drawing-space `planPlate` already returns everything in
+  // (see renderConstruction.js's file header — this is authored geometry, not UI chrome,
+  // so it lives in drawing-space like every other point in this file), landing inside the
+  // reserve bands `planPlate` set aside for exactly this kind of annotation. ----
+  const seamNote = NOTE({ x: top.x0 - 12, y: top.y0 - 10 }, toTop(0, 0), 'Seam');
+  // Label-polish pass: foldNote/insideNote used to anchor only ~9 drawing-units apart (their
+  // offsets pulled them toward the SAME panel-2 corner from opposite directions) — at this
+  // plate's own scale that's less than one text-box width, so the two knockout boxes
+  // overlapped. Re-anchored to genuinely different real estate instead of nudging the old
+  // offsets: fold line's callout stays on the SAME fold line (x=Lf) but higher up it (0.7H,
+  // was 0.5H); inside-pattern's callout moves off panel 2 entirely, into panel 3's own
+  // center at a low height (0.28H) — vertically stacked with ~25-unit clearance from the
+  // fold note, not squeezed into the same corner.
+  const foldAt = toDev(Lf, H * 0.7);
+  const foldNote = NOTE({ x: foldAt.x + 14, y: foldAt.y - 8 }, foldAt, 'Fold line');
+  const insideAt = toDev(Lf + Wd + Lf / 2, H * 0.28);
+  const insideNote = NOTE({ x: insideAt.x - 30, y: insideAt.y - 4 }, insideAt, 'Inside pattern');
+
+  // ---- Region captions — below each block, ROW-ALIGNED, not independently tied to each
+  // block's own bottom edge. `capDev`'s old anchor (`toDev(*, 0).y + 26`, a fixed offset off
+  // the strip's z=0 line) predates the end-cap addition above — the base cap now extends
+  // BELOW z=0, so that anchor landed the caption INSIDE the cap's own rectangle. Even before
+  // that bug, "(i)"/"(ii)" sat at two independently-computed y's (each block's own bottom +
+  // its own margin) that only happened to look close, never a genuine shared row the way
+  // K.C. John's own figure captions read. Fixed by taking whichever block's bottom edge is
+  // actually lower on screen — front+top's own (`top.y0+top.h`) or the development pattern's,
+  // now including the base cap (`toDev(*, -Wd).y`, not `toDev(*, 0).y`) — and putting BOTH
+  // captions the SAME `CAPTION_GAP` below THAT one shared row.
+  const CAPTION_GAP = 10;
+  // Bug-3 fix: the stretch-out dim below (`DIM_OFFSET`) used to anchor at z=0 (the cap
+  // hinge, mid-block) with the SAME stale pre-end-cap assumption capDev's old anchor had
+  // (see the caption-row comment this block already carries) — it landed inside/overlapping
+  // the base cap instead of clear below it. Anchored at devBottom now (matches the dim's
+  // own new z=-Wd anchor points), and its own reach folded into captionRowY the same way
+  // devBottom already is, so the caption row can never land on top of it.
+  const DIM_OFFSET = 16; // stretch-out dim's stand-off below the cap's real bottom edge
+  const frontTopBottom = top.y0 + top.h;
+  const devBottom = toDev(stretchOut / 2, -Wd).y;
+  const stretchDimBottom = devBottom + DIM_OFFSET;
+  const captionRowY = Math.max(frontTopBottom, stretchDimBottom) + CAPTION_GAP;
+  const capFrontTop = CAPTION({ x: front.x0 + front.w / 2, y: captionRowY }, '(i) Front view & top view');
+  const devBase = toDev(stretchOut / 2, 0);
+  const capDev = CAPTION({ x: devBase.x, y: captionRowY }, '(ii) Development of prism (inside pattern)');
 
   const steps = [
-    frontOutline, topOutline, projector,
-    dim(toFront(0, 0), toFront(Lf, 0), `${Lf} mm`, 'given', -12),
+    frontOutline, topOutline, projectorLeft, projectorRight,
+    // Offsets flipped positive (were -12/-12): `off`'s sign picks perp's own direction, and
+    // negative here pointed INWARD (perp=(0,1) down for the width dim, perp=(-1,0) left for
+    // the depth dim — "outward" needs the offset's sign to match, same law the correctly-
+    // signed H-dim below (+14) and the result-role stretch-out dim (+16) already follow).
+    // Was landing the dim line inside the outline instead of in the reserve band beside it.
+    dim(toFront(0, 0), toFront(Lf, 0), `${Lf} mm`, 'given', 12),
     dim(toFront(Lf, 0), toFront(Lf, H), `${H} mm`, 'given', 14),
-    dim(toTop(0, 0), toTop(0, Wd), `${Wd} mm`, 'given', -12),
+    dim(toTop(0, 0), toTop(0, Wd), `${Wd} mm`, 'given', 12),
+    ...topNumerals, seamNote, capFrontTop,
     transferBase, transferTop,
     devOutline, ...foldLines,
-    dim(toDev(0, 0), toDev(stretchOut, 0), `2×(${Lf}+${Wd}) = ${stretchOut} mm`, 'result', 16),
-    LABEL(toDev(stretchOut / 2, H), 'Development — four rectangles in sequence', -70, -8),
+    ...devNumeralsTop, ...devNumeralsBottom, ...devNumeralsCap, foldNote, insideNote,
+    // Dim-line pair stays at the clean level z=-Wd (the base cap's own bottom edge, a real
+    // corner on the LEFT end at x=0) so the dim line itself stays horizontal. The RIGHT end
+    // (x=stretchOut) has no geometry at z=-Wd — the base cap only spans x∈[0,Lf], so the
+    // pattern's true bottom-right corner is (stretchOut, 0), Wd above the dim-line pair's own
+    // b. extB below sends that end's tick the extra Wd so it actually reaches drawn outline
+    // instead of stopping in empty space (paintDim's extA/extB).
+    dim(toDev(0, -Wd), toDev(stretchOut, -Wd), `Stretch out = 2×(${Lf}+${Wd}) = ${stretchOut} mm`, 'result', DIM_OFFSET, undefined, toDev(stretchOut, 0)),
+    capDev,
   ];
 
   return {
     steps,
-    resultText: `Rectangular prism ${Lf}×${Wd} mm base, ${H} mm high — stretch-out = 2×(${Lf}+${Wd}) = ${stretchOut} mm, four rectangles ${Lf}×${H} / ${Wd}×${H} in sequence (K.C. John Example 15.1).`,
+    resultText: `Rectangular prism ${Lf}×${Wd} mm base, ${H} mm high — stretch-out = 2×(${Lf}+${Wd}) = ${stretchOut} mm, four rectangles ${Lf}×${H} / ${Wd}×${H} in sequence plus the ${Lf}×${Wd} mm base and top end caps hinged at the seam wall (K.C. John Example 15.1, Fig. 15.4).`,
   };
 }
 

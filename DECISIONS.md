@@ -4053,6 +4053,15 @@ topic-numbering momentum. `constructions.js`'s helix math is shared 3D-parametri
 projected into two SVG panes by one shared layout function, not duplicated per-view logic.
 **Status:** Active.
 
+**Addendum (2026-08-05): Reversed for Diploma Module 2 Topic 1.1 only.** The original decision
+(Diploma track stays 2D-only, no Three.js orbit view) is explicitly overridden for
+`graphics_diploma_module_2_topic_1_1_development_of_surfaces`. Reasoning: Development of Surfaces
+is fundamentally a 3D-solid-unrolled-to-2D subject — unlike the helix case this ADR was written
+for, seeing the actual solid before its flattened pattern is core to the pedagogy, not an optional
+enhancement. This addendum does not reopen this ADR for any other Diploma topic; each future case
+is judged on its own subject matter, per this ADR's own per-topic-ADR requirement. See ADR-112's
+own addendum for the implementation this reversal produced.
+
 ---
 
 ## ADR-098: Show Method's beat-emptiness test becomes mark-novelty in sheet-local 2D; the per-beat caption moves to a top-of-view title, out of the canvas-caption's own space; the nav pill's corner radius is made concentric with its buttons; the Set-N chip pill is re-anchored to clear the new title row
@@ -5410,6 +5419,348 @@ the same deviation, not "SVG felt harder." `src/developmentEngine.js` in this to
 and this copy are permitted to drift (different `ShapeType` tables, different scope), so no
 cross-file sync obligation is created by this ADR.
 **Status:** Active.
+
+**Addendum (2026-08-05): 3D View step added.** A new wizard step, 3D View, is inserted between
+Choose and Given (Choose → 3D View → Given → Construct → Verify). This is the track's first
+Three.js dependency, using Module 2's boot/disposal contract and `cube.js`/`cylinder.js`
+generators — copied fresh, not shared via the byte-identical family guarantee (RULES §7.2 doesn't
+extend to this track), matching the precedent already set for `developmentEngine.js`. The
+two-piece elbow requires a bespoke `elbowHalf.js` generator (no existing platform elbow mesh); it
+reuses the 2D construction's `cutHeight()` mitre-plane math, not shared geometry code. The
+existing Canvas2D development plate (front view + top view + development + transfer lines, one
+sheet) is unchanged — 3D is additive, not a replacement. See ADR-097's own addendum for the
+override this step required. **Superseded the next revision pass, before any of this was
+committed — see the 2026-08-06 addendum immediately below.**
+
+**Addendum (2026-08-06): the 3D View STEP above is replaced by a Compare card — nothing from the
+2026-08-05 addendum above had been committed yet, so this is a same-arc revision, not a rollback.**
+Two things surfaced this revision, stated plainly rather than silently reworked: (1) an unrelated
+audit of this topic's elbow drawing (front view pinned top-left instead of centered — a routine
+`constructions.js` `planPlate()` bug fix, logged in this topic's own CHANGELOG.md, not here)
+prompted re-reading Bhatt's actual page layout for this chapter
+(Fig. 15-1, 15-3 through 15-15) — **every** figure puts the small isometric pictorial and the
+front/top+development plate **side by side in one figure**, never sequentially (view the solid,
+leave it, then draw). The 3D View step contradicted the source material's own presentation.
+(2) Checking the platform's own Compare precedent surfaced ADR-080 (below): the floating/compact
+Compare card is fixed and removed everywhere, platform-wide — Compare has exactly one shape, the
+docked ADR-037 50/50 split. A "3D View step" was never going to reconcile with that; a Compare
+card is the shape the platform has already standardized on for "peek at a second view without
+losing the main one."
+**Decision:** the wizard reverts to the platform's standard four-step shape (Choose → Given →
+Construct → Verify, `stepper.js`). The 3D solid moves into a docked Compare split
+(ADR-012/037/080), **roles reversed from every other Compare topic on the platform**: this topic's
+Canvas2D construction plate (`#sim-viewport`) is already the primary pane (ADR-112 §1), so Compare
+docks the 3D solid (`view3d.js`, unchanged) as the SECOND pane instead of a 2D drawing — the usual
+direction is 3D-primary/2D-secondary (Points, Lines, the KTU
+`graphics_module_3_topic_2_development_of_surfaces` sibling); this is the first Compare-card topic
+built the other way around. `#given-fields` (the Given step's dimension sliders) docks into the
+split's `#workbench-rail` — unlike the sibling topics' rail (which docks a solid/cutting-plane
+*picker*), this rail exists so dimensions stay LIVE-adjustable while comparing solid against
+pattern, which the old sequential step structurally could not offer (Given and 3D View were
+different steps, never both on screen). `main.js`'s `rebuild()` now calls `view3d.js`'s
+`rebuild3D()` directly whenever Compare is open, closing that gap. `view3d.js`/`cube.js`/
+`cylinder.js`/`elbowHalf.js` are UNCHANGED — the lifecycle API (`show3D`/`hide3D`/`rebuild3D`/
+`resumeLoop3D`/`clear3D`) was already caller-agnostic, so only the caller (`main.js`, `stepper.js`,
+`index.html`) needed rewiring.
+**Files touched:** `stepper.js` (5→4 steps), `main.js` (compare state machine replacing
+`onEnter3DStep`/`onLeave3DStep`), `index.html` (Compare chip/card/workbench-rail/rail-toggle
+markup + CSS, ported from the KTU sibling topic), `view3d.js` (comment wording only — "Step 2" →
+"Compare open/close" throughout, no behavior change). `cube.js`/`cylinder.js`/`elbowHalf.js`
+untouched. `constructions.js` got the unrelated `planPlate()` centering fix noted above, same
+pass, logged in CHANGELOG.md rather than here (routine bug fix, not a decision).
+**Status:** Active. The 2026-08-05 addendum above is superseded by this one.
+
+**Addendum (2026-08-06): pane order swapped to 3D-left/2D-right, and the 3D solid gains corner
+numerals — the thing that makes Compare pedagogical, not just decorative.** This addendum's own
+"roles reversed" language above ("Compare docks the 3D solid as the SECOND pane") was read too
+literally into pane *position* as well as pane *role* — re-reading Bhatt Fig. 15-1/15-3…15-15
+confirms every figure puts the isometric pictorial and the construction plate side by side with
+the pictorial FIRST (left), never the plate first; every other Compare-card topic on the platform
+(Points, Lines, the KTU sibling) also puts 3D left. The Canvas2D plate stays this topic's primary
+pane in role (ADR-112 §1 — it's still what Choose/Given/Construct/Verify drive), but its screen
+position moves right. Pure CSS: `index.html`'s `grid-template-areas` string order flipped at all
+four split/rail-collapsed/mobile sites; DOM order and `main.js`'s `enterWorkbench()`/
+`exitWorkbench()` re-parenting are untouched, since grid position is expressed entirely by
+`grid-area` names, not DOM order or an `order:` property.
+
+Separately, and this is the change that actually closes the loop Compare was built to provide: the
+3D prism's corners are now numbered `1,2,3,4` (unprimed on both the base and top ring), matching
+`constructions.js`'s own top-view/development station numerals exactly (DESIGN.md §6) — until now
+the 3D solid carried no labels at all, so a student comparing panes had no way to trace a specific
+corner across them. New leaf `src/labels3d.js`, adapted from `Module2/src/vertexLabeler.js`
+(CSS2DObject DOM pills; independent copy, not byte-identical-shared, same precedent as this
+topic's own `cube.js`/`developmentEngine.js` — RULES §7.2's guarantee doesn't reach this track).
+Unlike `vertexLabeler.js`'s generic `uniqueLocalVertices`/`orderRing` atan2 inference (built for
+arbitrary n-gon solids), the prism's 8 corners are read directly off `BoxGeometry`'s own bounding
+box against an explicit, auditable station table — exact for a box, not inferred. `view3d.js`
+gained a `CSS2DRenderer` overlay (mounted/resized/rendered alongside the existing
+`WebGLRenderer`, same `z-index:1`-traps-the-label-stacking-context fix `Module2/CHANGELOG.md`
+already recorded once); no new dependency, `three/addons/` was already import-mapped. Numerals
+are Prism-only this phase — `rebuild3D()` clears them for cylinder/elbow — matching the
+solid-by-solid rebuild already underway for the 2D plate (ADR-113/114).
+
+**A discrepancy surfaced, not fixed:** deriving the 3D↔2D corner mapping required reading
+`constructions.js`'s own first-angle convention (`toTop`'s `y=0` is nearest the fold line, i.e.
+nearest the VP/rear) against `edges = [Lf, Wd, Lf, Wd]`'s comment, which labels that same walk
+"front → right → back → left". The two disagree on which wall is "front". Nothing renders wrong —
+a plain rectangular box's top view is symmetric, so the edge walk is a valid closed circuit either
+way and every on-screen measurement is unaffected — but the comment's prose is inconsistent with
+the file's own first-angle derivation elsewhere. Left as-is pending confirmation; flagged here
+rather than silently reworded.
+**Status:** Active.
+
+---
+
+## ADR-113: Development of Surfaces (Diploma) 2D plate — Phase 1 rendering rebuild (screen-space paint, Module2-parity ink hierarchy, textbook annotation) — Prism only, solid-by-solid
+
+**Date:** 2026-08-06
+**Decision:** Two prior same-day patches to this topic's `renderConstruction.js` (aliasing
+`given`→`--color-ink`, adding paper-knockout text — both logged in the topic's own `DESIGN.md` §3)
+did not close the visual gap against Module2's Show Method sheet, the cited quality bar. Rather than
+patch further, `Module2/main.js`'s entire Show Method drawing section (`drawMethodSheet` + every
+helper) was read in full, alongside both source chapters (`Development.pdf` — K.C. John Fig. 15.4/
+15.7; `KC-Development.pdf` — Bhatt Fig. 15-3/15-10/15-15 — filenames are swapped from their title
+pages, verified by content: `Development.pdf`'s Ktunotes-watermarked pages are K.C. John's "Engineering
+Graphics for Diploma"; `KC-Development.pdf`'s Charotar-Cognifront-marked pages are N.D. Bhatt's
+"Engineering Drawing"). Four structural defects were found, none of them a colour token:
+
+1. **Geometry was painted under a baked-in `ctx.scale()`.** `main.js`'s `paint()` set
+   `ctx.setTransform(dpr*scale, …)` from the live pan/zoom, so every `lineWidth`/font size in
+   `renderConstruction.js` (authored as plain numbers, e.g. `1.8`) meant that many WORLD units —
+   1.8px only at one particular zoom. The outline/fold thick/thin convention (K.C. John Ch.15 note
+   #4) silently broke at every other zoom level. Module2 never does this: `drawMethodSheet` builds a
+   `projectSheet(p)->{x,y}` and every stroke width is a literal, constant canvas-px number.
+2. **No auxiliary tier.** Three saturated hues (ink / a violet `move` / green `result`) sat at
+   near-equal visual weight — nothing read as scaffolding. Module2 drops every purely-auxiliary
+   construction mark (a projector, a reference line) to `--color-ink-secondary` and carries the
+   mark's MEANING in dash pattern instead (`Module2/main.js`'s within-Set-projector `[2,2]` vs.
+   carried-from-previous-Set `[8,4]` split).
+3. **Near-zero textbook annotation.** Every cited figure in both chapters numbers every corner/
+   generator on both the views AND the development (top and bottom row), and carries `Seam`/
+   `Fold line`/`Inside pattern` leader callouts plus a region caption under each block. The prism
+   drew zero numerals before this pass.
+4. **The fit budget excluded its own annotation.** `constructions.js`'s `planPlate()` fit the views
+   + development inside a flat margin with no allowance for the dims/captions/numerals living
+   OUTSIDE that geometric bbox — the exact bug class Module2 fixed in ADR-102 (a Set's own caption
+   offset left out of its fit, overlapping its nav pill).
+
+**Scope: Prism only, this pass.** The rebuild plan is explicitly solid-by-solid (Prism → Cylinder →
+Elbow, each shown for approval before the next); this ADR covers Prism. Cylinder/Elbow keep their
+pre-rebuild step CONTENT (no numerals/notes/captions yet) but render correctly through the rebuilt
+`renderConstruction.js` unchanged — verified live, no console errors, `constructions.js`'s own
+`verifyCutHeightAgainstGeneralSolver()` self-check stayed silent.
+
+**What changed:**
+- `main.js`'s `paint()` — `ctx` stays DPR-only for the whole paint; builds a `sheet` object
+  (`{ project, pxPerUnit, given, move, result, ink, inkSecondary, paper, fontSans, fontMono }`,
+  Module2's `projectSheet`/`pxPerUnit` shape) and hands it to `renderConstruction.js` instead of
+  setting a scaled transform.
+- `renderConstruction.js` — every `paint*` helper now projects its own points via `sheet.project()`
+  and draws in literal canvas px for anything that is UI chrome, not geometry (stroke width, font
+  size, point-dot radius, arrowhead size, dash lengths, the ruler/compass tool overlay — real
+  geometry like a circle/arc radius is still scaled, by `sheet.pxPerUnit`). Weights: `OUTLINE_PX
+  1.6`, `FOLD_PX 0.9`, `AUX_PX 0.75` (previously `1.8`/`0.6` WORLD units). Three new step kinds —
+  `'numeral'` (station identifier, always `ink`), `'note'` (leader callout, always `inkSecondary`),
+  `'caption'` (region caption, plain text) — all sharing one `drawKnockoutText` helper (ported
+  technique from Module2's `drawMethodLabels`/`strokeAngleArc`, not the file). Four named dashes —
+  `DASH_DATUM [1]`, `DASH_HIDDEN [5,4]`, `DASH_PROJECT [2,2]`, `DASH_CARRY [8,4]` — a `dash: 'carry'`
+  tag on a step opts a 'move'-role line into the cross-region pattern; every other 'move'-role line
+  defaults to `DASH_PROJECT`.
+- `constructions.js` — `OUTLINE_W`/`FOLD_W` updated to the new px values; `planPlate()` gained
+  `RESERVE_TOP/BOTTOM/LEFT/RIGHT` bands (fixed constants, subtracted before `scale` is derived —
+  ADR-053/054's intrinsic-only law, never a measured bbox); `buildPrism` fully rebuilt against K.C.
+  John Example 15.1/Fig. 15.4 — top-view corners numbered 1-4 clockwise from the seam, the SAME
+  numbers reused on the development's top AND bottom edge rows (the actual pedagogical thread the
+  figure teaches); `Seam`/`Fold line`/`Inside pattern` leader callouts; region captions; the single
+  projector (which only reached ONE of the two coincident corners it should have) replaced with two
+  projectors, each running the FULL depth of its x-column so it legitimately touches both real
+  corners a front-view edge collapses. A genuine content bug fixed in the same pass: the projector
+  was tagged `role: 'given'` (primary ink) — scaffolding, not stated geometry, so it is `'move'`
+  (auxiliary) like every other projector.
+- `index.html` — `--color-construct-move` now aliases `var(--color-ink-secondary)`; the retired
+  violet value (`#7b4fb5`) is recorded in a comment, not silently dropped.
+
+**Front-view corner numerals are a named scope decision, not an oversight:** depth collapses in the
+front view, so each of its 4 drawn points is a coincidence of two real solid corners (the prism's
+corners 1 and 4 both land on the front view's left edge) — labelling that coincidence correctly
+needs a disambiguating convention this topic doesn't otherwise use. The two projectors (each
+spanning a full x-column's depth) already carry that correspondence visually; the top view's own
+corners are genuinely unambiguous (only height collapses there) and carry the numerals instead.
+
+**End-cap faces (base/top rectangles) were considered and deferred, not silently decided.** K.C.
+John Example 15.1 step 2 explicitly attaches the base+top face rectangles to the pattern
+("draw the two rectangles 5,6,7,8 and 1,2,3,4..."); Bhatt omits ends by stated policy ("the ends or
+bases have been omitted"). This pass kept the existing lateral-surface-only scope (matching Bhatt's
+explicit policy and this topic's pre-rebuild behaviour) rather than widen scope mid-rewrite; flagged
+for the user rather than assumed.
+
+**A regression caught by verification, not assumed fixed:** a live check at the elbow's slider
+extremes (`legLength=100`) showed "100 mm (short leg)" clipping its leading digit at the canvas
+edge — a direct side-effect of point (1) above: dim TEXT is now a fixed px width regardless of a
+construction's own intrinsic `scale`, so a construction with a small intrinsic scale (the elbow's
+wide-legs-but-tall-bbox front view, `planPlate`'s own long-standing comment) can no longer rely on
+text shrinking to fit the way it did under the old baked-in `ctx.scale()`. Fixed by widening
+`RESERVE_LEFT`/`RESERVE_RIGHT` from `16`/`20` to `30`/`30` — re-verified clean at the elbow's own
+slider max and the prism's own min/max on every given. The reserve bands remain generous fixed
+constants, not a measured bbox (per point (4) above) — a future construction with an even longer dim
+string at an even tighter intrinsic scale could still need this revisited; flagged in
+`constructions.js`'s own comment, not treated as permanently solved.
+
+**Why:** RULES.md §2.19a (verify the underlying mechanism before shipping, not visual plausibility)
+applies here directly — the prior two patches looked locally reasonable (a token alias, a knockout
+rect) but never addressed why the sheet still didn't read as an engineering drawing. Reading the
+actual reference implementation and the actual source chapters, rather than iterating on guesses,
+is what surfaced the real (structural, not cosmetic) causes.
+**Alternatives rejected:** *Keep patching the existing colour/knockout layer* — this is the
+approach that already failed twice; rejected as the same failure mode a third time. *Build all three
+solids in one pass* — rejected per the user's own explicit instruction: solid-by-solid, Prism shown
+and approved before Cylinder/Elbow.
+**Consequences:** `renderConstruction.js`'s `paintLayer(ctx, layer, sheet)` third argument is no
+longer a flat colour `palette` — any future direct caller must build the `sheet` shape `main.js`'s
+`paint()` now constructs. Cylinder/Elbow render correctly today but read visually inconsistent with
+the now-rebuilt Prism (no numerals/notes/captions) until their own phases land — expected, not a
+defect, per the solid-by-solid plan.
+**Status:** Active. Cylinder and Elbow phases pending user approval of this Prism pass.
+
+## ADR-113 correction (2026-08-06): the PDF↔author mapping was backwards
+
+ADR-113 states `Development.pdf` is K.C. John's *Engineering Graphics for Diploma* (Ktunotes
+watermark) and `KC-Development.pdf` is N.D. Bhatt's *Engineering Drawing* (Charotar-Cognifront
+watermark) — i.e. the filenames are "swapped" from their content. Re-verified directly against
+both files' actual pages while sourcing citations for ADR-114 below: it's the other way round.
+`KC-Development.pdf` carries the Ktunotes watermark, the "Engineering Graphics for Diploma"
+running header, and K.C. John's own dotted figure numbering (`Fig. 15.4`, `Example 15.1` — its
+p.174 Example 15.1 is base 24×30mm, axis 40mm, the exact numbers this topic's `buildPrism()`
+defaults to). `Development.pdf` carries the Charotar-Cognifront watermark, the "Engineering
+Drawing" running header (pp.352-356), and Bhatt's hyphenated numbering (`Fig. 15-1`, `Problem
+15-1`) — its own §15-2 states the lateral-surface-only policy ADR-113 quoted ("The ends or bases
+have been omitted. They can be easily incorporated if required."), just filed under the wrong
+filename. Net effect: the filenames actually match their obvious reading (`KC-Development.pdf` =
+K.C. John, `Development.pdf` = Bhatt) — no swap. ADR-114 below cites both correctly.
+
+## ADR-114: Development of Surfaces (Diploma) Prism — dimension-offset sign fix, fit-to-frame→fixed-scale switch, and end-cap faces (K.C. John Fig. 15.4)
+
+**Date:** 2026-08-06
+**Decision:** Two bugs and a scope gap flagged in live review of ADR-113's Prism pass, fixed in
+one coherent follow-up (Prism only, per that same pass's solid-by-solid plan):
+
+1. **Given-step dimension lines rendered inside the outline.** `buildPrism()`'s base-length and
+   base-width `dim()` calls (`constructions.js`) carried a negative `offset` where the sign
+   convention (`renderConstruction.js`'s `paintDim()`: `perpx=-uy, perpy=ux`, `off`'s sign picks
+   the side) needed positive to land outside the shape — a leftover from before the Construct-
+   step development dim got this same fix; the height dim and the stretch-out dim were already
+   correctly signed. NOT a second code path: Given-step and Construct-step dims share one
+   `paintDim()` and one data source, filtered by `role` in `main.js`'s `rebuild()`/`play()`.
+   Confirmed by direct computation (offset -12 landed the width dim ~12 drawing-units inside an
+   ~85-unit-tall box at default params) and reproduced live in-browser before the fix.
+2. **The plate did not scale proportionally to its own mm dimensions.** `planPlate()`'s `scale`
+   was `Math.min(scaleX, scaleY, 4)`, both ratios derived from the CURRENT render's own
+   `frontW+devW`/`frontH+topDepth` — genuine fit-to-frame, so a 16mm and a 32mm base width could
+   render at nearly the same on-screen width (halving `baseWidth` raised `scaleY` and re-inflated
+   everything else). Root-caused as SEPARATE from (1) — a sign error breaks outside/inside
+   placement independent of what `scale`'s actual value is; the two only interact in that a small
+   `scale` could occasionally shrink the box enough to mask the sign bug by coincidence.
+3. **Lateral-surface-only, not the full pattern.** K.C. John Example 15.1 (Fig. 15.4, p.174 —
+   this topic's own cited source, see the correction above) explicitly attaches the base and top
+   rectangles to the strip ("draw the two rectangles 5,6,7,8 and 1,2,3,4..."), turning the
+   pattern into a cross, not a straight strip — ADR-113 flagged this and deliberately deferred it
+   rather than widen scope mid-rewrite. This ADR resolves that deferral.
+
+**What changed:**
+- `constructions.js` `buildPrism()` — the base-length dim's offset flipped `-12`→`+12`; the
+  base-width dim's offset flipped `-12`→`+12`. Both now point the same outward direction as the
+  height dim (`+14`) and the result-role stretch-out dim (`+16`).
+- `constructions.js` `planPlate()` gained an optional 6th param, `fixedScale` (default `null`,
+  every existing call site untouched — Cylinder/Elbow don't pass it, still fit-to-frame, out of
+  this pass's scope per ADR-113's own plan). When given, it overrides the derived `scale`
+  entirely; `extraX`/`extraY` (the existing even-split centering fix) then letterbox around
+  whatever room is left, instead of the scale itself flexing to fill the frame. `buildPrism()`
+  passes a new module constant, `PRISM_SCALE = 1.24`, derived ONCE from this construction's own
+  slider worst-case (every `given` range at its max simultaneously: `baseLength≤40`,
+  `baseWidth≤32`, `height≤60`) through the SAME two fit-budget ratios `planPlate()` itself
+  computes (`scaleX_worst = 294/(40+2×(40+32)) ≈ 1.598`, `scaleY_worst = 154/(60+2×32) ≈ 1.242`),
+  floored to 2dp — provably small enough to fit at every reachable slider combination, not just
+  the default. Verified: identical `1.24` px/mm computed independently for the base-length AND
+  base-width dims, at both `baseWidth=24` and `baseWidth=16` — and the worst-case combo plus 6
+  other corner-cases all fit inside the 420×260 canvas via `renderConstruction.js`'s own
+  `computeBounds()`.
+- `constructions.js` `planPlate()` also gained a 5th param, `devExtra` (default `0`, same
+  no-op-for-Cylinder/Elbow contract) — extra mm the DEVELOPMENT column alone needs above AND
+  below the front view's own `[0,frontH]` z-range for a face that folds out past the strip's own
+  top/bottom edge. `scaleY`'s fit-budget became `Math.max(frontH+topDepth, frontH+2×devExtra)`
+  (whichever column is actually taller binds); `front.y0` gained `+ devExtra*scale` unconditional
+  headroom. Worked through by hand for the prism's own case (`devExtra = Wd`, the same value as
+  `topDepth` there): in the scaleY-bound worst case, the top cap's outer edge lands exactly on
+  `RESERVE_TOP` and the front+top-view column's own bottom edge lands exactly on the canvas's
+  bottom margin too — no overflow on either column, no unclaimed slack when `devExtra` is `0`.
+- `constructions.js` `buildPrism()` — `devOutline` rebuilt from a 4-vertex rectangle into the
+  true 10-vertex cross-boundary polygon Fig. 15.4 draws: both end-cap rectangles hinge on the
+  FIRST (seam-side) panel only (x:0→Lf) — top cap folds up from z=H, base cap folds down from
+  z=0 — matching the source figure exactly (confirmed against a 600dpi crop of the actual page,
+  not the thumbnail scan). Two new fold-line segments (thin, `FOLD_W`) mark the cap hinges — the
+  exact two segments `devOutline`'s new path routes around instead of through. Four new station
+  numerals (`NUM`) on the caps' far corners reuse `3`/`4` — the SAME identifiers the top-view's
+  own corners already carry (folding the top-view's own 1-2-3-4 rectangle about its 1-2 edge
+  carries corner 4 to directly above/below corner 1, corner 3 above/below corner 2) — matching
+  this file's existing reuse-across-regions convention, not a new letter/number alphabet the way
+  K.C. John's own 1-4/5-8 split would need.
+
+**Why:** RULES.md §2.19a again (per ADR-113) — root-caused via direct arithmetic on the shipped
+`paintDim()`/`planPlate()` formulas and a 600dpi crop of the actual cited page, not visual
+plausibility. The end-cap placement specifically was re-derived from the source figure rather
+than guessed, since a wrong hinge/orientation would have shipped a pattern that folds into the
+wrong shape.
+**Alternatives rejected:** *Fix `planPlate()`'s fit-to-frame scale for all three solids at once*
+— rejected, same solid-by-solid discipline ADR-113 already committed to; Cylinder/Elbow have the
+same latent bug but are out of scope until their own phase. *Give the end caps their own fresh
+corner alphabet (K.C. John's literal 5-8 split)* — rejected in favour of reusing 1-4, since this
+file's `constructions.js` already established that convention for the SAME physical corners
+across the top view and both development rows, and a fifth-through-eighth label would be new
+decoration with no reader benefit over the existing reuse rule.
+**Consequences:** `planPlate()`'s signature grew two optional trailing params; any future direct
+caller (there are none outside `constructions.js` today) inherits fit-to-frame-by-default
+behaviour unless it opts in. A live position-drift issue was found investigating this pass (the
+front+top view group's on-canvas position now visibly shifts as sliders change, a latent
+consequence of `PRISM_SCALE` making the existing centering slack — `extraX`/`extraY`, previously
+near-zero under fit-to-frame — large and content-size-dependent) — reported separately, fix
+pending approval, not folded into this ADR.
+**Status:** Active. Cylinder and Elbow inherit the same fit-to-frame scale and lateral-surface-
+only scope pending their own phases (ADR-113's plan, unchanged).
+
+**Addendum (2026-08-06): the position-drift Consequence above is fixed, approved same day.**
+Root-caused before touching code, per RULES.md §2.19a: NOT the centering fix (`extraX`/`extraY`
+even-split, this same file's earlier ADR) computing the wrong answer — it was computing the
+right answer to a question that stopped mattering once `fixedScale` existed. That split exists
+to redistribute LEFTOVER space evenly; under fit-to-frame, leftover is ≈0 by construction (scale
+flexes to consume it), so the split was a no-op in practice. Under `PRISM_SCALE`, leftover
+becomes real and CONTENT-SIZE-DEPENDENT — so `front.x0`/`y0` (and everything anchored off them,
+including the Given step's front+top view, which never even draws the dev block that leftover is
+nominally shared with) started moving every time a slider moved. Confirmed by direct computation
+before fixing: shrinking `baseLength`+`baseWidth` moved `front.x0` `109.44→137.96`; shrinking
+`height` moved `front.y0` `101.08→113.48` — and `uiManager.js`'s slider-commit path
+(`main.js`'s `commit()`) never calls `viewTransform`'s `resetView()`/`ensureVisible()`, so nothing
+in the outer pan/zoom layer masks or re-frames that shift — it renders 1:1 on screen.
+
+**Fix:** `planPlate()`'s `extraX`/`extraY` are now pinned to `0` whenever `fixedScale` is passed
+— `front.x0`/`y0` collapse to the plate's fixed top-left corner (`MARGIN+RESERVE_LEFT`,
+`MARGIN+RESERVE_TOP+devExtra*scale`), identical at every slider value; only the drawn shapes'
+own size changes, the way a real drafting sheet is anchored to its corner rather than
+auto-centered. Cylinder/Elbow (`fixedScale` null) are byte-for-byte unaffected — `extraX`/`extraY`
+still compute the original way there, and the elbow's own ~35%-dead-space centering fix still
+applies untouched. A second, smaller fix was needed alongside it: `buildPrism()` was passing the
+LIVE `baseWidth` as `planPlate()`'s `devExtra` (the end-cap headroom reserved above `front.y0`) —
+live meant `front.y0` was STILL a function of the `baseWidth` slider even with `extraY` pinned to
+0. Replaced with a new constant, `PRISM_CAP_RESERVE_MM = 32` (the same `baseWidth` slider MAX
+`PRISM_SCALE` was already derived from), so the reserved headroom — and therefore `front.y0` — is
+now a true constant too; every `baseWidth` below the max just gets more (never less) headroom
+above the cap than it strictly needs, the deliberate trade for a stable origin.
+**Verified:** `front.x0,y0` computed identical (`48, 73.68`) across 7 param combinations including
+both slider-range extremes — confirmed by direct computation AND by a live in-browser render
+(a fixed reference crosshair painted at that exact drawing-space point lands on the front view's
+own top-left corner at `baseLength/baseWidth/height` = default, min, and max simultaneously).
+Bug-1 (dim-offset sign) and Bug-2 (`PRISM_SCALE` proportionality) both re-verified unregressed;
+Cylinder/Elbow step counts and `resultText` unchanged.
+**Status:** Resolved.
 
 ---
 

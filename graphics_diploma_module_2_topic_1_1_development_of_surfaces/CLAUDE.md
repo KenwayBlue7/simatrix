@@ -109,6 +109,7 @@ Audited file-by-file before building, not assumed:
 | `src/uiManager.js` | EXTRACTED (from Topic 2.3) **minus the hand-toggle wiring** | This topic's three constructions have no handedness axis |
 | `src/main.js` | EXTRACTED shape, REIMPLEMENTED viewport plumbing | Orchestrator/simController/simAPI/rebuild() funnel unchanged in shape; `givenLayer`/`dynamicLayer` are now `createLayer()` records, not SVG `<g>` refs, and a new `paint()` resolves CSS tokens + sets `ctx`'s transform every rAF frame |
 | `src/constructions.js` | INFERRED (new) | Entirely new geometry — `planPlate()`'s shared-axis layout, the prism/cylinder/elbow builders, all described above |
+| `src/labels3d.js` | INFERRED (new) + adapted from `Module2/src/vertexLabeler.js` (**not** byte-identical-shared — RULES §7.2's guarantee doesn't reach this track, same precedent as `cube.js`/`developmentEngine.js`) | Compare pane's 3D prism corner numerals (`1`,`2`,`3`,`4`, matching `constructions.js`'s own top-view/development digits); Prism only, see DESIGN.md §6 |
 | `src/problems.js` | INFERRED (new) | New `PROBLEMS` array (shape/`groupByTier()` unchanged) |
 | `src/terms.js` (mechanics) | EXTRACTED | Hover/focus/popover positioning is generic |
 | `src/terms.js` (data) | INFERRED | New `TERMS`: development, stretch-out line, fold line, seam, generator, mitre |
@@ -155,8 +156,15 @@ graphics_diploma_module_2_topic_1_1_development_of_surfaces/
     ├── problemLibrary.js                            ← Problem Library modal + self-check (byte-copy)
     ├── constructions.js                               ← prism/cylinder/elbow pure geometry (new)
     ├── renderConstruction.js                            ← paints steps onto Canvas2D (REIMPLEMENTED)
+    ├── labels3d.js                                       ← Compare pane's 3D prism corner numerals
+                                                              (CSS2DObject pills, adapted from
+                                                              Module2/src/vertexLabeler.js — new)
     └── main.js                                            ← orchestrator (REIMPLEMENTED viewport plumbing)
 ```
+
+(The Compare pane's own 3D layer — `view3d.js`, `cube.js`, `cylinder.js`, `elbowHalf.js` — is a
+pre-existing gap in this tree, untracked since the 2026-08-05/06 Compare build; not addressed here.
+`labels3d.js` is `view3d.js`'s only consumer of the pair.)
 
 ## Non-negotiables inherited from the platform (apply unchanged)
 
