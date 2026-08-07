@@ -295,6 +295,16 @@ function markBooted() {
   });
 }
 
+/**
+ * Signal lesson completion to the host (ADR-078 addendum, revised): the learner
+ * clicked "Finish lesson" at the terminal step. Fires on every call, no latch —
+ * the host confirmed it supports repeated sim:complete triggers, so replaying the
+ * signal is expected, not a bug.
+ */
+function markComplete() {
+  window.parent.postMessage({ type: 'sim:complete' }, '*');
+}
+
 // ============================================================================
 // rebuild() — THE ONLY path for geometry changes (CLAUDE.md, non-negotiable).
 // ============================================================================
@@ -3378,6 +3388,8 @@ const simController = {
     problemLibrary?.open();     // pick the next problem (pauses the loop while open)
     announce(message);          // last write wins in the live region — the win narrates
   },
+
+  markComplete,
 
   announce,
   flowNote,

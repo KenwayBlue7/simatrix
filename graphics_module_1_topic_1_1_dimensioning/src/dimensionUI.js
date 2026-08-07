@@ -284,6 +284,7 @@ export function initUI(sim) {
 
   const btnBack = $('btn-back');
   const btnNext = $('btn-next');
+  const btnFinish = $('btn-finish');
   const btnReset = $('btn-reset');
 
   if (elTotal) elTotal.textContent = String(TOTAL);
@@ -1422,6 +1423,14 @@ export function initUI(sim) {
       btnNext.title = onLast || done ? '' : gateHintLong(currentStep);
       btnNext.setAttribute('aria-describedby', 'step-gate');
     }
+    // Finish lesson: takes over the footer's primary slot once Next hides at the
+    // terminal step (Step 6), same hide-one-show-the-other idiom as Next/Back.
+    // Gated on isComplete(6) — the fault hunt (state.faultsFound.size >= MISTAKES.length),
+    // not mere arrival, since Step 6 opens with the faults still on the sheet.
+    if (btnFinish) {
+      btnFinish.hidden = !onLast;
+      btnFinish.disabled = !done;
+    }
     const gate = $('step-gate');
     if (gate) {
       const show = !onLast && !done;
@@ -1547,6 +1556,12 @@ export function initUI(sim) {
   // --- Navigation + reset ---------------------------------------------------
   on(btnNext, 'click', () => { if (currentStep < TOTAL) goToStep(currentStep + 1); });
   on(btnBack, 'click', () => goToStep(currentStep - 1));
+  // Finish lesson: posts sim:complete to the host (no latch — every click reposts,
+  // ADR-078 addendum revised). Own element, own listener — never a relabel of #btn-next.
+  on(btnFinish, 'click', () => {
+    sim.markComplete?.();
+    sim.announce?.('Lesson marked complete.');
+  });
   on(btnReset, 'click', () => sim.reset()); // the ONE reset path (RULES.md §2.9)
 
   for (const item of railItems) {

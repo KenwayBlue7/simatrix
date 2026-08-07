@@ -137,11 +137,25 @@ ok('title matches meta.json, difficulty lowercase', await evaluate(
      && m.difficulty === m.difficulty.toLowerCase()
      && ['beginner','intermediate','advanced'].includes(m.difficulty)
      && ['title','description','difficulty','tags'].every(k => k in m))`));
-ok('no postMessage / window.parent anywhere', await evaluate(
+// postMessage is no longer a blanket ban (ADR-078 narrows ADR-002): this topic now ships
+// TWO sanctioned outbound messages, sim:ready (markBooted) and sim:complete (markComplete,
+// wired to #btn-finish in src/stepper.js). Strip exactly those two known-good call sites out
+// of the concatenated source, then assert nothing else matching postMessage/window.parent/
+// window.top survives — a real allowlist, not a deleted check. A rogue third call (a typo'd
+// payload, an inbound `message` listener, a stray window.top read) still fails this.
+ok('postMessage allowlisted to sim:ready/sim:complete only', await evaluate(
   `Promise.all(['main.js','src/objectData.js','src/objectRig.js','src/projectionSheet.js',
-                'src/uiManager.js','src/orthoSteps.js','src/cameraRig.js']
+                'src/uiManager.js','src/orthoSteps.js','src/cameraRig.js','src/stepper.js']
     .map(f => fetch('./' + f).then(r => r.text())))
-    .then(t => !/postMessage|window\\.parent|window\\.top/.test(t.join('')))`));
+    .then(t => {
+      const ALLOWED = [
+        "window.parent.postMessage({ type: 'sim:ready' }, '*')",
+        "window.parent.postMessage({ type: 'sim:complete' }, '*')",
+      ];
+      let text = t.join('\\n');
+      for (const call of ALLOWED) text = text.split(call).join('');
+      return !/postMessage|window\\.parent|window\\.top/.test(text);
+    })`));
 
 // --- 3. The guided stepper is TWO steps ------------------------------------------------------
 ok('rail has 2 steps', (await evaluate('document.querySelectorAll("#step-rail .rail__item").length')) === 2);

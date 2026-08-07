@@ -2814,10 +2814,11 @@
             <div class="tour-chips" id="predict-chips" role="group" aria-label="Name this cut"></div>
             <p class="match-status" id="predict-status"></p>
             <p class="dock__note">When you can call every cut on sight, take on the chapter's own exercises with <strong>Practice problems</strong> at the top of this card.</p>
-            <!-- Terminal-step CTA: replaces Next on the last step. Label adapts to whether
-                 a textbook problem is loaded (stepper.js renderNav reads
-                 sim.isProblemActive()); click → sim.completeAndNext(). -->
-            <button id="btn-complete-next" class="btn btn--primary btn--block" type="button" hidden>Complete &amp; next problem</button>
+            <!-- "Try another problem" (Finish-button rollout — renamed off "Complete..."
+                 wording since #btn-finish now owns lesson completion): the repeatable
+                 practice-loop button, shown by stepper.js on the last step;
+                 click → sim.completeAndNext(). -->
+            <button id="btn-complete-next" class="btn btn--primary btn--block" type="button" hidden>Try another problem</button>
           </div>
         </section>
       </div>
@@ -2840,6 +2841,14 @@
         </div>
         <button id="btn-back" class="btn btn--nav" type="button" hidden>Back</button>
         <button id="btn-next" class="btn btn--primary btn--nav" type="button">Next</button>
+        <!-- Finish lesson: takes over the footer's primary slot once Next hides at the
+             terminal step (stepper.js). Fires sim:complete (ADR-078 addendum, revised —
+             no latch, every click reposts). Own element, own listener: NOT a relabel of
+             #btn-next. Ungated (confirmed against the KTU sibling
+             graphics_module_3_topic_2_development_of_surfaces, which also carries a
+             Problem Library and is likewise ungated — Diploma's hasSolvedProblem() gate
+             does not transfer to this track). -->
+        <button id="btn-finish" class="btn btn--primary btn--nav" type="button" hidden>Finish lesson</button>
       </footer>
     </section>
     </div>

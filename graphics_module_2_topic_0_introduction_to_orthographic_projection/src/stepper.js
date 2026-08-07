@@ -38,6 +38,7 @@ export function initStepper(sim) {
   const elLead = $('step-lead');
   const btnBack = $('btn-back');
   const btnNext = $('btn-next');
+  const btnFinish = $('btn-finish');
 
   if (elTotal) elTotal.textContent = String(TOTAL);
 
@@ -77,6 +78,13 @@ export function initStepper(sim) {
       // generic one (RULES.md §3.61: one loud action per step).
       btnNext.textContent = STEPS[currentStep - 1]?.nextLabel ?? 'Next';
     }
+    // Finish lesson: takes over the footer's primary slot once Next hides at the terminal
+    // step. Gated on isDrawingComplete() — Step 2 opens on blank paper, so arrival is not
+    // "finished"; the real payoff is the fully-built, dimensioned sheet.
+    if (btnFinish) {
+      btnFinish.hidden = currentStep < TOTAL;
+      btnFinish.disabled = !sim.isDrawingComplete?.();
+    }
   }
 
   /** Show one step's panel + copy, drive the scene into that step, update chrome. */
@@ -103,6 +111,12 @@ export function initStepper(sim) {
 
   btnNext?.addEventListener('click', () => { if (currentStep < TOTAL) goToStep(currentStep + 1); }, listen);
   btnBack?.addEventListener('click', () => goToStep(currentStep - 1), listen);
+  // Finish lesson: posts sim:complete to the host (no latch — every click reposts,
+  // ADR-078 addendum revised). Own element, own listener — never a relabel of #btn-next.
+  btnFinish?.addEventListener('click', () => {
+    sim.markComplete?.();
+    sim.announce?.('Lesson marked complete.');
+  }, listen);
 
   for (const item of railItems) {
     const btn = item.querySelector('.rail__btn');

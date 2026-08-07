@@ -1714,6 +1714,12 @@
         </div>
         <button id="btn-back" class="btn btn--nav" type="button" hidden>Back</button>
         <button id="btn-next" class="btn btn--primary btn--nav" type="button">Next</button>
+        <!-- Finish lesson: takes over the footer's primary slot once Next hides at the
+             terminal step (Step 2). Fires sim:complete (ADR-078 addendum, revised — no
+             latch, every click reposts). Own element, own listener: NOT a relabel of
+             #btn-next. Gated on isDrawingComplete() (main.js) — the sheet's own last
+             stage reached, not mere arrival at Step 2 (which opens blank). -->
+        <button id="btn-finish" class="btn btn--primary btn--nav" type="button" hidden disabled>Finish lesson</button>
       </footer>
     </section>
     </div>

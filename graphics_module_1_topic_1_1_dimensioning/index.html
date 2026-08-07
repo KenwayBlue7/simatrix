@@ -1914,6 +1914,12 @@
           </div>
           <button id="btn-back" class="btn btn--nav" type="button" hidden>Back</button>
           <button id="btn-next" class="btn btn--primary btn--nav" type="button">Next</button>
+          <!-- Finish lesson: takes over the footer's primary slot once Next hides at the
+               terminal step (Step 6). Fires sim:complete (ADR-078 addendum, revised — no
+               latch, every click reposts). Own element, own listener: NOT a relabel of
+               #btn-next. Gated on isComplete(6) (all 12 seeded faults found) — a real
+               completion signal, not mere arrival at Step 6. -->
+          <button id="btn-finish" class="btn btn--primary btn--nav" type="button" hidden disabled>Finish lesson</button>
           <!-- What still stands between the learner and the next step (never colour alone). -->
           <p class="step-gate" id="step-gate" hidden></p>
         </footer>
