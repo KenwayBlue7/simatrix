@@ -12,6 +12,7 @@ desktop.ini
 
 # Archives and generated codebase dumps (keep out of history)
 *.zip
+*.pdf
 
 /.obsidian
 
