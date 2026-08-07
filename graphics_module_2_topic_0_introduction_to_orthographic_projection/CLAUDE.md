@@ -139,6 +139,9 @@ generator, no `meshAnalyzer.js`, no `iShape.js`, no `problems.js`.
   guarded by the inline two-state confirm (RULES.md §2.9, §4.19).
 - Self-starting on load; import map pins `three@0.160.0`; `.js` extensions; relative paths.
 - Dismissible "Best experienced on desktop." notice below 768px, which reserves its own height.
+- **`sim:ready` boot signal** (ADR-078, narrows ADR-002): `markBooted()` posts
+  `{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` — the one
+  sanctioned outbound `postMessage`. Do not add any other `postMessage`/inbound listener.
 
 ## Cross-cutting rules
 - Every geometry change routes through the single `rebuild()`; nothing else touches the scene graph.

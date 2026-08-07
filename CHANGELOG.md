@@ -4,6 +4,36 @@ All notable changes at the Simatrix project root (spanning Module1, Module2, and
 topic deploy copies). Per-module changelogs live inside each module folder.
 
 ## 2026-08-07
+- Fixed: Vishnu's 3 merged topics (`graphics_module_1_topic_1_1_dimensioning`,
+  `graphics_module_2_topic_0_introduction_to_orthographic_projection`,
+  `graphics_module_3_topic_2_2_conic_sections`) never emitted the platform's `sim:ready` boot
+  signal — each `markBooted()` only cleared its own local `index.html` watchdog, with zero
+  `window.parent.postMessage` calls anywhere in the three. Added the same `document.fonts.ready`-gated
+  post every other shipped topic carries (ADR-078, RULES.md §2.10), byte-identical to
+  `graphics_module_3_topic_2_development_of_surfaces/main.js`'s `markBooted()`, the sibling
+  `graphics_module_3_topic_2_2_conic_sections` was itself scaffolded from. Verified live in Chrome
+  via a same-origin iframe wrapper listening on `window`: `sim:ready` fires exactly once per page
+  load in all three, with the bare `{ type: 'sim:ready' }` payload, after `__simBooted`/fonts/canvas
+  are all genuinely ready, survives `simAPI.reset()` without re-firing, and zero console errors.
+- Added: a `#btn-finish` "Finish lesson" button to the same three topics, replacing `#btn-next`
+  in the footer's primary slot at the terminal step and firing `sim:complete` via a new
+  `markComplete()` (ADR-078 addendum) — no latch, every click reposts, matching the host's
+  confirmed support for repeated triggers. DIM gates it on `isComplete(6)` (all 12 seeded
+  faults found, `dimensionUI.js`); ORTHO gates it on a new `isDrawingComplete()` (`main.js`) —
+  the sheet's own last stage reached, not mere arrival at Step 2, which opens blank; CONIC
+  ships it ungated, since every step there is a reading of the same live model and arrival at
+  the terminal step is already the payoff (confirmed against the ungated sibling
+  `graphics_module_3_topic_2_development_of_surfaces`, which carries the same Problem Library
+  pattern). CONIC's old terminal-step CTA (`#btn-complete-next`) is demoted from "Complete &
+  next problem" to "Try another problem," the repeatable practice-loop action, now that
+  `#btn-finish` owns lesson completion. ORTHO's `verify/shipped-module.mjs` postMessage check
+  widened from a blanket ban to an allowlist of exactly the `sim:ready`/`sim:complete` call
+  sites, so a rogue third `postMessage`/`window.parent`/`window.top` use still fails it.
+- Fixed: the same three topics' `.vp-controls`/`.vp-cluster` and `.wizard-toggle` were still
+  sized to the old `space-5` host-chrome clearance (`top: calc(44px + var(--space-5))` on the
+  left cluster, matched incorrectly on the right-side wizard toggle, which has no button above
+  it to clear). Restandardized to the current `space-3` value (DESIGN.md §5.12) every other
+  shipped topic uses, and corrected stale comments still citing `space-5`.
 - Added: `graphics_diploma_module_2_topic_1_1_development_of_surfaces`'s elbow (`buildElbow()`) rebuilt to the Prism/Cylinder quality bar — the third and final step of the solid-by-solid rebuild plan (Prism → Cylinder → Elbow). Fixed-scale rendering (`ELBOW_SCALE = 0.70`, derived the same way as `PRISM_SCALE`/`CYL_SCALE`, from this construction's own `diameter`/`legLength` slider worst case); left-seam generator renumbering (`a(k) = π + 2πk/12`, matching `buildCylinder()`'s own K.C. John-sourced convention — the pre-rebuild elbow numbered from the long/right wall while its own seam projector was always drawn at the left, a real inconsistency); `Seam`/`Fold line`/`Inside pattern` leader callouts; 12 numerals around the auxiliary circle and a thinned `1,2,4,7,10,12,1` set (Bhatt Fig. 15-11's own set for a 45°-cut cylinder) along the development's bottom edge; a formula-bearing stretch-out dimension; the seam projector's role fixed `'given'`→`'move'`; and de-duplicated front-view generator lines (both pieces' `k=0`/`k=6` generators coincide exactly with the outline's own edges, the same collapse class ADR-115 fixed for the cylinder's front view). Only ONE development pattern is drawn — the second piece is noted as its mirror image (Bhatt Fig. 15-15(v): "Parts A and C are similar") in the region caption, not drawn a second time; two side-by-side patterns drove the fixed scale down to 0.52 px/mm, too small for any numeral. See `DECISIONS.md` ADR-116.
 - Fixed: `graphics_diploma_module_2_topic_1_1_development_of_surfaces`'s topic `CLAUDE.md`/ADR-112 cited K.C. John Fig. 15.12/Example 15.9 as the elbow's single-truncation cylinder source — re-verified directly against the actual page (`KC-Development.pdf` p.179) and found to be a **doubly**-truncated tube (45° top, 30° lower), not a single-truncation source at all. The real sources, read and confirmed directly: Bhatt Problem 15-8/Fig. 15-10 and Problem 15-9/Fig. 15-11 (`Development.pdf` p.356–357). Every citation of this construction across `constructions.js`, `CLAUDE.md`, and `DECISIONS.md` corrected in the same pass. See `DECISIONS.md` ADR-116.
 - Fixed: that same elbow's development pattern was drawn from a z-datum offset by the pipe's own radius `r` from the front view's — every cut point sat `r` below its true front-view mitre counterpart, which is why this construction never had a working transfer line despite the topic's whole single-plate Canvas2D architecture (ADR-112) existing for exactly that. `devZBase` changed from `legLong + r` to `frontH` (the two are provably equal at every slider value). Added the 7 transfer lines this fix makes possible (`dash:'carry'`, one per distinct cut height). See `DECISIONS.md` ADR-116.
