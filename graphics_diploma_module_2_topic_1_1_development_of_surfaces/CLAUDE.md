@@ -76,21 +76,41 @@ than deleted for audit-trail-back-to-source, per ADR-112.
 **Neither reference PDF has a worked TWO-piece 90° elbow example.** Both books' only worked
 pipe-bend example is a THREE-piece bend (Bhatt Problem 15-13/Fig. 15-15; K.C. John Example
 15.18/Fig. 15.20-21, general formula `θ = 90°/(n+1)`). This topic's two-piece elbow is a deliberate
-simplification (ADR-112), each piece built from the single-truncation cylinder construction (Bhatt
-Fig. 15-10 / K.C. John Fig. 15.12, Example 15.9) mitred at 45° and mirrored. Do not cite a specific
-figure number for "the two-piece elbow" in future work — there isn't one; cite the single-truncation
-construction instead, as this file and `constructions.js` already do.
+simplification (ADR-112), each piece built from the single-truncation cylinder construction mitred
+at 45° and mirrored. Do not cite a specific figure number for "the two-piece elbow" in future work —
+there isn't one; cite the single-truncation construction instead, as this file and
+`constructions.js` already do.
+
+**Citation correction (2026-08-07, `../DECISIONS.md` ADR-116):** the single-truncation source is
+**Bhatt Problem 15-8/Fig. 15-10** (`Development.pdf` p.356–357) and, closer still,
+**Bhatt Problem 15-9/Fig. 15-11** (p.357, a 45° cut — exactly one elbow half). This file and
+`constructions.js` previously cited **K.C. John Fig. 15.12/Example 15.9** for this construction —
+re-verified directly against the actual page (`KC-Development.pdf` p.179) and found to be a
+**doubly**-truncated tube (45° at the top, 30° lower, two cut curves), not the single-truncation
+source this topic needs. Do not reintroduce that citation.
+
+**Only ONE development pattern is drawn (2026-08-07, Phase 3, ADR-116) — the second piece is its
+mirror image, noted in the region caption's own text, not drawn a second time.** Two side-by-side
+πD patterns drove the fixed scale down to 0.52 px/mm, too small for any station numeral at any
+density; one pattern recovers `ELBOW_SCALE = 0.70`. Bhatt's own Fig. 15-15(v) states the two end
+pieces of its three-piece elbow "are similar" — the same relationship this simplification relies on
+for a two-piece elbow.
 
 **A documented simplification within the simplification:** the horizontal piece's twelve generators
 have no genuine third (side) auxiliary view to project from in this topic's two-view-plus-
 development layout, so they're placed directly along that piece's own flat end and tied to the
 mitre line by a labelled number correspondence rather than a continuous orthogonal projector (see
-`constructions.js`'s `buildElbow()` comments). The underlying MATH (stretch-out length, cut-curve
-amplitude/period, leg-length algebra) is verified correct — see the in-file corner-point derivation
-and the `verifyCutHeightAgainstGeneralSolver()` dev-console self-check that runs once at module
-load. The FRONT-VIEW drawing of the horizontal piece's generators is the part that is simplified.
-If a future pass adds a genuine side view, replace that section — the cut-height math underneath it
-does not need to change.
+`constructions.js`'s `buildElbow()` comments). This is confirmed correct and deliberate — the
+Prism/Cylinder numeral system is what finally makes this correspondence readable; do not "fix" it
+by inventing a third view. As of Phase 3 (2026-08-07, ADR-116) this piece's own labels thin to the
+4 stations (`1, 2, 4, 7`) that remain positionally distinct within its own front-view depth-collapse
+dedup half — the same class of collapse the vertical piece's own front view already has (DESIGN.md
+§6), not a new gap. The underlying MATH (stretch-out length, cut-curve amplitude/period,
+leg-length algebra) is verified correct — see the in-file corner-point derivation and the
+`verifyCutHeightAgainstGeneralSolver()` dev-console self-check that runs once at module load. The
+FRONT-VIEW drawing of the horizontal piece's generators is the part that is simplified. If a future
+pass adds a genuine side view, replace that section — the cut-height math underneath it does not
+need to change.
 
 ## What copied verbatim (EXTRACTED) vs. what's new (INFERRED)
 
@@ -109,7 +129,7 @@ Audited file-by-file before building, not assumed:
 | `src/uiManager.js` | EXTRACTED (from Topic 2.3) **minus the hand-toggle wiring** | This topic's three constructions have no handedness axis |
 | `src/main.js` | EXTRACTED shape, REIMPLEMENTED viewport plumbing | Orchestrator/simController/simAPI/rebuild() funnel unchanged in shape; `givenLayer`/`dynamicLayer` are now `createLayer()` records, not SVG `<g>` refs, and a new `paint()` resolves CSS tokens + sets `ctx`'s transform every rAF frame |
 | `src/constructions.js` | INFERRED (new) | Entirely new geometry — `planPlate()`'s shared-axis layout, the prism/cylinder/elbow builders, all described above |
-| `src/labels3d.js` | INFERRED (new) + adapted from `Module2/src/vertexLabeler.js` (**not** byte-identical-shared — RULES §7.2's guarantee doesn't reach this track, same precedent as `cube.js`/`developmentEngine.js`) | Compare pane's 3D prism corner numerals (`1`,`2`,`3`,`4`, matching `constructions.js`'s own top-view/development digits); Prism only, see DESIGN.md §6 |
+| `src/labels3d.js` | INFERRED (new) + adapted from `Module2/src/vertexLabeler.js` (**not** byte-identical-shared — RULES §7.2's guarantee doesn't reach this track, same precedent as `cube.js`/`developmentEngine.js`) | Compare pane's 3D corner/generator numerals (`1`..`4` on the prism's both rings, `1`..`12` on the cylinder's base ring only, `1`..`12` on the elbow's vertical-leg flat-end ring only, matching `constructions.js`'s own top-view/development digits); all three solids, see DESIGN.md §6 |
 | `src/problems.js` | INFERRED (new) | New `PROBLEMS` array (shape/`groupByTier()` unchanged) |
 | `src/terms.js` (mechanics) | EXTRACTED | Hover/focus/popover positioning is generic |
 | `src/terms.js` (data) | INFERRED | New `TERMS`: development, stretch-out line, fold line, seam, generator, mitre |
@@ -162,8 +182,9 @@ graphics_diploma_module_2_topic_1_1_development_of_surfaces/
     └── main.js                                            ← orchestrator (REIMPLEMENTED viewport plumbing)
 ```
 
-(The Compare pane's own 3D layer — `view3d.js`, `cube.js`, `cylinder.js`, `elbowHalf.js` — is a
-pre-existing gap in this tree, untracked since the 2026-08-05/06 Compare build; not addressed here.
+(The Compare pane's own 3D layer — `view3d.js`, `cube.js`, `cylinder.js`, `elbowHalf.js` — is not
+re-listed above since it predates this file's own last full rewrite; all four now render/label
+Prism, Cylinder, AND Elbow (2026-08-07, ADR-116 closes out the solid-by-solid numeral rollout).
 `labels3d.js` is `view3d.js`'s only consumer of the pair.)
 
 ## Non-negotiables inherited from the platform (apply unchanged)

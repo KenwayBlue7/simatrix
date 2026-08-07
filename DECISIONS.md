@@ -5764,6 +5764,255 @@ Cylinder/Elbow step counts and `resultText` unchanged.
 
 ---
 
+## ADR-115: Development of Surfaces (Diploma) Cylinder — Phase 2 of the solid-by-solid rebuild (fixed-scale rendering, corrected generator direction, no end caps, textbook annotation)
+
+**Date:** 2026-08-06
+**Decision:** Apply the identical rendering bar ADR-113/114 established for the Prism to the
+Cylinder (`buildCylinder()` in `constructions.js`, plus its own 3D generator gaining vertex
+numerals in `labels3d.js`/`view3d.js`) — the second step of the explicitly solid-by-solid plan
+(Prism → Cylinder → Elbow, each shown for approval before the next).
+
+**Source verification, done against the actual pages, not assumed:**
+1. **No end caps.** K.C. John Fig. 15.7 (p.175, this construction's own cited source, Example
+   15.4) is titled *"Lateral surface of a cylinder"* and its development is a plain rectangle
+   with no circles attached — unlike Example 15.1's prism, which explicitly attaches base/top
+   rectangles. Bhatt Fig. 15-10/15-11 agree (§15-2's stated lateral-surface-only policy, the
+   same one ADR-113 quoted for the prism before its own end-cap addendum). **The cylinder stays
+   lateral-surface-only — `devExtra` is 0, no `PRISM_CAP_RESERVE_MM`-equivalent needed.** This
+   settles the question the rebuild brief asked to verify rather than assume.
+2. **Generator direction was shipped backwards against K.C. John's own text.** Example 15.4 step
+   1: *"Locate the seam (joint) of the development on left side and name the 12 generators
+   clockwise from this point"* — Fig. 15.7's circle reads 1 (left) → 2 (upper-left) → …
+   clockwise. The shipped `a = π − 2πk/12` walked the OPPOSITE direction (Bhatt Fig. 15-10's own
+   convention, not this construction's cited K.C. John source). Fixed to `a = π + 2πk/12`
+   (verified by hand: with `toTop`'s y-down screen convention, increasing θ in `(cosθ, sinθ)`
+   traces clockwise on screen).
+3. **One numbered development row, not two.** K.C. John numbers the top edge; Bhatt numbers the
+   bottom edge (and thins the station count). The cylinder's 13 stations across ~152mm at the
+   new `CYL_SCALE` sit closer together than a two-digit knockout box is wide — both-rows would
+   visibly collide (unlike the prism's 5 stations across ~108mm, where both-rows was correct).
+   Resolved with the user: **all 13 stations (1..12,1) on the BOTTOM edge only.** The top-view
+   circle itself still gets all 12 numerals — no density problem there, they sit radially
+   outside the circle rather than packed along one straight edge.
+4. **3D numerals: base ring only, not both rings.** `cylinder.js`'s mesh is a smooth 24-segment
+   round shell with no true corners; 24 pills (12×2 rings) would crowd the silhouette and CSS2D
+   pills do not depth-test (a far-side label on a round mesh shows straight through it — the
+   prism's flat box faces don't have this problem). Resolved with the user: base ring only,
+   matching the top-view circle's own numerals (both derive from the same 12 station angles).
+
+**What changed:**
+- `constructions.js` `buildCylinder()` — `CYL_SCALE = 1.10` (Bug-2-class fixed-scale override,
+  derived the same way as `PRISM_SCALE`: `scaleX_worst = 294/(60+π×60) ≈ 1.183`,
+  `scaleY_worst = 154/(80+60) = 1.100` from this construction's own `diameter≤60`/`height≤80`
+  slider worst case; min, floored to 2dp). `devExtra` stays 0 throughout (point 1 above), so
+  `planPlate()`'s existing `extraX`/`extraY` pin-to-0 branch keeps the origin stable with no
+  second reserve constant needed (unlike the prism's `PRISM_CAP_RESERVE_MM`).
+- The `⌀ D` dim's offset flipped `-12`→`+12` (same inverted-sign class as ADR-114 bug 1 — it
+  was landing inside the front view instead of in the `GAP_TOP` band beside it).
+- The stretch-out dim gained its formula text (`Stretch out = π×⌀${D} = … mm`), matching the
+  prism's own formula-bearing dim and Fig. 15.7's own *"Stretch out length, πd = 138.2"*.
+- The seam projector's role flipped `'given'`→`'move'` — scaffolding, not stated geometry, the
+  exact fix ADR-113 applied to the prism's projectors.
+- The two transfer lines (front view → development) gained `dash: 'carry'` — a cross-region
+  transfer, not the projectors' `DASH_PROJECT` — shipped untagged before this pass.
+- Front-view generator verticals de-duplicated: depth collapses there, so the 12 stations land
+  on only 7 distinct x's (two coincide with the outline's own left/right edges); the pre-rebuild
+  loop drew 11 lines where only 5 are geometrically distinct, silently overdrawing 6.
+- New annotation layer (all new, mirroring `buildPrism()`'s structure): 12 `numeral` steps
+  around the top-view circle (placed by quadrant so they sit outside the circle), 13 `numeral`
+  steps on the development's bottom edge, `Seam`/`Fold line`/`Inside pattern` leader callouts,
+  and a shared-row `(i)`/`(ii)` caption pair using the same `captionRowY` max-of-both-blocks rule
+  the prism's caption fix established.
+- `labels3d.js` — new `planCylinderStations()` beside `planPrismStations()`, dispatched by
+  `mesh.name` (`'cylinder'` vs `'prism'`) in `generate()`. Reads the mesh's own bounding box for
+  radius/base-Y (never a guessed offset, same discipline as the prism's planner), with the
+  2D→3D angle mapping derived directly from `buildCylinder()`'s own `a(k)` formula and
+  `cube.js`'s established front-face-is-+Z convention.
+- `view3d.js` — `rebuild3D()`'s numeral gate widened from `shapeId === 'prism'` to
+  `shapeId === 'prism' || shapeId === 'cylinder'`; Elbow still clears (`labeler?.clear()`),
+  pending its own phase.
+
+**Front-view station numerals stay OUT, same scope decision as the prism (DESIGN.md §6):** the
+cylinder's front view has the identical depth-collapse ambiguity at a larger scale (12 stations
+onto 7 distinct x's) and is scoped out for the identical reason — no disambiguating convention
+this topic otherwise uses, and the projectors already carry the correspondence visually.
+
+**Why:** RULES.md §2.19a (verify the underlying mechanism before shipping) applies directly —
+the generator-direction error was only caught by reading K.C. John's own step-by-step text
+against the shipped formula, not by visual plausibility (a mirrored circle numbering looks
+entirely reasonable at a glance). The end-cap and numeral-density questions were resolved by
+reading the actual cited page and asking the user, respectively, rather than silently choosing
+either the prism's own precedent or a guess.
+**Alternatives rejected:** *Both development rows, thinned to match the prism's density* —
+rejected in favour of one full row (all 13 stations), since Bhatt's own thinned convention
+(1,2,3,4,7,10,12,1) would silently drop 5 of 12 generators from the visible numbering, a bigger
+pedagogical loss than one unlabelled edge. *24 3D pills on both rings* — rejected per point 4
+above (silhouette crowding, no depth-testing on a round mesh with no true corners to anchor to).
+**Consequences:** Cylinder now renders through the same rebuilt pipeline the Prism already
+proved out, with zero changes to `renderConstruction.js`/`main.js`/`viewTransform.js` — this
+phase is scoped entirely to `constructions.js`/`labels3d.js`/`view3d.js`, confirming the Phase 1
+rendering layer needed no further changes to serve a second solid. Elbow keeps fit-to-frame
+scale, its own inverted dim signs, and no annotation until its own phase (unchanged, per the
+solid-by-solid plan).
+
+**A regression caught by live verification, not assumed fixed:** the ⌀ dim's first draft kept
+ADR-114's bottom-edge convention (z=0, offset+12) — correct in isolation, but a real
+foreground-browser check showed its text colliding with the top-view circle's own 'above'-placed
+numerals (stations 3/4/5): both wanted the same narrow `GAP_TOP` band. Moved to the front view's
+TOP edge (z=H, offset −14) instead, into the otherwise-empty `RESERVE_TOP` margin — re-verified
+by direct computation (bbox `minY=20` at every slider combination, never clipping the canvas)
+and live in-browser at default/min/max.
+**Status:** Active. Elbow phase pending user approval of this Cylinder pass.
+
+---
+
+## ADR-116: Development of Surfaces (Diploma) Elbow — Phase 3 (final) of the solid-by-solid rebuild (one development pattern, ELBOW_SCALE, left-seam renumbering, transfer lines, 3D numerals)
+
+**Date:** 2026-08-07
+**Decision:** Apply the rendering bar ADR-113/114/115 established for the Prism and Cylinder to
+the Elbow (`buildElbow()` in `constructions.js`, plus its own 3D generator gaining vertex numerals
+in `labels3d.js`/`view3d.js`) — the third and final step of the solid-by-solid plan.
+
+**Source verification, done against the actual pages, not assumed — and one citation was wrong:**
+`ADR-112`, the topic's own `CLAUDE.md`, and `buildElbow()`'s own comments cited *K.C. John Fig.
+15.12 / Example 15.9* as the single-truncation cylinder source for one elbow half. Read directly
+(`KC-Development.pdf` p.179): Example 15.9 is a **doubly**-truncated tube (a 45° cut at the top, a
+30° cut the opposite way lower down) — two cut curves, not one. It is not this topic's source. The
+genuine single-truncation sources, read directly and confirmed: **Bhatt Problem 15-8 / Fig. 15-10**
+(`Development.pdf` p.356–357, a 30°-cut cylinder) and, closer still, **Bhatt Problem 15-9 / Fig.
+15-11** (p.357, a **45°** cut — exactly one elbow half). Fig. 15-10's development is numbered on
+its bottom edge with a thinned set; Fig. 15-11 thins further to `1,2,4,7,10,12,1`. Bhatt Fig.
+15-15 (p.359, the actual three-piece elbow this topic simplifies away from, per ADR-112) states
+outright that its two end pieces "are similar" — the mirror-image relationship this phase's single
+drawn pattern relies on. Every citation of K.C. John Fig. 15.12 for this construction (ADR-112,
+topic `CLAUDE.md`, `constructions.js`'s own comments/`resultText`) is corrected to Bhatt Fig.
+15-10/15-11 in this same pass.
+
+**The elbow cannot carry annotation at its pre-rebuild (two-pattern) layout.** Two side-by-side πD
+development patterns plus a `D+legShort`-wide front view total up to 557mm of worst-case content —
+driving a fixed scale of just 0.52 px/mm (Prism 1.24, Cylinder 1.10). At 0.52 the auxiliary circle
+is 13px in radius and development stations sit 5.7px apart: no numeral fits at any density. This
+is a genuine new edge case (the rebuild brief's own item 1) — a *layout* limit, not a `paintDim()`
+or reserve-band defect. Resolved with the user: draw **ONE** development pattern; the second piece
+is noted as its mirror image (folded into the region caption's own text, see below) rather than
+drawn a second time. This alone recovers a workable scale.
+
+**What changed:**
+- `constructions.js` — new `ELBOW_SCALE = 0.70`, the Bug-2-class fixed-scale override, derived the
+  same documented way as `PRISM_SCALE`/`CYL_SCALE`, from this construction's own slider worst case
+  (`diameter≤60`, `legLength≤100`) with the ONE-pattern `devW`:
+  `scaleX_worst = 294/(160+188.5) ≈ 0.844`, `scaleY_worst = 154/(160+60) = 0.700` (binds). Floored
+  to 2dp. `devExtra` stays 0 (no end caps — Bhatt §15-2's lateral-surface-only policy, and neither
+  Fig. 15-10 nor 15-11 shows one), so `planPlate()`'s existing `extraX`/`extraY` pin-to-0 branch
+  keeps the origin stable with no cap-reserve-equivalent constant, exactly as the Cylinder needed
+  none.
+- **Left-seam renumbering.** `buildElbow()`'s station angle changed from `θ = 2πk/12` (0 at the
+  long/right wall) to `a(k) = π + 2πk/12` — `buildCylinder()`'s own formula, verbatim. Station 1 is
+  now the LEFT/short wall, station 7 the RIGHT/long wall, matching both K.C. John's stated
+  clockwise-from-left rule (Example 15.4 step 1, already Cylinder's own convention, ADR-115) and
+  fixing a real inconsistency: the seam projector was always drawn at the left wall while the old
+  numbering started at the right. `cutHeight()` itself is unchanged — `cos(a(0)) = −1` still yields
+  `legShort`, `cos(a(6)) = +1` still yields `legLong`.
+- **The development's z-datum was off by `r` from the front view's own.** `devZBase` was
+  `legLong + r`; `frontH` (the front view's own z-extent) is `D + legShort`, which **equals**
+  `legLong` exactly. So every development cut point sat `r` below its true front-view counterpart —
+  this construction never had a working transfer line despite ADR-112's whole single-plate
+  Canvas2D architecture existing for exactly that (K.C. John Ch.15 note #1: every development line
+  must be a TRUE length, genuinely horizontal here). Fixed: `devZBase = frontH`. Verified
+  independently (`frontH === legLong` at every param combination, by construction) and confirmed
+  the fix makes a front-view mitre point and its development counterpart land at the identical
+  drawing-space y.
+- **New transfer lines.** 7 distinct `role:'move'`, `dash:'carry'` lines (front-view mitre point →
+  development cut point), one per distinct cut height (`k=0..6`; `k` and `12−k` share a height by
+  the mitre's own 45° symmetry, the same depth-collapse this construction's front-view generators
+  already have) — the actual Parallel-Line-method content Bhatt Fig. 15-10 draws, and this
+  construction's own missing piece until the datum fix above made it possible.
+- **Seam projector role fixed** `'given'` → `'move'` — scaffolding, not stated geometry, the same
+  fix ADR-113/115 applied to the prism's and cylinder's own projectors (this one shipped still
+  `'given'`).
+- **De-duplicated collapsed front-view generators.** Both pieces' wall/mitre generator lines at
+  `k=0` and `k=6` coincide exactly with the front-view outline's own edges (`A-E`/`B-C` for the
+  vertical piece, `G-E`/`C-F` for the horizontal piece) — confirmed by direct substitution, not
+  assumed. Only `k=1..5` draw a new line per piece (5 each), the identical dedup class ADR-115 fixed
+  for the cylinder's front view (there: 11 drawn where 5 were distinct).
+- **Numerals.** Auxiliary circle: all 12, placed radially by quadrant (`buildCylinder()`'s own
+  `place` rule, reused verbatim). Development bottom edge: **thinned to Bhatt Fig. 15-11's own set,
+  `1,2,4,7,10,12,1`** — at `ELBOW_SCALE` the full 13 sit ≈9.2px apart against a ≈14px two-digit
+  knockout box (the same density problem ADR-115 solved for the cylinder, worse here since
+  `ELBOW_SCALE < CYL_SCALE`). Horizontal piece's own front-view mitre points keep a **numbered
+  correspondence** (this topic's own documented "no genuine third view" simplification, `CLAUDE.md`
+  "Elbow scope" — NOT removed by this phase) — thinned to the 4 stations `{1,2,4,7}` that remain
+  positionally distinct within this piece's own dedup half (`k=0..6`; stations 10/12 would coincide
+  with 4/2's own drawn positions, an artifact of the SAME depth-collapse dedup, not a fresh
+  omission).
+- **Dimension signs — audited against `paintDim()`'s `perp = (−uy, ux)` rule directly, not
+  assumed, since this shape's non-convex L-footprint (the two pieces' footprints meet at a reflex
+  vertex, C) makes "outward" genuinely direction-dependent per edge, unlike the prism's/cylinder's
+  simple rectangles (RULES §2.19a) — AND since `paintDim()` computes that perpendicular from `a`/`b`
+  in their OWN already-y-flipped `toFront`-space (screen convention: larger y = further down), not
+  the local mm frame those points came from, a sign derived by reasoning in the local frame lands
+  backwards. Verified by literally replicating `paintDim()`'s own `oa`/`ob`/mid formula in a script
+  and ray-casting each result against the real `frontOutline` polygon — not re-guessed by hand a
+  second time after the first manual pass shipped backwards signs for both leg dims:**
+  - `legShort` (A–E, the vertical piece's own leftmost wall for its full length): pre-rebuild
+    `offset −14` is confirmed outside at both extension ticks AND the text midpoint — this one was
+    already correct; no change shipped.
+  - `legLong` (B–C): pre-rebuild `offset +14` is confirmed outside at the B-end tick and the text
+    midpoint; only the C-end tick lands inside — this edge's exterior side is genuinely mixed along
+    its length (interior for the stretch nearest the reflex vertex C, where the horizontal piece's
+    own body overhangs; exterior for the rest), so no single perpendicular offset clears it
+    entirely. Already correct pre-rebuild for the achievable majority; no change shipped. The
+    residual C-end overlap is a genuine, flagged limitation, not silently claimed solved.
+  - `⌀ D`: the one REAL bug. Pre-rebuild `offset −12` landed inside the front view (the same
+    inverted-sign bug class ADR-114/115 fixed elsewhere) — confirmed by the same polygon
+    replication. Rather than a same-line sign flip (checked directly: `+12` on A–B still clips the
+    circle's own footprint at part of its length, and a placement on the auxiliary circle itself has
+    no slack in that band's exact-height budget), moved to a **horizontal** dim below the front
+    view's own A–B bottom edge, `offset +14` (`RESERVE_BOTTOM`, universally clear at every slider
+    value, since nothing is ever drawn below `yBottom`) — confirmed outside at both ticks and the
+    midpoint.
+  - Stretch-out dim gained its formula text (`Stretch out = π×⌀D = … mm`), matching the prism's and
+    cylinder's own formula-bearing dims and Bhatt's own *"π × D = 141.3"* annotation.
+- **3D numerals (Compare pane).** `elbowHalf.js`'s `createElbow()` returns TWO meshes
+  (`elbow-vertical`, `elbow-horizontal` — confirmed by reading the file, NOT the single-mesh
+  `'prism'`/`'cylinder'` convention `labels3d.js` previously assumed). New
+  `planElbowStations(mesh)` in `labels3d.js`, dispatched on `mesh.name === 'elbow-vertical'`,
+  numbers the vertical leg's **flat-end ring only** (12 stations, `a(k)` reused verbatim) — the
+  same reasoning as the cylinder's base-ring-only decision (ADR-115): a round mesh has no true
+  corners, CSS2D pills do not depth-test, and the flat end is where the 2D plate's own development
+  `z=0` line ties in. The horizontal leg mesh is simply never passed to the labeler — unlabelled,
+  matching the 2D plate's own single-pattern scope this phase. `view3d.js`'s numeral gate widened to
+  include `'elbow'`. The stale `labels3d.js` group name (`'Prism Corner Labels'`, inherited from
+  when the file only served one solid) is corrected to `'Solid Station Labels'`.
+
+**Why:** RULES.md §2.19a (verify the underlying mechanism, not visual plausibility) — the wrong
+K.C. John citation, the datum-offset bug, and both dim-sign bugs were each only caught by direct
+arithmetic/page-reading, not by how the pre-rebuild elbow looked on screen (a plausible-looking
+elbow front view gave no visual hint that its own development had never been able to draw a
+transfer line, or that a dim was 100% inside the shape rather than merely close to it).
+**Alternatives rejected:**
+- *Keep both development patterns, ship without numerals* — rejected: defeats this phase's own
+  stated goal (making the horizontal piece's numbered correspondence readable), the exact thing the
+  Prism/Cylinder numeral system exists to provide.
+- *Keep both patterns, shrink the `legLength` slider max to buy scale* — computed and rejected:
+  even at `legLength` max lowered to 80mm, two patterns still bind `scaleX` at ≈0.55 — does not
+  actually solve the problem, and silently narrows the construction's stated range.
+- *Number all 13 development stations, thinned or not* — rejected per the density arithmetic above,
+  same reasoning ADR-115 already used for the cylinder.
+- *Give the ⌀ dim a second circle-based placement attempt with a larger offset* — rejected after
+  direct computation showed no offset within the available band clears the circle's own footprint
+  at every diameter; the front-view-bottom placement has no such constraint.
+**Consequences:** All three solids in this topic now share one rendering bar (fixed scale, dash
+tiers, textbook annotation, 3D numerals). The `legLong` dim's residual near-`C` overlap (flagged
+above) is the one open cosmetic item carried forward, tied to this shape's own non-convex geometry
+rather than anything `paintDim()`/`planPlate()` can fix generically — noted for a future pass, not
+silently treated as solved.
+**Status:** Active, pending the live foreground-browser Play watch-through (this construction's own
+long-outstanding, never-before-completed check — see this topic's own session notes) and final
+user approval closing out the solid-by-solid rebuild.
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*

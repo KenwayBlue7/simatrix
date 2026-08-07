@@ -156,8 +156,19 @@ kinds carry this, all knockout-backed via the same `drawKnockoutText` helper as 
 | `'note'` | `{p, to, text}` | always `inkSecondary` | leader callout — thin auxiliary-tier line from the text anchor (`p`) to the point it names (`to`), small terminating dot at `to` |
 | `'caption'` | `{p, text}` | `inkSecondary`, NOT knockout-backed | Module2's own per-Set caption treatment (`drawMethodSheet`'s "Set caption" block) — plain text, since it lives in `planPlate`'s reserve band, never over crossing geometry |
 
-Currently only `buildPrism` emits these (this rebuild is solid-by-solid); the cylinder/elbow
-builders gain their own annotation in their own phase.
+`buildPrism`, `buildCylinder` (2026-08-06, Phase 2), and (2026-08-07, Phase 3) `buildElbow` all
+emit these now — the solid-by-solid rebuild is complete.
+
+**Cylinder diverges from the prism on numeral density — a named decision, not drift.** The
+prism numbers both development rows (5 stations across ~108mm at `PRISM_SCALE`); the cylinder
+has 13 stations (1..12,1) across ~152mm at `CYL_SCALE` — closer spacing per station, and a
+two-digit knockout box is wider than the resulting per-station gap. Both source figures agree
+this construction only needs ONE numbered row (K.C. John Fig. 15.7 numbers the development's
+TOP edge; Bhatt Fig. 15-10 numbers the BOTTOM edge and even thins the count) — unlike the
+prism, where both books' figures number both rows. Confirmed with the user: all 13 stations on
+the BOTTOM edge only, top edge unnumbered. The top-view circle itself still carries all 12
+station numerals (no density problem there — they sit radially outside the circle, not packed
+along one straight edge).
 
 **The 3D prism (Compare pane) carries the same digits (2026-08-06).** `src/labels3d.js` numbers
 the prism mesh's 8 corners `1,2,3,4`, unprimed on both the base and top ring — reusing exactly the
@@ -167,13 +178,69 @@ makes Compare mode teach the correspondence rather than just show two unrelated 
 a student can point at corner `1` on the 3D solid and find the same digit on the top view and on
 both rows of the development. Prism only this phase, matching the numeral rollout above.
 
+**The 3D cylinder (Compare pane, 2026-08-06 Phase 2, ADR-115) carries its 12 generator numerals
+on the BASE RING ONLY, not both rings like the prism's 8.** `cylinder.js`'s mesh is a smooth
+24-segment round shell with no true corners — 24 pills (12 stations × 2 rings) would crowd the
+silhouette, and CSS2D pills do not depth-test, so a far-side label on a round mesh would show
+straight through it (a box's flat faces don't have this problem, which is why the prism uses
+both rings). The base ring is also where the top-view circle's own numerals live — both derive
+from the same 12 station angles in `constructions.js`'s `buildCylinder()` — so a single ring is
+the one that actually completes the Compare correspondence, not an arbitrary halving.
+`src/labels3d.js`'s `planCylinderStations()` reads the mesh's own bounding box for radius/base-Y,
+the same exact-not-inferred approach as the prism's `planPrismStations()`.
+
 **A named scope decision, not an oversight:** the front view's own corners are NOT numbered.
 Depth collapses in the front view, so each of its drawn corners is a coincidence of two real solid
 corners (e.g. the prism's corners 1 and 4 both land on the front view's left edge) — labelling that
 coincidence correctly needs a disambiguating convention this topic doesn't otherwise use. The two
 projectors already carry that correspondence visually (each runs the full depth of its x-column,
 touching every top-view corner that shares that x), which is why the top view's corners — genuinely
-unambiguous, since only height collapses there — get the numerals instead.
+unambiguous, since only height collapses there — get the numerals instead. The cylinder's front
+view has the identical problem at a larger scale (its 12 stations collapse onto only 7 distinct
+front-view x's) and is scoped out the same way.
+
+**The elbow (2026-08-07, Phase 3, `../DECISIONS.md` ADR-116) draws ONE development pattern, not
+two.** Two side-by-side πD patterns plus the front view total up to 557mm of worst-case content —
+the fixed scale that survives is only 0.52 px/mm, too small for any station numeral at any density.
+Confirmed with the user: draw the vertical piece's own pattern only; the horizontal piece is noted
+as its mirror image (Bhatt Fig. 15-15(v): "Parts A and C are similar") in the region caption's own
+text, not a second standalone note — a standalone note near the pattern's own top edge landed only
+10 units into `RESERVE_TOP`, tighter than this plate's other annotation. `ELBOW_SCALE = 0.70`,
+derived the same documented way as `PRISM_SCALE`/`CYL_SCALE` — see `constructions.js`'s own
+comment for the arithmetic.
+
+**The elbow's development numerals are thinned further than the cylinder's own 13-station row —
+Bhatt Fig. 15-11's own set, `1,2,4,7,10,12,1`, not a new density call.** `ELBOW_SCALE` (0.70) is
+smaller than `CYL_SCALE` (1.10), so the full 13-station row that already needed thinning-to-nothing
+consideration for the cylinder (ADR-115 kept all 13 there) genuinely collides here (≈9.2px station
+spacing against a ≈14px two-digit knockout box). Bhatt's own Fig. 15-11 — the closest published
+figure to this construction's own single-truncation math — already thins to exactly this set for a
+45°-cut cylinder, so this is a sourced choice, not an arbitrary thinning rule.
+
+**The elbow renumbers to a LEFT seam (2026-08-07), matching the cylinder's own K.C. John-sourced
+convention.** The pre-rebuild elbow started station 1 at the long/right wall while its seam
+projector was always drawn at the left wall — a real inconsistency. `a(k) = π + 2πk/12`,
+`buildCylinder()`'s own formula, is now shared verbatim by both constructions.
+
+**The elbow's horizontal piece keeps its own front-view numbered correspondence — this is NOT the
+same rule as the paragraph above, and is not removed by it.** This topic's own `CLAUDE.md` ("Elbow
+scope") documents that the horizontal piece has no genuine third (side) view to project its twelve
+generators from, so a labelled number correspondence at its own mitre points stands in for a
+continuous projector — a load-bearing simplification, confirmed correct and deliberate, not
+something this phase's front-view-stays-unnumbered scope decision (the paragraph above, which
+applies to the VERTICAL piece and to the prism/cylinder) overrides. The horizontal piece's own
+labels thin to the 4 stations (`1, 2, 4, 7`) that remain positionally distinct within its own
+depth-collapse dedup half (`k=0..6` of 12 — `k` and `12−k` share a drawn position on this piece
+too, so stations 10 and 12 would otherwise land exactly on 4's and 2's own already-drawn points).
+
+**The elbow's 3D solid (Compare pane, 2026-08-07 Phase 3, ADR-116) carries its 12 generator
+numerals on the vertical leg's FLAT-END RING ONLY.** `elbowHalf.js`'s `createElbow()` returns TWO
+meshes (`elbow-vertical`, `elbow-horizontal`) — unlike the prism's/cylinder's single-mesh
+generators. Only the vertical leg is labelled (`labels3d.js`'s `planElbowStations()`, dispatched on
+`mesh.name === 'elbow-vertical'`), matching the 2D plate's own single-development-pattern scope
+this phase; the horizontal leg mesh is simply never passed to the labeler. Same base-ring-only
+reasoning as the cylinder (ADR-115): a round mesh has no true corners, and CSS2D pills do not
+depth-test.
 
 ---
 
