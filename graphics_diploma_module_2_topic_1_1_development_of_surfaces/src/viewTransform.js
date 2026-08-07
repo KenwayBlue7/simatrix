@@ -33,8 +33,13 @@ const MAX_ZOOM = 5;
  * @param {HTMLElement} viewportEl  drag/wheel listener target (the canvas itself, or its wrapper)
  * @param {() => void} onChange     called after every view-state change (pan/zoom/reset/fit) —
  *   main.js's hook to schedule a repaint. NOT called for reads (getView()).
+ * @param {() => void} [onResetRequest]  double-click hook. Default (omitted) is this file's
+ *   own resetView() — the fixed worst-case BASE_W×BASE_H box. main.js passes its own
+ *   content-aware resetFit() instead, so double-click reproduces the SAME tight framing
+ *   defaultFit() gives a fresh page load (this file stays a leaf, importing nothing — CLAUDE.md
+ *   layering — so that routing is a caller-supplied callback, never an import).
  */
-export function initViewTransform(viewportEl, onChange) {
+export function initViewTransform(viewportEl, onChange, onResetRequest) {
   const ac = new AbortController();
   const listen = { signal: ac.signal, passive: false };
 
@@ -97,13 +102,12 @@ export function initViewTransform(viewportEl, onChange) {
     apply();
   }
 
-  /** If `bounds` ({minX,maxX,minY,maxY} in drawing units, from renderConstruction.js's
-   *  computeBounds()) isn't fully inside the CURRENT view, zoom/pan out just enough to
-   *  bring it into frame — otherwise leaves the view untouched. main.js calls this right
-   *  before Play. Never zooms IN past the box's own fit, only out. */
-  function ensureVisible(bounds, margin = 10) {
-    const fits = bounds.minX >= vx && bounds.maxX <= vx + vw && bounds.minY >= vy && bounds.maxY <= vy + vh;
-    if (fits) return;
+  /** Unconditionally frame `bounds` ({minX,maxX,minY,maxY} in drawing units, from
+   *  renderConstruction.js's computeBounds()) — zooms IN or OUT, unlike ensureVisible's
+   *  "only if it doesn't already fit" guard. main.js's default-fit call (construction
+   *  selected/reset/problem-loaded) uses this so the initial view frames the actual
+   *  content tightly instead of sitting inside the fixed worst-case BASE_W×BASE_H box. */
+  function fitToBounds(bounds, margin = 10) {
     const bx0 = bounds.minX - margin, bx1 = bounds.maxX + margin;
     const by0 = bounds.minY - margin, by1 = bounds.maxY + margin;
     const bw = Math.max(bx1 - bx0, 1e-6);
@@ -115,6 +119,17 @@ export function initViewTransform(viewportEl, onChange) {
     vy = (by0 + by1) / 2 - vh / 2;
     clampPan();
     apply();
+  }
+
+  /** If `bounds` isn't fully inside the CURRENT view, zoom/pan out just enough to bring it
+   *  into frame — otherwise leaves the view untouched (a comfortable manual zoom/pan is
+   *  left alone). main.js calls this right before Play, and on every slider change as a
+   *  clip guard against the tighter default fitToBounds() now sets. Never zooms IN past
+   *  the box's own fit, only out. */
+  function ensureVisible(bounds, margin = 10) {
+    const fits = bounds.minX >= vx && bounds.maxX <= vx + vw && bounds.minY >= vy && bounds.maxY <= vy + vh;
+    if (fits) return;
+    fitToBounds(bounds, margin);
   }
 
   viewportEl.addEventListener('wheel', (e) => {
@@ -186,7 +201,7 @@ export function initViewTransform(viewportEl, onChange) {
   };
   viewportEl.addEventListener('pointerup', endDrag, listen);
   viewportEl.addEventListener('pointercancel', endDrag, listen);
-  viewportEl.addEventListener('dblclick', resetView, listen);
+  viewportEl.addEventListener('dblclick', () => (onResetRequest ?? resetView)(), listen);
 
-  return { resetView, ensureVisible, getView, dispose: () => ac.abort() };
+  return { resetView, ensureVisible, fitToBounds, getView, dispose: () => ac.abort() };
 }

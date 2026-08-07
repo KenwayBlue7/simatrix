@@ -413,9 +413,25 @@ function buildPrism(params) {
 // 2. Cylinder — K.C. John Example 15.4 / Bhatt Problem 15-8 (Fig. 15.7/15-10), whole
 //    (uncut) lateral surface only — this topic's cylinder construction has no truncation;
 //    the two-piece elbow (below) is where a cut cylinder's math is actually used.
+//
+// Phase 2 rebuild (../DECISIONS.md ADR-115) — same Module2-parity bar as buildPrism()
+// (ADR-113/114): fixed-scale rendering, numeral/note/caption annotation, corrected dim
+// signs. Verified against the actual K.C. John p.175 page (not assumed): Fig. 15.7 is
+// titled "Lateral surface of a cylinder" and its development is a plain rectangle with NO
+// end-cap circles attached — unlike Example 15.1's prism, this construction stays
+// lateral-surface-only, `devExtra` stays 0.
 // ============================================================================
 
 const CYL_GENERATORS = 12;
+
+// Bug-2-class fix (ADR-114's PRISM_SCALE precedent), same derivation: this construction's
+// own slider worst case (diameter≤60, height≤80) through planPlate()'s own two fit-budget
+// ratios (availW=294, availH=154 from this file's MARGIN/GAP_*/RESERVE_* constants):
+//   scaleX_worst = 294 / (60 + π×60)  = 294/248.5 ≈ 1.183
+//   scaleY_worst = 154 / (80 + 60)    = 154/140    = 1.100
+// (topDepth_max = D_max = 60, the circle band; devExtra = 0 throughout, no end caps above,
+// so it never enters the scaleY max()). Floored to 2dp, smaller of the two.
+const CYL_SCALE = 1.10;
 
 function buildCylinder(params) {
   const D = params.diameter ?? 44;
@@ -423,8 +439,8 @@ function buildCylinder(params) {
   const r = D / 2;
   const stretchOut = Math.PI * D;
 
-  const plate = planPlate(D, H, D, stretchOut);
-  const { toFront, toTop, toDev, scale } = plate;
+  const plate = planPlate(D, H, D, stretchOut, 0, CYL_SCALE);
+  const { toFront, toTop, toDev, front, top, dev, scale } = plate;
   const cx = r, cy = r; // circle centre, in the shared front/top x-axis and top's own depth axis
 
   // Front/top outlines are the STATED problem (visible immediately, before Play) —
@@ -434,24 +450,56 @@ function buildCylinder(params) {
     'given', true, OUTLINE_W,
   );
   const topCircle = CIRC(toTop(cx, cy), r * scale, 'given');
-  const projector = L(toFront(0, 0), toTop(0, cy), 'given');
+  // Seam projector — scaffolding, not stated geometry, so 'move' (auxiliary tier), the same
+  // fix ADR-113 applied to the prism's own projectors (this one shipped still 'given').
+  const projector = L(toFront(0, 0), toTop(0, cy), 'move');
 
-  // Twelve generators, seam at the left (K.C. John convention: "locate the seam on the
-  // left side of top view and name the generators clockwise from this point").
+  // Twelve generators, CLOCKWISE from the LEFT seam — K.C. John Example 15.4 step 1's own
+  // words: "Locate the seam (joint) of the development on left side and name the 12
+  // generators clockwise from this point" (Fig. 15.7, verified against the actual page).
+  // a(k) = π + 2πk/12: toTop's own y-axis grows DOWN the page (screen/canvas convention), so
+  // increasing θ in (cosθ, sinθ) traces CLOCKWISE on screen; starting at θ=π (the leftmost
+  // point, k=0) and increasing walks left→upper-left→top→right→bottom→left, matching Fig.
+  // 15.7's own 1,2,3…12 layout. The previous a = π − 2πk/12 walked the OPPOSITE direction —
+  // Bhatt Fig. 15-10's own convention, not this construction's cited K.C. John source
+  // (CLAUDE.md's "cross-check K.C. John first" rule).
   const genSteps = [];
-  const stationXs = [];
-  for (let k = 0; k <= CYL_GENERATORS; k++) {
-    const kk = k % CYL_GENERATORS;
-    const a = Math.PI - (2 * Math.PI * kk) / CYL_GENERATORS; // k=0 at the seam (angle 180°)
+  const topNumerals = [];
+  const stationPts = []; // this station's own (px,py) in the shared front/top x-axis — reused below
+  for (let k = 0; k < CYL_GENERATORS; k++) {
+    const a = Math.PI + (2 * Math.PI * k) / CYL_GENERATORS;
     const px = cx + r * Math.cos(a);
     const py = cy + r * Math.sin(a);
+    stationPts.push({ px, py });
     const topPt = toTop(px, py);
-    const frontBase = toFront(px, 0);
-    const frontTop = toFront(px, H);
+    genSteps.push(L(topPt, toFront(px, 0), 'move', undefined, FAST_MS)); // projector, top view → front view
+
+    // Numeral sits outward from the circle's own centre, in whichever of the four 'place'
+    // directions best matches this station's own quadrant (screen coords, y grows down).
+    const nx = Math.cos(a), ny = Math.sin(a);
+    const place = Math.abs(nx) >= Math.abs(ny) ? (nx >= 0 ? 'right' : 'left') : (ny >= 0 ? 'below' : 'above');
+    topNumerals.push(NUM(topPt, String(k + 1), place));
+  }
+  // Front-view verticals: depth collapses there, so the 12 stations land on only 7 distinct
+  // x's (k and 12−k share cos(a), hence the same px) — two of them coincide with the
+  // outline's own left/right edges (k=0, k=6) and need no separate line; the five genuinely
+  // interior x's (k=1..5, each shared with its mirror k=11..7) get exactly one line each —
+  // the pre-rebuild loop drew eleven lines for this, six of them silent duplicates.
+  // NAMED SCOPE DECISION, not an oversight (DESIGN.md §6, same rule the prism front view
+  // follows): front-view x's are each a coincidence of TWO stations (e.g. k=1 and k=11 both
+  // land here), and disambiguating that needs a second view convention (K.C. John's primed
+  // letters) this topic doesn't otherwise use — so front-view stations stay unnumbered; the
+  // projectors below already carry the top-view↔front-view correspondence visually.
+  for (let k = 1; k < CYL_GENERATORS / 2; k++) {
+    const { px } = stationPts[k];
+    genSteps.push(L(toFront(px, 0), toFront(px, H), 'given', FOLD_W));
+  }
+
+  const stationXs = [];
+  const stationLabels = [];
+  for (let k = 0; k <= CYL_GENERATORS; k++) {
     stationXs.push((k * stretchOut) / CYL_GENERATORS);
-    genSteps.push(L(topPt, frontBase, 'move', undefined, FAST_MS)); // projector, top view → front view
-    // role 'given' (shown immediately, no `duration` needed — 'given' steps never animate).
-    if (k > 0 && k < CYL_GENERATORS) genSteps.push(L(frontBase, frontTop, 'given', FOLD_W));
+    stationLabels.push(String((k % CYL_GENERATORS) + 1)); // 1,2,…,12,1 — closes the loop
   }
 
   const devOutline = POLY(
@@ -459,21 +507,61 @@ function buildCylinder(params) {
     'result', true, OUTLINE_W,
   );
   const devGenLines = stationXs.slice(1, -1).map((sx) => L(toDev(sx, 0), toDev(sx, H), 'result', FOLD_W, FAST_MS));
-  const transferBase = L(toFront(0, 0), toDev(stretchOut, 0), 'move');
-  const transferTop = L(toFront(0, H), toDev(stretchOut, H), 'move');
+  // Cross-region (front view → development): DASH_CARRY, not the projectors' DASH_PROJECT
+  // (renderConstruction.js's file header dash vocabulary) — shipped untagged before this pass.
+  const transferBase = L(toFront(0, 0), toDev(stretchOut, 0), 'move', undefined, undefined, 'carry');
+  const transferTop = L(toFront(0, H), toDev(stretchOut, H), 'move', undefined, undefined, 'carry');
+
+  // ---- Station numerals on the development — K.C. John Fig. 15.7 numbers the TOP edge;
+  // Bhatt Fig. 15-10 numbers the BOTTOM edge (and even thins the count). This construction
+  // has 13 stations across the width the prism's own 5 shared — both-rows would collide at
+  // this density (knockout boxes ~14px wide against ~12.7px station spacing at CYL_SCALE),
+  // so — per review — all 13 land on the BOTTOM edge only, top edge unnumbered; a deliberate
+  // divergence from the prism's both-rows treatment (DESIGN.md §6).
+  const devNumeralsBottom = stationXs.map((sx, i) => NUM(toDev(sx, 0), stationLabels[i], 'below'));
+
+  // ---- Leader callouts — Seam at the top view's own leftmost (k=0) point; Fold line/Inside
+  // pattern anchored to genuinely separate real estate (the prism's own label-polish lesson:
+  // two notes ~9 drawing-units apart overlapped at this font size).
+  const seamNote = NOTE({ x: top.x0 - 12, y: top.y0 - 10 }, toTop(0, cy), 'Seam');
+  const foldAt = toDev(stationXs[2], H * 0.75);
+  const foldNote = NOTE({ x: foldAt.x + 10, y: foldAt.y - 8 }, foldAt, 'Fold line');
+  const insideAt = toDev(stretchOut / 2, H * 0.3);
+  const insideNote = NOTE({ x: insideAt.x, y: insideAt.y + 16 }, insideAt, 'Inside pattern');
+
+  // ---- Region captions — same shared-row rule as the prism (constructions.js's buildPrism
+  // comment): whichever block's bottom edge is lower on screen sets the row, both captions
+  // the same CAPTION_GAP below it, so the stretch-out dim (which reaches DIM_OFFSET below
+  // the development's own z=0 edge) can never collide with it.
+  const CAPTION_GAP = 10;
+  const DIM_OFFSET = 16;
+  const frontTopBottom = top.y0 + top.h;
+  const devBottom = toDev(stretchOut / 2, 0).y;
+  const stretchDimBottom = devBottom + DIM_OFFSET;
+  const captionRowY = Math.max(frontTopBottom, stretchDimBottom) + CAPTION_GAP;
+  const capFrontTop = CAPTION({ x: front.x0 + front.w / 2, y: captionRowY }, '(i) Front view & top view');
+  const capDev = CAPTION({ x: dev.x0 + dev.w / 2, y: captionRowY }, '(ii) Development of cylinder (inside pattern)');
 
   const steps = [
     frontOutline, topCircle, projector, ...genSteps,
-    dim(toFront(0, 0), toFront(D, 0), `⌀ ${D} mm`, 'given', -12),
+    // Anchored at the TOP edge (z=H), not the bottom — a live check caught the bottom-edge
+    // placement (offset+12, the same outward direction ADR-114 fixed for the prism's dims)
+    // colliding with the top-view circle's own 'above'-placed numerals (stations 3/4/5): both
+    // wanted the same narrow GAP_TOP band between front view and circle. The top edge's own
+    // RESERVE_TOP margin is otherwise empty, so the dim moves there instead (offset -14,
+    // pointing further up/out — same sign law, opposite edge), leaving GAP_TOP to the numerals.
+    dim(toFront(0, H), toFront(D, H), `⌀ ${D} mm`, 'given', -14),
     dim(toFront(D, 0), toFront(D, H), `${H} mm`, 'given', 14),
+    ...topNumerals, seamNote, capFrontTop,
     transferBase, transferTop,
-    devOutline, ...devGenLines,
-    dim(toDev(0, 0), toDev(stretchOut, 0), `π×${D} = ${stretchOut.toFixed(1)} mm`, 'result', 16),
+    devOutline, ...devGenLines, ...devNumeralsBottom, foldNote, insideNote,
+    dim(toDev(0, 0), toDev(stretchOut, 0), `Stretch out = π×⌀${D} = ${stretchOut.toFixed(1)} mm`, 'result', DIM_OFFSET),
+    capDev,
   ];
 
   return {
     steps,
-    resultText: `Cylinder ⌀${D} mm × ${H} mm high — stretch-out = π×${D} = ${stretchOut.toFixed(1)} mm, twelve generators at ${(stretchOut / 12).toFixed(1)} mm spacing (K.C. John Example 15.4).`,
+    resultText: `Cylinder ⌀${D} mm × ${H} mm high — stretch-out = π×${D} = ${stretchOut.toFixed(1)} mm, twelve generators at ${(stretchOut / 12).toFixed(1)} mm spacing (K.C. John Example 15.4, Fig. 15.7).`,
   };
 }
 
@@ -482,7 +570,11 @@ function buildCylinder(params) {
 //    (Fig. 15-15) / K.C. John Example 15.18 (Fig. 15.20-21)'s THREE-piece worked bend,
 //    dropping the middle double-truncated piece (ADR-112: no numbered two-piece textbook
 //    figure exists — each piece here is a single 45°-mitred cylinder, Bhatt Fig. 15-10 /
-//    K.C. John Fig. 15.12's own construction, mitred and mirrored).
+//    15-11's own construction, mitred and mirrored — see DECISIONS.md ADR-116's citation
+//    correction: K.C. John Fig. 15.12/Example 15.9, cited here originally, is actually a
+//    DOUBLY truncated tube (45° at the top, 30° lower), not this topic's single-truncation
+//    source; Bhatt's own Fig. 15-10 (Problem 15-8) and Fig. 15-11 (Problem 15-9, a 45° cut)
+//    are the real sources).
 //
 // Front-view corner algebra (verified in-file, not just asserted): the mitre plane's
 // trace is the straight line from the INNER corner E=(-r,-r) to the OUTER corner
@@ -539,6 +631,22 @@ function cutHeight(theta, legShort, r) {
   }
 })();
 
+// Phase 3 rebuild (../DECISIONS.md ADR-116) — a FIXED px/mm ratio, same reasoning as
+// PRISM_SCALE/CYL_SCALE, derived from this construction's own slider worst case
+// (diameter≤60, legLength≤100). Drawing ONE development pattern (not two side by side,
+// see buildElbow()'s own comment) is what makes a usable scale reachable at all:
+//   frontW = frontH = D_max + legShort_max = 60 + 100           = 160
+//   topDepth = D_max                                             = 60
+//   devW = pi * D_max (ONE pattern)                               ≈ 188.5
+//   scaleX_worst = availW / (frontW + devW) = 294 / (160+188.5)  ≈ 0.8436
+//   scaleY_worst = availH / (frontH + topDepth) = 154 / (160+60) = 0.7000   <- binds
+// (availW/availH from this file's own MARGIN/GAP_*/RESERVE_* constants — recompute if
+// those constants or this construction's `given` ranges ever change.) Floored to 2dp.
+// TWO side-by-side patterns (devW ≈ 397) would instead bind scaleX at ≈0.52 px/mm — too
+// small for any station numeral (circle radius 13px, dev stations 5.7px apart) — the
+// edge case this phase's own brief flagged to watch for; confirmed with the user.
+const ELBOW_SCALE = 0.70;
+
 function buildElbow(params) {
   const D = params.diameter ?? 50;
   const legShort = params.legLength ?? 70;
@@ -559,7 +667,12 @@ function buildElbow(params) {
   const frontW = localMaxX - localMinX;
   const frontH = localMaxY - localMinY;
 
-  const plate = planPlate(frontW, frontH, D, stretchOut * 2 + 20 /* gap between the two patterns */);
+  // ONE development pattern (Phase 3 rebuild) — the other piece is its mirror image
+  // (Bhatt p.359, Fig. 15-15(v): "Parts A and C are similar"), noted in capDev's own
+  // caption text below, not drawn a second time. See ELBOW_SCALE's own comment for why:
+  // two side-by-side patterns made annotation unreachable at any fixed scale.
+  const devW = stretchOut;
+  const plate = planPlate(frontW, frontH, D, devW, 0, ELBOW_SCALE);
   const { front, dev, scale } = plate;
   const toFront = (p) => ({ x: front.x0 + (p.x - localMinX) * scale, y: front.y0 + (localMaxY - p.y) * scale });
   // Auxiliary circle: SAME elbow-frame x-axis as toFront (x=0 is the vertical piece's own
@@ -571,92 +684,182 @@ function buildElbow(params) {
   const toTop = (x, y) => ({ x: front.x0 + (x - localMinX) * scale, y: plate.top.y0 + y * scale });
 
   // Front-view outline is the STATED problem (visible immediately, before Play) — role
-  // 'given'; only the development patterns are the constructed 'result'.
+  // 'given'; only the development pattern is the constructed 'result'.
   const frontOutline = POLY([toFront(A), toFront(B), toFront(C), toFront(F), toFront(G), toFront(E)], 'given', true, OUTLINE_W);
   const mitreLine = L(toFront(E), toFront(C), 'given', FOLD_W);
   const topCircleCenter = toTop(0, topCy);
   const topCircle = CIRC(topCircleCenter, r * scale, 'given');
-  // Seam projector: front view's LEFT wall (x=-r, elbow frame) down to the circle's own
-  // leftmost point (x=-r, same frame, θ=π) — genuinely vertical, matching kk=6 below.
-  const projector = L(toFront(A), toTop(-r, topCy), 'given');
+  // Seam projector — scaffolding, not stated geometry, so 'move' (auxiliary tier), the
+  // same fix ADR-113/115 applied to the prism's/cylinder's own projectors (this one
+  // shipped still 'given'). Front view's LEFT wall (x=-r, elbow frame) down to the
+  // circle's own leftmost point (x=-r, same frame, station 1, θ=π) — genuinely vertical.
+  const projector = L(toFront(A), toTop(-r, topCy), 'move');
 
-  // Vertical piece's twelve generators: evenly spaced around the auxiliary circle,
-  // projected UP into the vertical piece's wall band, meeting the mitre line at
-  // cutHeight(theta) above yBottom — theta=0 at the RIGHT (outer, x=+r, LONG) direction,
-  // matching this piece's own long/short wall algebra above.
+  // Vertical piece's twelve generators — LEFT-seam clockwise, K.C. John's own stated rule
+  // (Example 15.4 step 1, ADR-115's own citation) and buildCylinder()'s identical a(k):
+  // station 1 (k=0) is the LEFT/short wall, station 7 (k=6) the RIGHT/long wall. Every
+  // front-view wall generator is a coincidence of TWO stations (k and 12-k share
+  // r*cos(a(k)), since sin/cos of a(k)=pi+2*pi*k/12 mirror about the seam) — the SAME
+  // depth-collapse dedup ADR-115 applied to the cylinder's front view: only k=1..5 need a
+  // drawn wall line, k=0/k=6 already ARE the outline's own A-E/B-C edges.
   const genStepsV = [];
-  for (let k = 0; k <= ELBOW_GENERATORS; k++) {
-    const kk = k % ELBOW_GENERATORS;
-    const theta = (2 * Math.PI * kk) / ELBOW_GENERATORS; // 0 at +x (right/outer/long)
-    const localX = r * Math.cos(theta);
-    const topPt = toTop(localX, topCy + r * Math.sin(theta));
-    const h = cutHeight(theta, legShort, r);
-    const wallTop = toFront({ x: localX, y: yBottom + h });
+  const topNumerals = [];
+  const stationPts = []; // {localX, a} per station — reused below by the horizontal piece
+                          // and the transfer lines, since both pieces share the SAME
+                          // station angle (this phase's own left-seam renumbering makes
+                          // that sharing exact, not approximate).
+  for (let k = 0; k < ELBOW_GENERATORS; k++) {
+    const a = Math.PI + (2 * Math.PI * k) / ELBOW_GENERATORS;
+    const localX = r * Math.cos(a);
+    const localYtop = r * Math.sin(a);
+    stationPts.push({ localX, a });
+    const topPt = toTop(localX, topCy + localYtop);
+    const h = cutHeight(a, legShort, r);
     const wallBase = toFront({ x: localX, y: yBottom });
+    const wallTop = toFront({ x: localX, y: yBottom + h });
     genStepsV.push(L(topPt, wallBase, 'move', undefined, FAST_MS));
-    if (kk !== 0) genStepsV.push(L(wallBase, wallTop, 'given', FOLD_W)); // 'given' — no animation, no duration needed
+    if (k >= 1 && k <= 5) genStepsV.push(L(wallBase, wallTop, 'given', FOLD_W));
+
+    // Numeral sits outward from the circle's own centre, in whichever of the four 'place'
+    // directions best matches this station's own quadrant — buildCylinder()'s own rule.
+    const nx = Math.cos(a), ny = Math.sin(a);
+    const place = Math.abs(nx) >= Math.abs(ny) ? (nx >= 0 ? 'right' : 'left') : (ny >= 0 ? 'below' : 'above');
+    topNumerals.push(NUM(topPt, String(k + 1), place));
   }
 
   // Horizontal piece's twelve generators: this topic has no genuine third (side) view to
-  // project them from, so they're placed directly along its own flat end (x=xRight) at
-  // evenly spaced positions and tied to the mitre line by a labelled correspondence
-  // (station numbers) rather than a continuous orthogonal projector — a documented
-  // simplification (see this topic's CLAUDE.md), not a claim of a third auxiliary view.
+  // project them from, so they're placed directly along its own flat end (x=xRight) and
+  // tied to the mitre line by a labelled number correspondence rather than a continuous
+  // orthogonal projector — a documented simplification (this topic's CLAUDE.md "Elbow
+  // scope"), not a claim of a third auxiliary view. Station k here shares the VERTICAL
+  // piece's own angle a(k) (stationPts above) — the mitre's 45° symmetry makes
+  // r*cos(a(k)) the SAME cross-section coordinate for both pieces (file header), so this
+  // piece's cut length is cutHeight()'s complement: legShort+r−r·cos(a(k)) instead of
+  // legShort+r+r·cos(a(k)). Same k=1..5-only dedup as the vertical piece — k=0/k=6
+  // already ARE the outline's own G-E/C-F edges.
   const genStepsH = [];
-  for (let k = 0; k <= ELBOW_GENERATORS; k++) {
-    const kk = k % ELBOW_GENERATORS;
-    const theta = (2 * Math.PI * kk) / ELBOW_GENERATORS; // 0 at -y (bottom/inner/long, this piece's own long direction)
-    const localY = r * Math.sin(theta) * -1;
-    const h = cutHeight(theta, legShort, r);
-    const wallEnd = toFront({ x: xRight, y: localY });
-    const mitrePt = toFront({ x: xRight - h, y: localY });
-    if (kk !== 0) genStepsH.push(L(mitrePt, wallEnd, 'given', FOLD_W)); // 'given' — no animation, no duration needed
-    genStepsH.push(P(mitrePt, 'move', String(kk), FAST_MS));
+  const horizNumerals = [];
+  const HORIZ_NUM_K = [0, 1, 3, 6]; // thinned set intersected with this piece's own
+                                     // distinct half (k=7..11 mirror k=5..1, see above) —
+                                     // stations 1, 2, 4, 7.
+  for (let k = 0; k <= 6; k++) {
+    const { a, localX: mLocalY } = stationPts[k]; // r*cos(a(k)) reused as this piece's own cross-section y
+    const hH = legShort + r - r * Math.cos(a);
+    const wallEnd = toFront({ x: xRight, y: mLocalY });
+    const mitrePt = toFront({ x: xRight - hH, y: mLocalY });
+    if (k >= 1 && k <= 5) genStepsH.push(L(mitrePt, wallEnd, 'given', FOLD_W));
+    if (HORIZ_NUM_K.includes(k)) horizNumerals.push(NUM(mitrePt, String(k + 1), 'right'));
   }
 
-  // --- Development: two congruent stretch-out patterns, side by side, each width πD,
-  // each a straight flat edge on one side and the cosine mitre curve on the other — the
-  // SAME formula for both pieces (see file header: a truly symmetric elbow's two
-  // developments are congruent, not merely similar). Development's own z=0 sits at each
-  // piece's flat end (its OWN convention, independent of the front view's yBottom, since
-  // the two pieces run along different front-view axes).
-  const devZBase = legLong + r; // headroom above z=0 for the tallest cut point
+  // --- Development: ONE stretch-out pattern (ELBOW_SCALE's own comment) — a straight flat
+  // edge (z=0, the piece's own uncut flat rim) on one side, the cosine mitre curve on the
+  // other. `devZBase = frontH` (Phase 3 fix, was `legLong + r`) ALIGNS the development's
+  // z-datum with the front view's own — before this fix every cut point sat `r` below its
+  // own front-view mitre point, which is why this construction never had a working
+  // transfer line despite ADR-112's whole single-plate architecture existing for exactly
+  // that (K.C. John Ch.15 note #1: every development line must be a TRUE length,
+  // genuinely horizontal here).
+  const devZBase = frontH;
   function dev0(x, z) { return { x: dev.x0 + x * scale, y: dev.y0 + (devZBase - z) * scale }; }
 
-  function devPattern(originX, label) {
-    const pts = [];
-    for (let k = 0; k <= ELBOW_GENERATORS; k++) {
-      const theta = (2 * Math.PI * k) / ELBOW_GENERATORS;
-      const h = cutHeight(theta, legShort, r);
-      pts.push({ x: originX + (k * stretchOut) / ELBOW_GENERATORS, z: h });
-    }
-    // flatEdge/sideA/sideB are short boundary lines, not the "hero" reveal — FAST_MS,
-    // same reasoning as the fold lines. cutCurve (the sinusoidal mitre cut, this
-    // construction's actual textbook-notable result) keeps the full default pace.
-    const flatEdge = POLY([dev0(pts[0].x, 0), dev0(pts[pts.length - 1].x, 0)], 'result', false, OUTLINE_W, FAST_MS);
-    const cutCurve = POLY(pts.map((p) => dev0(p.x, p.z)), 'result', false, OUTLINE_W);
-    const sideA = L(dev0(pts[0].x, 0), dev0(pts[0].x, pts[0].z), 'result', OUTLINE_W, FAST_MS);
-    const sideB = L(dev0(pts[pts.length - 1].x, 0), dev0(pts[pts.length - 1].x, pts[pts.length - 1].z), 'result', OUTLINE_W, FAST_MS);
-    const foldLines = pts.slice(1, -1).map((p) => L(dev0(p.x, 0), dev0(p.x, p.z), 'result', FOLD_W, FAST_MS));
-    const cap = LABEL(dev0(originX, legLong + r + 6), label, 0, 0);
-    return [flatEdge, sideA, sideB, ...foldLines, cutCurve, cap];
+  const devPts = [];
+  for (let k = 0; k <= ELBOW_GENERATORS; k++) {
+    const a = Math.PI + (2 * Math.PI * k) / ELBOW_GENERATORS;
+    devPts.push({ x: (k * stretchOut) / ELBOW_GENERATORS, z: cutHeight(a, legShort, r) });
+  }
+  // flatEdge/sideA/sideB are short boundary lines, not the "hero" reveal — FAST_MS, same
+  // reasoning as the fold lines. cutCurve (the sinusoidal mitre cut, this construction's
+  // actual textbook-notable result) keeps the full default pace, stretched by RESULT_PACE.
+  const flatEdge = POLY([dev0(devPts[0].x, 0), dev0(devPts[devPts.length - 1].x, 0)], 'result', false, OUTLINE_W, FAST_MS);
+  const cutCurve = POLY(devPts.map((p) => dev0(p.x, p.z)), 'result', false, OUTLINE_W);
+  const sideA = L(dev0(devPts[0].x, 0), dev0(devPts[0].x, devPts[0].z), 'result', OUTLINE_W, FAST_MS);
+  const sideB = L(dev0(devPts[devPts.length - 1].x, 0), dev0(devPts[devPts.length - 1].x, devPts[devPts.length - 1].z), 'result', OUTLINE_W, FAST_MS);
+  const foldLines = devPts.slice(1, -1).map((p) => L(dev0(p.x, 0), dev0(p.x, p.z), 'result', FOLD_W, FAST_MS));
+
+  // Thinned numeral set — Bhatt Fig. 15-11's own set for a 45° single-truncation cylinder
+  // (1,2,4,7,10,12,1), not the full 13: at ELBOW_SCALE the full set collides (≈9.2px
+  // spacing vs a ≈14px two-digit knockout box), the same density problem ADR-115 solved
+  // for the cylinder, worse here since ELBOW_SCALE < CYL_SCALE. Confirmed with the user.
+  const THIN_K = [0, 1, 3, 6, 9, 11, 12];
+  const devNumerals = THIN_K.map((k) => NUM(dev0(devPts[k].x, 0), String((k % ELBOW_GENERATORS) + 1), 'below'));
+
+  // Cross-region (front view → development) transfer lines, DASH_CARRY — the ONE thing
+  // ADR-112's single-plate Canvas2D architecture exists for and this construction never
+  // had until the devZBase fix above. 7 distinct heights (k=0..6, legShort → legLong
+  // monotonically), not 12 — the SAME depth-collapse dedup as the wall generators, since a
+  // transfer line's front-view endpoint is a wall/mitre point subject to the identical
+  // k/12-k coincidence.
+  const transfers = [];
+  for (let k = 0; k <= 6; k++) {
+    const { a, localX } = stationPts[k];
+    const h = cutHeight(a, legShort, r);
+    const frontPt = toFront({ x: localX, y: yBottom + h });
+    transfers.push(L(frontPt, dev0(devPts[k].x, h), 'move', undefined, undefined, 'carry'));
   }
 
-  const pattern1 = devPattern(0, 'Piece 1 (vertical leg)');
-  const pattern2 = devPattern(stretchOut + 20, 'Piece 2 (horizontal leg, mirror image)');
+  // ---- Leader callouts.
+  const seamNote = NOTE({ x: plate.top.x0 - 12, y: plate.top.y0 - 10 }, toTop(stationPts[0].localX, topCy), 'Seam');
+  const foldAt = dev0(devPts[2].x, devPts[2].z * 0.6);
+  const foldNote = NOTE({ x: foldAt.x + 10, y: foldAt.y - 8 }, foldAt, 'Fold line');
+  const insideAt = dev0(stretchOut / 2, devPts[6].z * 0.3);
+  const insideNote = NOTE({ x: insideAt.x, y: insideAt.y + 16 }, insideAt, 'Inside pattern');
+
+  // ---- Region captions. The mirror-image note (Bhatt p.359, Fig. 15-15(v): "Parts A and
+  // C are similar") folds into capDev's OWN text rather than a standalone NOTE — a
+  // standalone note near the pattern's own top edge landed only 10 units above the front
+  // view's top edge (inside RESERVE_TOP, not overflowing the canvas, but tight); the
+  // caption row is already the one position on this plate proven collision-free at every
+  // slider extreme (captionRowY below), so reusing it is strictly safer than finding a new
+  // clear spot inside the development block itself. — same shared-row rule the prism/cylinder established: whichever
+  // block's bottom edge is lower on screen sets the row, both captions the same gap below.
+  const CAPTION_GAP = 10;
+  const DIM_OFFSET = 16;
+  const frontTopBottom = plate.top.y0 + plate.top.h;
+  const devBottom = dev0(stretchOut / 2, 0).y;
+  const stretchDimBottom = devBottom + DIM_OFFSET;
+  const captionRowY = Math.max(frontTopBottom, stretchDimBottom) + CAPTION_GAP;
+  const capFrontTop = CAPTION({ x: front.x0 + front.w / 2, y: captionRowY }, '(i) Front view & top view');
+  const capDev = CAPTION({ x: dev.x0 + dev.w / 2, y: captionRowY }, '(ii) Development of one elbow piece (inside pattern) — piece 2 is its mirror image');
 
   const steps = [
-    frontOutline, mitreLine, topCircle, projector, ...genStepsV, ...genStepsH,
-    dim(toFront(A), toFront(B), `⌀ ${D} mm`, 'given', -12),
+    frontOutline, mitreLine, topCircle, projector,
+    ...genStepsV, ...topNumerals, seamNote,
+    ...genStepsH, ...horizNumerals,
+    // ⌀ dim: horizontal, below the A-B bottom edge (RESERVE_BOTTOM) — universally clear
+    // for its whole length, unlike a placement beside/on the front view or circle (both
+    // are only PARTIALLY clear against this shape's own non-convex L-footprint, see
+    // ADR-116). Was landing INSIDE the front view (offset -12 pre-rebuild, then briefly
+    // -14 mid-rebuild — both wrong; paintDim()'s perpendicular is computed from a/b in
+    // their OWN already-y-flipped toFront-space, not the local mm frame these points came
+    // from, so a sign derived by reasoning in local space lands backwards here). Verified
+    // by literally replicating paintDim()'s own oa/ob/mid formula against the real
+    // frontOutline polygon (ray-casting inside/outside), not re-guessed by hand a third
+    // time: +14 is confirmed outside at both ends and the midpoint.
+    dim(toFront(A), toFront(B), `⌀ ${D} mm`, 'given', 14),
+    // legShort: LEFT of the A-E wall (x=-r, the shape's true global-leftmost edge for this
+    // wall's whole y-range) — confirmed outside at both ends and the midpoint by the same
+    // polygon replication above. This one was already correct pre-rebuild (-14); no change.
     dim(toFront(A), toFront(E), `${legShort} mm (short leg)`, 'given', -14),
+    // legLong: RIGHT of the B-C wall — also already correct pre-rebuild (+14): outside at
+    // the B end and the dim TEXT's own midpoint, confirmed by the same polygon
+    // replication. Only the C end (`ob`) lands inside — B-C's exterior side genuinely
+    // differs above/below local y=-r on this non-convex L-shaped outline (the horizontal
+    // piece's own body overhangs the upper stretch near the reflex vertex C), so no single
+    // perpendicular offset clears this edge's WHOLE length; the achievable best (text and
+    // majority of the line clear) is what's shipped here. Flagged, not silently treated as
+    // fully solved (RULES §2.19a; see ADR-116's own note on this edge case).
     dim(toFront(B), toFront(C), `${legLong} mm (long leg)`, 'given', 14),
-    ...pattern1, ...pattern2,
-    dim(dev0(0, 0), dev0(stretchOut, 0), `π×${D} = ${stretchOut.toFixed(1)} mm`, 'result', 16),
+    capFrontTop,
+    flatEdge, sideA, sideB, ...foldLines, cutCurve, ...devNumerals,
+    foldNote, insideNote,
+    ...transfers,
+    dim(dev0(0, 0), dev0(stretchOut, 0), `Stretch out = π×⌀${D} = ${stretchOut.toFixed(1)} mm`, 'result', DIM_OFFSET),
+    capDev,
   ];
 
   return {
     steps,
-    resultText: `Two-piece 90° elbow, ⌀${D} mm, short leg ${legShort} mm / long leg ${legLong} mm — each piece is a plain cylinder mitred once at 45° (Bhatt Fig. 15-10 / K.C. John Fig. 15.12's single-cut math), stretch-out π×${D} = ${stretchOut.toFixed(1)} mm each, mirrored.`,
+    resultText: `Two-piece 90° elbow, ⌀${D} mm, short leg ${legShort} mm / long leg ${legLong} mm — each piece is a plain cylinder mitred once at 45° (Bhatt Fig. 15-10/15-11's single-truncation construction), stretch-out π×${D} = ${stretchOut.toFixed(1)} mm. One development pattern is drawn; the second piece is its mirror image.`,
   };
 }
 
@@ -705,7 +908,7 @@ export const CONSTRUCTIONS = [
     id: 'elbow',
     label: 'Two-Piece 90° Elbow',
     shortLabel: 'Elbow',
-    principle: 'A 90° pipe bend built from two identical cylinder pieces, each mitred once at 45° and joined mirror-symmetrically. Each piece’s development is the single-truncation cylinder construction (Bhatt Fig. 15-10 / K.C. John Fig. 15.12) — a straight flat edge on one side, a cosine-shaped cut curve on the other, amplitude equal to the pipe’s own radius.',
+    principle: 'A 90° pipe bend built from two identical cylinder pieces, each mitred once at 45° and joined mirror-symmetrically. Each piece’s development is the single-truncation cylinder construction (Bhatt Fig. 15-10 / Fig. 15-11) — a straight flat edge on one side, a cosine-shaped cut curve on the other, amplitude equal to the pipe’s own radius. Only one pattern is drawn; the second piece is its mirror image.',
     given: [
       { key: 'diameter', label: 'Pipe diameter', unit: 'mm', min: 30, max: 60, step: 2, default: 50 },
       { key: 'legLength', label: 'Leg length (short side)', unit: 'mm', min: 40, max: 100, step: 5, default: 70 },

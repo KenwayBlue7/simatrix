@@ -47,6 +47,13 @@ let state = { constructionId: null, params: {} };
 let lastRecipe = null;
 let activePlay = null; // playSteps()/playRollAnimation() handle, so a replay can cancel one
 
+// Default-zoom fix: the Given step's front+top block only, framed with this much drawing-
+// space breathing room — same magnitude family as constructions.js's own gap constants
+// (CAPTION_GAP=10, dim offsets 12-16). Was the fixed BASE_W×BASE_H box (viewTransform.js),
+// sized for the worst-case FULL plate incl. development, so the small Given-step block sat
+// lost in a lot of dead space at page load.
+const DEFAULT_FIT_MARGIN = 14;
+
 let paused = false;
 let lastFrameTime = 0;
 let rafId = null;
@@ -61,7 +68,10 @@ const canvas = document.getElementById('construction-canvas');
 const statusEl = document.getElementById('sim-status');
 const givenLayer = createLayer();
 const dynamicLayer = createLayer();
-const viewTransform = initViewTransform(canvas, () => {}); // paint() runs every rAF frame regardless — see frame()
+// 3rd arg: dblclick routes through resetFit() (defined below), not the leaf's own fixed-box
+// resetView() — see that function's own comment. Wrapped in an arrow since resetFit is a
+// function DECLARATION further down this file — hoisted, so it's already in scope here.
+const viewTransform = initViewTransform(canvas, () => {}, () => resetFit()); // paint() runs every rAF frame regardless — see frame()
 
 function announce(msg) { if (statusEl) statusEl.textContent = msg; }
 
@@ -83,9 +93,14 @@ function flowNote(msg) {
 // paint() — the one function that touches the canvas. Resolves the current theme's
 // tokens fresh every call (cheap for this simple 2D scene, and correct across a live
 // light/dark toggle with no extra listener), sizes the DPR-scaled backing store, then
-// sets ctx's transform from viewTransform's current view-state (letterboxed, uniform
-// scale — same "meet" semantics as SVG's preserveAspectRatio) before delegating to
-// renderConstruction.js's paintLayer() for both layers, in z-order (given, then dynamic).
+// builds a `sheet` (Module2 `drawMethodSheet`'s own `projectSheet`/`pxPerUnit` shape,
+// `Module2/main.js`) instead of baking pan/zoom into ctx's transform — ctx stays DPR-only
+// for this entire paint, and every mark is projected to canvas px inside
+// renderConstruction.js's paint* helpers. This is the fix for stroke weights and text
+// scaling with zoom (Phase 1 rebuild, see ../DECISIONS.md's ADR for this topic): a
+// baked-in `ctx.scale` makes `lineWidth: 1.6` mean 1.6 WORLD units, which is 1.6px only at
+// one particular zoom; Module2 never does this — its own `drawMethodSheet` always projects
+// points through `projectSheet()` and strokes constant-px widths. ------------------------
 // ============================================================================
 
 function paint() {
@@ -107,23 +122,37 @@ function paint() {
   ctx.fillRect(0, 0, rect.width, rect.height);
 
   const { vx, vy, vw, vh } = viewTransform.getView();
-  const scale = Math.min(rect.width / vw, rect.height / vh);
-  const offX = (rect.width - vw * scale) / 2;
-  const offY = (rect.height - vh * scale) / 2;
-  ctx.setTransform(dpr * scale, 0, 0, dpr * scale, dpr * (offX - vx * scale), dpr * (offY - vy * scale));
+  const pxPerUnit = Math.min(rect.width / vw, rect.height / vh);
+  const offX = (rect.width - vw * pxPerUnit) / 2;
+  const offY = (rect.height - vh * pxPerUnit) / 2;
+  // Drawing-unit → canvas-px, letterboxed same as before — but this is now a PLAIN
+  // FUNCTION renderConstruction.js's paint* helpers call per point, not a ctx transform,
+  // so a `strokeWidth: 1.6` line is genuinely 1.6 canvas px at every zoom level.
+  const project = (p) => ({ x: (p.x - vx) * pxPerUnit + offX, y: (p.y - vy) * pxPerUnit + offY });
 
-  const palette = {
-    given: cssVar('--color-construct-given', '#5a5d66'),
-    move: cssVar('--color-construct-move', '#7b4fb5'),
+  const sheet = {
+    project,
+    pxPerUnit,
+    // given/move/result — the pedagogical colour axis (DESIGN.md §3), read from their own
+    // tokens rather than hard-coded, per RULES.md's "read all colours from CSS tokens" —
+    // `given` aliases --color-ink and `move` now aliases --color-ink-secondary in
+    // index.html (Phase 1 rebuild retired `move`'s own violet), but this still resolves
+    // through the token, not a JS-side alias, so a future token edit stays the one place
+    // that changes it.
+    given: cssVar('--color-construct-given', '#06070b'),
+    move: cssVar('--color-construct-move', '#5a5d66'),
     result: cssVar('--color-construct-result', '#1f8a4c'),
-    tool: cssVar('--color-ink-secondary', '#5a5d66'),
+    // ink/inkSecondary — used directly by content that sits OUTSIDE the given/move/result
+    // axis (station numerals, leader callouts, region captions: see renderConstruction.js's
+    // file header) rather than picking one of the three roles above.
+    ink: cssVar('--color-ink', '#06070b'),
     inkSecondary: cssVar('--color-ink-secondary', '#5a5d66'),
     paper: cssVar('--color-paper', '#ffffff'),
     fontSans: cssVar('--font-sans', 'sans-serif'),
     fontMono: cssVar('--font-mono', 'monospace'),
   };
-  paintLayer(ctx, givenLayer, palette);
-  paintLayer(ctx, dynamicLayer, palette);
+  paintLayer(ctx, givenLayer, sheet);
+  paintLayer(ctx, dynamicLayer, sheet);
 }
 
 // ============================================================================
@@ -170,10 +199,32 @@ const simController = {
     state = { constructionId: construction.id, params: defaultsFor(construction) };
     rebuild();
     uiManager.sync({ rebuildFields: true });
-    viewTransform.resetView();
+    defaultFit();
     announce(`${construction.label} selected. Adjust the given values, then continue.`);
   },
   onEnterConstructStep() { onboarding?.playHint(); },
+
+/** Frame the CURRENT Given-step content tightly (front+top block, role:'given' steps only
+ *  — everything else is dynamicLayer, not drawn until Play) instead of viewTransform.js's
+ *  fixed worst-case box. Falls back to a plain resetView() when nothing's selected (no
+ *  bounds to fit). Call AFTER rebuild() so lastRecipe is fresh. */
+function defaultFit() {
+  if (!lastRecipe) { viewTransform.resetView(); return; }
+  const givenSteps = lastRecipe.steps.filter((s) => s.role === 'given');
+  viewTransform.fitToBounds(computeBounds(givenSteps), DEFAULT_FIT_MARGIN);
+}
+
+/** Double-click-reset target (viewTransform.js's onResetRequest hook) — content-aware, unlike
+ *  a plain defaultFit(): before Play (dynamicLayer empty), double-click should reproduce
+ *  EXACTLY the fresh-page-load framing, so it just calls defaultFit(). Once Play has drawn
+ *  into dynamicLayer, the given-only block no longer contains everything on screen — the
+ *  green development pattern would sit clipped outside that tight frame — so this widens the
+ *  fit to the WHOLE recipe (every step, not just role:'given') instead. No lastRecipe falls
+ *  through to defaultFit()'s own resetView() fallback, same as every other call site here. */
+function resetFit() {
+  if (!lastRecipe || dynamicLayer.entries.length === 0) { defaultFit(); return; }
+  viewTransform.fitToBounds(computeBounds(lastRecipe.steps), DEFAULT_FIT_MARGIN);
+}
 
   // uiManager.js
   getActiveConstruction: () => (state.constructionId ? findConstruction(state.constructionId) : null),
@@ -203,7 +254,7 @@ const simController = {
     rebuild();
     stepper.reset();
     uiManager.sync({ rebuildFields: true });
-    viewTransform.resetView();
+    defaultFit(); // lastRecipe is null post-reset — falls back to plain resetView()
     announce('Reset. Choose a solid to begin.');
     // solvedAny is deliberately NOT cleared here — #btn-finish's gate is page-load
     // scoped, not session-scoped, same reset-immunity the platform's own retired
@@ -221,7 +272,7 @@ const simController = {
     state = { constructionId: construction.id, params: defaultsFor(construction) };
     rebuild();
     uiManager.sync({ rebuildFields: true });
-    viewTransform.resetView();
+    defaultFit();
     stepper.goToGivenStep();
     announce(`${construction.label} selected for this problem. Adjust the given values to match, then continue.`);
   },
@@ -311,3 +362,10 @@ function init() {
 }
 
 init();
+    // Clip guard: defaultFit()'s tighter initial frame is sized for the DEFAULT params —
+    // a slider dragged toward its max can grow the Given-step block past that frame. Same
+    // "zoom out only if it doesn't already fit, leave a manual zoom alone otherwise"
+    // contract play() already trusts below.
+    if (lastRecipe) {
+      viewTransform.ensureVisible(computeBounds(lastRecipe.steps.filter((s) => s.role === 'given')));
+    }
