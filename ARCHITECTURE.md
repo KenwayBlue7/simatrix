@@ -84,6 +84,49 @@ C:\xampp\htdocs\Simatrix\
 │                                              meshAnalyzer.js. Teaches line types on an
 │                                              orbitable 3D bearing block. (ADR-029.)
 │
+├── graphics_module_1_topic_1_1_dimensioning\  MODULE-1 SUBJECT ("Dimensioning" — BIS
+│                                              dimensioning practice, Chapter 4 of the
+│                                              prescribed textbook / Dimensions.pdf), built on
+│                                              MODULE 2's orchestrator pattern. BUILT & SHIPPED
+│                                              (2026-07-26); its 3-D inspection reuses
+│                                              Foundations' meshAnalyzer + lineDrawer for LIVE
+│                                              camera-dependent edge classification while the
+│                                              front elevation keeps its authored linework
+│                                              (ADR-136); curriculum-audited and remediated
+│                                              (2026-07-27 — see CURRICULUM-AUDIT.md in the
+│                                              topic, its standing academic checklist; the
+│                                              production/authoring workflow is the one item
+│                                              deliberately deferred, ADR-135). Sits immediately
+│                                              after Topic 1
+│                                              (Foundations): that topic teaches what the LINES
+│                                              mean, this one how a drawing states SIZE and
+│                                              LOCATION. One machined subject throughout — the
+│                                              Guide Plate, a 200x100x30 stepped plate carrying a
+│                                              shoulder, an R15 fillet, an R12 corner, a 10x45
+│                                              chamfer, an R220 crowned step face, a bore
+│                                              chamfered 3x45 at its mouth, a hole countersunk on
+│                                              the FAR
+│                                              face (the drawing's one hidden outline, by
+│                                              design), a square hole, a slot, a spherical
+│                                              seat and a cylindrical spigot whose axis lies IN
+│                                              the drawing plane (so the elevation shows it as a
+│                                              rectangle), all as real geometry. Six guided steps:
+│                                              the elements of a dimension, the correct/violation
+│                                              rule flips, Method-1 vs Method-2 under a
+│                                              turn-the-drawing slider, the five arrangements
+│                                              with a before/after split, the shape symbols, and
+│                                              a mistake hunt over the finished drawing. Leaves:
+│                                              dimensionData (pure geometry data), dimensionRig
+│                                              (the manifold solid + its line alphabet),
+│                                              dimensionDraw (the declarative BIS dimension
+│                                              renderer), dimensionLabels (CSS2D values, drags,
+│                                              review markers), dimensionUI (the stepper), plus
+│                                              five pure-data catalogues. NOTE: a single
+│                                              ORTHOGRAPHIC camera — no perspective camera, no
+│                                              projection morph — and NO occlusion raycaster or
+│                                              three-mesh-bvh; the linework is authored, so
+│                                              nothing is camera-dependent. (ADR-133, ADR-134.)
+│
 ├── graphics_module_1_topic_2_spatial_framework\ MODULE-1 SUBJECT ("Spatial Framework" —
 │                                              Quadrants + First-angle combined into one
 │                                              topic), built on MODULE 2's orchestrator
@@ -204,6 +247,33 @@ C:\xampp\htdocs\Simatrix\
 │                                              self-check via the non-rebuild
 │                                              commitStringPath() overlay commit (ADR-070). See
 │                                              root DECISIONS.md ADR-064..070.
+│
+├── graphics_module_3_topic_2_2_conic_sections\  MODULE-3 SUBJECT (Conic Sections), built on
+│                                              MODULE 2's orchestrator pattern per ADR-033.
+│                                              BUILT (2026-07-29), feature-complete: teaches
+│                                              textbook Chapter 6 in SIX guided steps — the
+│                                              double cone, its six section planes, the conic as
+│                                              a locus, the nomenclature, the eccentricity
+│                                              construction, and the other eleven constructions.
+│                                              Scaffolded from the SIBLING topic above rather
+│                                              than template_starter/, with every shared engine
+│                                              file re-copied from Module2/ and md5-verified
+│                                              (ADR-137); it carries ONLY cone.js of the five
+│                                              generators. A new pure leaf src/conicEngine.js
+│                                              (ADR-139) owns all plane-curve mathematics and the
+│                                              Canvas2D sheet: one focal-polar model for all
+│                                              three curves, four sheet modes, twelve
+│                                              constructions, one renderer over a typed display
+│                                              list; sheet state is stored in MILLIMETRES, not
+│                                              world units (ADR-138). src/conicData.js is the
+│                                              pure catalogue (the six planes + their rules,
+│                                              classifySection() judged against the LIVE
+│                                              generator angle, the method table). Topic-1's
+│                                              sectionCut.js is ported verbatim but used as a
+│                                              CURVE EXTRACTOR — the cone is never cut away
+│                                              (ADR-140). The problem library ships all fifteen
+│                                              chapter exercises verbatim and stamps NOTHING on
+│                                              load. See root DECISIONS.md ADR-137..085.
 │
 └── (src_csharp\)                              Old C# Unity prototype. NOT documented
                                                here. (Not present in the working tree
@@ -359,7 +429,7 @@ into the orchestrator directly.
   driven by `main.js`'s state-change notifications. **Imports:** `problems.js` + the
   injected controller. **Provides:** `initProblemLibrary(sim)`.
 
-- **`methodController.js`** (ADR-084 pedagogy, ADR-085 container) — "Show Method": a
+- **`methodController.js`** (ADR-139 pedagogy, ADR-140 container) — "Show Method": a
   Step-6 walkthrough that replays the loaded problem's construction as 2-3 side-by-side
   Sets (simple position → one axis resolved → both), one construction beat at a time
   via Next/Back, plus Set-N focus chips. It draws into its OWN independent, focus-
@@ -405,11 +475,11 @@ into the orchestrator directly.
 - **`index.html`** (~102 KB) — The single page. It holds the **import map** pinning
   `three@0.160.0`, a small inline boot-watchdog script (shows an on-brand fallback if
   the module fails to load, via `__simBootTimer`), the CDN-hosted `@font-face`
-  declarations (ADR-086), **all of the CSS and design tokens inline in one big `<style>`
+  declarations (ADR-141), **all of the CSS and design tokens inline in one big `<style>`
   block**, the complete wizard/viewport markup (step card, rail, sliders, toggles,
   mobile notice), and finally loads
 
-  **Mandatory boot sequence (every topic, ADR-078):** `index.html`'s inline script
+  **Mandatory boot sequence (every topic, ADR-133):** `index.html`'s inline script
   arms `window.__simBooted = false` and a 15 s `__simBootTimer` watchdog before
   anything else runs. `main.js` must call `markBooted()` **last**, and only on a
   fully successful boot, which (1) flips `__simBooted = true` and clears the
@@ -419,7 +489,7 @@ into the orchestrator directly.
   guessing; cloning `template_starter/main.js`'s `markBooted()` verbatim is the
   required starting point.
 
-  **Completion signal (ADR-078 addendum, revised 2026-07-31):** a sibling
+  **Completion signal (ADR-133 addendum, revised 2026-07-31):** a sibling
   `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` so the host can
   surface its "next topic / stay" overlay. Every shipped topic — Module 2, all 9 KTU
   stepper topics (including the last 2 stragglers, `graphics_module_1_topic_1_foundations`
@@ -443,7 +513,7 @@ into the orchestrator directly.
   There is no remaining topic on the old auto-triggered/latched shape.
   One topic, `graphics_module_2_topic_1_introduction`, omits `markComplete()` entirely —
   it is a free-browse anatomy gallery with no steps and no "finished" state to hook (a
-  deliberate exclusion, not an oversight; see the ADR-078 addendum).
+  deliberate exclusion, not an oversight; see the ADR-133 addendum).
   `main.js` as an ES module. (Note: Module 2 keeps its CSS *inline* here, unlike
   Module 1 — see §8.)
 
@@ -475,7 +545,7 @@ frame, so the seven pages cannot drift apart.
   (`alb`/`albBox`/`acr`) rather than a separate `vertexLabeler.js`.
 
 - **`src/shell.css`** (~53 KB) — The shared stylesheet: the `:root` design tokens,
-  CDN-hosted `@font-face` (ADR-086), the wizard/viewport shell, all control styling,
+  CDN-hosted `@font-face` (ADR-141), the wizard/viewport shell, all control styling,
   and the CSS for the chrome that `chrome.js` injects. (Module 2 has no equivalent
   file — it keeps this same material inline in `index.html`.)
 
@@ -605,7 +675,7 @@ renderer as an argument, so it was renderer-agnostic before this change too.
 
 Each Simatrix sim runs inside a sandboxed `iframe` on the host website. The contract
 is mostly **a global JavaScript API object, not message passing** — with one
-deliberate, narrow exception: a single outbound boot-ready signal (ADR-078).
+deliberate, narrow exception: a single outbound boot-ready signal (ADR-133).
 
 **Confirmed from the code:**
 
@@ -622,10 +692,10 @@ deliberate, narrow exception: a single outbound boot-ready signal (ADR-078).
   only on a fully successful boot — fires
   `window.parent.postMessage({ type: 'sim:ready' }, '*')` after `document.fonts.ready`
   resolves, so the host's loading screen can close exactly when the scene is
-  displayable rather than guessing from the iframe's `load` event (ADR-078).
+  displayable rather than guessing from the iframe's `load` event (ADR-133).
 - **The sim announces its own lesson completion.** `markComplete()` posts
   `window.parent.postMessage({ type: 'sim:complete' }, '*')`, so the host can surface
-  its "next topic / stay" overlay (ADR-078 addendum, revised 2026-07-31). Every shipped
+  its "next topic / stay" overlay (ADR-133 addendum, revised 2026-07-31). Every shipped
   topic fires it from a `#btn-finish` click, latchless (re-fires every click) — the
   footer nav for most, `#workbench-rail` for
   `graphics_module_1_topic_4_understanding_orthographic_views` (its footer is CSS-hidden
@@ -648,7 +718,7 @@ host reads, and the two sim → host signals, `sim:ready` (boot) and `sim:comple
 **What is NOT in this codebase:** beyond the two sanctioned emits (`sim:ready`,
 `sim:complete`), there is **no other `postMessage` and no `window.parent`/`window.top`
 usage anywhere in the repository** (verified by search across all folders; ADR-002,
-narrowed by ADR-078). So
+narrowed by ADR-133). So
 the actual host-side code that reaches into the iframe and calls `simAPI.*`, and the
 code that listens for `sim:ready`/`sim:complete` to drive the loading screen and the
 next-topic overlay, lives in the separate host website, which is not part of this
@@ -679,7 +749,7 @@ Confirmed identical or common by reading the files:
   `package.json`; ES modules loaded via an import map pinned to **`three@0.160.0`**
   from jsDelivr; `.js` extensions required on imports; all paths relative; fonts
   served from the Supabase Storage CDN (Atkinson Hyperlegible + IBM Plex Mono),
-  never a Google-Fonts CDN (ADR-086, reverses the prior bundled-local-woff2 rule).
+  never a Google-Fonts CDN (ADR-141, reverses the prior bundled-local-woff2 rule).
 - **Platform dependencies (pinned CDN ES modules).** The only runtime library every
   sim loads is **`three@0.160.0`** (plus `three/addons/`). One topic adds a **second**
   pinned dependency in the *same* import map: **`three-mesh-bvh`** — used by

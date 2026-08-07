@@ -532,6 +532,19 @@ Every rule is formatted:
 > of the page instead of docked. Removing the second Compare shape removes the state a resize could
 > strand it in.
 
+> **§5.16b ✅ DO** dock ONLY the value drivers of the pane the rail serves — the sibling
+> Module-3 topic docks two groups (`['shape', 'section']`), and Conic Sections docks two
+> (`['cone', 'section']`). **❌ NEVER** dock a topic's whole control set: `#workbench-rail` is a
+> single wrapping row on the split grid's `auto` row, sized by its content against the viewport's
+> `minmax(0, 1fr)` row, so every extra group is taken directly out of the 3D pane's height.
+> *(ADR-021, ADR-037; regression fixed 2026-07-29)*
+> Reason: docking all six step groups in `graphics_module_3_topic_2_2_conic_sections` drove the
+> rail to **1340 px**, starving the viewport row to **2 px** — the renderer, the drawing sheet and
+> the rail toggle all collapsed with it. A control the split cannot show is reached by leaving the
+> split, exactly as the sibling topics do.
+
+
+
 > **§5.17 ❌ NEVER** mirror/duplicate the driver or construction-launcher controls into the rail, or
 > give the docked rail a shadow — **re-parent** the existing nodes (one source of truth) and
 > separate the rail with a hairline only (Flat-Ink). *(ADR-021, ADR-037)*
@@ -714,6 +727,49 @@ Every rule is formatted:
 > `initProblemLibrary(sim, config)` form — to migrate. That migration, if it ever happens, is a
 > separate, not-yet-decided ADR.
 > *(ADR-083)*
+
+
+> **§6.27 ✅ DO** keep the platform's `1 world unit = 10 mm` (§6.8) for anything that enters the 3D
+> scene. A topic whose 2D construction NEVER enters the scene **may** store its sheet state in
+> millimetres instead (`graphics_module_3_topic_2_2_conic_sections`) — but then **❌ NEVER** convert
+> inside the pure engine leaf: convert once, at the control, and state each bag's unit in exactly
+> one place. *(ADR-138, ADR-018)*
+> Reason: the chapter quotes millimetres, so storing world units would leave the data layer, the
+> dock, the self-check targets and the textbook statement disagreeing by a factor of ten; but a
+> conversion buried in the engine puts the same factor somewhere no author will look.
+
+> **§6.28 ✅ DO** build a multi-construction drawing engine as ONE pure leaf where each layout
+> returns a **display list** of typed primitives plus its own analytic bbox, rendered by a SINGLE
+> renderer. **❌ NEVER** give a construction its own drawing path. *(ADR-139, ADR-066)*
+> Reason: twelve immediate-mode routines are twelve chances for the thin-construction /
+> heavy-answer line vocabulary to drift.
+
+> **§6.29 ✅ DO** prove every construction with a Node oracle before shipping it — each plotted
+> point must satisfy its own curve (PF = e·PQ, `x²/a² ± y²/b² = 1`, a zero discriminant for an
+> envelope, a constant sum / difference / product). Re-run it after touching a layout. *(ADR-139,
+> ADR-019)*
+> Reason: a wrong construction still draws a plausible curve — both defects found this way were
+> invisible on screen.
+
+> **§6.30 ✅ DO** put a control in the ONE guided step whose question it answers, and hide it
+> everywhere else. **❌ NEVER** show a learner the whole parameter set of a topic at once because
+> every parameter is real. *(ADR-141, PRODUCT.md §1/§2)*
+> Reason: the persona is the struggling first-year. A panel offering eleven construction methods
+> before the learner knows why a parabola differs from an ellipse is CAD software with a syllabus
+> attached — the failure the Conic Sections redesign was written to undo.
+
+> **§6.31 ✅ DO** report a phenomenon in plain words BEFORE naming it, and keep the textbook
+> statement for the step that introduces the name. **❌ NEVER** open with the formal definition.
+> *(ADR-141)*
+> Reason: "a closed oval that still closes up" is something a learner can check against the screen;
+> "a section plane inclined to the axis and cutting all the generators" is something they can only
+> take on trust. A data-layer entry that names a phenomenon should therefore carry BOTH forms —
+> `ConicSection`'s `seen` / `name` / `rule` triple is the pattern.
+
+> **§6.32 ✅ DO** let a teaching step MOVE the model for the learner (a guided tour that travels the
+> cutting plane, a construction that plays stage by stage), and narrate what changed. **❌ NEVER**
+> let that shortcut reach an assessed answer — the Problem Library's checked targets stay
+> hand-dialled. *(ADR-141, scoping ADR-063)*
 
 ---
 

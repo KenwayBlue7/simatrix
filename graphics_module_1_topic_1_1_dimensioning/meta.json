@@ -1,0 +1,6 @@
+{
+  "title": "Dimensioning",
+  "description": "Learn to dimension a drawing on one real machined plate. Build a dimension piece by piece, flip every rule to see what breaks, write the values both ways as the drawing turns, lay the sheet out five ways, place every shape symbol on the feature it belongs to, then hunt the faults in a finished drawing.",
+  "difficulty": "beginner",
+  "tags": ["engineering-graphics", "dimensioning", "bis", "sp-46", "guide-plate", "drawing-rules"]
+}

@@ -1,0 +1,2019 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light only" />
+  <!-- <title> MUST equal meta.json.title (ADR-026 / RULES.md §1.12). -->
+  <title>Dimensioning</title>
+  <!-- Inline data-URI icon: without one the browser requests /favicon.ico and logs a 404,
+       which shows up as a console error in verification. No external host (RULES.md §2.4). -->
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2 8h12M2 5v6M14 5v6' stroke='%231f2933' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
+  <meta name="description" content="Learn to dimension a drawing on one real machined plate — build a dimension piece by piece, flip every rule to see what breaks, write the values both ways, lay the sheet out five ways, place every shape symbol, then hunt the faults in a finished drawing." />
+
+  <!--
+    Three.js is loaded as CDN ES modules ONLY, pinned to 0.160.0 (RULES.md §2.2–§2.4).
+    No build step, no bundler, no npm. This import map is the exact platform contract.
+
+    `three-mesh-bvh` is pinned here for the 3-D INSPECTION only (RULES.md §2.20, ADR-136). The
+    front elevation draws the plate's AUTHORED linework — a drawing is a fixed agreed
+    projection — but the moment the learner turns the part, `lineDrawer.js` classifies every
+    edge live against the camera, and the BVH is what makes that affordable at ~1200 rays a
+    frame. Same stack, same version, as the sibling Foundations topic.
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+      "three-mesh-bvh": "https://cdn.jsdelivr.net/npm/three-mesh-bvh@0.7.8/build/index.module.js"
+    }
+  }
+  </script>
+
+  <!--
+    Boot watchdog (classic script, runs before the ES module). The sim's only runtime
+    network dependency is the pinned Three.js CDN module; if it is blocked or the module
+    fails to evaluate, init() never runs and the iframe would sit blank. This arms a calm,
+    self-healing fallback. main.js clears it on a successful boot.
+  -->
+  <script>
+    (function () {
+      window.__simBooted = false;
+      var WEBGL_COPY = {
+        title: 'Your browser could not start the 3D view',
+        body: 'This simulation needs hardware-accelerated graphics (WebGL), which looks switched off or unavailable here. Turn on hardware acceleration in your browser settings, or open this in a recent Chrome, Edge, or Firefox, then reload.',
+      };
+      window.__showSimFallback = function (variant) {
+        if (window.__simBooted) return;
+        var el = document.getElementById('sim-fallback');
+        if (!el) return;
+        if (variant === 'webgl') {
+          var t = document.getElementById('sim-fallback-title');
+          var b = document.getElementById('sim-fallback-body');
+          if (t) t.textContent = WEBGL_COPY.title;
+          if (b) b.textContent = WEBGL_COPY.body;
+        }
+        el.hidden = false;
+      };
+      window.addEventListener('error', function () {
+        if (!window.__simBooted) window.__showSimFallback();
+      });
+      window.__simBootTimer = window.setTimeout(function () {
+        if (!window.__simBooted) window.__showSimFallback();
+      }, 15000);
+      document.addEventListener('DOMContentLoaded', function () {
+        var btn = document.getElementById('sim-fallback-reload');
+        if (btn) btn.addEventListener('click', function () { window.location.reload(); });
+      });
+    })();
+  </script>
+
+  <style>
+    /*
+      Bundled web fonts (DESIGN.md typography). Shared platform font host (ADR-086, amends
+      RULES.md §2.12/§2.15's local-only mandate for this track) — Atkinson Hyperlegible
+      (UI/body), IBM Plex Mono (numbers).
+    */
+    @font-face {
+      font-family: "Atkinson Hyperlegible";
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Atkinson Hyperlegible";
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+      font-weight: 700;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "IBM Plex Mono";
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    /*
+      ============================================================
+      Design tokens — Simatrix "Modern Drafting Bench" (light, locked)
+      ============================================================
+      Single runtime source of truth for colour/space/motion. JS reads these via
+      getComputedStyle(...).getPropertyValue('--token') — never hard-codes hex
+      (RULES.md §4.1). Mirrors the root DESIGN.md master token set exactly; the only
+      ADDITIONS are the two viewport verdict encodings at the end, which are this topic's
+      own functional encodings (permitted by RULES.md §4.16 — a module may add its own
+      viewport encodings, never redefine a shared token).
+    */
+    :root {
+      /* --- Surfaces --- */
+      --color-paper:        #ffffff;
+      --color-panel:        #f0f2f5;
+      --color-solid-fill:   #e7e1d4;
+
+      /* --- Ink --- */
+      --color-ink:          #06070b;
+      --color-ink-secondary:#5a5d66;
+
+      /* --- Mid neutral --- */
+      --color-bench-grey:   #938b7b;
+      --color-border:       #e0e1e5;
+      --color-track:        #e0e1e5;
+
+      /* --- The one interaction accent (technical blue) — chrome only (§4.5) --- */
+      --color-accent:        #1f66b5;
+      --color-accent-strong: #17539b;
+      --color-accent-soft:   #e3ecf7;
+      --color-focus:         var(--color-accent);
+      --ring-focus:          0 0 0 3px color-mix(in srgb, var(--color-accent) 26%, transparent);
+      --shadow-md:           0 4px 16px color-mix(in srgb, var(--color-ink) 12%, transparent);
+
+      /* --- Status (UI only, always paired with an icon — §4.6) --- */
+      --color-success:       #2e7d52;
+      --color-success-soft:  #e2efe8;
+
+      /* --- Spacing scale (4px base) --- */
+      --space-1: 4px;  --space-2: 8px;  --space-3: 12px;
+      --space-4: 16px; --space-5: 24px; --space-6: 32px;
+
+      /* --- Radius --- */
+      --radius-xs: 4px; --radius-sm: 6px; --radius-md: 10px;
+
+      /* --- Type --- */
+      --font-sans: "Atkinson Hyperlegible", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", monospace;
+      --text-xs: 0.75rem; --text-sm: 0.875rem; --text-base: 1rem;
+      --text-lead: 1.125rem; --text-title: 1.35rem;
+
+      /* --- Motion --- */
+      --dur-fast: 150ms; --dur-base: 200ms; --dur-step: 380ms;
+      /* Lets a height transition to and from `auto` — the accordions rely on it. */
+      interpolate-size: allow-keywords;
+      --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+
+      /* --- Layering --- */
+      --z-notice: 100;
+
+      /*
+        TOPIC-OWN VIEWPORT ENCODINGS (RULES.md §4.16 — additions, never redefinitions).
+        A dimensioning lesson has to be able to say "this stroke is the wrong one" INSIDE
+        the drawing, where the accent blue is forbidden (§4.5 Chrome-Only Blue). These two
+        are used on viewport linework only, and never alone: a faulted dimension is always
+        ALSO carried by a ✗ marker and a written rule, and a corrected one by ✓ (Two-Cue
+        Rule, §4.6). Both are checked ≥ 4.5:1 on --color-paper.
+      */
+      --color-flag-wrong:  #a83226; /* faulted linework — brick, ~6.1:1 on paper */
+      --color-flag-right:  #2e7d52; /* corrected linework — the platform success green */
+      --color-flag-wrong-soft: #fbeae7;
+    }
+
+    /* ============================================================
+       Normalize / base
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; }
+    /* The HTML `hidden` attribute must always win over class/id rules that set display. */
+    [hidden] { display: none !important; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      font-size: var(--text-base);
+      color: var(--color-ink);
+      background: var(--color-paper);
+      overflow: hidden;
+      font-variant-numeric: tabular-nums;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      display: flex;
+      flex-direction: row;
+      position: relative;
+    }
+    button { font: inherit; color: inherit; }
+
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
+
+    /* ============================================================
+       Viewport — WebGL canvas + CSS2D overlay mount here (main.js)
+       ============================================================ */
+    #sim-viewport {
+      position: relative;
+      flex: 1 1 0;
+      min-width: 0;
+      height: 100%;
+      background: var(--color-paper);
+      order: 1; /* the drawing on the LEFT, the wizard on the right */
+    }
+    #sim-viewport canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    /* --- Viewport callout (CSS2D): names, ON the drawing, whatever the step is currently
+       pointing at — the isolated element in Step 1, the chosen symbol in Step 5. Same pill
+       as the sibling Foundations topic's line-type callouts, token for token. */
+    .vp-callout {
+      font-family: var(--font-sans);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      line-height: 1;
+      color: var(--color-ink);
+      background: color-mix(in srgb, var(--color-paper) 90%, transparent);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xs);
+      padding: 3px 6px;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    /* --- Dimensional values (CSS2D). The OUTER element is only a positioning anchor —
+       CSS2DRenderer owns its transform — so any Method-1 rotation lives on the inner span. */
+    .vp-value {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      line-height: 1;
+      color: var(--color-ink);
+      white-space: pre-line;      /* a note may carry a second line (ø14 / ø24 × 90° CSK) */
+      user-select: none;
+      font-variant-numeric: tabular-nums;
+      transition: opacity var(--dur-base) var(--ease-standard);
+    }
+    .vp-value__text {
+      display: inline-block;
+      background: color-mix(in srgb, var(--color-paper) 92%, transparent);
+      border-radius: var(--radius-xs);
+      padding: 1px 4px;
+      transform-origin: center;
+      transition: transform var(--dur-base) var(--ease-standard);
+    }
+    /* Method-2 interrupts the dimension line and drops the value into the gap, so the pill
+       needs an opaque fill to actually break the stroke. */
+    .vp-value.is-boxed .vp-value__text { background: var(--color-paper); padding: 1px 5px; }
+    .vp-value.is-bad   .vp-value__text { color: var(--color-flag-wrong); background: var(--color-flag-wrong-soft); font-weight: 700; }
+    .vp-value.is-good  .vp-value__text { color: var(--color-flag-right); font-weight: 700; }
+    .vp-value.is-muted .vp-value__text { color: var(--color-bench-grey); }
+    .vp-value.is-faded { opacity: 0.18; }
+    .vp-value.is-dragging .vp-value__text { box-shadow: var(--ring-focus); }
+    .vp-value[tabindex]:focus-visible .vp-value__text { outline: none; box-shadow: var(--ring-focus); }
+
+    /* --- Review hotspots (Step 6). Real buttons: the mistake hunt is keyboard-playable. */
+    .vp-hotspot {
+      width: 26px; height: 26px;
+      display: grid; place-items: center;
+      padding: 0;
+      border: 1.5px solid var(--color-bench-grey);
+      border-radius: 50%;
+      background: var(--color-paper);
+      color: var(--color-ink-secondary);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      transition: transform var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  background var(--dur-fast) var(--ease-standard);
+    }
+    /* 44px pointer/touch target without growing the painted disc (DESIGN.md §5.1). */
+    .vp-hotspot::before {
+      content: ""; position: absolute;
+      top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 44px; height: 44px;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .vp-hotspot:hover { border-color: var(--color-ink); background: var(--color-panel); }
+    }
+    .vp-hotspot:active { transform: scale(0.94); }
+    .vp-hotspot:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    /*
+      Four marker states, each with its own SHAPE or glyph as well as its colour (Two-Cue Rule):
+      untouched "?", visited "?" on a filled disc, wrongly accused "✗", solved "✓". The learner
+      has twelve of these to work through and must never lose track of which they have tried.
+    */
+    .vp-hotspot.is-visited { border-color: var(--color-ink-secondary); background: var(--color-panel); color: var(--color-ink); }
+    .vp-hotspot.is-found  { border-color: var(--color-flag-right); color: var(--color-flag-right); background: var(--color-success-soft); }
+    .vp-hotspot.is-missed { border-color: var(--color-flag-wrong); color: var(--color-flag-wrong); background: var(--color-flag-wrong-soft); }
+    /* The one just judged, so the eye can find it again next to the explanation card. */
+    .vp-hotspot.is-current { box-shadow: 0 0 0 3px var(--color-accent-soft), 0 0 0 4px var(--color-accent); }
+    .vp-hotspot.is-found.is-current { animation: hotspot-solved var(--dur-slow) var(--ease-standard); }
+    @keyframes hotspot-solved {
+      0%   { transform: scale(1); }
+      45%  { transform: scale(1.28); }
+      100% { transform: scale(1); }
+    }
+    .vp-hotspot.is-faded  { opacity: 0.2; }
+
+    /* --- Floating viewport controls + the orbit hint --- */
+    .vp-controls {
+      position: absolute;
+      top: calc(44px + var(--space-5));
+      left: var(--space-4);
+      display: flex;
+      gap: var(--space-2);
+      z-index: 5;
+    }
+    .vp-chip {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 0 var(--space-3);
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      background: var(--color-panel);
+      color: var(--color-ink-secondary);
+      font-family: var(--font-sans);
+      font-size: 0.8125rem;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .vp-chip::before {
+      content: ""; position: absolute;
+      top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 100%; height: 100%; min-width: 44px; min-height: 44px;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .vp-chip:hover:not(:disabled) { background: var(--color-paper); border-color: var(--color-accent); }
+    }
+    .vp-chip:active:not(:disabled) { transform: scale(0.97); }
+    /* A chip that cannot act must not look or feel like one that can. */
+    .vp-chip:disabled { opacity: 0.45; cursor: not-allowed; }
+    .vp-chip:disabled:hover { background: var(--color-panel); border-color: var(--color-border); }
+    .vp-chip:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .vp-chip[aria-pressed="true"] { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-paper); }
+    .vp-chip[aria-pressed="true"]:hover { background: var(--color-accent-strong); border-color: var(--color-accent-strong); color: var(--color-paper); }
+
+    .vp-hint {
+      position: absolute;
+      bottom: var(--space-4);
+      left: var(--space-4);
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--color-paper) 88%, transparent);
+      border: 1px solid var(--color-border);
+      color: var(--color-ink-secondary);
+      font-size: var(--text-sm);
+      pointer-events: none;
+      z-index: 5;
+    }
+
+    /*
+      WHICH FIGURE IS ON THE SHEET. Top RIGHT — the one free corner: the view chips are top
+      left under the panel toggle, the orbit hint is bottom left and the caption band bottom
+      right. Deliberately quiet: it is a caption, not a control, and the drawing is the thing
+      being looked at. It states the figure and what it teaches, because the lesson's
+      progression from a plain rectangle to the Guide Plate is part of what is being taught —
+      a drawing that silently changes under the learner just looks like a bug.
+    */
+    .vp-figure {
+      position: absolute;
+      top: var(--space-4);
+      /* Clear of the 44 px panel toggle, which is pinned to this same corner. */
+      right: calc(44px + var(--space-4));
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      text-align: right;
+      gap: 2px;
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--color-paper) 88%, transparent);
+      border: 1px solid var(--color-border);
+      pointer-events: none;
+      z-index: 5;
+      max-width: min(46ch, 42%);
+    }
+    .vp-figure__name {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-ink);
+    }
+    .vp-figure__teaches { font-size: var(--text-xs); color: var(--color-ink-secondary); }
+
+    /*
+      The name of a drawing, anchored in that drawing's OWN world space and therefore sitting
+      directly beneath it. This replaces a strip of names pinned to the top of the viewport,
+      which left the learner matching a label at the top of the screen to a drawing in the
+      middle of it. Both names are the same size, the same distance below their sheet, and
+      symmetric about the viewport centre, because both sheets are.
+    */
+    /* Side by side, each drawing is about half size — its annotation scales with it. Applied
+       to BOTH sheets, so the two are still rendered identically. */
+    #sim-viewport.is-compare .vp-value { font-size: 11px; }
+    #sim-viewport.is-compare .vp-value__text { letter-spacing: -0.01em; }
+
+    .vp-sheet-name {
+      padding: var(--space-1) var(--space-3);
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      background: color-mix(in srgb, var(--color-paper) 92%, transparent);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      white-space: nowrap;
+      color: var(--color-ink-secondary);
+    }
+
+    /* Two things tell a Step-4 sheet apart — its method and its layout — so the caption stacks
+       them. Same pill, same type; the second line is quieter because the method is the axis the
+       step has just introduced and the layout is the one it already taught. */
+    .vp-sheet-name--stacked {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1px;
+      line-height: 1.25;
+    }
+    .vp-sheet-name__main { color: var(--color-ink); }
+    .vp-sheet-name__sub { opacity: 0.75; }
+
+    /*
+      Caption band — §4.5 item 6. The name of the object and the views, below the drawing, in
+      CAPITALS; the question number at the left top of the figure, enclosed in a circle; the
+      scale below the drawing (item 5); and, only when the unit is not the millimetre, the
+      general unit note that belongs near the title block (item 4).
+    */
+    .vp-caption {
+      position: absolute;
+      /*
+        Bottom RIGHT, on the same row as the orbit hint rather than lifted above it. Centred
+        and raised, the band sat on top of the finished drawing's lowest dimension lane — and
+        the finished drawing is the only thing that ever shows a caption. Bottom-right is also
+        where a title block lives on a real sheet, so it is below the drawing either way.
+      */
+      bottom: var(--space-4);
+      right: var(--space-4);
+      display: flex;
+      align-items: center;
+      gap: var(--space-4);
+      padding: var(--space-2) var(--space-4);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--color-paper) 92%, transparent);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--color-ink);
+      pointer-events: none;
+      white-space: nowrap;
+      z-index: 5;
+    }
+    .vp-caption__no {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px; height: 26px;
+      border: 1px solid var(--color-ink);
+      border-radius: 50%;
+      font-weight: 700;
+    }
+    .vp-caption__scale, .vp-caption__note { color: var(--color-ink-secondary); }
+
+    /* ---- Wizard hide/show toggle ---- */
+    .wizard-toggle {
+      position: absolute;
+      top: calc(44px + var(--space-5));
+      right: var(--space-3);
+      z-index: 5;
+      width: 44px; height: 44px;
+      display: grid; place-items: center;
+      padding: 0;
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .wizard-toggle:hover { background: var(--color-paper); border-color: var(--color-bench-grey); color: var(--color-ink); }
+    }
+    .wizard-toggle:active { transform: scale(0.97); }
+    .wizard-toggle:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .wizard-toggle__icon { width: 20px; height: 20px; transition: transform var(--dur-base) var(--ease-standard); }
+    body.wizard-collapsed #wizard { display: none; }
+    body.wizard-collapsed .wizard-toggle__icon { transform: rotate(180deg); }
+
+    /* ============================================================
+       Wizard dock (right) — the guided 6-step rail + card
+       ============================================================ */
+    #wizard {
+      order: 2;
+      flex: 0 0 auto;
+      width: clamp(360px, 36vw, 480px);
+      height: 100%;
+      background: var(--color-panel);
+      border-left: 1px solid var(--color-border);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      padding: var(--space-4);
+      overflow: hidden;
+    }
+    .wizard-main {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: row;
+      gap: var(--space-4);
+    }
+
+    /* --- Step rail --- */
+    #step-rail {
+      position: relative;
+      flex: 0 0 auto;
+      order: 2;
+      width: 64px;
+      margin: 0;
+      padding: var(--space-2) 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    #step-rail::before {
+      content: "";
+      position: absolute;
+      left: 50%; top: 30px; bottom: 30px;
+      width: 2px;
+      transform: translateX(-50%);
+      background: var(--color-border);
+    }
+    .rail__item { position: relative; display: flex; }
+    .rail__btn {
+      flex: 1 1 auto;
+      min-width: 44px;
+      display: flex;
+      flex-direction: column; /* label BELOW the marker — DESIGN.md §5.6 / RULES.md §4.20 */
+      align-items: center;
+      gap: var(--space-1);
+      margin: 0;
+      padding: var(--space-1) 0;
+      border: 0;
+      background: none;
+      font: inherit;
+      color: inherit;
+      text-align: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .rail__btn:disabled { cursor: default; }
+    .rail__marker {
+      width: 34px; height: 34px;
+      display: grid; place-items: center;
+      border: 1.5px solid var(--color-border);
+      border-radius: 50%;
+      background: var(--color-paper);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      font-weight: 700;
+      color: var(--color-ink-secondary);
+      transition: background var(--dur-base) var(--ease-standard),
+                  border-color var(--dur-base) var(--ease-standard),
+                  color var(--dur-base) var(--ease-standard),
+                  box-shadow var(--dur-base) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .rail__label { font-size: var(--text-xs); line-height: 1.2; color: var(--color-ink-secondary); max-width: 60px; }
+    .rail__item.is-upcoming .rail__marker { opacity: 0.5; }
+    .rail__item.is-upcoming .rail__label  { opacity: 0.5; }
+    .rail__item.is-current .rail__marker {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: var(--color-paper);
+      box-shadow: 0 0 0 4px var(--color-accent-soft);
+    }
+    .rail__item.is-current .rail__label { color: var(--color-ink); font-weight: 700; }
+    .rail__item.is-complete .rail__marker { background: var(--color-success); border-color: var(--color-success); color: var(--color-paper); }
+    .rail__item.is-complete .rail__label { color: var(--color-ink-secondary); }
+    .rail__btn:active:not(:disabled) .rail__marker { transform: scale(0.94); }
+    .rail__btn:focus-visible { outline: none; }
+    .rail__btn:focus-visible .rail__marker { box-shadow: var(--ring-focus); }
+
+    /* --- Step card --- */
+    #step-card {
+      flex: 1 1 auto;
+      min-width: 0;
+      order: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    .card__scroll {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      /* Symmetric side padding; a small run-out so the last control does not sit hard
+         against the footer's rule. Larger than this is just blank space, since the footer is
+         a sibling and can never cover the content. */
+      padding: var(--space-4) var(--space-4) var(--space-4);
+      overscroll-behavior: contain; /* a flick at the end does not scroll the page behind */
+      scroll-behavior: smooth;
+    }
+    .card__scroll::-webkit-scrollbar { width: 10px; }
+    .card__scroll::-webkit-scrollbar-track { background: transparent; }
+    .card__scroll::-webkit-scrollbar-thumb {
+      background: var(--color-border);
+      background-clip: padding-box;
+      border: 3px solid transparent;
+      border-radius: 999px;
+    }
+    @supports (-moz-appearance: none) {
+      .card__scroll { scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
+    }
+
+    .card__eyebrow {
+      margin: 0 0 var(--space-1);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--color-ink-secondary);
+    }
+    .card__title {
+      margin: 0 0 var(--space-2);
+      font-size: var(--text-title);
+      line-height: 1.2;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .card__lead {
+      margin: 0 0 var(--space-4);
+      max-width: 60ch;
+      font-size: var(--text-sm);
+      line-height: 1.55;
+      color: var(--color-ink-secondary);
+    }
+    .step-body, .step-post-body {
+      max-width: 60ch;
+      font-size: var(--text-sm);
+      line-height: 1.6;
+      color: var(--color-ink-secondary);
+    }
+    .step-body { margin: 0 0 var(--space-4); }
+    .step-post-body { margin: var(--space-4) 0 0; }
+    .step-post-body:empty { margin: 0; }
+    .step-body p, .step-post-body p { margin: 0 0 var(--space-3); color: var(--color-ink-secondary); }
+    .step-body p:last-child, .step-post-body p:last-child { margin-bottom: 0; }
+    .step-body b, .step-post-body b { font-weight: 700; }
+    .step-body em, .step-post-body em { font-style: italic; }
+
+    /* Inline glossary trigger */
+    .term {
+      font: inherit;
+      color: var(--color-accent-strong);
+      background: none;
+      border: 0;
+      padding: 0;
+      cursor: help;
+      text-decoration: underline dotted;
+      text-underline-offset: 2px;
+    }
+    .term:hover { color: var(--color-accent); }
+    .term:focus-visible { outline: none; border-radius: var(--radius-xs); box-shadow: var(--ring-focus); }
+
+    #term-pop {
+      position: fixed;
+      z-index: 30;
+      top: 0; left: 0;
+      width: max-content;
+      max-width: 34ch;
+      padding: var(--space-3);
+      font-size: var(--text-sm);
+      font-weight: 400;
+      line-height: 1.45;
+      text-align: left;
+      color: var(--color-ink);
+      background: var(--color-accent-soft);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transform: scale(0.96);
+      transition: opacity var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard),
+                  visibility var(--dur-fast) var(--ease-standard);
+    }
+    #term-pop.is-open { opacity: 1; visibility: visible; transform: none; }
+
+    /*
+      `[hidden]` LOSES to any author rule that sets `display` — and this panel sets
+      `display: flex` on chips rows, option lists, the progress meter and the segmented
+      controls. Every one of those that gets hidden was therefore still laid out as an empty
+      flex box reserving its own height and the panel's gap around it. This is the canonical
+      fix, and it is why the per-component `[hidden]` overrides below are no longer needed.
+    */
+    [hidden] { display: none !important; }
+
+    /*
+      PANEL LAYOUT — one system, all six steps.
+        header (does not scroll)  ·  content (scrolls)  ·  footer (does not scroll)
+      #step-card is the flex column, .card__scroll is the only thing with overflow, and
+      .card__nav is a non-shrinking sibling AFTER it. Nothing is positioned, so the footer
+      cannot overlap the content and the content cannot slide beneath the footer.
+
+      Spacing, everywhere:
+        between sections .............. 16 px   (.step-panel > * + *)
+        between accordion headers ......  8 px   (.fold + .fold)
+        between a heading and its content 12 px  (.group__label, .fold__body)
+        between a control and its verdict 12 px  (the pairing rules further down)
+
+      The margins that produce those numbers are declared with the pairing rules further down,
+      not here: several components zero their own margin at the same specificity, and only the
+      later rule wins that tie.
+    */
+    /* Margin-based, not `gap`: a flex gap is identical between every pair, and stacked
+       accordions need to sit closer than sections do. */
+    .step-panel { display: flex; flex-direction: column; }
+    .group-stack { display: flex; flex-direction: column; }
+    .step-panel.is-active { animation: panelIn var(--dur-step) var(--ease-standard); }
+    @keyframes panelIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: none; }
+    }
+
+    /* ============================================================
+       Buttons
+       ============================================================ */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-2);
+      min-height: 44px;
+      padding: var(--space-3) var(--space-4);
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      font-size: var(--text-base);
+      font-weight: 400;
+      cursor: pointer;
+      transition: border-color var(--dur-fast) var(--ease-standard),
+                  background var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .btn:active:not(:disabled) { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn--primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-panel); }
+    .btn--primary:hover:not(:disabled) { background: var(--color-accent-strong); border-color: var(--color-accent-strong); }
+    .btn--secondary { background: var(--color-paper); border-color: var(--color-border); color: var(--color-ink); }
+    .btn--secondary:hover:not(:disabled) { border-color: var(--color-accent); background: var(--color-solid-fill); }
+    .btn--ghost {
+      min-height: 36px;
+      padding: 0 var(--space-3);
+      font-size: var(--text-sm);
+      font-weight: 400;
+      color: var(--color-ink-secondary);
+      background: transparent;
+      border-color: transparent;
+    }
+    .btn--block { width: 100%; }
+
+    /* Inline two-state Reset confirm (RULES.md §4.19). */
+    .card__nav.is-reset-armed .btn--nav { display: none; }
+    .reset-confirm {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-1) var(--space-2);
+      font-size: var(--text-sm);
+      animation: resetConfirmIn var(--dur-fast) var(--ease-standard);
+    }
+    .reset-confirm[hidden] { display: none; }
+    .reset-confirm__prompt { color: var(--color-ink); }
+    .reset-confirm__sep { color: var(--color-bench-grey); user-select: none; }
+    .reset-confirm .reset-confirm__action { min-height: 44px; padding: 0 var(--space-2); }
+    @keyframes resetConfirmIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .done-badge {
+      display: none;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-sm);
+      background: var(--color-success-soft);
+      color: var(--color-success);
+      font-size: var(--text-sm);
+      font-weight: 700;
+    }
+    .done-badge.is-on { display: inline-flex; }
+    .step-hint { color: var(--color-ink-secondary); font-size: var(--text-sm); line-height: 1.5; margin: 0; }
+
+    /* ============================================================
+       Shared step-panel components
+       ============================================================ */
+
+    /* Group label above a control cluster. */
+    .group__label {
+      display: block;
+      margin: 0 0 var(--space-3);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-ink-secondary);
+    }
+
+    /* Segmented control (Method-1 / Method-2, Correct / Violation). */
+    .seg {
+      display: flex;
+      gap: 3px;
+      padding: 3px;
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+    }
+    .seg__btn {
+      flex: 1 1 0;
+      min-height: 44px; /* same hit target as every other control */
+      padding: var(--space-2) var(--space-3);
+      border: 0;
+      border-radius: var(--radius-xs);
+      background: transparent;
+      color: var(--color-ink-secondary);
+      font-size: var(--text-sm);
+      font-weight: 700;
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+    }
+    .seg__btn:hover:not(.is-active) { color: var(--color-ink); }
+    .seg__btn.is-active { background: var(--color-accent); color: var(--color-panel); }
+    .seg__btn.is-active[data-variant="wrong"] { background: var(--color-flag-wrong); }
+    .seg__btn:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .seg__btn:disabled { cursor: not-allowed; }
+    /* A group that does not apply right now stays in place and fades, so the learner can see
+       it is still there and read WHY it is unavailable. */
+    #angular-group.is-off .seg { opacity: 0.45; }
+
+    /* Chip grid — the Step-1 element inspector and the Step-5 symbol toolbar. */
+    .chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+    .chip {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      min-height: 44px;
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      font-size: var(--text-sm);
+      cursor: pointer;
+      transition: border-color var(--dur-fast) var(--ease-standard),
+                  background var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .chip:hover { border-color: var(--color-accent); background: var(--color-accent-soft); }
+    }
+    .chip:active { transform: scale(0.97); }
+    .chip:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .chip.is-active { border-color: var(--color-accent); background: var(--color-accent-soft); font-weight: 700; }
+    .chip__glyph {
+      font-family: var(--font-mono);
+      font-size: var(--text-base);
+      color: var(--color-ink-secondary);
+      min-width: 1.6em;
+      text-align: center;
+    }
+    .chip.is-active .chip__glyph { color: var(--color-accent-strong); }
+
+    /*
+      Option list — kept for SHORT sets only (Step 1's four line types). The rule across the
+      module: up to four choices stay open, because comparing them side by side is the point;
+      beyond four they collapse into `.select`, because the list stops being a comparison and
+      starts being a menu that buries the answer below the fold.
+    */
+    .opts { display: flex; flex-direction: column; gap: var(--space-2); }
+
+    /*
+      THE PANEL'S VERTICAL RHYTHM, in one place and in specificity order.
+
+      1. Sections — every direct child of a step panel — sit 16 px apart. This rule lives HERE,
+         after the component styles, because several components zero their own margin
+         (`.step-hint`, `.summary__list`) at the same specificity, and the later rule wins the
+         tie. Put it earlier and those components silently collapse to a 0 px gap.
+      2. Stacked accordions sit 8 px apart: their headers read as one list, not as sections.
+      3. A control and the verdict it produces sit 12 px apart — they are one unit.
+    */
+    .step-panel > * + *,
+    .group-stack > * + * { margin-top: var(--space-4); }
+    .fold + .fold { margin-top: var(--space-2); }
+
+    /*
+      A control and the verdict it produces are one unit, so they sit closer to each other
+      than either does to the next group. This is the whole vertical rhythm of the panel:
+      label · control · verdict, then a wide gap, then the next idea.
+    */
+    .chips + .detail,
+    .opts + .detail,
+    .seg + .detail,
+    .select + .detail,
+    .toggle + .detail,
+    .compare-slot + .detail,
+    /* With the compare open, the "compare with" list sits between the slot and the verdict, so
+       the pairing has to survive being pushed one sibling along. */
+    #compare-with-group + .detail,
+    .slider-row + .detail,
+    .step-hint + .detail,
+    .chips + .step-hint,
+    .slider-row + .step-hint,
+    .opts + .btn,
+    .chips + .btn,
+    .detail + .btn,
+    .select + .chips,      /* variant chips belong to the selector above them */
+    .seg + .toggle,
+    .select + .toggle { margin-top: var(--space-3); }
+    .btn + .detail { margin-top: var(--space-3); }
+    /* Two selectors that answer ONE question — Step 4's "compare with", which needs a layout and
+       a method — sit closer than two separate questions do. Same reasoning as stacked accordions. */
+    .select + .select { margin-top: var(--space-2); }
+    /* A fold that FOLLOWS ordinary content starts a new section; a fold that follows another
+       fold is the next row of one list (see `.fold + .fold` above). */
+    .detail + .fold, .compare-slot + .fold { margin-top: var(--space-4); }
+    .opt {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: var(--space-1);
+      min-height: 44px;
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      background: transparent;
+      color: var(--color-ink);
+      font-size: var(--text-sm);
+      text-align: left;
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard);
+    }
+    @media (hover: hover) and (pointer: fine) { .opt:hover { background: var(--color-panel); } }
+    .opt:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .opt.is-active { background: var(--color-accent-soft); border-color: var(--color-accent); font-weight: 700; }
+    .opt__ref { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--color-ink-secondary); font-weight: 400; }
+
+    /*
+      Select — ONE collapsing picker, used by Step 2's rules and Step 4's layouts. Ten rules and
+      six layouts as open lists filled the panel and pushed the verdict off screen; collapsed,
+      each step shows one line until the learner asks for the rest. Same component both places,
+      because the two steps are asking the same kind of question.
+    */
+    .select { position: relative; }
+    .select__btn {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      width: 100%;
+      min-height: 44px;
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      font-size: var(--text-sm);
+      font-weight: 700;
+      text-align: left;
+      cursor: pointer;
+      transition: border-color var(--dur-fast) var(--ease-standard),
+                  background var(--dur-fast) var(--ease-standard);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .select__btn:hover { border-color: var(--color-accent); background: var(--color-accent-soft); }
+    }
+    .select__btn:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .select__btn[aria-expanded="true"] { border-color: var(--color-accent); background: var(--color-accent-soft); }
+    /* Wraps rather than truncates: a clipped label leaves the learner unable to read what is
+       currently selected, which is the one job a collapsed picker has. */
+    .select__value { flex: 1 1 auto; min-width: 0; line-height: 1.35; }
+    .select__caret {
+      flex: none;
+      color: var(--color-ink-secondary);
+      transition: transform var(--dur-base) var(--ease-standard);
+    }
+    .select__btn[aria-expanded="true"] .select__caret { transform: rotate(180deg); }
+
+    .select__list {
+      position: absolute;
+      z-index: 20;
+      top: calc(100% + 4px);
+      left: 0; right: 0;
+      max-height: 320px;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      padding: var(--space-1);
+      border: 1px solid var(--color-accent);
+      border-radius: var(--radius-sm);
+      background: var(--color-paper);
+      box-shadow: var(--shadow-md);
+      /* Opens as a quick reveal, never a bounce — the drawing stays the thing that moves. */
+      transform-origin: top center;
+      animation: select-open var(--dur-base) var(--ease-standard);
+    }
+    .select__list[hidden] { display: none; }
+    @keyframes select-open {
+      from { opacity: 0; transform: scaleY(0.96) translateY(-4px); }
+      to   { opacity: 1; transform: none; }
+    }
+    .select__opt {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      width: 100%;
+      min-height: 44px;
+      padding: var(--space-2) var(--space-3);
+      border: 0;
+      border-radius: var(--radius-xs);
+      background: transparent;
+      color: var(--color-ink);
+      font-size: var(--text-sm);
+      text-align: left;
+      cursor: pointer;
+    }
+    .select__opt[aria-selected="true"] { background: var(--color-accent-soft); font-weight: 700; }
+    .select__opt.is-cursor { background: var(--color-panel); box-shadow: inset 0 0 0 1px var(--color-accent); }
+    .select__opt .opt__ref { font-weight: 400; }
+
+    /*
+      Toggle row — the ONE two-state control shape in the module: the before/after compare in
+      Steps 4 and 6, and Step 3's eight-directions study. One fixed label that never changes
+      wording, and a switch that carries the state. A button whose text rewrites itself on press
+      makes the learner re-read it to find out what just happened.
+    */
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      width: 100%;
+      min-height: 44px;
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-paper);
+      color: var(--color-ink);
+      font-size: var(--text-sm);
+      text-align: left;
+      cursor: pointer;
+      transition: border-color var(--dur-fast) var(--ease-standard),
+                  background var(--dur-fast) var(--ease-standard);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .toggle:hover:not(:disabled) { border-color: var(--color-accent); background: var(--color-accent-soft); }
+    }
+    .toggle:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .toggle:disabled { opacity: 0.45; cursor: not-allowed; }
+    .toggle[aria-pressed="true"] { border-color: var(--color-accent); background: var(--color-accent-soft); }
+    .toggle__label { flex: 1 1 auto; font-weight: 700; }
+    .toggle__note { display: block; font-weight: 400; color: var(--color-ink-secondary); font-size: var(--text-xs); }
+    .toggle__switch {
+      flex: none;
+      width: 36px; height: 20px;
+      border-radius: 999px;
+      background: var(--color-bench-grey);
+      position: relative;
+      transition: background var(--dur-base) var(--ease-standard);
+    }
+    .toggle__switch::after {
+      content: "";
+      position: absolute;
+      top: 2px; left: 2px;
+      width: 16px; height: 16px;
+      border-radius: 50%;
+      background: var(--color-paper);
+      transition: transform var(--dur-base) var(--ease-standard);
+    }
+    .toggle[aria-pressed="true"] .toggle__switch { background: var(--color-accent); }
+    .toggle[aria-pressed="true"] .toggle__switch::after { transform: translateX(16px); }
+
+    /*
+      Progress — Step 6's assessment meter. A count alone ("0 of 12") states a fact; the bar
+      makes the remaining work legible at a glance, which is what a learner halfway through a
+      hunt actually wants to know.
+    */
+    .progress { display: flex; flex-direction: column; gap: var(--space-2); }
+    .progress__head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-3);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-ink-secondary);
+    }
+    .progress__count { font-size: var(--text-sm); color: var(--color-ink); font-weight: 700; letter-spacing: 0; }
+    .progress__track {
+      display: flex;
+      gap: 3px;
+      height: 10px;
+    }
+    .progress__cell {
+      flex: 1 1 0;
+      border-radius: 2px;
+      background: var(--color-panel);
+      box-shadow: inset 0 0 0 1px var(--color-border);
+      transition: background var(--dur-base) var(--ease-standard),
+                  box-shadow var(--dur-base) var(--ease-standard);
+    }
+    .progress__cell.is-on {
+      background: var(--color-success);
+      box-shadow: inset 0 0 0 1px var(--color-success);
+    }
+    .progress__milestone {
+      margin: 0;
+      font-size: var(--text-sm);
+      font-weight: 700;
+      color: var(--color-success);
+    }
+    .progress__milestone[hidden] { display: none; }
+
+    /*
+      Accordion. COLLAPSED IT IS EXACTLY ITS HEADER — no padding on the wrapper, no reserved
+      body height, no margin of its own. The rule that used to sit here (`padding-top: 16px`
+      on the .fold itself) was invisible space that every collapsed section paid for; the
+      separation now comes from the panel's margin system above, which can tell "next section"
+      apart from "next accordion in the same list".
+    */
+    .fold { border-top: 1px solid var(--color-border); }
+    .fold > summary {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      min-height: 44px;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--color-ink-secondary);
+      list-style: none;
+    }
+    .fold > summary::-webkit-details-marker { display: none; }
+    .fold > summary::before {
+      content: "▸";
+      transition: transform var(--dur-base) var(--ease-standard);
+    }
+    .fold[open] > summary::before { transform: rotate(90deg); }
+    .fold > summary:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .fold__body { padding-top: var(--space-3); display: flex; flex-direction: column; gap: var(--space-4); }
+
+    /*
+      Open/close animates in CSS, not JavaScript: `interpolate-size` lets the body's height
+      transition to and from `auto`, and `::details-content` is the box that actually holds it.
+      Where the browser does not support them the section still opens and closes correctly, it
+      simply snaps — the behaviour is never load-bearing. No layout is read back, so nothing
+      here can thrash.
+    */
+    @supports selector(::details-content) {
+      .fold::details-content {
+        block-size: 0;
+        overflow-y: clip;
+        transition: block-size var(--dur-base) var(--ease-standard),
+                    content-visibility var(--dur-base) var(--ease-standard) allow-discrete;
+      }
+      .fold[open]::details-content { block-size: auto; }
+    }
+
+    /* Detail panel — the prose that explains the current selection. */
+    .detail {
+      padding: var(--space-3) var(--space-4);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-panel);
+      font-size: var(--text-sm);
+      line-height: 1.55;
+      color: var(--color-ink-secondary);
+    }
+    .detail h3 {
+      margin: 0 0 var(--space-1);
+      font-size: var(--text-sm);
+      font-weight: 700;
+      color: var(--color-ink);
+    }
+    .detail p { margin: 0 0 var(--space-3); }
+    .detail p:last-child { margin-bottom: 0; }
+    .detail dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: var(--space-2) var(--space-3); }
+    .detail dt { font-weight: 700; color: var(--color-ink); }
+    .detail dd { margin: 0; }
+    /* A closing line after a Why/Where list is a new thought, not another row of it. */
+    .detail dl + p { margin-top: var(--space-3); }
+    .detail--verdict { background: var(--color-accent-soft); border-color: var(--color-accent); }
+    .detail--wrong { background: var(--color-flag-wrong-soft); border-color: var(--color-flag-wrong); }
+    .detail--right { background: var(--color-success-soft); border-color: var(--color-success); }
+    .detail__flag {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-1);
+      font-weight: 700;
+      color: var(--color-ink);
+    }
+    /*
+      Step 4's method note. The shared `.detail dl` is a two-column grid, which is right for a
+      Why/Where pair of short labels and wrong here: these terms carry both names and a flag, so
+      the label column would take most of the width and squeeze the sentence beside it. Stacked
+      instead — term, then its one line — and the method NOT on the drawing is set quieter so the
+      live one reads first without either disappearing.
+    */
+    #method-note dl { display: block; }
+    #method-note dt { display: flex; align-items: baseline; gap: var(--space-2); flex-wrap: wrap; }
+    #method-note dd { color: var(--color-ink-secondary); }
+    #method-note dt + dd { margin-bottom: var(--space-3); }
+    #method-note dd:last-child { margin-bottom: 0; }
+    #method-note dt:not(.is-on) { color: var(--color-ink-secondary); }
+
+    /* The line-type / figure reference under a detail heading. */
+    .detail__meta {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--color-ink-secondary);
+      margin: 0 0 var(--space-2);
+    }
+
+    /* Closing summary of each step — what it actually established. */
+    .summary {
+      margin-top: var(--space-4);
+      padding: var(--space-3);
+      border: 1px solid var(--color-border);
+      border-left: 3px solid var(--color-ink-secondary);
+      border-radius: var(--radius-sm);
+      background: var(--color-panel);
+    }
+    .summary__title {
+      margin: 0 0 var(--space-2);
+      font-size: var(--text-sm);
+      font-weight: 700;
+      color: var(--color-ink);
+    }
+    .summary__list {
+      margin: 0;
+      padding-left: 1.15em;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      font-size: var(--text-sm);
+      line-height: 1.55;
+      color: var(--color-ink-secondary);
+    }
+
+    /* What still stands between the learner and the next step. */
+    /*
+      What is left to explore in this step. It is a NUDGE, not a barrier — Next is never
+      disabled — so it sits quietly in the footer's free space on the same row as the buttons
+      and only wraps to its own line when it genuinely cannot fit. Keeping it on one row is
+      what stops the footer's height changing under the learner as a step completes.
+    */
+    .step-gate {
+      margin: 0;
+      flex: 0 1 auto;
+      min-width: 0;
+      order: -1;               /* between Reset and Back, on the SAME row as the buttons */
+      line-height: 1.35;
+      font-size: var(--text-xs);
+      color: var(--color-ink-secondary);
+      text-align: right;
+      white-space: nowrap;     /* the hints are terse by design, so this never truncates */
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Slider (Step 1 — the arrow-head angle, and the space between projection lines). */
+    .slider-row { display: flex; align-items: center; gap: var(--space-3); min-height: 44px; }
+    /*
+      The CONTROL is 44 px tall even though the TRACK is 4 px: the painted track was also the
+      whole hit target, so grabbing the slider meant hitting a four-pixel-high strip. The track
+      is drawn on the runnable-track pseudo-element instead, and the input itself is a
+      transparent 44 px band around it (DESIGN.md §5.1, the same rule the round review markers
+      follow).
+    */
+    .slider-row input[type="range"] {
+      flex: 1 1 auto;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 44px;
+      background: transparent;
+      cursor: pointer;
+    }
+    .slider-row input[type="range"]::-webkit-slider-runnable-track {
+      height: 4px;
+      border-radius: 999px;
+      background: linear-gradient(to right, var(--color-accent) var(--p, 0%), var(--color-track) var(--p, 0%));
+    }
+    .slider-row input[type="range"]::-moz-range-track {
+      height: 4px;
+      border-radius: 999px;
+      background: var(--color-track);
+    }
+    .slider-row input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 16px; height: 16px;
+      margin-top: -6px; /* centre the thumb on the 4 px track */
+      border-radius: 50%;
+      background: var(--color-accent);
+      border: 2px solid var(--color-paper);
+      box-shadow: 0 0 0 1px var(--color-border);
+    }
+    .slider-row input[type="range"]::-moz-range-thumb {
+      width: 16px; height: 16px;
+      border: 2px solid var(--color-paper);
+      border-radius: 50%;
+      background: var(--color-accent);
+    }
+    .slider-row input[type="range"]::-moz-range-progress { background: var(--color-accent); height: 4px; border-radius: 999px; }
+    .slider-row:focus-within input[type="range"] { outline: none; }
+    .slider-row input[type="range"]:focus-visible { box-shadow: var(--ring-focus); border-radius: 999px; }
+    .slider-row output {
+      min-width: 5ch;
+      text-align: right;
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--color-ink);
+    }
+
+    /* Co-ordinate table (Fig. 4.19a). */
+    .table-wrap { overflow-x: auto; }
+    table.data {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--color-ink);
+    }
+    table.data th, table.data td {
+      border: 1px solid var(--color-border);
+      padding: var(--space-1) var(--space-2);
+      text-align: right;
+    }
+    table.data th { background: var(--color-panel); font-weight: 700; color: var(--color-ink-secondary); }
+    table.data td:last-child, table.data th:last-child { text-align: left; font-family: var(--font-sans); }
+
+    /*
+      Difference table — the two layouts a comparison is holding, judged on the three axes the
+      chapter judges them by. Prose, not numbers, so it reads left-to-right in the body face and
+      the two columns are equal width: neither layout is presented as the right answer.
+    */
+    table.data--diff { table-layout: fixed; font-family: var(--font-sans); font-size: var(--text-sm); }
+    table.data--diff th, table.data--diff td { text-align: left; vertical-align: top; line-height: 1.45; }
+    table.data--diff thead th { font-family: var(--font-mono); font-size: var(--text-xs); }
+    table.data--diff thead th:first-child { width: 5.5em; border: 0; background: transparent; }
+    table.data--diff tbody th {
+      width: 5.5em;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--color-ink-secondary);
+    }
+    table.data--diff td:last-child, table.data--diff th:last-child { font-family: inherit; }
+    /* The two sides of a comparison heading, held apart without a colour of their own. */
+    .detail__vs { font-family: var(--font-mono); font-size: var(--text-xs); font-weight: 400; color: var(--color-ink-secondary); }
+    /* The everyday word for a term whose official name is the heading. Quieter than the heading
+       and never bold, so the standard's term stays the one that reads as the name of the thing. */
+    .detail__alias { font-size: var(--text-xs); font-weight: 400; color: var(--color-ink-secondary); white-space: nowrap; }
+
+    /* The BIS checklist that closes the lesson. */
+    ol.checklist { margin: 0; padding-left: 1.3em; font-size: var(--text-sm); line-height: 1.5; color: var(--color-ink-secondary); }
+    ol.checklist li { margin-bottom: var(--space-2); }
+    ol.checklist li:last-child { margin-bottom: 0; }
+
+    .score {
+      display: flex;
+      align-items: baseline;
+      gap: var(--space-2);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--color-ink-secondary);
+    }
+    .score b { font-size: var(--text-title); color: var(--color-ink); }
+
+    /* Nav footer — pinned outside the scroll region. */
+    /*
+      Footer. `flex: 0 0 auto` on a sibling of the ONLY scrolling box is what makes it sticky:
+      it is outside the scroll, so it cannot scroll away, cannot overlap the content, and needs
+      no positioning or z-index. It is also never taller than it has to be.
+    */
+    .card__nav {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-2) var(--space-3);
+      flex: 0 0 auto;
+      margin: 0;
+      padding: var(--space-3) var(--space-4);
+      border-top: 1px solid var(--color-border);
+      background: var(--color-paper);
+    }
+    #reset-control { order: -2; margin-right: auto; }
+    .card__nav .btn--nav { min-width: 80px; }
+
+    :where(button, [tabindex]):focus-visible { outline: none; box-shadow: var(--ring-focus); }
+
+    /* ============================================================
+       Mobile advisory — banner only, never blocks the sim (§2.13)
+       ============================================================ */
+    #mobile-notice {
+      position: fixed;
+      left: var(--space-4); right: var(--space-4); bottom: var(--space-4);
+      z-index: var(--z-notice);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-4);
+      padding: var(--space-3) var(--space-4);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+    }
+    #mobile-notice .notice__text { margin: 0; font-size: var(--text-sm); }
+    .notice__dismiss {
+      flex: 0 0 auto;
+      min-height: 40px;
+      padding: var(--space-2) var(--space-3);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-paper);
+      cursor: pointer;
+    }
+
+    /* ============================================================
+       WebGL context-loss chip + boot/runtime fallback + toast
+       ============================================================ */
+    .sim-restoring {
+      position: fixed;
+      top: var(--space-4);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 150;
+      padding: var(--space-2) var(--space-4);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+      font-size: var(--text-sm);
+    }
+    .sim-fallback {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-6);
+      background: var(--color-paper);
+    }
+    .sim-fallback__inner { max-width: 30rem; text-align: center; }
+    .sim-fallback__icon { width: 48px; height: 48px; color: var(--color-bench-grey); margin-bottom: var(--space-4); }
+    .sim-fallback__title { font-size: var(--text-title); margin: 0 0 var(--space-3); }
+    .sim-fallback__body { color: var(--color-ink-secondary); line-height: 1.5; margin: 0 0 var(--space-5); }
+
+    .sim-toast {
+      position: fixed;
+      left: 50%;
+      top: var(--space-5);
+      transform: translateX(-50%);
+      z-index: 130;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-4);
+      font-size: var(--text-sm);
+      color: var(--color-ink);
+      background: var(--color-success-soft);
+      border: 1px solid var(--color-success);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+      opacity: 0;
+      transition: opacity var(--dur-base) var(--ease-standard);
+    }
+    .sim-toast.is-visible { opacity: 1; }
+    .sim-toast[hidden] { display: none; }
+    .sim-toast__icon { flex: none; width: 20px; height: 20px; color: var(--color-success); }
+
+    /* ============================================================
+       Reduced motion — collapse animation to instant (§4.13)
+       ============================================================ */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        transition-duration: 0.001ms !important;
+      }
+      /* `::details-content` is not matched by `*`, so the accordion needs saying by name. */
+      .fold::details-content { transition-duration: 0.001ms !important; }
+      .card__scroll { scroll-behavior: auto; }
+    }
+
+    /* Narrow screens: shrink the wizard, stack the card above the rail. */
+    @media (max-width: 767px) {
+      #wizard { width: 320px; }
+      .wizard-main { flex-direction: column; }
+      #step-card { order: 1; flex: 1 1 auto; min-height: 0; }
+      #step-rail {
+        order: 2;
+        flex: 0 0 auto;
+        flex-direction: row;
+        width: 100%;
+        padding: var(--space-3) 0 0;
+      }
+      #step-rail::before {
+        left: 30px; right: 30px;
+        top: calc(var(--space-3) + 17px);
+        bottom: auto;
+        width: auto; height: 2px;
+        transform: translateY(-50%);
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Boot/runtime failure fallback (CDN blocked, connection dropped, or WebGL off). -->
+  <div id="sim-fallback" class="sim-fallback" role="alert" hidden>
+    <div class="sim-fallback__inner">
+      <svg class="sim-fallback__icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M24 8 40 17 24 26 8 17Z" />
+        <path d="M40 17V31L24 40 8 31V17" />
+        <path d="M8.5 8.5 39.5 39.5" />
+      </svg>
+      <h1 class="sim-fallback__title" id="sim-fallback-title">We could not load the simulation</h1>
+      <p class="sim-fallback__body" id="sim-fallback-body">It looks like the connection dropped while the 3D tools were starting up. Check your internet connection, then reload to try again.</p>
+      <button type="button" class="btn btn--primary" id="sim-fallback-reload">Reload the simulation</button>
+    </div>
+  </div>
+
+  <div id="sim-context-lost" class="sim-restoring" role="status" hidden>
+    <span>Restoring the 3D view&hellip;</span>
+  </div>
+
+  <div id="sim-toast" class="sim-toast" aria-hidden="true" hidden>
+    <svg class="sim-toast__icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M4 10.5 8.5 15 16 5.5" />
+    </svg>
+    <span class="sim-toast__text"></span>
+  </div>
+
+  <aside id="mobile-notice" role="status" hidden>
+    <p class="notice__text">Best experienced on desktop.</p>
+    <button id="mobile-notice-dismiss" class="notice__dismiss" type="button">Dismiss</button>
+  </aside>
+
+  <!-- ============================================================
+       Viewport — the Guide Plate drawing (canvas + CSS2D overlay)
+       ============================================================ -->
+  <main id="sim-viewport" aria-label="Engineering drawing viewport. The figure being dimensioned. Drag to orbit into three dimensions.">
+    <button id="wizard-toggle" class="wizard-toggle" type="button" aria-controls="wizard" aria-expanded="true" title="Hide steps panel">
+      <svg class="wizard-toggle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 6l6 6-6 6" />
+      </svg>
+      <span class="sr-only">Toggle steps panel</span>
+    </button>
+
+    <div class="vp-controls">
+      <!-- The drawing itself: a true orthographic front elevation. Latched by default. -->
+      <button type="button" class="vp-chip" id="btn-front" aria-pressed="true" title="Return to the flat orthographic front view — the drawing">Front view</button>
+      <!-- Proof the drawing describes a solid: a three-quarter pictorial. -->
+      <button type="button" class="vp-chip" id="btn-pictorial" aria-pressed="false" title="See the plate as a solid, so you can check the drawing against it">3-D view</button>
+      <!-- The countersink is machined on the far face; this reads it from that side. -->
+      <button type="button" class="vp-chip" id="btn-rear" aria-pressed="false" title="Turn the plate over to read the far-side countersink">Turn over</button>
+      <!--
+        Inspection only. Once the plate is turned, the linework is classified live against the
+        camera; this takes the faces off so every buried edge shows through, dashed. Disabled
+        in the flat drawing, where the hidden detail is already stated and must not move.
+      -->
+      <button type="button" class="vp-chip" id="btn-hidden" aria-pressed="false" disabled
+              title="Turn the plate first — the flat drawing already shows its hidden detail dashed">Reveal hidden lines</button>
+    </div>
+
+    <!--
+      Which figure is on the sheet, and what it is here to teach. The lesson works through five
+      of them, simplest first, and a learner who is not told that just sees the drawing change
+      under them. Painted by main.js's updateFigureBadge().
+    -->
+    <p class="vp-figure" id="vp-figure">
+      <span class="vp-figure__name" id="vp-figure-name">Plain plate</span>
+      <span class="vp-figure__teaches" id="vp-figure-teaches"></span>
+    </p>
+
+    <!-- §4.5 item 6 — the caption a finished class-work sheet carries. -->
+    <div class="vp-caption" id="vp-caption" hidden>
+      <span class="vp-caption__no" aria-hidden="true">1</span>
+      <span id="vp-caption-name">GUIDE PLATE — FRONT ELEVATION</span>
+      <span class="vp-caption__scale" id="vp-caption-scale">SCALE 1:1</span>
+      <span class="vp-caption__note" id="vp-caption-note" hidden></span>
+    </div>
+
+    <p class="vp-hint" id="vp-hint">Drag to orbit · scroll to zoom</p>
+  </main>
+
+  <!-- ============================================================
+       Wizard — the guided six-step dimensioning lesson
+       ============================================================ -->
+  <aside id="wizard" aria-label="Guided steps">
+    <div class="wizard-main">
+      <ol id="step-rail" aria-label="Progress">
+        <li class="rail__item" data-step="1"><button type="button" class="rail__btn"><span class="rail__marker">1</span><span class="rail__label">Elements</span></button></li>
+        <li class="rail__item" data-step="2"><button type="button" class="rail__btn"><span class="rail__marker">2</span><span class="rail__label">Rules</span></button></li>
+        <li class="rail__item" data-step="3"><button type="button" class="rail__btn"><span class="rail__marker">3</span><span class="rail__label">Values</span></button></li>
+        <li class="rail__item" data-step="4"><button type="button" class="rail__btn"><span class="rail__marker">4</span><span class="rail__label">Arrange</span></button></li>
+        <li class="rail__item" data-step="5"><button type="button" class="rail__btn"><span class="rail__marker">5</span><span class="rail__label">Symbols</span></button></li>
+        <li class="rail__item" data-step="6"><button type="button" class="rail__btn"><span class="rail__marker">6</span><span class="rail__label">Review</span></button></li>
+      </ol>
+
+      <!--
+        Not a live region. #sim-status (role="status", aria-live="polite") is the single
+        announcement channel — dimensionUI.js narrates "Step X of N" there on every change.
+      -->
+      <section id="step-card">
+        <div class="card__scroll">
+          <header>
+            <p class="card__eyebrow">Step <span id="step-current">1</span> of <span id="step-total">6</span></p>
+            <h2 class="card__title" id="step-title" tabindex="-1">What a dimension is made of</h2>
+            <p class="card__lead" id="step-lead"></p>
+            <div class="step-body" id="step-body"></div>
+          </header>
+
+          <div class="card__body">
+            <!-- ===== Step 1 — the elements, and how each one is drawn (§4.1) ===== -->
+            <div class="step-panel" data-step="1">
+              <button type="button" class="btn btn--primary btn--block" id="btn-add-dims">Add the dimensions</button>
+              <span class="done-badge" id="done-add">✓ Dimensions added</span>
+              <div class="group-stack" id="element-group" hidden>
+                <div>
+                  <span class="group__label">The parts of a dimension</span>
+                  <div class="chips" id="element-chips" role="group" aria-label="Parts of a dimension — select one to isolate it on the drawing"></div>
+                  <div class="detail" id="element-detail" role="status">Point at an element to isolate it on the drawing.</div>
+                </div>
+
+                <div>
+                  <span class="group__label">Line types</span>
+                  <div class="opts" id="linetype-list" role="group" aria-label="Line types"></div>
+                  <div class="detail" id="linetype-detail" role="status">Pick a line type to hold it on the drawing and fade the rest.</div>
+                </div>
+
+                <!--
+                  Three further studies of the SAME five elements, folded. Open, this step ran to
+                  three screens of scrolling before the learner had done anything, and the two
+                  groups that carry it — the parts and the line types — were buried in the middle
+                  of it. Each fold is one idea, opened when it is wanted.
+                -->
+                <details class="fold">
+                  <summary>How the line ends</summary>
+                  <div class="fold__body">
+                    <div>
+                      <div class="chips" id="term-chips" role="group" aria-label="How the dimension line ends"></div>
+                      <div class="slider-row">
+                        <input type="range" id="termangle-range" min="15" max="90" step="5" value="15"
+                               aria-label="Angle of the arrow head" aria-valuetext="15 degrees included angle" />
+                        <output id="termangle-out" for="termangle-range">15°</output>
+                      </div>
+                      <p class="step-hint">Anything from 15° to 90° is allowed. Narrow — about 15° — is the usual choice.</p>
+                      <div class="detail" id="term-detail" role="status"></div>
+                    </div>
+                  </div>
+                </details>
+
+                <details class="fold">
+                  <summary>When space runs out</summary>
+                  <div class="fold__body">
+                    <div>
+                      <div class="slider-row">
+                        <input type="range" id="space-range" min="3" max="80" step="1" value="60"
+                               aria-label="Space between the projection lines, in millimetres" aria-valuetext="60 millimetres between the projection lines" />
+                        <output id="space-out" for="space-range">60 mm</output>
+                      </div>
+                      <p class="step-hint">Squeeze the gap and watch the arrows give way — first outside, then down to a dot.</p>
+                      <div class="detail" id="space-detail" role="status">Move the slider to close the gap.</div>
+                    </div>
+                  </div>
+                </details>
+
+                <details class="fold">
+                  <summary>How a leader ends</summary>
+                  <div class="fold__body">
+                    <div>
+                      <div class="chips" id="leader-chips" role="group" aria-label="How a leader ends"></div>
+                      <div class="detail" id="leader-detail" role="status">Pick a head to take the same note to a different kind of thing.</div>
+                    </div>
+                  </div>
+                </details>
+              </div>
+            </div>
+
+            <!-- ===== Step 2 — the rules, correct vs violation ===== -->
+            <div class="step-panel" data-step="2" hidden>
+              <div>
+                <span class="group__label">Pick a rule</span>
+                <!-- Collapsing selector, painted by dimensionUI.js. Ten rules as an open list
+                     pushed the verdict below the fold; collapsed, the drawing stays the hero. -->
+                <div id="rule-select"></div>
+              </div>
+              <div class="seg" role="group" aria-label="Switch the drawing between the two versions">
+                <button type="button" class="seg__btn is-active" id="rule-ok" data-variant="ok" aria-pressed="true">Correct</button>
+                <button type="button" class="seg__btn" id="rule-bad" data-variant="wrong" aria-pressed="false">Violation</button>
+              </div>
+              <div class="detail" id="rule-detail" role="status"></div>
+
+              <div>
+                <span class="group__label">Place the value yourself</span>
+                <p class="step-hint">Drag the highlighted value, or select it and use the arrow keys. The drawing puts it back if it lands somewhere it cannot go.</p>
+                <div class="detail" id="place-detail" role="status">Waiting for you to move the value.</div>
+              </div>
+            </div>
+
+            <!-- ===== Step 3 — Method-1 vs Method-2 (§4.2) ===== -->
+            <div class="step-panel" data-step="3" hidden>
+              <div>
+                <span class="group__label">How values are written</span>
+                <div class="seg" role="group" aria-label="How values are written">
+                  <button type="button" class="seg__btn is-active" id="method-1" data-method="1" aria-pressed="true">Aligned</button>
+                  <!-- "Unidirectional" is the term the standards, the textbook and the exam use.
+                       The learner-friendly synonym "upright" survives only inside the explanation
+                       card below, never as the label. -->
+                  <button type="button" class="seg__btn" id="method-2" data-method="2" aria-pressed="false">Unidirectional</button>
+                </div>
+                <!-- Same compare component, same fixed position under the step's own primary
+                     control, as Steps 4 and 6. Here it holds the SAME drawing in both value
+                     systems, which is the only honest way to compare them: switching between
+                     two drawings makes the learner remember the first one. -->
+                <div class="compare-slot" id="compare-slot-3"></div>
+                <!-- The verdict sits with the control that produces it, not at the end of the
+                     panel — that is the module's rhythm everywhere else. -->
+                <div class="detail" id="method-detail" role="status"></div>
+              </div>
+              <button type="button" class="toggle" id="btn-oblique" aria-pressed="false">
+                <span class="toggle__label">Same value, eight directions
+                  <span class="toggle__note">Watch which ones flip to stay readable</span>
+                </span>
+                <span class="toggle__switch" aria-hidden="true"></span>
+              </button>
+              <!-- Angles are an ALIGNED-only question — unidirectional is level by definition. The group
+                   stays in place and says so rather than vanishing: a control that disappears
+                   makes the learner wonder what they did, which is the same fault the compare
+                   button had. -->
+              <div id="angular-group">
+                <span class="group__label">Angles</span>
+                <div class="seg" role="group" aria-label="How angle values are written">
+                  <button type="button" class="seg__btn is-active" data-angular="a" aria-pressed="true">Follow the curve</button>
+                  <button type="button" class="seg__btn" data-angular="b" aria-pressed="false">Keep level</button>
+                </div>
+                <p class="step-hint" id="angular-note" hidden>Unidirectional values are already level, so there is nothing to choose here.</p>
+              </div>
+            </div>
+
+            <!-- ===== Step 4 — arrangement of dimension lines (§4.3) ===== -->
+            <div class="step-panel" data-step="4" hidden>
+              <div>
+                <span class="group__label">Layout</span>
+                <!-- Same selector component as Step 2 — the two steps ask the same kind of
+                     question, so they must not answer it with two different controls. -->
+                <div id="arrangement-select"></div>
+              </div>
+              <div>
+                <!-- The SECOND axis of the same drawing. A layout says where the dimension lines
+                     go; a method says how the values on them are written, and the two choices are
+                     independent — which is exactly what a learner has to see. Same selector
+                     component again, directly under Layout, so the pair reads as one question
+                     asked twice. -->
+                <span class="group__label">Method</span>
+                <div id="method-select"></div>
+                <div class="detail" id="method-note" role="status"></div>
+              </div>
+              <div class="chips" id="arrangement-variants" role="group" aria-label="Ways of drawing this layout" hidden></div>
+              <!-- The compare control's fixed slot. Same component, same place, in Step 6 too. -->
+              <div class="compare-slot" id="compare-slot-4"></div>
+              <!-- What to hold beside the current drawing: its own layout AND its own method, so
+                   the learner can hold one still and move the other. Same two selectors as above,
+                   in the same order. -->
+              <div id="compare-with-group" hidden>
+                <span class="group__label">Compare with</span>
+                <div id="compare-select"></div>
+                <div id="compare-method-select"></div>
+              </div>
+              <div class="detail" id="arrangement-detail" role="status"></div>
+              <div class="table-wrap" id="coordinate-table" hidden></div>
+            </div>
+
+            <!-- ===== Step 5 — shape symbols (§4.4) ===== -->
+            <div class="step-panel" data-step="5" hidden>
+              <div>
+                <span class="group__label">The five shape symbols</span>
+                <div class="chips" id="symbol-chips" role="group" aria-label="The five shape symbols"></div>
+              </div>
+              <!-- Secondary by definition: these are NOT the five shape symbols, and the step
+                   gates on the five. Folded, so the five stay the subject. -->
+              <details class="fold">
+                <summary>Conventions — not symbols</summary>
+                <div class="fold__body">
+                  <div class="chips" id="symbol-chips-conv" role="group" aria-label="Conventions, which are not symbols"></div>
+                </div>
+              </details>
+              <div class="chips" id="symbol-variants" role="group" aria-label="The forms this symbol's own figure prints" hidden></div>
+              <div class="detail" id="symbol-detail" role="status">Pick a symbol to see it dimension the feature it belongs to.</div>
+              <button type="button" class="btn btn--secondary btn--block" id="btn-symbol-view" hidden>Turn the plate over to read it</button>
+            </div>
+
+            <!-- ===== Step 6 — review + the mistake hunt + the sheet itself ===== -->
+            <div class="step-panel" data-step="6" hidden>
+              <!--
+                The assessment leads. Progress first, then the hunt, then the explanation of the
+                last verdict — the order the learner's attention actually moves in. Everything
+                that is reference rather than assessment folds away below.
+              -->
+              <div class="progress" id="review-progress">
+                <div class="progress__head">
+                  <span>Progress</span>
+                  <span class="progress__count" id="review-count">0 / 12 solved</span>
+                </div>
+                <div class="progress__track" id="review-track" role="img" aria-label="0 of 12 faults solved"></div>
+                <p class="progress__milestone" id="review-milestone" hidden></p>
+              </div>
+
+              <p class="step-hint">Click a marker on the drawing to accuse that dimension. Some break a rule; others just write a symbol badly. Both count.</p>
+              <div class="detail" id="review-detail" role="status">Every marker is a dimension worth a second look. Some are innocent.</div>
+
+              <div>
+                <span class="group__label">Which drawing</span>
+                <!-- Two states, not three: the third was a compare, and compare is a toggle
+                     everywhere else in the module. -->
+                <div class="seg" role="group" aria-label="Which drawing to show">
+                  <button type="button" class="seg__btn is-active" id="rev-faults" data-view="faults" aria-pressed="true">With faults</button>
+                  <button type="button" class="seg__btn" id="rev-correct" data-view="correct" aria-pressed="false">Corrected</button>
+                </div>
+                <!-- The compare control's fixed slot — same component and same position as Step 4. -->
+                <div class="compare-slot" id="compare-slot-6"></div>
+              </div>
+
+              <details class="fold" id="review-sheet-fold">
+                <summary>The sheet itself</summary>
+                <div class="fold__body">
+                  <div>
+                    <div class="chips" id="scale-chips" role="group" aria-label="Scale of drawing"></div>
+                    <div class="chips" id="unit-chips" role="group" aria-label="Unit of the drawing"></div>
+                    <p class="step-hint">Watch carefully: the drawing changes size, the numbers do not.</p>
+                    <div class="detail" id="sheet-detail" role="status">Change the scale and watch every value stay exactly where it is.</div>
+                  </div>
+                </div>
+              </details>
+
+              <details class="fold" id="review-reference">
+                <summary>The rules, in short</summary>
+                <div class="fold__body">
+                  <ol class="checklist" id="bis-checklist"></ol>
+                  <span class="group__label">What this drawing uses</span>
+                  <div class="detail"><dl id="classwork-list"></dl></div>
+                </div>
+              </details>
+            </div>
+          </div>
+
+          <div class="step-post-body" id="step-post-body"></div>
+          <div class="summary" id="step-summary"></div>
+        </div><!-- /.card__scroll -->
+
+        <footer class="card__nav">
+          <div id="reset-control">
+            <button id="btn-reset" class="btn btn--ghost" type="button">Reset</button>
+            <div id="reset-confirm" class="reset-confirm" role="group" aria-label="Reset confirmation" hidden>
+              <span class="reset-confirm__prompt">Reset everything?</span>
+              <span class="reset-confirm__sep" aria-hidden="true">·</span>
+              <button id="btn-reset-yes" class="btn btn--ghost reset-confirm__action" type="button" aria-label="Yes, reset everything">Yes</button>
+              <span class="reset-confirm__sep" aria-hidden="true">/</span>
+              <button id="btn-reset-cancel" class="btn btn--ghost reset-confirm__action" type="button" aria-label="Cancel reset">Cancel</button>
+            </div>
+          </div>
+          <button id="btn-back" class="btn btn--nav" type="button" hidden>Back</button>
+          <button id="btn-next" class="btn btn--primary btn--nav" type="button">Next</button>
+          <!-- What still stands between the learner and the next step (never colour alone). -->
+          <p class="step-gate" id="step-gate" hidden></p>
+        </footer>
+      </section>
+    </div>
+  </aside>
+
+  <!-- Live region for state narration (screen readers). -->
+  <div id="sim-status" class="sr-only" role="status" aria-live="polite"></div>
+
+  <!-- Single shared glossary popover — positioned/filled by terms.js. -->
+  <div id="term-pop" role="tooltip" aria-hidden="true"></div>
+
+  <script type="module" src="./src/main.js"></script>
+
+  <!-- Inline chrome wiring (platform parity): the wizard hide/show toggle + the two-state
+       Reset confirm (RULES.md §4.19). Chrome-only — "Yes" re-dispatches the original Reset
+       click so dimensionUI.js's handler (the one simAPI.reset() path, §2.9) runs unchanged. -->
+  <script>
+    (function () {
+      var status = document.getElementById('sim-status');
+      var say = function (msg) { if (status) status.textContent = msg; };
+
+      /* --- Wizard hide/show --- */
+      var toggle = document.getElementById('wizard-toggle');
+      if (toggle) {
+        toggle.addEventListener('click', function () {
+          var collapsed = document.body.classList.toggle('wizard-collapsed');
+          toggle.setAttribute('aria-expanded', String(!collapsed));
+          toggle.title = collapsed ? 'Show steps panel' : 'Hide steps panel';
+          say(collapsed ? 'Steps panel hidden.' : 'Steps panel shown.');
+        });
+      }
+
+      /* --- Slider fill (the travelled portion of the track) --- */
+      document.addEventListener('input', function (e) {
+        var el = e.target;
+        if (!el || el.type !== 'range') return;
+        var min = Number(el.min || 0);
+        var max = Number(el.max || 100);
+        el.style.setProperty('--p', ((Number(el.value) - min) / (max - min) * 100) + '%');
+      });
+
+      /* --- Two-state Reset confirm --- */
+      var btnReset = document.getElementById('btn-reset');
+      var confirmBox = document.getElementById('reset-confirm');
+      var btnYes = document.getElementById('btn-reset-yes');
+      var btnCancel = document.getElementById('btn-reset-cancel');
+      var cardNav = btnReset && btnReset.closest('.card__nav');
+      if (!btnReset || !confirmBox || !btnYes || !btnCancel) return;
+
+      var armed = false;
+      var passthrough = false;
+
+      function arm() {
+        if (armed) return;
+        armed = true;
+        btnReset.hidden = true;
+        confirmBox.hidden = false;
+        if (cardNav) cardNav.classList.add('is-reset-armed');
+        btnCancel.focus();
+        say('Reset everything? Choose Yes to clear your work, or Cancel to keep it.');
+      }
+      function disarm(returnFocus) {
+        if (!armed) return;
+        armed = false;
+        confirmBox.hidden = true;
+        btnReset.hidden = false;
+        if (cardNav) cardNav.classList.remove('is-reset-armed');
+        if (returnFocus) btnReset.focus();
+      }
+
+      document.addEventListener('click', function (e) {
+        if (passthrough) return;
+        if (e.target !== btnReset && !btnReset.contains(e.target)) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        arm();
+      }, true);
+
+      btnYes.addEventListener('click', function () {
+        disarm(true);
+        passthrough = true;
+        btnReset.click();
+        passthrough = false;
+      });
+      btnCancel.addEventListener('click', function () {
+        disarm(true);
+        say('Reset cancelled.');
+      });
+      confirmBox.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') { e.stopPropagation(); disarm(true); say('Reset cancelled.'); }
+      });
+      confirmBox.addEventListener('focusout', function (e) {
+        if (armed && !confirmBox.contains(e.relatedTarget)) disarm(false);
+      });
+      document.addEventListener('pointerdown', function (e) {
+        if (armed && !confirmBox.contains(e.target)) disarm(false);
+      });
+    })();
+  </script>
+</body>
+</html>
