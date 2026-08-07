@@ -223,8 +223,10 @@
     /* ---- Wizard hide/show toggle: floats over the canvas so it is reachable in both states. */
     .wizard-toggle {
       position: absolute;
-      /* Same band as `.vp-controls` opposite it, matching the benchmark's own pairing. */
-      top: calc(44px + var(--space-5));
+      /* NOT the .vp-controls 44px+space-3 clearance opposite it — this top-right toggle has
+         nothing above it, so it is decoupled from the left cluster's host-chrome-avoidance
+         logic entirely (platform Jul-16 regression fix). */
+      top: var(--space-3);
       right: var(--space-3);
       z-index: 7; /* above the flow note (6), which is pointer-events:none and may pass under it */
       width: 44px;
@@ -1207,7 +1209,7 @@
     */
     .vp-controls {
       position: absolute;
-      top: calc(44px + var(--space-5));
+      top: calc(44px + var(--space-3)); /* current host-chrome clearance (DESIGN.md §5.12) */
       left: var(--space-4);
       display: flex;
       gap: var(--space-2);

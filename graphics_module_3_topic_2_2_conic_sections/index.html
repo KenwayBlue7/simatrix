@@ -319,7 +319,7 @@
        chevron flips when collapsed; the viewport reflows to full width via flex. */
     .wizard-toggle {
       position: absolute;
-      /* Standard top-corner inset (--space-3) — NOT the .vp-cluster 44px+space-5 clearance
+      /* Standard top-corner inset (--space-3) — NOT the .vp-cluster 44px+space-3 clearance
          (that value is for the top-LEFT stack, one button-height down plus the host
          a11y-scaler header gap; the top-right toggle has no button above it). The
          Compare card's compact top (calc(space-3 + 44px + space-2)) already assumes this
@@ -360,7 +360,7 @@
        controls inside it take pointer events. */
     .vp-cluster {
       position: absolute;
-      top: calc(44px + var(--space-5)); /* one 44px button-height down (the platform's top-corner stack offset); + --space-5 clears the host a11y text-scaler header */
+      top: calc(44px + var(--space-3)); /* one 44px button-height down (the platform's top-corner stack offset); + --space-3 is the current host-chrome clearance (DESIGN.md §5.12) */
       left: var(--space-3);
       z-index: 4;
       display: flex;
