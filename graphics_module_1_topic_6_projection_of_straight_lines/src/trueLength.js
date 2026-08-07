@@ -144,7 +144,29 @@ export function createTrueLength({ resolved, method = 'I' }) {
       setOp(alphaLbl, lc(G, 7.2, 7.8));
     }
     animate(0);
-    return { group, animate, duration: DURATION2 };
+    // Discrete-step phase table (constructionStepper.js) — breakpoints along the SAME G/TL2_N
+    // domain animate() already uses; captions grounded in True Length.pdf Art 10-8 (Method II,
+    // figs 10-18/10-19) + Inclined to Both.pdf Art 10-5/10-6 (apparent angles). A rig that came
+    // back null (trap hypotenuse parallel, angle 0) contributes no stops, mirroring runRig's own
+    // `if (!rig) return` guard.
+    const phases = [];
+    if (tvRig) {
+      phases.push(
+        { t: 1 / TL2_N, caption: 'Erect a perpendicular to the top view at a, equal to a’s distance from xy in the front view.' },
+        { t: 2 / TL2_N, caption: 'Erect a second perpendicular at b, equal to b’s distance from xy in the front view.' },
+        { t: 3 / TL2_N, caption: `Join the two perpendiculars’ far ends on the top view — the true length of AB (${Math.round(resolved.tl)} mm).` },
+        { t: 3.8 / TL2_N, caption: `θ = ${Math.round(resolved.theta)}° — AB’s true inclination with the H.P. (β = ${Math.round(resolved.beta)}° shown alongside, the top view’s own larger apparent angle).` },
+      );
+    }
+    if (fvRig) {
+      phases.push(
+        { t: 5 / TL2_N, caption: 'Erect a perpendicular to the front view at a′, equal to a’s distance from xy in the top view.' },
+        { t: 6 / TL2_N, caption: 'Erect a second perpendicular at b′, equal to b’s distance from xy in the top view.' },
+        { t: 7 / TL2_N, caption: `Join the two perpendiculars’ far ends on the front view — the true length of AB (${Math.round(resolved.tl)} mm).` },
+        { t: 7.8 / TL2_N, caption: `φ = ${Math.round(resolved.phi)}° — AB’s true inclination with the V.P. (α = ${Math.round(resolved.alpha)}° shown alongside, the front view’s own larger apparent angle).` },
+      );
+    }
+    return { group, animate, duration: DURATION2, phases };
   }
 
   const pivotIsA = A1[0] <= B1[0];
@@ -227,5 +249,22 @@ export function createTrueLength({ resolved, method = 'I' }) {
   }
 
   animate(0);
-  return { group, animate, duration: (fvTrue && tvTrue) ? DURATION_FLAT : DURATION };
+  // Discrete-step phase table (constructionStepper.js) — breakpoints along the SAME G/TL_N
+  // domain animate() already uses; captions grounded in True Length.pdf Art 10-8 (Method I,
+  // figs 10-15/10-16/10-17) + Inclined to Both.pdf Art 10-5/10-6 (apparent angles α/β).
+  const phases = [
+    { t: 1 / TL_N, caption: 'Swing the top view’s free end about the pivot until parallel to xy.' },
+    { t: 2 / TL_N, caption: 'Trace the arc it sweeps — centre at the pivot, radius equal to the top view’s length — to b₁.' },
+    { t: 3.5 / TL_N, caption: 'Drop a projector through b₁ to meet b′’s horizontal locus at b′₁.' },
+    { t: 5 / TL_N, caption: `Join the pivot’s front-view point to b′₁ — the true length of AB (${Math.round(resolved.tl)} mm).` },
+    { t: 5.6 / TL_N, caption: `θ = ${Math.round(resolved.theta)}° — the angle this line makes with xy is AB’s true inclination with the H.P.` },
+    { t: 5.9 / TL_N, caption: `α = ${Math.round(resolved.alpha)}° — the original (unrotated) front view’s own angle with xy, always greater than θ (apparent inclination).` },
+    { t: 7 / TL_N, caption: 'Swing the front view’s free end about the pivot until parallel to xy.' },
+    { t: 8 / TL_N, caption: 'Trace the arc it sweeps, to b′₂.' },
+    { t: 9.5 / TL_N, caption: 'Drop a projector through b′₂ to meet b’s vertical locus at b₂.' },
+    { t: 11 / TL_N, caption: `Join the pivot’s top-view point to b₂ — the true length of AB (${Math.round(resolved.tl)} mm).` },
+    { t: 11.6 / TL_N, caption: `φ = ${Math.round(resolved.phi)}° — the angle this line makes with xy is AB’s true inclination with the V.P.` },
+    { t: 11.9 / TL_N, caption: `β = ${Math.round(resolved.beta)}° — the original top view’s own angle with xy, always greater than φ (apparent inclination).` },
+  ];
+  return { group, animate, duration: (fvTrue && tvTrue) ? DURATION_FLAT : DURATION, phases };
 }

@@ -102,6 +102,7 @@ export function createTraces({ resolved }) {
   const both = !T.noHT && !T.noVT;
 
   let animate;
+  const phases = []; // discrete-step phase table, filled by whichever branch below runs
 
   if (T.method === 'II') {
     // Art 10-11 (Traces.pdf p.212, fig. 10-26): projections ⟂ xy — Method I has no h/v feet to
@@ -147,6 +148,35 @@ export function createTraces({ resolved }) {
       if (tvRig) runRig(tvRig, HT_PA, HT_PB, HT_H, HT_X, HT_R);
       if (fvRig) runRig(fvRig, VT_PA, VT_PB, VT_H, VT_X, VT_R);
     };
+
+    // Discrete-step phase table (constructionStepper.js) — breakpoints along the SAME prog (0..1)
+    // domain animate() already uses; captions grounded in Traces.pdf Art 10-10 Method II / Art
+    // 10-11 (figs 10-25/10-26). A side with no rig (T.htReason/vtReason !== 'trace') folds its
+    // reason into that side's own H1/V1 slot instead of a separate stop (its own "AB IN HP" etc.
+    // convention, traces.js's existing noteHT/noteVT/noteBoth wording).
+    const bothParallelII = T.htReason === 'parallel' && T.vtReason === 'parallel';
+    if (bothParallelII) {
+      phases.push({ t: 0.5, caption: 'AB is parallel to both the H.P. and V.P. — it has no trace.' });
+    } else {
+      if (tvRig) {
+        phases.push(
+          { t: HT_PA[1], caption: 'Erect the first perpendicular of the true-length trapezoid on the top view.' },
+          { t: HT_PB[1], caption: 'Erect the second perpendicular, completing the trapezoid on the top view.' },
+          { t: HT_H[1], caption: 'Join the two perpendiculars’ far ends — the true length, C₂D₂.' },
+          { t: HT_R + 0.04, caption: 'Produce both the top view and the true-length line — where they meet is the H.T.' },
+        );
+      } else if (T.htReason === 'parallel') phases.push({ t: 0, caption: 'AB is parallel to the H.P. — no H.T.' });
+      else if (T.htReason === 'inPlane') phases.push({ t: 0, caption: 'AB lies wholly in the H.P. — no distinct trace point to find.' });
+      if (fvRig) {
+        phases.push(
+          { t: VT_PA[1], caption: 'Erect the first perpendicular of the true-length trapezoid on the front view.' },
+          { t: VT_PB[1], caption: 'Erect the second perpendicular, completing the trapezoid on the front view.' },
+          { t: VT_H[1], caption: 'Join the two perpendiculars’ far ends — the true length, C₁D₁.' },
+          { t: VT_R + 0.04, caption: 'Produce both the front view and the true-length line — where they meet is the V.T.' },
+        );
+      } else if (T.vtReason === 'parallel') phases.push({ t: 1, caption: 'AB is parallel to the V.P. — no V.T.' });
+      else if (T.vtReason === 'inPlane') phases.push({ t: 1, caption: 'AB lies wholly in the V.P. — no distinct trace point to find.' });
+    }
   } else {
     // Art 10-10 Method I (or the Art 10-9 point-view coincidence, F2): extend the front view to
     // XY at h, drop a projector, extend the top view to meet it → HT; extend the top view to XY
@@ -203,6 +233,32 @@ export function createTraces({ resolved }) {
         setOp(vtG, lc(prog, VT_R - 0.02, VT_R + 0.05));
       }
     };
+
+    // Discrete-step phase table (constructionStepper.js) — breakpoints along the SAME prog (0..1)
+    // domain animate() already uses; captions grounded in Traces.pdf Art 10-10 Method I (fig
+    // 10-24). A side with no extension line (T.htReason/vtReason !== 'trace') folds its reason
+    // into that side's own H1/V1 slot instead of a separate stop.
+    const bothParallelI = T.htReason === 'parallel' && T.vtReason === 'parallel';
+    if (bothParallelI) {
+      phases.push({ t: 0.5, caption: 'AB is parallel to both the H.P. and V.P. — it has no trace.' });
+    } else {
+      if (extFV) {
+        phases.push(
+          { t: HT_E[1], caption: 'Produce the front view to meet xy at h.' },
+          { t: HT_P[1], caption: 'Through h, draw a projector down toward the top view.' },
+          { t: HT_R + 0.05, caption: 'Produce the top view to meet that projector — this is the H.T.' },
+        );
+      } else if (T.htReason === 'parallel') phases.push({ t: 0, caption: 'AB is parallel to the H.P. — no H.T.' });
+      else if (T.htReason === 'inPlane') phases.push({ t: 0, caption: 'AB lies wholly in the H.P. — no distinct trace point to find.' });
+      if (extTV) {
+        phases.push(
+          { t: VT_E[1], caption: 'Produce the top view to meet xy at v.' },
+          { t: VT_P[1], caption: 'Through v, draw a projector up toward the front view.' },
+          { t: VT_R + 0.05, caption: 'Produce the front view to meet that projector — this is the V.T.' },
+        );
+      } else if (T.vtReason === 'parallel') phases.push({ t: 1, caption: 'AB is parallel to the V.P. — no V.T.' });
+      else if (T.vtReason === 'inPlane') phases.push({ t: 1, caption: 'AB lies wholly in the V.P. — no distinct trace point to find.' });
+    }
   }
 
   // Reason-driven callouts for whichever side(s) have no real trace point (htReason/vtReason !=
@@ -231,5 +287,5 @@ export function createTraces({ resolved }) {
   }
 
   animate(0);
-  return { group, animate, duration: DURATION };
+  return { group, animate, duration: DURATION, phases };
 }
