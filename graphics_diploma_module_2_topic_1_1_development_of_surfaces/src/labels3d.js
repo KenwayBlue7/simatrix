@@ -1,9 +1,12 @@
-// Step-Compare annotation layer for the 3D prism (2026-08-06) — adapted from
-// Module2/src/vertexLabeler.js, NOT byte-identical-shared (RULES §7.2's guarantee is scoped
-// to the Module-2 family; this track's own precedent is cube.js/developmentEngine.js, both
-// independent copies free to drift, ADR-112). Only the label-placement + CSS2D disposal
-// machinery is kept — Module2's chain-line axis and dashed-generator LineSegments2 rig has
-// no analogue here (this topic draws no 3D axis) and is deliberately dropped.
+// Step-Compare annotation layer for the 3D solids (prism 2026-08-06, cylinder 2026-08-06
+// Phase 2 ADR-115, elbow 2026-08-07 Phase 3 ADR-116) — adapted from Module2/src/vertexLabeler.js, NOT byte-identical-shared
+// (RULES §7.2's guarantee is scoped to the Module-2 family; this track's own precedent is
+// cube.js/developmentEngine.js, both independent copies free to drift, ADR-112). Only the
+// label-placement + CSS2D disposal machinery is kept — Module2's chain-line axis and
+// dashed-generator LineSegments2 rig has no analogue here (this topic draws no 3D axis) and
+// is deliberately dropped. `generate(mesh)` dispatches on `mesh.name` (`'prism'`/`'cylinder'`,
+// set by cube.js/cylinder.js) to the matching planner below; elbow stays unlabelled pending
+// its own phase.
 //
 // WHY the numbering isn't inferred from geometry (Module2's uniqueLocalVertices/orderRing
 // atan2 sort): a BoxGeometry's 8 corners and their correspondence to constructions.js's
@@ -80,6 +83,89 @@ function planPrismStations(mesh) {
   return labels;
 }
 
+const CYL_GENERATORS = 12; // also ELBOW_GENERATORS — see planElbowStations() below
+
+/**
+ * Plan the 12 cylinder generator labels (2026-08-06, Phase 2 — see file header's box-corner
+ * precedent, same reasoning applied to a round mesh). BASE RING ONLY, not both rings like
+ * the prism's 8: `cylinder.js`'s mesh is a smooth 24-segment round shell with no true
+ * corners, so 24 pills (12 stations × 2 rings) would crowd the silhouette and CSS2D pills do
+ * not depth-test — a far-side label would show straight through the mesh. The base ring is
+ * also where `constructions.js`'s own top-view circle carries its numerals (both derive from
+ * the SAME 12 station angles), so a single ring is the one that actually completes the
+ * Compare correspondence, not an arbitrary halving.
+ *
+ * Angle convention, derived from `constructions.js`'s `buildCylinder()` (not guessed):
+ * station k sits at `a(k) = π + 2πk/12` in the shared front/top drawing-space axes, where
+ * `toTop`'s own x is the front view's shared x-axis and `toTop`'s own y is plan depth growing
+ * DOWN the page from the fold line (nearest the VP/rear). `cylinder.js` centres its
+ * `THREE.Mesh` on the origin with radius along the XZ plane and the camera on +Z (front/near
+ * the observer) — so drawing-space x maps directly to local X, and drawing-space y (rear→
+ * front) maps to local Z with the SAME sign (y=0/rear → Z toward the camera's far side is
+ * wrong; y=0 is nearest the fold line, which `cube.js`'s own +Z-faces-viewer convention
+ * treats as the FRONT face, i.e. +Z) — this file's `planPrismStations()` neighbour resolves
+ * the identical front/rear ambiguity via its own STATIONS `sz` table, so the same sign
+ * (`sz: +1` for the front/near face) is reused here as `sinSign`.
+ * @param {THREE.Mesh} mesh
+ * @returns {{ local: THREE.Vector3, text: string }[]}
+ */
+function planCylinderStations(mesh) {
+  mesh.geometry.computeBoundingBox();
+  const box = mesh.geometry.boundingBox;
+  if (!box) return [];
+  const radius = (box.max.x - box.min.x) / 2;
+  const baseY = box.min.y;
+  const cx = (box.max.x + box.min.x) / 2;
+  const cz = (box.max.z + box.min.z) / 2;
+
+  const labels = [];
+  for (let k = 0; k < CYL_GENERATORS; k++) {
+    const a = Math.PI + (2 * Math.PI * k) / CYL_GENERATORS; // buildCylinder()'s own a(k)
+    const localX = cx + radius * Math.cos(a);
+    const localZ = cz + radius * Math.sin(a); // drawing-space y (rear→front) -> local +Z (front)
+    labels.push({ local: new THREE.Vector3(localX, baseY, localZ), text: String(k + 1) });
+  }
+  return labels;
+}
+
+/**
+ * Plan the 12 elbow generator labels (Phase 3, 2026-08-07, ADR-116) — FLAT-END RING ONLY,
+ * on the VERTICAL leg mesh only (`mesh.name === 'elbow-vertical'`); the horizontal leg
+ * stays unlabelled, matching the 2D plate's own single-pattern scope this phase (ADR-116).
+ * Same reasoning as the cylinder's base-ring-only decision (ADR-115): a round mesh has no
+ * true corners, CSS2D pills do not depth-test, and the flat end is where the 2D plate's
+ * own development z=0 stretch-out line ties in.
+ *
+ * Angle convention: IDENTICAL to `planCylinderStations()` above — `elbowHalf.js`'s
+ * `buildLegGeometry()`'s `point()` helper uses the exact same
+ * `[radius*cos(angle), axisVal, radius*sin(angle)]` convention `cylinder.js` does, and
+ * `constructions.js`'s `buildElbow()` uses the SAME left-seam `a(k) = π + 2πk/12` as
+ * `buildCylinder()`'s own `a(k)` (this phase's own left-seam renumbering, ADR-116) — so no
+ * new sign derivation is needed, only the bounding box's own axis differs: Y is the leg's
+ * AXIS here (not a generic "up"), and the flat cap is the LOWER ring (`box.min.y`), since
+ * `elbowHalf.js` hangs the vertical leg's flat end down (`capSign: -1` on the `'y'` axis).
+ * @param {THREE.Mesh} mesh
+ * @returns {{ local: THREE.Vector3, text: string }[]}
+ */
+function planElbowStations(mesh) {
+  mesh.geometry.computeBoundingBox();
+  const box = mesh.geometry.boundingBox;
+  if (!box) return [];
+  const radius = (box.max.x - box.min.x) / 2;
+  const baseY = box.min.y; // the flat cap ring — see header
+  const cx = (box.max.x + box.min.x) / 2;
+  const cz = (box.max.z + box.min.z) / 2;
+
+  const labels = [];
+  for (let k = 0; k < CYL_GENERATORS; k++) {
+    const a = Math.PI + (2 * Math.PI * k) / CYL_GENERATORS;
+    const localX = cx + radius * Math.cos(a);
+    const localZ = cz + radius * Math.sin(a);
+    labels.push({ local: new THREE.Vector3(localX, baseY, localZ), text: String(k + 1) });
+  }
+  return labels;
+}
+
 /**
  * Wire a Compare-pane annotation controller onto a scene. Owns one persistent group (added
  * to the scene once) and rebuilds its CSS2DObject labels on each generate() call. Mirrors
@@ -90,7 +176,7 @@ function planPrismStations(mesh) {
  */
 export function initLabels3d(scene) {
   const group = new THREE.Group();
-  group.name = 'Prism Corner Labels';
+  group.name = 'Solid Station Labels';
   scene.add(group);
 
   /** Detach + dispose every child's DOM node (CSS2DObject leaves nothing else to free). */
@@ -111,7 +197,10 @@ export function initLabels3d(scene) {
   function generate(mesh) {
     clear();
     if (!mesh) return;
-    const labels = planPrismStations(mesh);
+    let labels;
+    if (mesh.name === 'cylinder') labels = planCylinderStations(mesh);
+    else if (mesh.name === 'elbow-vertical') labels = planElbowStations(mesh);
+    else labels = planPrismStations(mesh);
     if (labels.length === 0) return;
 
     const matrixWorld = mesh.matrixWorld;

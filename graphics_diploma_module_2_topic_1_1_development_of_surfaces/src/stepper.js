@@ -1,13 +1,18 @@
-// Guided-stepper controller — the same four-step shape every topic in this syllabus track
-// shares:
+// Guided-stepper controller — this topic's four-step shape (ADR-112; reverted from a
+// 2026-08-05 five-step build — see ../DECISIONS.md addendum superseding ADR-097/ADR-112's
+// "3D View step" addenda, same day):
 //   1. Choose    — pick one of the three constructions (prism, cylinder, elbow).
 //   2. Given     — set the solid's own dimensions below.
 //   3. Construct — press Play, watch the front view, top view, and development draw
 //      together, transfer lines carrying each true height straight across.
 //   4. Verify    — the result, and a route into the Problem Library.
+// The solid itself is no longer a separate step to visit and leave — it's the Compare
+// card's docked 50/50 split (main.js `compare.show()`/`enterWorkbench()`), reachable from
+// any step via the viewport's Compare chip, matching how Bhatt/K.C. John actually lay the
+// pictorial and the construction out (side by side, not sequential).
 //
-// EXTRACTED mechanics, byte-identical in shape to every other Diploma topic's stepper.js
-// — only STEPS' copy below is new.
+// EXTRACTED mechanics (rail rendering, step-panel show/hide, nav gating), byte-identical in
+// SHAPE to every other Diploma topic's stepper.js; STEPS' copy is this topic's own.
 //
 // Layering (CLAUDE.md): leaf module. Imports nothing; main.js injects `sim`.
 
@@ -158,8 +163,8 @@ export function initStepper(sim) {
   /** Return to the picker without a full platform reset (Verify step's "Try another"). */
   function restart() { goToStep(1); }
 
-  /** Jump straight to the Given step (step 2) — used when a Problem Library problem is
-   *  loaded, so the student lands on the dial-able step, never the picker (RULES §6.2). */
+  /** Jump straight to the Given step — used when a Problem Library problem is loaded, so
+   *  the student lands on the dial-able step, never the picker (RULES §6.2). */
   function goToGivenStep() { goToStep(2); }
 
   goToStep(1, { announce: false });

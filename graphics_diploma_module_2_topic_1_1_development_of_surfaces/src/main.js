@@ -28,6 +28,7 @@ import { initUIManager } from './uiManager.js';
 import { initProblemLibrary } from './problemLibrary.js';
 import { initViewTransform } from './viewTransform.js';
 import { tick as tickTweens, cancelAll as cancelTweens, tween } from './anim.js';
+import { show3D, hide3D, clear3D, rebuild3D, resumeLoop3D } from './view3d.js'; // 3D View, ADR-097/ADR-112 addenda
 
 const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -45,7 +46,6 @@ let state = { constructionId: null, params: {} };
 
 /** The last built recipe (constructions.js output) for the active construction+params. */
 let lastRecipe = null;
-let activePlay = null; // playSteps()/playRollAnimation() handle, so a replay can cancel one
 
 // Default-zoom fix: the Given step's front+top block only, framed with this much drawing-
 // space breathing room — same magnitude family as constructions.js's own gap constants
@@ -53,11 +53,23 @@ let activePlay = null; // playSteps()/playRollAnimation() handle, so a replay ca
 // sized for the worst-case FULL plate incl. development, so the small Given-step block sat
 // lost in a lot of dead space at page load.
 const DEFAULT_FIT_MARGIN = 14;
+let activePlay = null; // playSteps()/playRollAnimation() handle, so a replay can cancel one
 
 let paused = false;
 let lastFrameTime = 0;
 let rafId = null;
 let solvedAny = false; // a Problem Library problem has matched this page load — gates #btn-finish
+
+// Compare view + docked 50/50 workbench (ADR-012/037/080; roles reversed — see this
+// file's own import comment above and ../DECISIONS.md's addendum). simAPI.pause()/resume()
+// also gate view3d.js's loop off `compareOpen`.
+let compareCard = null;
+let compareChip = null;
+let compareOpen = false;
+let workbenchOpen = false;
+/** #given-fields's captured {parent, nextSibling} home inside the Given step-panel, so
+ *  exitWorkbench() can put it back exactly where it came from. */
+let givenFieldsHome = null;
 
 // ============================================================================
 // DOM references — ONE canvas carries the whole plate (ADR-112 §1), not an SVG pair of
@@ -65,6 +77,7 @@ let solvedAny = false; // a Problem Library problem has matched this page load �
 // ============================================================================
 
 const canvas = document.getElementById('construction-canvas');
+const viewport3dEl = document.getElementById('viewport-3d'); // 3D View, inside #compare-card's stage
 const statusEl = document.getElementById('sim-status');
 const givenLayer = createLayer();
 const dynamicLayer = createLayer();
@@ -180,29 +193,16 @@ function rebuild() {
     renderStatic(givenLayer, givenSteps);
   }
 
+  // Keep the Compare pane's solid in sync with the just-committed params — #given-fields
+  // docks into the workbench rail precisely so dimensions stay adjustable WHILE comparing,
+  // so (unlike the old sequential 3D View step) the 3D solid can go stale mid-visit if this
+  // isn't here.
+  if (compareOpen) rebuild3D(state.constructionId, state.params);
+  updateCompareChip();
+
   stepper?.sync();
   problemLibrary?.sync();
 }
-
-// ============================================================================
-// simController — the small object every leaf module receives, never reaching back
-// into the DOM/state directly (RULES.md §3.2, re-expressed for this substrate)
-// ============================================================================
-
-const simController = {
-  // stepper.js
-  announce,
-  hasConstruction: () => !!state.constructionId,
-  getConstructionLabel: () => (state.constructionId ? findConstruction(state.constructionId).label : null),
-  selectConstruction(id) {
-    const construction = findConstruction(id);
-    state = { constructionId: construction.id, params: defaultsFor(construction) };
-    rebuild();
-    uiManager.sync({ rebuildFields: true });
-    defaultFit();
-    announce(`${construction.label} selected. Adjust the given values, then continue.`);
-  },
-  onEnterConstructStep() { onboarding?.playHint(); },
 
 /** Frame the CURRENT Given-step content tightly (front+top block, role:'given' steps only
  *  — everything else is dynamicLayer, not drawn until Play) instead of viewTransform.js's
@@ -226,6 +226,144 @@ function resetFit() {
   viewTransform.fitToBounds(computeBounds(lastRecipe.steps), DEFAULT_FIT_MARGIN);
 }
 
+// ============================================================================
+// Compare view + docked 50/50 workbench (ADR-012 / ADR-037, narrowed by ADR-080 — ported
+// from graphics_module_3_topic_2_development_of_surfaces, roles REVERSED: this topic's
+// construction canvas is already the primary pane, so Compare docks the 3D solid instead
+// of a 2D drawing. See ../DECISIONS.md's addendum for why this replaced the original
+// sequential "3D View step" build the same day. Compare has exactly one shape platform-
+// wide (ADR-080): the docked split, never a floating card.
+// ============================================================================
+
+/** Collapse the wizard, split the viewport 50/50, and dock #given-fields into the rail so
+ *  dimensions stay adjustable while comparing. Idempotent. */
+function enterWorkbench() {
+  if (workbenchOpen) return;
+  workbenchOpen = true;
+
+  const rail = document.getElementById('workbench-rail');
+  const givenFields = document.getElementById('given-fields');
+  if (rail && givenFields) {
+    if (!givenFieldsHome) givenFieldsHome = { parent: givenFields.parentElement, next: givenFields.nextSibling };
+    rail.appendChild(givenFields);
+  }
+
+  // Re-parent the card out to <body> so the grid can place it as the right pane (ADR-080 —
+  // a plain grid cell, not absolutely positioned, but it still needs to leave #sim-viewport
+  // to become a body-level sibling of it, since CSS grid-area only applies to direct
+  // children of the grid container).
+  if (compareCard && compareCard.parentElement !== document.body) {
+    document.body.appendChild(compareCard);
+  }
+  document.body.classList.add('compare-split');
+  // The rail toggle always defaults to shown on entry — a prior collapse from an earlier
+  // split visit must not carry over.
+  document.body.classList.remove('rail-collapsed');
+  syncRailToggleState(false);
+}
+
+/** Restore the floating layout: hand #given-fields back to its captured home slot and
+ *  re-nest the card in #sim-viewport. Idempotent. */
+function exitWorkbench() {
+  if (!workbenchOpen) return;
+  workbenchOpen = false;
+  document.body.classList.remove('compare-split');
+  document.body.classList.remove('rail-collapsed');
+  syncRailToggleState(false);
+
+  const simViewport = document.getElementById('sim-viewport');
+  if (compareCard && simViewport && compareCard.parentElement !== simViewport) {
+    simViewport.appendChild(compareCard);
+  }
+  if (givenFieldsHome?.parent) {
+    const givenFields = document.getElementById('given-fields');
+    if (givenFields) givenFieldsHome.parent.insertBefore(givenFields, givenFieldsHome.next);
+  }
+}
+
+/** Hidden until a construction is chosen (nothing to compare before then); aria-pressed
+ *  mirrors the card's open state (CSS fills the pill solid accent while pressed). */
+function updateCompareChip() {
+  if (!compareChip) return;
+  compareChip.hidden = !state.constructionId;
+  compareChip.setAttribute('aria-pressed', String(compareOpen));
+}
+
+const compare = {
+  show() {
+    if (!state.constructionId) return; // nothing to compare before a construction exists
+    compareOpen = true;
+    if (compareCard) compareCard.hidden = false;
+    enterWorkbench(); // Compare has exactly one shape now (ADR-080) — always the docked split
+    const ok = show3D(viewport3dEl, state.constructionId, state.params);
+    if (!ok) window.__showSimFallback?.('webgl');
+    updateCompareChip();
+    announce('Compare view opened — the solid itself.');
+  },
+  hide() {
+    if (!compareOpen) return;
+    compareOpen = false;
+    hide3D();
+    const wasSplit = workbenchOpen;
+    if (wasSplit) exitWorkbench(); // tear the split down before the card vanishes
+    if (compareCard) compareCard.hidden = true;
+    updateCompareChip();
+    announce('Compare view closed.');
+  },
+  toggle() { compareOpen ? compare.hide() : compare.show(); },
+  isOpen: () => compareOpen,
+};
+
+/** One-source-of-truth sync for #rail-toggle's state facets — called from its own click
+ *  handler AND from enter/exitWorkbench, which force-reset it on every split transition. */
+function syncRailToggleState(collapsed) {
+  const btn = document.getElementById('rail-toggle');
+  if (!btn) return;
+  btn.setAttribute('aria-expanded', String(!collapsed));
+  btn.setAttribute('aria-label', collapsed ? 'Show controls' : 'Hide controls');
+  btn.title = collapsed ? 'Show controls' : 'Hide controls';
+  const txt = btn.querySelector('.rail-toggle__text');
+  if (txt) txt.textContent = collapsed ? 'Show' : 'Hide';
+}
+
+function setupRailToggle() {
+  const btn = document.getElementById('rail-toggle');
+  btn?.addEventListener('click', () => {
+    const collapsed = document.body.classList.toggle('rail-collapsed');
+    syncRailToggleState(collapsed);
+    announce(collapsed ? 'Controls rail hidden.' : 'Controls rail shown.');
+  });
+}
+
+/** Bind + wire the Compare chrome once at boot: the chip is Compare's only open/close
+ *  control (ADR-080) — there is no separate expand/close head chrome and no breakpoint
+ *  fallback to a floating card. */
+function setupCompareCard() {
+  compareCard = document.getElementById('compare-card');
+  compareChip = document.getElementById('compare-chip');
+  compareChip?.addEventListener('click', () => compare.toggle());
+}
+
+// ============================================================================
+// simController — the small object every leaf module receives, never reaching back
+// into the DOM/state directly (RULES.md §3.2, re-expressed for this substrate)
+// ============================================================================
+
+const simController = {
+  // stepper.js
+  announce,
+  hasConstruction: () => !!state.constructionId,
+  getConstructionLabel: () => (state.constructionId ? findConstruction(state.constructionId).label : null),
+  selectConstruction(id) {
+    const construction = findConstruction(id);
+    state = { constructionId: construction.id, params: defaultsFor(construction) };
+    rebuild();
+    uiManager.sync({ rebuildFields: true });
+    defaultFit();
+    announce(`${construction.label} selected. Adjust the given values, then continue.`);
+  },
+  onEnterConstructStep() { onboarding?.playHint(); },
+
   // uiManager.js
   getActiveConstruction: () => (state.constructionId ? findConstruction(state.constructionId) : null),
   getParams: () => state.params,
@@ -233,6 +371,13 @@ function resetFit() {
     state.params = { ...state.params, ...partial };
     rebuild();
     uiManager.sync({ rebuildFields: false });
+    // Clip guard: defaultFit()'s tighter initial frame is sized for the DEFAULT params —
+    // a slider dragged toward its max can grow the Given-step block past that frame. Same
+    // "zoom out only if it doesn't already fit, leave a manual zoom alone otherwise"
+    // contract play() already trusts below.
+    if (lastRecipe) {
+      viewTransform.ensureVisible(computeBounds(lastRecipe.steps.filter((s) => s.role === 'given')));
+    }
   },
   play() {
     if (!lastRecipe) return;
@@ -249,9 +394,11 @@ function resetFit() {
     });
   },
   reset() {
+    compare.hide(); // no-op when closed; also tears the workbench split down first
     state = { constructionId: null, params: {} };
     cancelTweens();
     rebuild();
+    clear3D(); // 3D View, ADR-097/ADR-112 addenda — dispose the solid, not the renderer
     stepper.reset();
     uiManager.sync({ rebuildFields: true });
     defaultFit(); // lastRecipe is null post-reset — falls back to plain resetView()
@@ -343,8 +490,8 @@ function setupVerifyActions() {
 // ============================================================================
 
 window.simAPI = {
-  pause() { paused = true; },
-  resume() { paused = false; lastFrameTime = 0; },
+  pause() { paused = true; if (compareOpen) hide3D(); },
+  resume() { paused = false; lastFrameTime = 0; if (compareOpen) resumeLoop3D(); },
   reset() { simController.reset(); },
 };
 
@@ -355,6 +502,8 @@ window.simAPI = {
 function init() {
   rebuild();
   setupWizardToggle();
+  setupCompareCard();
+  setupRailToggle();
   setupVerifyActions();
   rafId = requestAnimationFrame(frame);
   window.__simBooted = true; // clears the boot watchdog fallback (index.html inline script)
@@ -362,10 +511,3 @@ function init() {
 }
 
 init();
-    // Clip guard: defaultFit()'s tighter initial frame is sized for the DEFAULT params —
-    // a slider dragged toward its max can grow the Given-step block past that frame. Same
-    // "zoom out only if it doesn't already fit, leave a manual zoom alone otherwise"
-    // contract play() already trusts below.
-    if (lastRecipe) {
-      viewTransform.ensureVisible(computeBounds(lastRecipe.steps.filter((s) => s.role === 'given')));
-    }

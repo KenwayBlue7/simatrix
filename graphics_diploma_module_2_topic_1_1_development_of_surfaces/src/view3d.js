@@ -156,9 +156,13 @@ export function rebuild3D(shapeId, params) {
   shapeGroup.add(...meshes);
   frameSolid();
 
-  // Corner numerals — Prism only this phase (DESIGN.md §6); cylinder/elbow get their own
-  // annotation in their own phase, matching constructions.js's solid-by-solid numeral rollout.
-  if (shapeId === 'prism') {
+  // Corner/generator numerals — Prism, Cylinder, and (Phase 3, ADR-116) Elbow. The elbow's
+  // `createElbow()` returns TWO meshes (`elbow-vertical`, `elbow-horizontal`, unlike the
+  // single-mesh prism/cylinder generators) — only the vertical leg (`meshes[0]`) gets
+  // labelled, matching the 2D plate's own single-development-pattern scope this phase
+  // (labels3d.js's `planElbowStations()` dispatches on `mesh.name`, not `shapeId`, so the
+  // horizontal leg mesh is simply never passed in).
+  if (shapeId === 'prism' || shapeId === 'cylinder' || shapeId === 'elbow') {
     meshes[0].updateWorldMatrix(true, false);
     labeler?.generate(meshes[0]);
   } else {
