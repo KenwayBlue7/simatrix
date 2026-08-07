@@ -1,0 +1,1792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light only" />
+  <title>Introduction to Orthographic Projection</title>
+  <meta name="description" content="A guided introduction to orthographic projection: look at four textbook machine parts from the four principal directions, then watch a first-angle drawing built one line at a time - elevation, plan and side view, each from construction lines to outline, hidden detail, centre lines and aligned dimensions." />
+
+  <!--
+    Three.js is loaded as CDN ES modules ONLY, pinned to 0.160.0.
+    No build step, no bundler, no npm (RULES.md §2.1–§2.4). This import map is the
+    exact contract required by the platform.
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <!--
+    Boot watchdog (classic script, runs before the ES module below). The sim's ONLY
+    runtime network dependency is the pinned Three.js CDN module; if a campus firewall
+    blocks it, the connection drops mid-load, or the module otherwise fails to evaluate,
+    init() never runs and the iframe would sit blank. This arms a self-healing fallback
+    so the learner reads a calm explanation instead of a void. main.js clears it on a
+    successful boot, and a merely-slow (but working) load self-heals.
+  -->
+  <script>
+    (function () {
+      window.__simBooted = false;
+      var WEBGL_COPY = {
+        title: 'Your browser could not start the 3D view',
+        body: 'This simulation needs hardware-accelerated graphics (WebGL), which looks switched off or unavailable here. Turn on hardware acceleration in your browser settings, or open this in a recent Chrome, Edge, or Firefox, then reload.',
+      };
+      window.__showSimFallback = function (variant) {
+        if (window.__simBooted) return;
+        var el = document.getElementById('sim-fallback');
+        if (!el) return;
+        if (variant === 'webgl') {
+          var t = document.getElementById('sim-fallback-title');
+          var b = document.getElementById('sim-fallback-body');
+          if (t) t.textContent = WEBGL_COPY.title;
+          if (b) b.textContent = WEBGL_COPY.body;
+        }
+        el.hidden = false;
+      };
+      window.addEventListener('error', function () {
+        if (!window.__simBooted) window.__showSimFallback();
+      });
+      window.__simBootTimer = window.setTimeout(function () {
+        if (!window.__simBooted) window.__showSimFallback();
+      }, 15000);
+      document.addEventListener('DOMContentLoaded', function () {
+        var btn = document.getElementById('sim-fallback-reload');
+        if (btn) btn.addEventListener('click', function () { window.location.reload(); });
+      });
+    })();
+  </script>
+
+  <style>
+    /*
+      Bundled web fonts (DESIGN.md §3). Local subset woff2 in ./assets/fonts/ — no
+      runtime Google-Fonts fetch, so the sim still works offline after the initial load
+      (relative paths, RULES.md §2.5/§2.15). Atkinson Hyperlegible for UI/body,
+      IBM Plex Mono for numeric readouts (tabular figures).
+    */
+    @font-face {
+      font-family: "Atkinson Hyperlegible";
+      font-style: normal; font-weight: 400; font-display: swap;
+      src: url("./assets/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "Atkinson Hyperlegible";
+      font-style: normal; font-weight: 700; font-display: swap;
+      src: url("./assets/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+    }
+    @font-face {
+      font-family: "IBM Plex Mono";
+      font-style: normal; font-weight: 400; font-display: swap;
+      src: url("./assets/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+    }
+
+    /*
+      ============================================================
+      Design tokens — the platform contract (root ../DESIGN.md §2)
+      ============================================================
+      Single source of truth for every colour, space, and motion value. JS reads these
+      through src/tokens.js via getComputedStyle(...).getPropertyValue('--token') and
+      never hard-codes a hex (RULES.md §4.1/§4.2). Values are identical to Topic 1's and
+      to the root DESIGN.md token table — a topic may ADD a token, never re-define a
+      shared one (RULES.md §4.16). This topic adds none.
+    */
+    :root {
+      /* --- Surfaces --- */
+      --color-paper:        #ffffff; /* pure-white base — viewport floor + raised control fills */
+      --color-panel:        #f0f2f5; /* clinical cool grey working surface (LAB) — wizard/dock/cards */
+      --color-solid-fill:   #e7e1d4; /* oklch(0.90 0.013 88) — solid faces, so ink edges read */
+
+      /* --- Ink --- */
+      --color-ink:          #06070b; /* clinical near-black (LAB) — body text + visible edges */
+      --color-ink-secondary:#5a5d66; /* clinical cool grey (LAB) — secondary text + labels */
+
+      /* --- Mid neutral --- */
+      --color-bench-grey:   #938b7b; /* oklch(0.62 0.012 88) — construction linework, inactive UI */
+      --color-border:       #e0e1e5; /* clinical cool grey (LAB) — crisp 1px structural seams */
+      --color-track:        #e0e1e5; /* clinical cool grey (LAB) — recessed slider groove */
+
+      /* --- The one interaction accent (technical blue) --- */
+      --color-accent:        #1f66b5; /* oklch(0.52 0.14 252) — focus, primary action, selection */
+      --color-accent-strong: #17539b; /* oklch(0.45 0.14 252) — hover / active */
+      --color-accent-soft:   #e3ecf7; /* oklch(0.94 0.025 252) — current-step wash, hint background */
+      --color-focus:         var(--color-accent);
+      --ring-focus:          0 0 0 3px color-mix(in srgb, var(--color-accent) 26%, transparent);
+      --shadow-md:           0 4px 16px color-mix(in srgb, var(--color-ink) 12%, transparent);
+
+      /* --- Status (UI only, always paired with an icon) --- */
+      --color-success:       #2e7d52;
+      --color-success-soft:  #e2efe8;
+
+      /*
+        --- Domain colours (inside the viewport only, never chrome) ---
+        Two-Cue Rule: each carries a non-colour cue too. Consumed here by the
+        orthographic sheet and the Step-3 face highlights.
+      */
+      --color-hp-line: #007f7c; /* HP projection: teal, the top view */
+      --color-vp-line: #b25718; /* oklch(~0.55 0.12 52) — VP projection: amber, DASHED (teal↔amber is the CVD-safe pair; darkened one step from #bc5d1e so VP label text clears AA: 4.92:1 on paper) */
+      --color-pp-line: #7a5ea6; /* PP projection: violet, the side view */
+
+      /* --- Spacing scale (4px base) --- */
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 24px;
+      --space-6: 32px;
+
+      /* --- Radius --- */
+      --radius-xs: 4px;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+
+      /* --- Type --- */
+      --font-sans: "Atkinson Hyperlegible", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", monospace;
+      --text-xs: 0.75rem;
+      --text-sm: 0.875rem;
+      --text-base: 1rem;
+      --text-lead: 1.125rem;
+      --text-title: 1.35rem;
+
+      /* --- Motion --- */
+      --dur-fast: 150ms;
+      --dur-base: 200ms;
+      --dur-step: 380ms;
+      --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+
+      /* --- Layering --- */
+      --z-notice: 100;
+      --z-overlay: 120;
+    }
+
+    /* ============================================================
+       Normalize / reset — minimal, modern
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      font-size: var(--text-base);
+      color: var(--color-ink);
+      background: var(--color-paper);
+      overflow: hidden;
+      font-variant-numeric: tabular-nums;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      display: flex;
+      flex-direction: row;
+      position: relative;
+    }
+    button { font: inherit; color: inherit; }
+
+    .sr-only {
+      position: absolute;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* ============================================================
+       Viewport — the WebGL canvas mounts here (main.js)
+       ============================================================ */
+    #sim-viewport {
+      position: relative;
+      flex: 1 1 0;
+      min-width: 0;
+      height: 100%;
+      background: var(--color-paper);
+      order: 1; /* viewport LEFT, wizard right (DESIGN.md §4.5) */
+    }
+    #sim-viewport canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    /* ---- Wizard hide/show toggle: floats over the canvas so it is reachable in both states. */
+    .wizard-toggle {
+      position: absolute;
+      /* Same band as `.vp-controls` opposite it, matching the benchmark's own pairing. */
+      top: calc(44px + var(--space-5));
+      right: var(--space-3);
+      z-index: 7; /* above the flow note (6), which is pointer-events:none and may pass under it */
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .wizard-toggle:active { transform: scale(0.97); }
+    .wizard-toggle:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .wizard-toggle__icon {
+      width: 20px;
+      height: 20px;
+      transition: transform var(--dur-base) var(--ease-standard);
+    }
+    body.wizard-collapsed #wizard { display: none; }
+    body.wizard-collapsed .wizard-toggle__icon { transform: rotate(180deg); }
+
+    /* ============================================================
+       Mobile advisory — banner only, never blocks the sim (RULES.md §2.13)
+       ============================================================ */
+    #mobile-notice {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: var(--z-notice);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      background: var(--color-panel);
+      color: var(--color-ink);
+      border-bottom: 1px solid var(--color-border);
+    }
+    #mobile-notice[hidden] { display: none; }
+    .notice__text { margin: 0; font-size: var(--text-sm); }
+    .notice__dismiss {
+      flex: none;
+      min-height: 44px;
+      padding: 0 var(--space-4);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-paper);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .notice__dismiss:active { background: var(--color-border); transform: scale(0.97); }
+    .notice__dismiss:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+
+    /* ============================================================
+       Boot / runtime failure fallback — calm, never a raw error trace.
+       ============================================================ */
+    .sim-fallback {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-5);
+      background: var(--color-paper);
+    }
+    .sim-fallback[hidden] { display: none; }
+    .sim-fallback__inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-4);
+      max-width: 42ch;
+      text-align: center;
+    }
+    .sim-fallback__icon { width: 48px; height: 48px; color: var(--color-bench-grey); }
+    .sim-fallback__title {
+      margin: 0;
+      font-size: var(--text-title);
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -0.01em;
+      color: var(--color-ink);
+    }
+    .sim-fallback__body {
+      margin: 0;
+      font-size: var(--text-base);
+      line-height: 1.6;
+      color: var(--color-ink-secondary);
+    }
+    .sim-fallback .btn { margin-top: var(--space-1); }
+
+    /* Transient WebGL context-loss chip — a floating overlay, so it earns the shadow
+       (the Flat-Ink Rule's transient-overlay exception). */
+    .sim-restoring {
+      position: fixed;
+      left: 50%;
+      top: var(--space-5);
+      transform: translateX(-50%);
+      z-index: 150;
+      padding: var(--space-2) var(--space-4);
+      font-size: var(--text-sm);
+      color: var(--color-ink);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+    }
+    .sim-restoring[hidden] { display: none; }
+
+    /* Visible keyboard focus everywhere (never removed without replacement). */
+    :focus-visible {
+      outline: 2px solid var(--color-focus);
+      outline-offset: 2px;
+    }
+
+    /* Reduced motion: collapse chrome transitions + step animations (RULES.md §4.13). */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* ============================================================
+       Guided Stepper chrome — step rail (progress spine) + step card
+       ============================================================ */
+    #wizard {
+      flex: 0 0 auto;
+      width: clamp(340px, 34vw, 460px);
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      padding: var(--space-5) var(--space-4);
+      background: var(--color-panel);
+      border-left: 1px solid var(--color-border); /* Border-Over-Shadow — flat seam */
+      order: 2;
+    }
+
+    .wizard-main {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: row;
+      gap: var(--space-4);
+    }
+
+    /* --- Step rail --- */
+    #step-rail {
+      position: relative;
+      flex: 0 0 auto;
+      order: 2;
+      width: 64px;
+      margin: 0; padding: var(--space-2) 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    #step-rail::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 30px;
+      bottom: 30px;
+      width: 2px;
+      transform: translateX(-50%);
+      background: var(--color-border);
+    }
+    .rail__item {
+      position: relative;
+      display: flex;
+    }
+    .rail__btn {
+      flex: 1 1 auto;
+      min-width: 44px;
+      display: flex;
+      flex-direction: column; /* label BELOW the marker — keeps the rail narrow (DESIGN.md §5.6) */
+      align-items: center;
+      gap: var(--space-1);
+      margin: 0;
+      padding: var(--space-1) 0;
+      border: 0;
+      background: none;
+      font: inherit;
+      color: inherit;
+      text-align: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .rail__btn:disabled { cursor: default; }
+    .rail__marker {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 1.5px solid var(--color-border);
+      border-radius: 50%;
+      background: var(--color-paper);
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      font-weight: 700;
+      color: var(--color-ink-secondary);
+      transition: background var(--dur-base) var(--ease-standard),
+                  border-color var(--dur-base) var(--ease-standard),
+                  color var(--dur-base) var(--ease-standard),
+                  box-shadow var(--dur-base) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .rail__label {
+      font-size: var(--text-xs);
+      line-height: 1.2;
+      color: var(--color-ink-secondary);
+      max-width: 60px;
+    }
+    .rail__item.is-upcoming .rail__marker { opacity: 0.5; }
+    .rail__item.is-upcoming .rail__label  { opacity: 0.5; }
+    .rail__item.is-current .rail__marker {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: var(--color-paper);
+      box-shadow: 0 0 0 4px var(--color-accent-soft);
+    }
+    .rail__item.is-current .rail__label { color: var(--color-ink); font-weight: 700; }
+    .rail__item.is-complete .rail__marker {
+      background: var(--color-success);
+      border-color: var(--color-success);
+      color: var(--color-paper);
+    }
+    .rail__item.is-complete .rail__label { color: var(--color-ink-secondary); }
+    .rail__btn:active:not(:disabled) .rail__marker { transform: scale(0.94); }
+    .rail__btn:focus-visible { outline: none; }
+    .rail__btn:focus-visible .rail__marker { box-shadow: var(--ring-focus); }
+
+    /* --- Step card --- */
+    #step-card {
+      flex: 1 1 auto;
+      min-width: 0;
+      order: 1;
+      display: flex;
+      flex-direction: column;
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-5) var(--space-4);
+      overflow: hidden;
+    }
+    /* Pinned nav footer: the header + step body scroll inside .card__scroll while
+       .card__nav (Back / Next / Reset) stays fixed at the bottom of the card. */
+    .card__scroll {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: var(--space-3); /* centred scrollbar gutter (ADR-032) */
+    }
+    /* Floating padded scrollbar pill — platform standard (DESIGN.md §5.11, ADR-032).
+       `scrollbar-width` stays UNSET on the base rule or Chrome 121+ drops the
+       pseudo-elements; it is set for Firefox only, in the @supports guard. */
+    .card__scroll::-webkit-scrollbar { width: 10px; }
+    .card__scroll::-webkit-scrollbar-track { background: transparent; }
+    .card__scroll::-webkit-scrollbar-thumb {
+      background: var(--color-border);
+      background-clip: padding-box;
+      border: 3px solid transparent;
+      border-radius: 999px;
+    }
+    @supports (-moz-appearance: none) {
+      .card__scroll {
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-border) transparent;
+      }
+    }
+
+    .card__eyebrow-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2);
+      margin: 0 0 var(--space-1);
+    }
+    .card__eyebrow {
+      margin: 0;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--color-ink-secondary);
+    }
+    .card__title {
+      margin: 0 0 var(--space-2);
+      font-size: var(--text-title);
+      line-height: 1.2;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .card__lead {
+      margin: 0 0 var(--space-5);
+      max-width: 60ch;
+      font-size: var(--text-sm);
+      line-height: 1.55;
+      color: var(--color-ink-secondary);
+    }
+    .card__body { flex: 1 1 auto; }
+
+    .step-panel { display: flex; flex-direction: column; gap: var(--space-5); }
+    .step-panel[hidden] { display: none; }
+    @keyframes panelIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: none; }
+    }
+    .step-panel.is-active { animation: panelIn var(--dur-step) var(--ease-standard); }
+
+    .card__nav {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-top: var(--space-5);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--color-border);
+    }
+    #reset-control { margin-right: auto; }
+    .card__nav .btn--nav { min-width: 88px; }
+    .btn[hidden] { display: none; }
+
+    /* Inline two-state Reset confirm (RULES.md §4.19). */
+    .card__nav.is-reset-armed .btn--nav { display: none; }
+    .reset-confirm {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-1) var(--space-2);
+      font-size: var(--text-sm);
+      animation: resetConfirmIn var(--dur-fast) var(--ease-standard);
+    }
+    .reset-confirm[hidden] { display: none; }
+    .reset-confirm__prompt { color: var(--color-ink); }
+    .reset-confirm__sep { color: var(--color-bench-grey); user-select: none; }
+    .reset-confirm .reset-confirm__action { min-height: 44px; padding: 0 var(--space-2); }
+    @keyframes resetConfirmIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* ============================================================
+       Control primitives (DESIGN.md §5.1–§5.5)
+       ============================================================ */
+    .dock__group { display: flex; flex-direction: column; gap: var(--space-3); }
+    .dock__group-title {
+      margin: 0 0 var(--space-1);
+      padding-bottom: var(--space-2);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--color-ink-secondary);
+      border-bottom: 1px solid var(--color-border);
+    }
+    .dock__note {
+      margin: 0;
+      max-width: 60ch;
+      font-size: var(--text-sm);
+      line-height: 1.45;
+      color: var(--color-ink-secondary);
+    }
+
+    /* --- Slider + numeric field --- */
+    .field { display: flex; flex-direction: column; gap: var(--space-1); }
+    .field__label {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-2);
+      font-size: var(--text-sm);
+    }
+    /* Engineering notation, set in the mono face so `L`, `H` and `ØD` read as drawing annotation
+       rather than as UI prose — the same face the values and the transfer tokens use. It leads the
+       label, and the plain-English name follows it. */
+    .field__symbol {
+      order: -1;
+      margin-right: auto;
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--color-ink);
+    }
+    .field__name { color: var(--color-ink-secondary); }
+
+    /* --- An optional dimension: the learner declares it stated or unknown. --- */
+    .field__optional { display: flex; align-items: center; gap: var(--space-2); min-height: 32px; }
+    .field__check {
+      width: 16px; height: 16px;
+      margin: 0;
+      accent-color: var(--color-accent);   /* the one place a native control takes the accent */
+      cursor: pointer;
+    }
+    .field__check:focus-visible { outline: none; box-shadow: var(--ring-focus); border-radius: 3px; }
+    .field__check-label {
+      font-size: var(--text-sm);
+      color: var(--color-ink);
+      cursor: pointer;
+    }
+    /* The state the slider is replaced by. Mono + bench grey: it is a value the drawing is using,
+       but not one the learner set. */
+    .field__auto {
+      margin: 0;
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--color-bench-grey);
+    }
+    .field__auto-value {
+      margin: 0;
+      font-size: var(--text-xs);
+      color: var(--color-ink-secondary);
+    }
+    .field__auto-note { margin: var(--space-1) 0 0; }
+    .field__row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      min-height: 44px;
+    }
+    .field__range {
+      flex: 1 1 auto;
+      min-width: 0;
+      height: 44px;            /* full 44px hit target around a thin 3px track */
+      margin: 0;
+      background: transparent;
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .field__range::-webkit-slider-runnable-track { height: 3px; border-radius: 999px; background: var(--color-track); }
+    .field__range::-moz-range-track { height: 3px; border-radius: 999px; background: var(--color-track); }
+    .field__range::-moz-range-progress { height: 3px; border-radius: 999px; background: var(--color-accent); }
+    .field__range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      margin-top: -5.5px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      border: none;
+      box-shadow: none;
+      transition: box-shadow var(--dur-fast) var(--ease-standard),
+                  background var(--dur-fast) var(--ease-standard);
+    }
+    .field__range::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      border: none;
+      box-shadow: none;
+      transition: box-shadow var(--dur-fast) var(--ease-standard),
+                  background var(--dur-fast) var(--ease-standard);
+    }
+    .field__range:focus-visible { outline: none; }
+    .field__range:focus-visible::-webkit-slider-thumb,
+    .field__range:active::-webkit-slider-thumb {
+      background: var(--color-accent-strong);
+      box-shadow: var(--ring-focus);
+    }
+    .field__range:focus-visible::-moz-range-thumb,
+    .field__range:active::-moz-range-thumb {
+      background: var(--color-accent-strong);
+      box-shadow: var(--ring-focus);
+    }
+    .field__num {
+      flex: 0 0 auto;
+      width: 4.5rem;
+      padding: var(--space-2);
+      text-align: right;
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      font-variant-numeric: tabular-nums;
+      color: var(--color-ink);
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xs);
+      transition: border-color var(--dur-fast) var(--ease-standard),
+                  box-shadow var(--dur-fast) var(--ease-standard);
+    }
+    .field__num:focus,
+    .field__select:focus {
+      outline: none;
+      border-color: var(--color-accent);
+      box-shadow: var(--ring-focus);
+    }
+    .field__unit {
+      flex: 0 0 auto;
+      width: 2.5ch;
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      color: var(--color-ink-secondary);
+    }
+    .field__select {
+      width: 100%;
+      min-height: 44px;
+      padding: var(--space-2) var(--space-5) var(--space-2) var(--space-3);
+      font: inherit;
+      color: var(--color-ink);
+      background-color: var(--color-paper);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%235a5d66' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right var(--space-3) center;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xs);
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+      transition: border-color var(--dur-fast) var(--ease-standard),
+                  box-shadow var(--dur-fast) var(--ease-standard);
+    }
+    input:disabled, select:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    /* --- Buttons --- */
+    .btn {
+      font: inherit;   /* Two-Weight Rule: buttons stay Atkinson 400 (DESIGN.md §5.1) */
+      min-height: 44px;
+      padding: 0 var(--space-4);
+      color: var(--color-ink);
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .btn:active { background: var(--color-border); transform: scale(0.97); }
+    .btn:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn--primary {
+      color: var(--color-paper);
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+    }
+    .btn--primary:active { background: var(--color-accent-strong); border-color: var(--color-accent-strong); }
+    .btn--block { width: 100%; }
+    .btn--ghost {
+      min-height: 36px;
+      padding: 0 var(--space-3);
+      font-size: var(--text-sm);
+      color: var(--color-ink-secondary);
+      background: transparent;
+      border-color: transparent;
+    }
+
+    /* --- Hint callout: full accent wash, never a coloured side-stripe (DESIGN.md §5.8) --- */
+    .hint {
+      display: flex;
+      gap: var(--space-2);
+      padding: var(--space-3);
+      background: var(--color-accent-soft);
+      border-radius: var(--radius-sm);
+      font-size: var(--text-sm);
+      line-height: 1.5;
+      color: var(--color-ink);
+    }
+    .hint[hidden] { display: none; }
+    .hint__icon { flex: none; width: 18px; height: 18px; color: var(--color-accent); }
+
+    /* --- Inline term definition (DESIGN.md §5.7) --- */
+    .term {
+      font: inherit;
+      color: var(--color-accent-strong);
+      background: none;
+      border: 0;
+      padding: 0;
+      cursor: help;
+      text-decoration: underline dotted;
+      text-underline-offset: 2px;
+      position: relative;
+    }
+    .term:focus-visible {
+      outline: none;
+      border-radius: var(--radius-xs);
+      box-shadow: var(--ring-focus);
+    }
+    .term__pop {
+      position: fixed; /* escapes the step card's scroll clip; placed by terms.js */
+      z-index: 30;
+      width: max-content;
+      max-width: 32ch;
+      padding: var(--space-3);
+      font-size: var(--text-sm);
+      font-weight: 400;
+      line-height: 1.45;
+      text-align: left;
+      text-decoration: none;
+      white-space: normal;
+      color: var(--color-ink);
+      background: var(--color-accent-soft);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(4px) scale(0.96);
+      transform-origin: top center;
+      transition: opacity var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard),
+                  visibility var(--dur-fast) var(--ease-standard);
+      pointer-events: none;
+    }
+    .term.is-open .term__pop {
+      opacity: 1;
+      visibility: visible;
+      transform: none;
+    }
+
+    /* ---- Orbit-discovery hint + contextual chips (onboarding.js) ---- */
+    .vp-hint {
+      position: absolute;
+      left: 50%;
+      bottom: var(--space-5);
+      transform: translateX(-50%) translateY(6px);
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+      font-size: var(--text-sm);
+      color: var(--color-ink);
+      opacity: 0;
+      transition: opacity var(--dur-base) var(--ease-standard),
+                  transform var(--dur-base) var(--ease-standard);
+    }
+    .vp-hint.is-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .vp-hint[hidden] { display: none; }
+    .vp-hint__icon { flex: none; width: 18px; height: 18px; color: var(--color-ink-secondary); }
+    .vp-hint__dismiss {
+      position: relative;
+      flex: none;
+      width: 28px;
+      height: 28px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      font-size: 18px;
+      line-height: 1;
+      color: var(--color-ink-secondary);
+      background: none;
+      border: 0;
+      border-radius: var(--radius-xs);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+    }
+    .vp-hint__dismiss::before {
+      content: "";
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100%; height: 100%;
+      min-width: 44px; min-height: 44px;
+    }
+    .vp-hint__dismiss:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .vp-spotlight__dot {
+      flex: none;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--color-ink-secondary);
+    }
+    .vp-spotlight--hp  .vp-spotlight__dot { background: var(--color-hp-line); }
+    .vp-spotlight--vp  .vp-spotlight__dot { background: var(--color-vp-line); }
+    .vp-spotlight--ink .vp-spotlight__dot { background: var(--color-ink-secondary); }
+    .vp-spotlight__text { text-wrap: balance; }
+
+    /* ---- Flow note: a brief accent-wash note floated top-centre, in step with something
+         the learner just watched happen. aria-hidden — #sim-status narrates it, so this
+         must not be a second live region. Auto-dismisses. ---- */
+    .vp-note {
+      position: absolute;
+      left: 50%;
+      top: var(--space-5);
+      transform: translateX(-50%) translateY(-6px);
+      /* Above the orthographic sheet (5): the note is centred over the viewport and the sheet is
+         docked top-left, so at narrow widths the two overlap — the transient note must win, and it
+         is pointer-events:none so it never steals a click from what is underneath. */
+      z-index: 6;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      max-width: min(34rem, calc(100% - var(--space-6)));
+      padding: var(--space-2) var(--space-3);
+      background: var(--color-accent-soft);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      font-size: var(--text-sm);
+      line-height: 1.35;
+      color: var(--color-ink);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity var(--dur-base) var(--ease-standard),
+                  transform var(--dur-base) var(--ease-standard);
+    }
+    .vp-note.is-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .vp-note[hidden] { display: none; }
+    .vp-note__icon { flex: none; width: 18px; height: 18px; color: var(--color-accent); }
+    .vp-note__text { text-wrap: balance; }
+
+    /* ============================================================
+       Module 2, Topic 0 - Introduction to Orthographic Projection.
+       Topic-specific layers. Every colour consumes a shared token; every colour signal
+       carries a second cue (label / weight / position), per the Two-Cue Rule. No blue
+       inside the viewport - the accent stays on the chrome that guides.
+       ============================================================ */
+
+    /* --- The projection sheet (Step 2) ---------------------------------------------------------
+         Step 2 is a lesson about a DRAWING, so the drawing gets half the bench: `body.sheet-open`
+         splits the viewport into two columns, the solid on the left and the sheet on the right.
+         The sheet has exactly ONE box and one sizing rule, and it only ever exists on the step it
+         is the subject of, so there is no second sizing mode for it to disagree with
+         (RULES.md 3.66). --- */
+    body.sheet-open #sim-viewport {
+      display: grid;
+      grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.6fr);
+      gap: var(--space-4);
+      padding: var(--space-4);
+      background: var(--color-panel);
+    }
+    body.sheet-open #sim-viewport > canvas {
+      order: 1;                       /* main.js appends the canvas, so state the order explicitly */
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      background: var(--color-paper);
+      min-width: 0;
+    }
+    body.sheet-open .psheet { order: 2; }
+
+    .psheet {
+      display: none;
+      flex-direction: column;
+      min-width: 0;
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-3);
+      gap: var(--space-2);
+    }
+    body.sheet-open .psheet { display: flex; }
+    .psheet__title {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--color-ink-secondary);
+      margin: 0;
+    }
+    .psheet__stage-box {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: auto;
+    }
+    .psheet__svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+    /* --- The line alphabet -----------------------------------------------------------------------
+         BIS SP 46's four line types, at `graphics_module_1_topic_1_1_dimensioning`'s own widths:
+         Type A visible 2.5 · Type E/F hidden 1.5 · Type G centre 1.3 · Type B narrow 1.0. Those are
+         that topic's `WIDTH_PX.visible / hidden / centre` and `WIDTH_PX.thin`, taken as-is rather
+         than re-derived, so the two topics' drawings are the same weight of ink.
+
+         WIDTHS ARE THE BENCHMARK'S PIXELS, divided by the scale the sheet is actually fitted at.
+         `--ink-scale` is 1 / (px per mm), set by projectionSheet.js on layout and on resize, so
+         `calc(2.5 * var(--ink-scale))` renders as 2.5 device pixels on every object and at every
+         pane size. A fixed millimetre width cannot: the fit scale runs from 1.95 to 2.30 px/mm
+         across these four sheets, so one number would land anywhere in an 8% band.
+
+         NOT `vector-effect: non-scaling-stroke`, which looks like the obvious answer and is a trap:
+         it makes Chrome compute `stroke-dasharray` in SCREEN space, which silently disables
+         `pathLength="1"`. The draw-on's dash then means "1 px on, 1 px off" instead of "the whole
+         path", and every outline renders as a fine dotted line. Tried, measured, reverted — and
+         note that the dashoffset PROPERTY still animates cleanly to 0 while this is happening, so
+         the only way to catch it is to look at the drawing.
+
+         Type B covers dimension lines, extension lines AND projection lines: all three are narrow
+         continuous, and it is the bench grey plus the fade, not a thinner stroke, that keeps the
+         projectors out of the way (RULES.md 3.58 — no weight that means what an existing one does).
+
+         THREE LEVELS THE EYE SORTS AT A GLANCE. The standard puts visible outlines and visible
+         edges in one type; this topic splits them at 2.5 and 1.8, because a beginner has to find
+         where the object ENDS before they can read what is inside it, and that is the emphasis a
+         textbook figure prints. `edge` is a real fourth meaning, not a fourth way of saying an
+         existing one, which is what §3.58 actually forbids:
+
+           2.5  silhouette      where the object ends
+           1.8  visible edge    a step, a shoulder, a bore, a slot
+           1.5  hidden          dashed — an edge the material conceals
+           1.3  centre          chain — the axis of something round
+           1.0  supporting      dimension, extension, projection, leader
+       --- */
+    .psheet__ink {
+      fill: none;
+      stroke: var(--color-ink);
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+    .psheet__svg { --ink-scale: 0.4; }   /* replaced from the live fit; this is the 2.5 px/mm case */
+    .psheet__ink--outline      { stroke-width: calc(2.5 * var(--ink-scale)); }
+    .psheet__ink--edge         { stroke-width: calc(1.8 * var(--ink-scale)); }
+    .psheet__ink--hidden       {
+      stroke-width: calc(1.5 * var(--ink-scale));
+      stroke-dasharray: calc(6 * var(--ink-scale)) calc(3.5 * var(--ink-scale));
+    }
+    .psheet__ink--centre       {
+      stroke-width: calc(1.3 * var(--ink-scale));
+      stroke-dasharray: calc(16 * var(--ink-scale)) calc(3.5 * var(--ink-scale))
+                        calc(3 * var(--ink-scale)) calc(3.5 * var(--ink-scale));
+    }
+    .psheet__ink--construction { stroke-width: calc(1 * var(--ink-scale)); stroke: var(--color-bench-grey); }
+    .psheet__ink--dimension    { stroke-width: calc(1 * var(--ink-scale)); stroke: var(--color-ink); }
+    .psheet__arrow { fill: var(--color-ink); stroke: none; }
+
+    .psheet__value, .psheet__caption {
+      fill: var(--color-ink);
+      font-family: var(--font-mono);
+      font-size: 4.4px;                /* millimetres of the sheet, not CSS px */
+    }
+    .psheet__caption {
+      font-family: var(--font-sans);
+      font-size: 5px;
+      font-weight: 700;
+      fill: var(--color-ink-secondary);
+    }
+
+    /* A stage is hidden until the learner draws it, and drawn ON rather than switched on: every
+       stroked node carries pathLength="1", so ONE rule draws any shape whatever its real
+       perimeter. Dashed and chain linework cannot use the dash trick (its dashes ARE the pattern),
+       so those stages fade instead - which is honest: you cannot draw a dash on progressively. */
+    .psheet__stage { visibility: hidden; }
+    .psheet__stage.is-on { visibility: visible; }
+    .psheet__stage [pathLength] {
+      stroke-dasharray: 1;
+      stroke-dashoffset: 1;
+      transition: stroke-dashoffset var(--dur-step) linear;
+    }
+    .psheet__stage.is-on [pathLength] { stroke-dashoffset: 0; }
+    /* The dashed and chain stages keep their own patterns, so the draw-on rule must not touch them. */
+    .psheet__stage--hidden [pathLength], .psheet__stage--centre [pathLength] { stroke-dasharray: none; }
+    .psheet__stage--hidden, .psheet__stage--centre, .psheet__stage--dimension {
+      opacity: 0;
+      transition: opacity var(--dur-step) var(--ease-standard);
+    }
+    .psheet__stage--hidden.is-on, .psheet__stage--centre.is-on, .psheet__stage--dimension.is-on { opacity: 1; }
+
+    /* Projection lines animate, then fade: once the view they carried is inked they have nothing
+       left to say, and by the time the sheet is dimensioned they are gone. They are never DELETED
+       while the drawing is still being built - a learner going Back has to find them again. */
+    .psheet__proj { transition: opacity var(--dur-step) var(--ease-standard); }
+    .is-faded .psheet__proj { opacity: 0.3; }
+    .is-gone   .psheet__proj { opacity: 0; }
+
+    @media (prefers-reduced-motion: reduce) {
+      .psheet__stage, .psheet__stage [pathLength] { transition: none !important; }
+      .psheet__stage.is-on [pathLength] { stroke-dashoffset: 0; }
+    }
+
+    /* --- Step 2's stage transport ---------------------------------------------------------------
+         Back / readout / Draw next, pinned at the foot of the 3D pane. One press is one idea, and
+         the forward control is disabled while a stage is still drawing so nothing can be skipped
+         past half-drawn. Back is never disabled and never replays (RULES.md 3.49). --- */
+    /* Centred under the drawing, because that is what it drives. Two rows: the pair that walks
+       the construction, then the one that abandons it — a Restart sitting shoulder to shoulder
+       with Draw next is one mis-click away from throwing the work away. */
+    .stage-strip {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: var(--space-4);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-4);
+      background: color-mix(in srgb, var(--color-paper) 88%, transparent);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      z-index: 5;
+    }
+    .stage-strip[hidden] { display: none; }
+    .stage-strip__row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .stage-strip__readout {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--color-ink-secondary);
+      text-align: center;
+      white-space: nowrap;
+    }
+    /* One row now: Restart | Draw next | Previous, with the status line above it. */
+    .stage-strip__row .btn { white-space: nowrap; }
+
+    /* --- Segmented control (the four principal directions) -------------------------------------
+         A segmented group, not four toggles: the camera is at one named direction or at none, and
+         the pressed state is pushed FROM the scene. Each button carries the direction AND the name
+         of the drawing it produces - the pairing the whole step installs (Two-Cue Rule). --- */
+    .segmented {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1px;
+      background: var(--color-border);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+    }
+    .segmented__btn {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 2px;
+      min-height: 44px;
+      padding: var(--space-2) var(--space-3);
+      font: inherit;
+      text-align: left;
+      color: var(--color-ink);
+      background: var(--color-paper);
+      border: 0;
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard);
+    }
+    .segmented__btn:active { transform: scale(0.97); }
+    .segmented__btn:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .segmented__label { font-weight: 700; font-size: var(--text-sm); }
+    .segmented__sub {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--color-ink-secondary);
+    }
+    .segmented__btn[aria-pressed="true"] {
+      background: var(--color-accent);
+      color: var(--color-paper);
+    }
+    .segmented__btn[aria-pressed="true"] .segmented__sub { color: var(--color-paper); }
+    @media (hover: hover) and (pointer: fine) {
+      .segmented__btn[aria-pressed="false"]:hover { background: var(--color-accent-soft); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .segmented__btn { transition: none !important; }
+      .segmented__btn:active { transform: none; }
+    }
+
+    /* --- Floating viewport controls ------------------------------------------------------------
+         Copied token-for-token from `graphics_module_1_topic_1_1_dimensioning`, the reviewed
+         benchmark for this platform's viewport chrome: same corner offset, same 34 px chip on a
+         44 px hit target, same pill, same label, same hover / press / focus / pressed states, same
+         z-index. Pressed state lives on `aria-pressed` — in the accessibility tree, not in a class
+         of our own — which is also the Two-Cue partner (fill inversion) to the label text. --- */
+    /*
+      Position, inset, gap and z-index are `graphics_module_1_topic_1_1_dimensioning`'s exactly.
+      That topic drops its chips a button-height because a caption band occupies the strip above
+      them; this topic has no caption band, so the WIZARD TOGGLE is aligned to the same band (see
+      `.wizard-toggle` below) rather than leaving the chip stranded on an empty row. The two
+      controls then read as one deliberate band across the top of the viewport, which is what the
+      benchmark looks like, instead of reproducing the shape RULES.md §2.23 warns about.
+    */
+    .vp-controls {
+      position: absolute;
+      top: calc(44px + var(--space-5));
+      left: var(--space-4);
+      display: flex;
+      gap: var(--space-2);
+      z-index: 5;
+    }
+    .vp-chip {
+      position: relative;
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 0 var(--space-3);
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      background: var(--color-panel);
+      color: var(--color-ink-secondary);
+      font-family: var(--font-sans);
+      font-size: 0.8125rem;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    /* The chip reads at 34 px and is HIT at 44 px (DESIGN.md §4.1) — the benchmark's trick for
+       meeting the target floor without a control that looks oversized against the drawing. */
+    .vp-chip::before {
+      content: ""; position: absolute;
+      top: 50%; left: 50%; transform: translate(-50%, -50%);
+      width: 100%; height: 100%; min-width: 44px; min-height: 44px;
+    }
+    @media (hover: hover) and (pointer: fine) {
+      .vp-chip:hover:not(:disabled) { background: var(--color-paper); border-color: var(--color-accent); }
+    }
+    .vp-chip:active:not(:disabled) { transform: scale(0.97); }
+    .vp-chip:disabled { opacity: 0.45; cursor: not-allowed; }
+    .vp-chip:disabled:hover { background: var(--color-panel); border-color: var(--color-border); }
+    .vp-chip:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .vp-chip[aria-pressed="true"] { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-paper); }
+    .vp-chip[aria-pressed="true"]:hover { background: var(--color-accent-strong); border-color: var(--color-accent-strong); color: var(--color-paper); }
+    @media (prefers-reduced-motion: reduce) {
+      .vp-chip { transition: none !important; }
+      .vp-chip:active:not(:disabled) { transform: none; }
+    }
+
+    /* Dimensions off: the sheet keeps every line and loses every number. A class, not a relayout,
+       so a half-drawn construction keeps its place. The class lands on the sheet's MOUNT
+       (#proj-sheet-stage), which is what `setDimensions()` is handed — not on .psheet outside it. */
+    .is-nodims .psheet__stage--dimension { display: none; }
+
+    /* --- Collapsible secondary sections. Native <details>, so the disclosure, the keyboard
+         behaviour and the accessible name are the browser's and this topic adds no component. --- */
+    .fold {
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-paper);
+    }
+    .fold + .fold { margin-top: var(--space-2); }
+    .fold > summary {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      min-height: 44px;
+      padding: 0 var(--space-3);
+      font-size: var(--text-sm);
+      font-weight: 700;
+      color: var(--color-ink);
+      cursor: pointer;
+      list-style: none;
+    }
+    .fold > summary::-webkit-details-marker { display: none; }
+    .fold > summary::before {
+      content: "";
+      flex: none;
+      width: 0;
+      height: 0;
+      border-left: 6px solid var(--color-ink-secondary);
+      border-top: 4px solid transparent;
+      border-bottom: 4px solid transparent;
+      transition: transform var(--dur-fast) var(--ease-standard);
+    }
+    .fold[open] > summary::before { transform: rotate(90deg); }
+    .fold > summary:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .fold__body {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-3);
+      padding: 0 var(--space-3) var(--space-3);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .fold > summary::before { transition: none !important; }
+    }
+
+    /* --- The Dimensions & Labels switch. The platform's drafting-square checkbox (DESIGN.md
+         §5.4) — an empty box versus a filled accent box with a tick is a SHAPE cue, not colour
+         alone. --- */
+    .switch-row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      min-height: 44px;
+      cursor: pointer;
+    }
+    .switch-row__box {
+      flex: none;
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      accent-color: var(--color-accent);
+      cursor: pointer;
+    }
+    .switch-row__box:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .switch-row__text { font-size: var(--text-sm); color: var(--color-ink); }
+
+    /* --- Step 2's side-view choice. A radio pair, because it is one question with two answers
+         and the learner must be able to see both before choosing. --- */
+    .choice { display: flex; flex-direction: column; gap: var(--space-1); }
+    .choice__opt {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      min-height: 44px;
+      padding: 0 var(--space-3);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-paper);
+      font-size: var(--text-sm);
+      cursor: pointer;
+    }
+    .choice__opt input { accent-color: var(--color-accent); cursor: pointer; }
+    .choice__opt input:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .choice__opt:has(input:checked) {
+      border-color: var(--color-accent);
+      background: var(--color-accent-soft);
+    }
+    .choice__where {
+      margin-left: auto;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      color: var(--color-ink-secondary);
+    }
+
+    /* --- Dimension values on the SOLID. The benchmark's `.vp-value` register exactly: mono,
+         --text-xs, tabular, a paper wash so the value breaks the line it sits on. Billboarded by
+         CSS2D, so no Method-1 rotation is needed or wanted. --- */
+    .vp-dim {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      line-height: 1;
+      color: var(--color-ink);
+      background: color-mix(in srgb, var(--color-paper) 92%, transparent);
+      border-radius: var(--radius-xs);
+      padding: 1px 4px;
+      font-variant-numeric: tabular-nums;
+      white-space: nowrap;
+      pointer-events: none;
+      user-select: none;
+    }
+    .vp-dim--note { color: var(--color-ink-secondary); }
+
+    /* --- The Front arrow's label. The benchmark's `.vp-callout` geometry exactly — same size,
+         weight, radius and padding — recoloured to the accent it shares with the arrow it names,
+         which is this topic's one viewport accent (ADR-130). Borderless: the arrow already carries
+         the line, and a second outline round three letters is what made it read as a button. --- */
+    .vp-label {
+      font-family: var(--font-sans);
+      pointer-events: none;
+      user-select: none;
+    }
+    .vp-label--front {
+      font-size: var(--text-xs);
+      font-weight: 700;
+      line-height: 1;
+      color: var(--color-accent);
+      background: color-mix(in srgb, var(--color-paper) 90%, transparent);
+      border-radius: var(--radius-xs);
+      padding: 2px 5px;
+      white-space: nowrap;
+    }
+
+    /* --- The view / stage explanation panel. One box, whatever it currently describes. --- */
+    .explain {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      padding: var(--space-3);
+      background: var(--color-accent-soft);
+      border-radius: var(--radius-sm);
+    }
+    .explain__title {
+      font-size: var(--text-sm);
+      font-weight: 700;
+      color: var(--color-ink);
+      margin: 0;
+    }
+    .explain__body {
+      font-size: var(--text-sm);
+      line-height: 1.5;
+      color: var(--color-ink);
+      margin: 0;
+    }
+
+    /* --- Step 2's line-alphabet legend. Colour is never the only signal, so each row shows the
+         actual stroke it names (RULES.md 4.6). --- */
+    .legend { display: flex; flex-direction: column; gap: var(--space-2); }
+    .legend__row { display: flex; align-items: baseline; gap: var(--space-3); }
+    .legend__swatch { flex: 0 0 46px; height: 10px; overflow: visible; }
+    .legend__swatch line { stroke: var(--color-ink); }
+    .legend__text { font-size: var(--text-sm); line-height: 1.45; color: var(--color-ink-secondary); }
+    .legend__text b { color: var(--color-ink); }
+
+    .step-action { align-self: flex-start; }
+    .step-question {
+      font-size: var(--text-base);
+      font-weight: 700;
+      color: var(--color-ink);
+      margin: 0;
+    }
+    .step-list {
+      margin: 0;
+      padding-left: 1.1em;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      font-size: var(--text-sm);
+      line-height: 1.45;
+      color: var(--color-ink-secondary);
+    }
+
+    /* Decorative hover only for a real pointing device — a faked hover on touch would latch
+       a stuck highlight after a tap. */
+    @media (hover: hover) and (pointer: fine) {
+      .wizard-toggle:hover {
+        background: var(--color-paper);
+        border-color: var(--color-bench-grey);
+        color: var(--color-ink);
+      }
+      .vp-hint__dismiss:hover { background: var(--color-border); color: var(--color-ink); }
+      .notice__dismiss:hover { background: var(--color-panel); border-color: var(--color-bench-grey); }
+      .rail__item:not(.is-current) .rail__btn:not(:disabled):hover .rail__marker {
+        box-shadow: 0 0 0 4px var(--color-accent-soft);
+      }
+      .rail__item:not(.is-current) .rail__btn:not(:disabled):hover .rail__label {
+        color: var(--color-ink);
+      }
+      .field__range:hover::-webkit-slider-thumb { background: var(--color-accent-strong); }
+      .field__range:hover::-moz-range-thumb     { background: var(--color-accent-strong); }
+      .field__num:hover { border-color: var(--color-bench-grey); }
+      .field__select:hover { border-color: var(--color-bench-grey); }
+      .btn:hover { background: var(--color-panel); border-color: var(--color-bench-grey); }
+      .btn:disabled:hover { background: var(--color-paper); border-color: var(--color-border); }
+      .btn--primary:hover { background: var(--color-accent-strong); border-color: var(--color-accent-strong); }
+      .btn--primary:disabled:hover { background: var(--color-accent); border-color: var(--color-accent); }
+      .btn--ghost:hover { background: var(--color-panel); border-color: var(--color-border); }
+      .term:hover { color: var(--color-accent); }
+    }
+
+    /* ============================================================
+       Narrow viewports: stack vertically so the sim is never squeezed to nothing
+       (platform contract: advise, never block).
+       ============================================================ */
+    @media (max-width: 767px) {
+      body { flex-direction: column; }
+
+      #sim-viewport {
+        order: 0;
+        width: 100%;
+        flex: 0 0 42%;
+        height: auto;
+        min-height: 0;
+      }
+      body.wizard-collapsed #sim-viewport { flex: 1 1 100%; }
+
+      /* The panel now stacks BELOW the viewport, so the chevron points along that axis. */
+      .wizard-toggle__icon { transform: rotate(90deg); }
+      body.wizard-collapsed .wizard-toggle__icon { transform: rotate(-90deg); }
+
+      #wizard {
+        order: 1;
+        width: 100%;
+        height: auto;
+        min-height: 0;
+        flex: 1 1 auto;
+        flex-direction: column;
+        border-left: none;
+        border-top: 1px solid var(--color-border);
+      }
+      .wizard-main { flex-direction: column; }
+      #step-card { order: 1; flex: 1 1 auto; min-height: 0; }
+      #step-rail {
+        order: 2;
+        flex: 0 0 auto;
+        flex-direction: row;
+        width: 100%;
+        padding: var(--space-3) 0 0;
+      }
+      #step-rail::before {
+        left: 30px;
+        right: 30px;
+        top: calc(var(--space-3) + 17px);
+        bottom: auto;
+        width: auto;
+        height: 2px;
+        transform: translateY(-50%);
+      }
+      /* Below the two-pane threshold the sheet becomes the other VIEW rather than a window
+         over this one: it takes the whole port and the 3D pane stops competing for width
+         (RULES.md 3.63 - a narrow screen gets a different layout, not a scaled one). */
+      body.sheet-open #sim-viewport { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(120px, 34vh) minmax(0, 1fr); }
+      .stage-strip { left: 50%; transform: translateX(-50%); flex-wrap: wrap; justify-content: center; bottom: var(--space-3); }
+    }
+
+    @media (max-width: 900px) {
+      .segmented { grid-template-columns: minmax(0, 1fr); }
+    }
+  </style>
+</head>
+<body>
+  <!-- Boot/runtime failure fallback: shown only when the sim cannot start. role="alert"
+       so assistive tech announces it when revealed. -->
+  <div id="sim-fallback" class="sim-fallback" role="alert" hidden>
+    <div class="sim-fallback__inner">
+      <svg class="sim-fallback__icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M24 8 40 17 24 26 8 17Z" />
+        <path d="M40 17V31L24 40 8 31V17" />
+        <path d="M8.5 8.5 39.5 39.5" />
+      </svg>
+      <h1 class="sim-fallback__title" id="sim-fallback-title">We could not load the simulation</h1>
+      <p class="sim-fallback__body" id="sim-fallback-body">It looks like the connection dropped while the 3D tools were starting up. Check your internet connection, then reload to try again.</p>
+      <button type="button" class="btn btn--primary" id="sim-fallback-reload">Reload the simulation</button>
+    </div>
+  </div>
+
+  <!-- Transient WebGL context-loss recovery chip (GPU reset / long backgrounding). -->
+  <div id="sim-context-lost" class="sim-restoring" role="status" hidden>
+    <span>Restoring the 3D view&hellip;</span>
+  </div>
+
+  <!-- Mobile advisory. Hidden until main.js confirms a < 768px viewport. -->
+  <aside id="mobile-notice" role="status" hidden>
+    <p class="notice__text">Best experienced on desktop.</p>
+    <button id="mobile-notice-dismiss" class="notice__dismiss" type="button">Dismiss</button>
+  </aside>
+
+  <!-- Guided Stepper chrome — step rail + step card. stepper.js drives it. -->
+  <aside id="wizard" aria-label="Guided steps">
+    <div class="wizard-main">
+    <ol id="step-rail" aria-label="Progress">
+      <li class="rail__item" data-step="1"><button type="button" class="rail__btn"><span class="rail__marker">1</span><span class="rail__label">Look at the Object</span></button></li>
+      <li class="rail__item" data-step="2"><button type="button" class="rail__btn"><span class="rail__marker">2</span><span class="rail__label">Build the Drawing</span></button></li>
+    </ol>
+
+    <!--
+      Not a live region. #sim-status (role="status", aria-live="polite") is the single
+      announcement channel — stepper.js narrates "Step X of N" there on every transition.
+    -->
+    <section id="step-card">
+      <div class="card__scroll">
+      <header>
+        <div class="card__eyebrow-row">
+          <p class="card__eyebrow">Step <span id="step-current">1</span> of <span id="step-total">2</span></p>
+        </div>
+        <h2 class="card__title" id="step-title">Look at the Object</h2>
+        <p class="card__lead" id="step-lead"></p>
+      </header>
+
+      <div class="card__body">
+        <!-- STEP 1 - Look at the object ------------------------------------------------------->
+        <section class="step-panel" data-step="1">
+          <div class="dock__group">
+            <h3 class="dock__group-title">Object</h3>
+            <label class="sr-only" for="object-select">Object</label>
+            <select id="object-select" class="field__select" aria-label="Choose an object"></select>
+          </div>
+
+          <div class="dock__group">
+            <h3 class="dock__group-title">Look from one direction</h3>
+            <div id="view-buttons" class="segmented" role="group" aria-label="Principal viewing directions"></div>
+            <button id="view-home" class="btn btn--nav" type="button">Free Orbit</button>
+
+            <!-- With the direction buttons, because it is another viewing aid: it marks which
+                 face the elevation is taken from. -->
+            <label class="switch-row" for="front-toggle">
+              <input class="switch-row__box" id="front-toggle" type="checkbox" checked />
+              <span class="switch-row__text">Front arrow</span>
+            </label>
+
+            <div class="explain">
+              <p class="explain__title" id="view-note-title">Turning it yourself</p>
+              <p class="explain__body" id="view-note"></p>
+            </div>
+          </div>
+
+          <details class="fold" open>
+            <summary>About this object</summary>
+            <div class="fold__body">
+              <p class="dock__note" id="object-blurb"></p>
+              <p class="dock__note">The blue arrow marks the <strong>front</strong>. Whoever makes
+                the drawing decides which face that is; every other view is named from it.</p>
+            </div>
+          </details>
+
+          <details class="fold">
+            <summary>Why only four directions?</summary>
+            <div class="fold__body">
+              <p class="dock__note">A view is taken from <strong>exactly one</strong> of the four.
+                Turn the object even slightly off one and you get a picture that is nice to look at
+                and impossible to measure. That is what
+                <button class="term" type="button">orthographic projection<span class="term__pop">Orthographic projection: you are imagined to be infinitely far away, so your lines of sight stay parallel and hit the paper square-on. That is why a face pointing straight at you is drawn at its real size, no matter how far away it is.</span></button>
+                means.</p>
+            </div>
+          </details>
+        </section>
+
+        <!-- STEP 2 - Build the drawing ---------------------------------------------------------->
+        <section class="step-panel" data-step="2" hidden>
+          <div class="dock__group">
+            <h3 class="dock__group-title">Which side view?</h3>
+            <div id="side-choice" class="choice" role="radiogroup" aria-label="Which side view to draw">
+              <label class="choice__opt">
+                <input type="radio" name="side-view" value="right" />
+                <span>Right side view</span>
+                <span class="choice__where">drawn on the left</span>
+              </label>
+              <label class="choice__opt">
+                <input type="radio" name="side-view" value="left" />
+                <span>Left side view</span>
+                <span class="choice__where">drawn on the right</span>
+              </label>
+            </div>
+          </div>
+
+          <div class="dock__group">
+            <h3 class="dock__group-title">The drawing so far</h3>
+            <div class="explain">
+              <p class="explain__title" id="stage-note-title">A blank sheet</p>
+              <p class="explain__body" id="stage-note-body"></p>
+            </div>
+          </div>
+
+          <details class="fold" open>
+            <summary>Drawing rules</summary>
+            <div class="fold__body">
+              <p class="dock__note">The side you look from and the side it is drawn on are
+                <strong>opposite</strong>. That is what
+                <button class="term" type="button">first-angle projection<span class="term__pop">First-angle projection: the object is imagined to sit between you and the paper, so each view is pushed through onto the paper on the far side. Fold that paper flat and the top view ends up below the front view, and each side view ends up on the opposite side. India and most of Europe use this. North America uses third angle, which puts them the other way round.</span></button>
+                does, and it is the thing most people get backwards at first.</p>
+              <ol class="step-list">
+                <li><b>Front view</b> first — everything else is measured from it.</li>
+                <li><b>Top view</b> below it, lines dropped straight down.</li>
+                <li><b>Side view</b> beside it, heights carried across.</li>
+              </ol>
+            </div>
+          </details>
+
+          <details class="fold">
+            <summary>Construction notes</summary>
+            <div class="fold__body">
+            <p class="dock__note">Press <strong>Draw next</strong> under the drawing. The object
+              turns to face the direction each view is taken from as that view is drawn, so the two
+              halves of the screen always agree.</p>
+            <div class="legend">
+              <div class="legend__row">
+                <svg class="legend__swatch" viewBox="0 0 46 10" aria-hidden="true"><line x1="1" y1="5" x2="45" y2="5" stroke-width="1" stroke="var(--color-bench-grey)"/></svg>
+                <span class="legend__text"><b>Building lines</b> — thin, and only there to line the views up. They fade once they have done their job.</span>
+              </div>
+              <div class="legend__row">
+                <svg class="legend__swatch" viewBox="0 0 46 10" aria-hidden="true"><line x1="1" y1="5" x2="45" y2="5" stroke-width="2.4"/></svg>
+                <span class="legend__text"><b>Outline</b> — thick and solid. The edges you could really see from this direction.</span>
+              </div>
+              <div class="legend__row">
+                <svg class="legend__swatch" viewBox="0 0 46 10" aria-hidden="true"><line x1="1" y1="5" x2="45" y2="5" stroke-width="1.4" stroke-dasharray="6 3.5"/></svg>
+                <span class="legend__text"><b>Hidden edges</b> — short dashes for edges buried inside the material. Without them, nobody can tell there is a hole there.</span>
+              </div>
+              <div class="legend__row">
+                <svg class="legend__swatch" viewBox="0 0 46 10" aria-hidden="true"><line x1="1" y1="5" x2="45" y2="5" stroke-width="1.1" stroke-dasharray="12 3 2 3"/></svg>
+                <span class="legend__text"><b>Centre lines</b> — long chain through anything round. It says "this is round, and this is the middle".</span>
+              </div>
+            </div>
+            <p class="dock__note">Sizes go on last, in the
+              <button class="term" type="button">aligned system<span class="term__pop">Aligned system: every size is written along its own dimension line and sits just above it, turned so you can read the whole sheet from the bottom edge or the right-hand edge. The other way, the unidirectional system, writes every size horizontally.</span></button>
+              — along the line each one measures, and given once. The
+              <strong>Dimensions</strong> button at the top left hides and shows them at any
+              time, on the drawing and on the solid alike.</p>
+            </div>
+          </details>
+        </section>
+      </div>
+      </div><!-- /.card__scroll -->
+
+      <footer class="card__nav">
+        <!-- Ghost Reset, guarded by an inline two-state confirm (RULES.md §4.19). Only
+             "Yes" fires simAPI.reset() — the single reset path (§2.9). -->
+        <div id="reset-control">
+          <button id="btn-reset" class="btn btn--ghost" type="button">Reset</button>
+          <div id="reset-confirm" class="reset-confirm" role="group" aria-label="Reset confirmation" hidden>
+            <span class="reset-confirm__prompt">Reset everything?</span>
+            <span class="reset-confirm__sep" aria-hidden="true">·</span>
+            <button id="btn-reset-yes" class="btn btn--ghost reset-confirm__action" type="button" aria-label="Yes, reset everything">Yes</button>
+            <span class="reset-confirm__sep" aria-hidden="true">/</span>
+            <button id="btn-reset-cancel" class="btn btn--ghost reset-confirm__action" type="button" aria-label="Cancel reset">Cancel</button>
+          </div>
+        </div>
+        <button id="btn-back" class="btn btn--nav" type="button" hidden>Back</button>
+        <button id="btn-next" class="btn btn--primary btn--nav" type="button">Next</button>
+      </footer>
+    </section>
+    </div>
+  </aside>
+
+  <!-- The 3D teaching viewport. main.js mounts the WebGL canvas here; Step 2 splits it in two
+       and hands the right half to the drawing sheet. -->
+  <main id="sim-viewport" aria-label="3D simulation viewport. Drag to orbit.">
+    <!-- Hide/show the guided-steps panel to enlarge the 3D view. -->
+    <button id="wizard-toggle" class="wizard-toggle" type="button" aria-controls="wizard" aria-expanded="true" title="Hide steps panel">
+      <svg class="wizard-toggle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 6l6 6-6 6" />
+      </svg>
+      <span class="sr-only">Toggle steps panel</span>
+    </button>
+
+    <!-- Viewport toolbar. One chip today; the same state as the step card's switch, pushed from
+         main.js so the two can never disagree. -->
+    <div class="vp-controls">
+      <!-- The benchmark's chip, carrying this topic's primary annotation switch: the sizes are
+           read on the model, so the control for them lives where the model is. -->
+      <button type="button" class="vp-chip" id="vp-dims" aria-pressed="true"
+              title="Show or hide the engineering dimensions">Dimensions</button>
+    </div>
+
+    <!-- The first-angle drawing sheet (Step 2). projectionSheet.js builds its SVG from the
+         object's own data inside the single rebuild(), so it can never disagree with the solid
+         beside it. One box, one sizing rule, and it exists only on the step it is the subject
+         of (RULES.md 3.66). -->
+    <aside id="proj-sheet" class="psheet" aria-label="First-angle orthographic drawing">
+      <p class="psheet__title">First-angle projection</p>
+      <div id="proj-sheet-stage" class="psheet__stage-box"></div>
+    </aside>
+
+    <!-- Step 2's stage transport. One press draws one thing; Draw next is disabled while a stage
+         is still drawing, and Back is never disabled and never replays (RULES.md 3.49). -->
+    <div id="stage-strip" class="stage-strip" role="group" aria-label="Drawing stages" hidden>
+      <span id="stage-readout" class="stage-strip__readout" aria-live="off">0 of 0</span>
+      <div class="stage-strip__row">
+        <button id="stage-restart" class="btn btn--ghost" type="button">Restart</button>
+        <button id="stage-next" class="btn btn--primary btn--nav" type="button">Draw next</button>
+        <button id="stage-prev" class="btn btn--nav" type="button">Previous</button>
+      </div>
+    </div>
+
+    <!-- One-time orbit hint: appears with the first solid, dismisses on first drag. -->
+    <div id="vp-orbit-hint" class="vp-hint" role="status" hidden>
+      <svg class="vp-hint__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+        <path d="M21 3.5v4h-4" />
+      </svg>
+      <span>Drag to rotate the view</span>
+      <button id="vp-orbit-dismiss" class="vp-hint__dismiss" type="button" aria-label="Dismiss hint">&times;</button>
+    </div>
+
+    <!-- Contextual spotlight chip (onboarding.js). Shares the bottom-centre slot with the
+         orbit hint; one plays at a time so chips never stack (Quiet Chrome). -->
+    <div id="vp-spotlight" class="vp-hint vp-spotlight" role="status" hidden>
+      <span class="vp-spotlight__dot" aria-hidden="true"></span>
+      <span class="vp-spotlight__text"></span>
+      <button id="vp-spotlight-dismiss" class="vp-hint__dismiss" type="button" aria-label="Dismiss hint">&times;</button>
+    </div>
+
+    <!-- Flow note: flashed in step with something the learner just watched happen.
+         aria-hidden — #sim-status already narrates it, so this is not a second live region. -->
+    <div id="vp-flow-note" class="vp-note" aria-hidden="true" hidden>
+      <svg class="vp-note__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 11v5" />
+        <path d="M12 7.5h.01" />
+      </svg>
+      <span class="vp-note__text"></span>
+    </div>
+  </main>
+
+  <!-- Live region: main.js + stepper.js narrate step + mode changes for screen readers. -->
+  <div id="sim-status" class="sr-only" role="status" aria-live="polite"></div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
