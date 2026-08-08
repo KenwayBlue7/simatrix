@@ -196,8 +196,12 @@ function buildStepNode(step) {
     });
     group.appendChild(dot);
     if (step.label) {
+      // dx/dy default to the original fixed +4/-4 offset — assignLabelPositions() (below)
+      // overrides them per-recipe when a construction has enough points/labels for
+      // collisions to be possible; a construction with only a couple of labels never
+      // triggers the greedy search and keeps today's exact placement.
       const text = el('text', {
-        x: step.p.x + 4, y: step.p.y - 4,
+        x: step.p.x + (step.dx ?? 4), y: step.p.y + (step.dy ?? -4),
         fill: roleColor(step.role), 'font-family': 'var(--font-sans)',
         'font-size': 6.5, 'font-weight': 700,
       });
@@ -294,6 +298,77 @@ export function clear(group) {
   while (group.firstChild) group.removeChild(group.firstChild);
 }
 
+/** Approximate on-screen box a label's text will occupy at a given dx/dy offset from its
+ *  point — text is left-anchored at p.x+dx, sits just above p.y+dy (matches the 'point'
+ *  branch above), so the box extends right of x and up from y. Width is a rough
+ *  per-character estimate (font-size 6.5, bold) — doesn't need to be exact, only good
+ *  enough to catch real overlaps. */
+function labelBox(step, dx, dy) {
+  const w = step.label.length * 4.3 + 1.5;
+  const h = 7;
+  return { x0: step.p.x + dx, x1: step.p.x + dx + w, y0: step.p.y + dy - h, y1: step.p.y + dy + 1.5 };
+}
+
+function pointBox(p, r) {
+  return { x0: p.x - r, x1: p.x + r, y0: p.y - r, y1: p.y + r };
+}
+
+function boxesOverlap(a, b, pad = 1) {
+  return a.x0 - pad < b.x1 && a.x1 + pad > b.x0 && a.y0 - pad < b.y1 && a.y1 + pad > b.y0;
+}
+
+/** 12 candidate directions around a point, at 3 radii (the hint's own, then 1.5x and 2.2x
+ *  that) — starting from the point's own dx/dy hint (constructions.js's radial-outward
+ *  offset, when it supplies one) so the FIRST try is usually already the semantically-right
+ *  side of the point, falling back to a rotating, then widening, search only when that
+ *  collides with something. Points with no hint start from the plain +4/-4 direction, keeping
+ *  today's default look. */
+function candidateOffsets(hintDx, hintDy) {
+  const mag = hintDx != null ? Math.hypot(hintDx, hintDy) : Math.hypot(4, 4);
+  const baseAngle = hintDx != null ? Math.atan2(hintDy, hintDx) : Math.atan2(-4, 4);
+  const turnsDeg = [0, 45, -45, 90, -90, 135, -135, 180, 22.5, -22.5, 67.5, -67.5];
+  const out = [];
+  // Three rings — the third (2.2x) is the escape hatch for genuinely tight spots (e.g.
+  // n=12 near max side in the semicircle-division method, where several division points
+  // sit within a label-box-width of each other) that the first two rings can't clear.
+  for (const radius of [mag, mag * 1.5, mag * 2.2]) {
+    for (const turn of turnsDeg) {
+      const a = baseAngle + (turn * Math.PI) / 180;
+      out.push({ dx: radius * Math.cos(a), dy: radius * Math.sin(a) });
+    }
+  }
+  return out;
+}
+
+/** Greedy label-collision pass, run ONCE over a whole steps list before either static or
+ *  animated rendering — so a label's position is decided up front and never jumps mid-
+ *  animation. Every point (labelled or not) is a fixed obstacle at its own marker-dot size;
+ *  every LABELLED point additionally gets the first candidate offset (see candidateOffsets)
+ *  whose text box doesn't overlap an already-placed label or any marker dot — including the
+ *  case where two points sit at the exact same coordinate (e.g. a division point and the
+ *  vertex it derives), which no single fixed offset can resolve for both. Returns a new
+ *  array; steps without a label, or that aren't 'point' steps, pass through unchanged. */
+function assignLabelPositions(steps) {
+  const occupied = [];
+  for (const step of steps) {
+    if (step.kind === 'point') {
+      occupied.push(pointBox(step.p, (step.role === 'result' ? 1.7 : 1.1) + 1));
+    }
+  }
+  const resolved = [];
+  for (const step of steps) {
+    if (step.kind !== 'point' || !step.label) { resolved.push(step); continue; }
+    const candidates = candidateOffsets(step.dx, step.dy);
+    let chosen = candidates[0];
+    for (const c of candidates) {
+      if (!occupied.some((b) => boxesOverlap(labelBox(step, c.dx, c.dy), b))) { chosen = c; break; }
+    }
+    occupied.push(labelBox(step, chosen.dx, chosen.dy));
+    resolved.push({ ...step, dx: chosen.dx, dy: chosen.dy });
+  }
+  return resolved;
+}
+
 /** The axis-aligned bounding box (drawing units) of a list of recipe steps, including
  *  each dim mark's own offset reach — main.js calls this before Play so the viewport
  *  (viewTransform.js's ensureVisible()) can confirm a zoomed-in/panned view still shows
@@ -343,7 +418,7 @@ export function computeBounds(steps) {
 /** Draw a list of steps immediately at full opacity — no animation. Used for the "Given"
  *  step's static display and for landing on a later wizard step without pressing Play. */
 export function renderStatic(group, steps) {
-  for (const step of steps) {
+  for (const step of assignLabelPositions(steps)) {
     const { node, reveal, finalize } = buildStepNode(step);
     group.appendChild(node);
     reveal(1);
@@ -360,13 +435,14 @@ export function renderStatic(group, steps) {
  * @param {{onComplete?: () => void}} [opts]
  */
 export function playSteps(group, steps, { onComplete } = {}) {
+  const resolvedSteps = assignLabelPositions(steps);
   let cancelled = false;
   let activeTween = null;
 
   function playAt(i) {
     if (cancelled) return;
-    if (i >= steps.length) { onComplete?.(); return; }
-    const step = steps[i];
+    if (i >= resolvedSteps.length) { onComplete?.(); return; }
+    const step = resolvedSteps[i];
     const { node, reveal, finalize } = buildStepNode(step);
     group.appendChild(node);
     activeTween = tween({

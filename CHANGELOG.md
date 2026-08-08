@@ -3,6 +3,58 @@
 All notable changes at the Simatrix project root (spanning Module1, Module2, and the
 topic deploy copies). Per-module changelogs live inside each module folder.
 
+## 2026-08-08
+- Fixed: `graphics_module_1_topic_1_foundations`'s vertical (H) dimension value ("46") rendered
+  to the right of/below its vertical dimension line in Aligned mode, against BIS/ISO convention
+  (text should sit above the line — which, once rotated −90° CCW to read bottom-to-top, means
+  screen-LEFT of the line, not right). The offset (`annotations.js`) and the rotation
+  (`labelLayer.js`) disagreed about which side "above" was, because the offset was a bare world
+  position baked in before rotation was known, and the rotation logic never repositioned. Reworked
+  the contract so `annotations.js` emits an anchor plus per-mode direction vectors
+  (`normalAligned`/`normalUni`), and `labelLayer.js` (which owns `dimMode`) applies rotation and
+  offset together via one `applyMode()` — Aligned now offsets left, Unidirectional keeps the
+  original right-side placement (no regression). Also introduced a shared `DIM_TEXT_GAP` constant,
+  replacing two previously-mismatched magic-number gaps (`0.22` vs `0.3`). Verified live in Chrome:
+  both dimension mode toggles, several times each, correct on every pass.
+- Fixed: `graphics_diploma_module_1_topic_1_4_regular_polygons`'s n-gon "Perpendicular Bisector"
+  method never drew a perpendicular bisector at all — four floating compass-arc marks followed by
+  a "calibration arc" whose radius was read directly off the closed-form circumcentre (an arc drawn
+  through the answer, not deriving it), with no bisector line, no marked intersection points, and
+  none of *Regular Polygons.pdf* Fig 5.24's centre-point ladder (4, 5, 6, 7…). Rebuilt the full
+  sequence: the bisector line and its two intersection points, point 4 and point 6 (both real,
+  exact compass arcs), point 5 (the book's own literal midpoint), then a ladder to the selected n —
+  placed at the TRUE apothem rather than the book's own equal-interval extrapolation, which is only
+  exact through n=6 and leaves an octagon visibly open by ~6.6° at n=8. Also rebuilt the "Semicircle
+  Division" method to match Fig 5.23 (point P extending AB, semicircle centred on B not A,
+  divisions numbered P→A, no circumcircle — Fig 5.23 doesn't draw one); its second division point
+  independently derives vertex C exactly, verified for n=3–12, with the remaining vertices using
+  the same closed-form-driven compass step every other method here already uses (an attempted
+  ray-cut derivation for every vertex was tried and numerically disproved for n≥7). See
+  `DECISIONS.md` ADR-143.
+- Changed: that same topic's Step 1 picker option renamed "General Regular Polygon" →
+  "N-Sided Regular Polygon" (`index.html`, `src/constructions.js` — two independent occurrences,
+  the construction `id: 'ngon'` unchanged).
+- Fixed (same-day follow-up): the "Semicircle Division" entry above was itself wrong on two counts,
+  found during a Phase A audit against `polygon.pdf` (the authoritative source for this topic,
+  not previously checked against for this method). The semicircle is centred on **A**, not B — the
+  method extends AB past A to C, not past B to P — and the "ray-cut derivation was disproved for
+  n≥7" claim was false: it's inscribed-angle exact for every n, and the earlier failure was a
+  ray-origin bug (rays drawn from B), not a geometric limit. `buildSemicircleDivision()`
+  (`src/constructions.js`) was rebuilt A-centred, with an actual ray drawn from A through every
+  division point and a real arc-cut deriving every vertex past B (not just C) — verified exact for
+  n=3–12, bounds-checked against the 200×140 viewBox for the full n=3–12 × side-range sweep, and
+  confirmed live in Chrome (full Play animation, Verify step text, Reset, both methods, pentagon/
+  hexagon regression check, zero console errors). Also fixed: `renderConstruction.js`'s point-label
+  placement had no collision avoidance at all (an unconditional `+4/-4` offset) — crowded further by
+  the new rays' extra points, and already exhibiting an exact-coincidence collision (a division
+  label and a vertex label landing on the same point) independent of the rays. Replaced with a
+  greedy candidate-search placement pass, seeded by radial-outward label hints from
+  `constructions.js`, run once per recipe before either static or animated rendering — resolves the
+  exact-coincidence case and the n=12-near-max-side crush, though the single most extreme corner
+  (n=12, side=42) still shows light residual crowding among the densest division labels. See
+  `DECISIONS.md` ADR-143 (updated in place, not superseded — nothing from the original entry had
+  been committed yet) and the new `graphics_diploma_module_1_topic_1_4_regular_polygons/CHANGELOG.md`.
+
 ## 2026-08-07
 - Fixed: Vishnu's 3 merged topics (`graphics_module_1_topic_1_1_dimensioning`,
   `graphics_module_2_topic_0_introduction_to_orthographic_projection`,

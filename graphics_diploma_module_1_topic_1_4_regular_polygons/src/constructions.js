@@ -12,21 +12,31 @@
 //
 // New to this topic: EVERY construction offers 2-3 alternate METHODS for reaching the SAME
 // regular polygon (a live method switcher, uiManager.js's #method-switcher — see CLAUDE.md).
-// `regularPolygonVertices(A, B, n)` below is the one shared ground-truth calculation (a
-// regular n-gon on a stated side AB has exactly one shape: circumradius R = s/(2 sin(π/n)),
-// vertices spaced 360°/n apart around a computed centre O) — every method then stages its
-// OWN distinct sequence of 'move' steps that visibly derives that SAME O/vertex set, so
-// switching methods on one polygon shows a different derivation path converging on an
-// identical result, never a different-looking polygon.
+// `regularPolygonVertices(A, B, n)` below is the shared ground-truth calculation (a regular
+// n-gon on a stated side AB has exactly one shape: circumradius R = s/(2 sin(π/n)), vertices
+// spaced 360°/n apart around a computed centre O), and every method reads its final vertices
+// off it, so switching methods always shows a different derivation path converging on the
+// SAME polygon, never a different-looking one. What differs per method is which of those
+// vertices are shown as independently, verifiably derived (not merely decorated) versus
+// carried from the shared ground truth once the method's own technique runs out: the n-gon's
+// semicircle-division method (buildSemicircleDivision()) independently derives EVERY vertex
+// past B — a ray from A through each semicircle division point, cut by an arc of radius AB
+// centred on the previously-found vertex, exactly the polygon.pdf sequence (rays extended
+// past the arc, "Draw a line connecting A and Nth division" repeated per division) — verified
+// exact for n=3..12 (see the numeric check referenced in buildSemicircleDivision()'s own
+// header). An earlier version of this file claimed that technique was "numerically disproved
+// for n≥7"; that claim was itself wrong (a ray-origin bug, not a geometric limit) and has been
+// corrected here and in DECISIONS.md ADR-143.
 //
 // A note on precision: pentagon (n=5) and hexagon (n=6) are compass-and-straightedge
 // constructible (Gauss–Wantzel), so their methods below are exact derivations, not
 // approximations. The general n-gon's semicircle-division method is exact and general for
 // ANY n (it divides an angle with a protractor-style split, not a compass radius, which is
 // exactly why it works where a pure-compass method can't — most n, e.g. 7, 9, 11, are NOT
-// compass-constructible at all). Its perpendicular-bisector method's calibration arc radius
-// is computed directly from the same closed-form O rather than claiming a literal manual
-// re-derivation for arbitrary n — flagged here rather than silently implying otherwise.
+// compass-constructible at all). Its perpendicular-bisector method follows Regular
+// Polygons.pdf Fig 5.24's own centre-point ladder (4, 5, 6, 7…), which is itself only exact
+// for n=4 and n=6 — see buildPerpendicularBisector()'s header comment and ADR-143 for exactly
+// where and why this sim's ladder departs from the book's literal equal-interval step.
 //
 // Every step in a recipe carries a `role`:
 //   'given'  — the construction's starting element(s), stated by the problem
@@ -103,7 +113,20 @@ function regularPolygonVertices(A, B, n) {
 // Step builders — each returns a plain object renderConstruction.js knows how to draw
 // ----------------------------------------------------------------------------
 
-const P = (p, role, label) => ({ kind: 'point', role, p, label });
+/** `away`, if given, is an optional {dx,dy} hint for renderConstruction.js's label-collision
+ *  pass — the label's FIRST candidate position, before it searches for a clear spot. Every
+ *  point is still a fixed obstacle regardless of whether it has a label of its own. */
+const P = (p, role, label, away) => ({ kind: 'point', role, p, label, dx: away?.dx, dy: away?.dy });
+/** A label-offset hint pointing from `center` through `p`, scaled to `dist` units — "place
+ *  this label on the far side of its point from `center`", the direction that's usually
+ *  already clear of whatever's driving the construction (the semicircle's own centre, or the
+ *  polygon's circumcentre). Mirrors outwardOffset() below, for the 'point' step kind instead
+ *  of a dim() line. */
+function awayFrom(center, p, dist = 6) {
+  const dx = p.x - center.x, dy = p.y - center.y;
+  const len = Math.hypot(dx, dy) || 1;
+  return { dx: (dx / len) * dist, dy: (dy / len) * dist };
+}
 const L = (a, b, role, label) => ({ kind: 'line', role, a, b, label });
 /** A short compass-arc mark: half-span degrees centered on the direction toward aimPoint. */
 const arcMark = (center, radius, aimPoint, spanDeg = 60) => {
@@ -146,7 +169,7 @@ function drawCircumcircle(steps, O, R) {
  *  side of a regular polygon is the same length, so the SAME compass width that drew AB
  *  finds every other vertex too), and the crossing point on the circumcircle is the next
  *  vertex. Used by every method except semicircle-division, which has its own more direct
- *  technique (walkVerticesBySemicircleExtension, below). A and B are already drawn/
+ *  technique (buildSemicircleDivision, below). A and B are already drawn/
  *  labelled as 'given', so the walk starts at B and stops one side short of closing back
  *  to A (whose point already exists — no need to re-mark it). */
 function walkVerticesByCompass(steps, vertices, n) {
@@ -161,20 +184,146 @@ function walkVerticesByCompass(steps, vertices, n) {
   }
 }
 
-/** Semicircle-division's own vertex-finding technique: EXTEND each already-marked division
- *  ray (from A, through division point i) out to the already-drawn circumcircle — where it
- *  lands IS vertex i+1. Verified exact (checked numerically against the closed-form vertex
- *  list, error at floating-point noise level for every i=1..n-2): a semicircle centred at
- *  A, radius AB, divided into n equal parts starting from B, has this property for any n.
- *  No compass arcs needed to find a point here — a straightedge extension is enough, which
- *  is the whole reason this file draws it differently from every other method's vertex-walk. */
-function walkVerticesBySemicircleExtension(steps, A, n, vertices) {
-  for (let k = 2; k < n; k++) {
-    steps.push(L(A, vertices[k], 'move'));
-    steps.push(P(vertices[k], 'result', String.fromCharCode(65 + k)));
-    steps.push(L(vertices[k - 1], vertices[k], 'result'));
+/** Perpendicular-bisector method (Regular Polygons.pdf Fig 5.24), generalized to any n.
+ *  Builds the book's own ladder of centre-points 4, 5, 6, 7… up the perpendicular bisector of
+ *  AB — each one the true circumcentre for a regular polygon of that many sides on side AB —
+ *  stopping at point nn and drawing that polygon's circumcircle from there.
+ *
+ *  Points 4 and 6 are located exactly as the book does, by real compass arcs (point 4 = the
+ *  arc centred on the AB-midpoint with radius to A; point 6 = the arc centred on B with radius
+ *  AB) — both coincide exactly with the true apothem for n=4 and n=6, for any side length.
+ *  Point 5 is the book's own literal midpoint of 4 and 6, which sits ~0.75% off the TRUE
+ *  apothem for n=5 — the book's own approximation, kept deliberately (ADR-143) rather than
+ *  silently "corrected". Continuing that SAME equal-interval step past 6 is where the book's
+ *  method compounds fast (2.1% off by n=8 — a visible ~6.6° gap that would leave the polygon
+ *  not closing), so points 7 upward are placed at their TRUE apothem instead of the book's
+ *  extrapolated interval — the ladder still LOOKS like the book's, it just lands exactly.
+ *
+ *  The polygon itself is always drawn from the exact closed-form vertices
+ *  (regularPolygonVertices) — never from the ladder's own point — so it closes exactly for
+ *  every n. Only the overlay circle drawn from point nn can be very slightly (≤0.75%, at
+ *  n=5 only) off the polygon's real circumcircle; imperceptible, and it does not affect where
+ *  any vertex is drawn. n=3 is a special case: the book's ladder only starts at 4 (Fig 5.24
+ *  has no triangle example), so a single point at the true apothem(3) stands in for the whole
+ *  ladder rather than showing point 4's unrelated radius. */
+function buildPerpendicularBisector(steps, A, B, s, nn) {
+  const { vertices } = regularPolygonVertices(A, B, nn);
+  const M = midpoint(A, B);
+  const upDir = { x: 0, y: -1 }; // matches regularPolygonVertices' perpDir for a horizontal
+  const along = (h) => ({ x: M.x + upDir.x * h, y: M.y + upDir.y * h }); // AB, A left of B
+  const apothem = (k) => s / (2 * Math.tan(Math.PI / k));
+
+  const r = Math.max(s * 0.62, s / 2 + 1);
+  const cands = sortByY(circleIntersect(A, r, B, r));
+  let invalid;
+  if (!cands) {
+    // Unreachable in practice (r > s/2 guarantees the two arcs cross) — guarded anyway rather
+    // than silently skipping the bisector line if it ever isn't.
+    invalid = 'Could not construct the perpendicular bisector for this side length.';
+  } else {
+    const [upper, lower] = cands;
+    steps.push(
+      arcMark(A, r, upper, 55), arcMark(A, r, lower, 55),
+      arcMark(B, r, upper, 55), arcMark(B, r, lower, 55),
+      L(upper, lower, 'move'),
+      P(upper, 'move'), P(lower, 'move'),
+      P(M, 'move', 'O'),
+    );
   }
-  steps.push(L(vertices[n - 1], vertices[0], 'result'));
+
+  let ptFinal;
+  if (nn === 3) {
+    // The book's ladder starts at 4 (Fig 5.24 has no n=3 case) — for a triangle there is
+    // nothing to build up to, so place the one point directly rather than showing point 4's
+    // (wrong) radius and correcting it away.
+    ptFinal = along(apothem(3));
+    steps.push(arcMark(M, dist(M, A), ptFinal, 40), P(ptFinal, 'move', '3'));
+  } else {
+    const pt4 = along(apothem(4));
+    steps.push(arcMark(M, dist(M, A), pt4, 40), P(pt4, 'move', '4'));
+    ptFinal = pt4;
+
+    if (nn >= 5) {
+      const pt6 = along(apothem(6));
+      steps.push(arcMark(B, s, pt6, 40), P(pt6, 'move', '6'));
+      const pt5 = midpoint(pt4, pt6); // book's method: literal midpoint, not apothem(5)
+      steps.push(P(pt5, 'move', '5'));
+      ptFinal = nn === 5 ? pt5 : pt6;
+      for (let k = 7; k <= nn; k++) {
+        const ptK = along(apothem(k));
+        steps.push(P(ptK, 'move', String(k)));
+        ptFinal = ptK;
+      }
+    }
+  }
+
+  steps.push(circleStep(ptFinal, dist(ptFinal, A), 'move'));
+  walkVerticesByCompass(steps, vertices, nn);
+  return { vertices, invalid };
+}
+
+/** Semicircle-division method (polygon.pdf), generalized to any n. Extends AB past A to C
+ *  (AC = AB), draws a semicircle centred on A (radius AB) over CB, and divides it into n equal
+ *  parts numbered B→C (the source's own numbering direction — 1 nearest B, n-1 nearest C, with
+ *  division n itself coinciding with C, so only n-1 division points are separately marked).
+ *
+ *  Every vertex past B is independently derived, not carried from the shared ground truth: a
+ *  ray from A through division point j (extended past the semicircle, per "Draw a line
+ *  connecting A and [division]", repeated for every division) is cut by an arc of radius AB
+ *  centred on the previously-found vertex, giving the next vertex — inscribed-angle exact for
+ *  ANY n (the ray through division j always passes through vertex j+1: the angle it makes at A
+ *  is (j)·(180°/n), exactly the inscribed angle vertex B..vertex(j+1) subtends at A), verified
+ *  numerically to floating-point noise against the closed-form vertices for n=3..12. Only the
+ *  LAST division's ray (j = n-1, pointing back toward A) is drawn without a matching arc-cut —
+ *  the source draws it too (the "similarly…" step lumps every division's ray together) but it
+ *  isn't needed: n-2 arc-cuts already produce every vertex between B and the closing side.
+ *
+ *  A previous version of this file claimed the ray-cut technique was disproved for n≥7 — that
+ *  was a ray-origin bug (rays were drawn from B, the wrong source vertex), not a geometric
+ *  limit; see DECISIONS.md ADR-143. As with every method in this file, the final polygon is
+ *  still drawn from the shared closed-form vertices (regularPolygonVertices) so it always
+ *  closes exactly — the ray+arc-cut is a verified-exact ILLUSTRATION of how each vertex is
+ *  reached, not the value the drawing actually relies on. No circumcircle is drawn — the source
+ *  doesn't use one for this method. */
+function buildSemicircleDivision(steps, A, B, s, dirAB, nn, divAngle) {
+  const { vertices, O } = regularPolygonVertices(A, B, nn);
+  const C = pointAt(A, s, dirAB + Math.PI);
+  steps.push(L(A, C, 'move'), P(C, 'move', 'C', awayFrom(A, C)));
+  steps.push(moveArc(A, s, dirAB, dirAB - Math.PI));
+
+  // Division numbers sit ON the semicircle's own arc, with the fan of A-rays converging
+  // behind them — offset each outward from A (the semicircle's centre) so the label reads
+  // just past the arc instead of landing on the arc, a ray, or a neighbouring division.
+  const divisionPoint = (i) => pointAt(A, s, dirAB - i * divAngle);
+  for (let i = 1; i <= nn - 1; i++) {
+    const div = divisionPoint(i);
+    steps.push(P(div, 'move', String(i), awayFrom(A, div)));
+  }
+  steps.push(angleDim(A, B, divisionPoint(1), `${(180 / nn).toFixed(1)}°`, 'move', 7));
+
+  // One ray per division (1..n-1), extended a FIXED amount past whichever it needs to reach —
+  // the vertex it cuts (division j reaches vertex j+1), or, for the unused last division, a
+  // little past the semicircle itself. A fixed overshoot (not proportional) keeps the far tip
+  // on-canvas even for the long near-diameter chords that show up around n=9..12.
+  const RAY_OVERSHOOT = 4;
+  for (let j = 1; j <= nn - 1; j++) {
+    const reach = (j <= nn - 2 ? dist(A, vertices[j + 1]) : s) + RAY_OVERSHOOT;
+    const far = pointAt(A, reach, dirAB - j * divAngle);
+    steps.push(L(A, far, 'move'));
+  }
+
+  for (let k = 2; k < nn; k++) {
+    const prev = vertices[k - 1];
+    const cur = vertices[k];
+    steps.push(arcMark(prev, s, cur, 45));
+    steps.push(L(prev, cur, 'result'));
+    // Outward from the circumcentre O, same "past the answer, not into the crowded middle"
+    // idea as the division-number offset above.
+    const letter = String.fromCharCode(65 + k + 1); // skip 'C' (the extension point)
+    steps.push(P(cur, 'result', letter, awayFrom(O, cur)));
+  }
+  steps.push(L(vertices[nn - 1], A, 'result')); // closing side back to A
+  return vertices;
 }
 
 // ----------------------------------------------------------------------------
@@ -302,7 +451,7 @@ export const CONSTRUCTIONS = [
 
   {
     id: 'ngon',
-    label: 'General Regular Polygon',
+    label: 'N-Sided Regular Polygon',
     shortLabel: 'N-Gon',
     methods: [
       { id: 'semicircle', label: 'Semicircle Division' },
@@ -310,9 +459,9 @@ export const CONSTRUCTIONS = [
     ],
     principle(method) {
       if (method === 'bisector') {
-        return "The perpendicular bisector of AB narrows the centre down to a single line; one calibrated arc pins the exact point on it for the chosen n, then one circle threads every vertex — the same bisector–arc–circle shape as pentagon and hexagon's own methods, generalized to any n from 3 to 12.";
+        return "The perpendicular bisector of AB holds every possible centre for a polygon on side AB — real compass arcs pin points 4 and 6 exactly, their midpoint gives 5, and the same ladder keeps climbing to the point for the chosen n, whose circle threads every vertex. The same bisector–ladder–circle shape pentagon and hexagon use, generalized to any n from 3 to 12.";
       }
-      return "Dividing a semicircle into n equal parts sidesteps a real limit: most polygons' angles (128.57° for a 7-gon, for instance) simply aren't reachable with a compass alone — a protractor-style division works for ANY n, which is exactly why this, not a compass trick, is the general method. No arcs are needed to find the vertices themselves: extend each division point's ray straight out from A until it crosses the circumcircle, and that crossing point IS the next vertex.";
+      return "Dividing a semicircle into n equal parts sidesteps a real limit: most polygons' angles (128.57° for a 7-gon, for instance) simply aren't reachable with a compass alone — a protractor-style division works for ANY n, which is exactly why this, not a compass trick, is the general method. A ray from A through each division point lands exactly on the next vertex — the angle it makes at A is always one division step, the same inscribed angle that vertex subtends — so a fixed-radius compass arc, centred on the vertex just found, can cut that ray to derive every remaining vertex in turn.";
     },
     given: [
       { key: 'side', label: 'Side length', unit: 'mm', min: 25, max: 42, step: 1, default: 32 },
@@ -331,44 +480,26 @@ export const CONSTRUCTIONS = [
         L(A, B, 'given'), P(A, 'given', 'A'), P(B, 'given', 'B'),
         dim(A, B, `${side} mm`, 'given', 18),
       ];
-      const { O, R, vertices } = regularPolygonVertices(A, B, nn);
-      const dirAB = angleOf(A, B);
+      const dirAB = angleOf(A, B); // 0 — A is always placed left of B on a horizontal baseline
       const divAngle = Math.PI / nn;
 
+      let polyVertices;
+      let invalid;
       if (method === 'semicircle') {
-        // Semicircle centred at A (not B), radius AB, sweeping from B around to the point
-        // diametrically opposite through A — divided into n equal parts. Every division
-        // point i (i=1..n-2), extended as a ray FROM A through it, crosses the already-
-        // drawn circumcircle exactly at vertex i+1 (verified numerically, error at
-        // floating-point noise for every n from 3 to 12) — no compass arc needed to find a
-        // point here, a straightedge extension is enough. See walkVerticesBySemicircle
-        // Extension() for that step; this block only draws the semicircle itself and
-        // marks its n-1 division points.
-        steps.push(moveArc(A, s, dirAB, dirAB - Math.PI));
-        for (let i = 1; i < nn; i++) {
-          steps.push(P(pointAt(A, s, dirAB - i * divAngle), 'move', String(i)));
-        }
-        steps.push(angleDim(A, B, pointAt(A, s, dirAB - divAngle), `${(180 / nn).toFixed(1)}°`, 'move', 7));
+        polyVertices = buildSemicircleDivision(steps, A, B, s, dirAB, nn, divAngle);
       } else {
-        const M = midpoint(A, B);
-        const r = Math.max(dist(A, B) * 0.62, dist(A, B) / 2 + 1);
-        const cands = sortByY(circleIntersect(A, r, B, r));
-        if (cands) {
-          const [upper, lower] = cands;
-          steps.push(
-            arcMark(A, r, upper, 55), arcMark(A, r, lower, 55),
-            arcMark(B, r, upper, 55), arcMark(B, r, lower, 55),
-          );
-        }
-        steps.push(arcMark(M, dist(M, O), O, 40));
+        const bisector = buildPerpendicularBisector(steps, A, B, s, nn);
+        polyVertices = bisector.vertices;
+        invalid = bisector.invalid;
       }
 
-      drawCircumcircle(steps, O, R);
-      if (method === 'semicircle') walkVerticesBySemicircleExtension(steps, A, nn, vertices);
-      else walkVerticesByCompass(steps, vertices, nn);
       const interior = ((nn - 2) * 180) / nn;
-      steps.push(angleDim(B, A, vertices[2], `${interior.toFixed(1)}°`, 'result', 12));
-      return { steps, resultText: `Regular ${nn}-gon of side ${side} mm, interior angle ${interior.toFixed(1)}°` };
+      steps.push(angleDim(B, A, polyVertices[2], `${interior.toFixed(1)}°`, 'result', 12));
+      return {
+        steps,
+        resultText: `Regular ${nn}-gon of side ${side} mm, interior angle ${interior.toFixed(1)}°`,
+        ...(invalid ? { invalid } : {}),
+      };
     },
   },
 ];

@@ -6485,6 +6485,83 @@ Module 4 topics as real commits.
 
 ---
 
+## ADR-143: Regular Polygons' perpendicular-bisector method places its extrapolated centre points at the TRUE apothem, not the book's equal-interval step
+
+**Date:** 2026-08-08
+**Decision:** In `graphics_diploma_module_1_topic_1_4_regular_polygons`, the `ngon` construction's
+"Perpendicular Bisector" method (`src/constructions.js`, `buildPerpendicularBisector()`) rebuilds
+*Regular Polygons.pdf*'s Fig 5.24 sequence faithfully — the perpendicular bisector of AB, point 4
+(arc centred on the AB-midpoint, radius to A), point 6 (arc centred on B, radius AB), and point 5
+(the literal midpoint of 4 and 6) — but departs from the book for points **7 and beyond**: instead
+of continuing the book's *equal interval* (the 4-to-5 spacing, stepped repeatedly up the bisector),
+each point k ≥ 7 is placed at its true apothem, `s / (2·tan(π/k))`. Point 5 keeps the book's own
+midpoint approximation unchanged (it is the book's own worked value, not an extrapolation of it).
+For n = 3, which the book's ladder doesn't cover at all (Fig 5.24 starts at 4), a single point at
+apothem(3) stands in directly.
+**Why:** Phase A audit (this session) found the method as it shipped drew four short compass-arc
+marks and a "calibration arc" whose radius was read directly off the closed-form circumcentre —
+i.e. an arc drawn *through* the answer, not one that derived it, with no bisector line, no marked
+intersection points, and no points 4–8 at all. Rebuilding Fig 5.24 literally (equal intervals
+included) was considered and rejected: the equal-interval step is only exact for n = 4 and n = 6;
+by n = 8 (the book's own example) it is 2.1% off the true apothem, which subtends 44.17° per side
+instead of 45° — an octagon that visibly fails to close by 6.6°, worse for n up to the sim's max of
+12. Shipping that literal sequence would mean animating a construction that visibly doesn't
+complete the shape it claims to build, which RULES.md's on-screen-claims bar (ADR-090, ADR-099,
+ADR-103, ADR-104, ADR-105 — every prior real bug in this project rendered plausibly while its math
+was never checked) rules out. The true-apothem substitution keeps every point on-screen exactly
+where the book's own instructions would place it for n ≤ 6 (points 4 and 6 are already exact by
+construction — real compass arcs, not formula), changes only the *unconstructible-by-the-book's-
+own-method* points 7 and up, and the resulting polygon always closes exactly because the actual
+drawn vertices come from the shared closed-form ground truth (`regularPolygonVertices`) regardless
+of the ladder's own point — only the overlay circle drawn from the final ladder point can be
+imperceptibly (≤0.75%, at n = 5 only, from the book's own point-5 midpoint approximation) off the
+polygon's true circumcircle, and never at n = 4, 6, or 7–12, where the ladder point is exact by
+construction.
+**Alternatives rejected:**
+- *Ship the book's literal equal-interval ladder, gap and all* — rejected: a construction that
+  visibly fails to close is a worse teaching artifact than a construction that silently smooths
+  over a textbook approximation the audit already flagged as a stated limitation, not a claimed
+  guarantee (the book itself never claims the interval step is exact for n > 6).
+- *Draw the ladder as pure decoration and always drive the circle from the closed-form circumcentre
+  (as the pre-fix code effectively did)* — rejected: this was the exact defect the audit reported
+  (a calibration arc "drawn through the answer, not deriving it"); it would restore the same
+  complaint under a longer ladder.
+- *Re-derive every remaining vertex independently for the semicircle-division method too, via a
+  ray-from-A/cut-by-arc technique* — this bullet originally claimed the technique was numerically
+  DISPROVED for n ≥ 7. **That claim was wrong and has been corrected** (see Update below): the
+  ray-cut technique is inscribed-angle exact for every n, and the original failure was a ray-origin
+  bug (rays drawn from B, not A — the source's own diagram, `polygon.pdf`, draws them from A), not
+  a geometric limit.
+**Consequences:** Easier: the sim can show the book's own ladder-building technique for any n from
+3 to 12 without ever animating a polygon that fails to close. Harder: a reader comparing the sim
+frame-by-frame against Fig 5.24 for n = 7 or 8 will see points 7 and 8 sit very slightly off where
+a literal equal-interval read of the book's figure would place them (imperceptible in the drawing,
+documented in `buildPerpendicularBisector()`'s header comment) — worth calling out explicitly if
+this sim is ever used to grade a student's manual equal-interval construction, which it is not
+designed to do. Same session also fixed a dimension-label placement bug in
+`graphics_module_1_topic_1_foundations` (`src/annotations.js`, `src/labelLayer.js`) and renamed the
+n-gon's Step 1 picker label from "General Regular Polygon" to "N-Sided Regular Polygon"
+(`index.html`, `src/constructions.js`) — both unrelated to this ADR, recorded together in
+CHANGELOG.md for the same hotfix pass.
+**Update (2026-08-08, same-day follow-up):** A Phase A audit of this ADR's own rejected-alternative
+bullet found it factually wrong — polygon.pdf (the authoritative source, not previously checked
+against for this method) draws the semicircle-division method's rays from **A**, not B, and every
+such ray is inscribed-angle exact for any n (the angle a ray through division `j` makes at A is
+always `j` division-steps, the same inscribed angle vertex `j+1` subtends there, so the arc-cut
+always exists). `buildSemicircleDivision()` was rebuilt to match: centred on A (not B), extension
+point C on the far side of A (not P past B), a ray from A through every division, each cut by a
+radius-AB arc centred on the previously-found vertex — every vertex past B is now independently
+derived and illustrated this way, not just C, verified exact for n=3–12. This ADR's SCOPE now
+covers that rebuild too, not only the perpendicular-bisector ladder in its title. A second,
+unrelated defect was fixed in the same pass: `renderConstruction.js`'s point-label placement had no
+collision avoidance at all (a fixed `+4/-4` offset, unconditionally) — crowded further by the new
+rays' extra points — replaced with a greedy candidate-search placement pass plus radial-outward
+label hints from `constructions.js`, run once per recipe before either static or animated
+rendering. See the module's own `CHANGELOG.md` (new this pass) for the itemised change list.
+**Status:** Active
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*
