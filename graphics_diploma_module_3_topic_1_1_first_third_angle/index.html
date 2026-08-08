@@ -1,0 +1,2329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light only" />
+  <title>First and Third Angle Projection</title>
+  <meta name="description" content="Compare first-angle and third-angle orthographic projection on the same solid: the glass-box setup, the rabatment fold, the resulting view layout, and the BIS title-block symbol for each." />
+
+  <!--
+    Three.js is loaded as CDN ES modules ONLY, pinned to 0.160.0.
+    No build step, no bundler, no npm. See CLAUDE.md "Architecture (non-negotiable)".
+    This import map is the exact contract required by the platform.
+  -->
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+
+  <!--
+    Boot watchdog (classic script, runs before the ES module below). The sim's
+    ONLY runtime network dependency is the pinned Three.js CDN module; if a campus
+    firewall blocks it, the connection drops mid-load, or the module otherwise
+    fails to evaluate, init() never runs and the iframe would sit blank. This arms
+    a self-healing fallback so the learner reads a calm explanation instead of a
+    void. main.js clears it on a successful boot, and a merely-slow (but working)
+    load self-heals because main.js also hides the fallback once it finally boots.
+  -->
+  <script>
+    (function () {
+      window.__simBooted = false;
+      var WEBGL_COPY = {
+        title: 'Your browser could not start the 3D view',
+        body: 'This simulation needs hardware-accelerated graphics (WebGL), which looks switched off or unavailable here. Turn on hardware acceleration in your browser settings, or open this in a recent Chrome, Edge, or Firefox, then reload.',
+      };
+      window.__showSimFallback = function (variant) {
+        if (window.__simBooted) return;
+        var el = document.getElementById('sim-fallback');
+        if (!el) return;
+        if (variant === 'webgl') {
+          var t = document.getElementById('sim-fallback-title');
+          var b = document.getElementById('sim-fallback-body');
+          if (t) t.textContent = WEBGL_COPY.title;
+          if (b) b.textContent = WEBGL_COPY.body;
+        }
+        el.hidden = false;
+      };
+      // Fast path: any uncaught error before boot means the sim never started.
+      window.addEventListener('error', function () {
+        if (!window.__simBooted) window.__showSimFallback();
+      });
+      // Catch-all: if nothing has booted in time, surface the fallback. A genuinely
+      // slow connection self-heals once main.js boots and hides it.
+      window.__simBootTimer = window.setTimeout(function () {
+        if (!window.__simBooted) window.__showSimFallback();
+      }, 15000);
+      // Reload control is wired here so it works even if the module never ran.
+      document.addEventListener('DOMContentLoaded', function () {
+        var btn = document.getElementById('sim-fallback-reload');
+        if (btn) btn.addEventListener('click', function () { window.location.reload(); });
+      });
+    })();
+  </script>
+
+  <style>
+    /*
+      Web fonts served from Supabase Storage CDN (DESIGN.md typography / ADR-086 —
+      reverses the prior bundled-woff2/no-CDN rule). Atkinson Hyperlegible for UI/body
+      (legibility-first, chosen for the struggling / low-vision learner), IBM Plex Mono
+      for numeric readouts (tabular figures). font-display:swap paints immediately in
+      the system fallback, then swaps in once fetched — offline-first load no longer
+      holds for type.
+    */
+    @font-face {
+      font-family: "Atkinson Hyperlegible";
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+      font-weight: 400; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: "Atkinson Hyperlegible";
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+      font-weight: 700; font-style: normal; font-display: swap;
+    }
+    @font-face {
+      font-family: "IBM Plex Mono";
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+      font-weight: 400; font-style: normal; font-display: swap;
+    }
+
+    /*
+      ============================================================
+      Design tokens — Simatrix "Modern Drafting Bench" (light, locked)
+      ============================================================
+      Single source of truth for every colour, space, and motion value.
+      JS reads these via getComputedStyle(...).getPropertyValue('--token'),
+      never hard-codes hex. See DESIGN.md + CLAUDE.md "Cross-cutting rules".
+
+      Neutrals are authored in OKLCH (warm hue ~90, chroma 0.006–0.014 so no
+      neutral is a dead grey) and stored as the resolved sRGB hex because
+      THREE.Color cannot parse oklch(). The OKLCH intent is noted per token.
+      No #000 / #fff anywhere (DESIGN.md "Don't").
+    */
+    :root {
+      /* --- Surfaces (clinical palette: neutral gray + white working surfaces, tonal layering not shadows) --- */
+      --color-paper:        #ffffff; /* pure-white base — viewport floor + raised control fills */
+      --color-panel:        #f0f2f5; /* clinical cool grey working surface (LAB) — wizard/dock/cards, one tonal step BELOW paper */
+      --color-solid-fill:   #e7e1d4; /* oklch(0.90 0.013 88)  — solid faces, so ink edges read */
+
+      /* --- Ink (warm near-black) — deepened for high-contrast CAD legibility --- */
+      --color-ink:          #06070b; /* clinical near-black (LAB) — body text + visible edges (~20:1 on paper) */
+      --color-ink-secondary:#5a5d66; /* clinical cool grey (LAB) — secondary text + labels (~6.6:1 on paper) */
+
+      /* --- Mid neutral --- */
+      --color-bench-grey:   #938b7b; /* oklch(0.62 0.012 88) — hidden-edge linework, inactive, slider rest */
+      --color-border:       #e0e1e5; /* clinical cool grey (LAB) — crisp 1px structural seams (Ink Border Rule) */
+      --color-track:        #e0e1e5; /* clinical cool grey (LAB) — recessed slider groove, now == --color-border for slider↔scrollbar parity (ADR-040) */
+
+      /* --- The one interaction accent (technical blue) — confident, AA on paper --- */
+      --color-accent:        #1f66b5; /* oklch(0.52 0.14 252) — focus, primary action, selection (5.6:1 vs paper) */
+      --color-accent-strong: #17539b; /* oklch(0.45 0.14 252) — hover / active */
+      --color-accent-soft:   #e3ecf7; /* oklch(0.94 0.025 252) — current-step wash, hint background */
+      --color-focus:         var(--color-accent);
+      /* Soft focus/drag halo, derived from the accent so it stays a single source. */
+      --ring-focus:          0 0 0 3px color-mix(in srgb, var(--color-accent) 26%, transparent);
+      /* Warm-tinted shadow for transient overlays only (term-definition popover, banner). */
+      --shadow-md:           0 4px 16px color-mix(in srgb, var(--color-ink) 12%, transparent);
+
+      /* --- Status (UI only, always paired with an icon — DESIGN.md "Color is never alone") --- */
+      --color-success:       #2e7d52; /* oklch(0.56 0.10 158) — step complete, with check icon (AA on paper) */
+      --color-success-soft:  #e2efe8; /* oklch(0.94 0.03 158) — complete wash */
+
+      /*
+        --- Domain colours (inside the viewport only, not chrome) ---
+        Two-Cue Rule: each carries a non-colour cue too.
+        Consumed by the projection layer (meshAnalyzer / projectionDrawer).
+      */
+      --color-hp-line: #007f7c; /* oklch(0.53 0.11 192) — HP projection: teal, SOLID (held off blue so it never reads as the chrome accent; 4.57:1 on paper) */
+      --color-vp-line: #b25718; /* oklch(~0.55 0.12 52) — VP projection: amber, DASHED (teal↔amber is the CVD-safe pair; darkened one step from #bc5d1e so VP label text clears AA: 4.92:1 on paper) */
+      --color-pp-line: #7a5ea6; /* oklch(0.55 0.10 305) — PP projection: violet, the third (profile) plane; held off the chrome blue (h305 vs 252) and clear of teal/amber; ~4.5:1 on paper */
+
+      /* --- Spacing scale (4px base) --- */
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 24px;
+      --space-6: 32px;
+
+      /* --- Radius --- */
+      --radius-xs: 4px;  /* crisp control corners (checkbox, inputs) */
+      --radius-sm: 6px;
+      --radius-md: 10px;
+
+      /* --- Type --- */
+      /* Bundled Atkinson Hyperlegible (DESIGN.md), system stack as fallback while
+         the woff2 loads / if it 404s. BlinkMacSystemFont covers older Chromium. */
+      --font-sans: "Atkinson Hyperlegible", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      /* Bundled IBM Plex Mono for numeric readouts; system monospace as fallback. */
+      --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", monospace;
+      --text-xs: 0.75rem;   /* group labels, uppercase technical headers */
+      --text-sm: 0.875rem;
+      --text-base: 1rem;
+      --text-lead: 1.125rem;
+      --text-title: 1.35rem; /* step title */
+
+      /* --- Motion (subtle, exponential ease-out — DESIGN.md) --- */
+      --dur-fast: 150ms;
+      --dur-base: 200ms;
+      --dur-step: 380ms; /* step-panel swap / rail advance */
+      --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+
+      /* --- Layering --- */
+      --z-notice: 100;
+      --z-compare: 90; /* Compare card (ADR-012) — over the viewport chrome (z 3–4), below the overlay */
+      --z-overlay: 120; /* full-viewport Practice-problems dialog (above the mobile
+                           notice 100; below the context-lost chip 150 / boot fallback 200) */
+    }
+
+    /* ============================================================
+       Normalize / reset — minimal, modern
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      font-size: var(--text-base);
+      color: var(--color-ink);
+      background: var(--color-paper);
+      /* The sim owns the whole iframe; nothing scrolls behind the viewport. */
+      overflow: hidden;
+      /* Tabular figures everywhere numbers can appear (DESIGN.md Tabular Numbers Rule). */
+      font-variant-numeric: tabular-nums;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      /* Wizard chrome beside the loud viewport (DESIGN.md layout shape). */
+      display: flex;
+      flex-direction: row;
+      position: relative;
+    }
+    button { font: inherit; color: inherit; }
+
+    /* Screen-reader-only utility. */
+    .sr-only {
+      position: absolute;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* ============================================================
+       Viewport — the WebGL canvas + CSS2D label overlay mount here (main.js)
+       ============================================================ */
+    #sim-viewport {
+      position: relative;
+      flex: 1 1 0;
+      min-width: 0;
+      height: 100%;
+      background: var(--color-paper);
+      order: 1; /* viewport on the LEFT, wizard on the right (see #wizard order) */
+    }
+    #sim-viewport canvas {
+      display: block; /* kill the inline-canvas descender gap */
+      width: 100%;
+      height: 100%;
+      /* Drag-to-orbit shouldn't trigger text selection or touch scrolling. */
+      touch-action: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    /* Vertex labels (Step 3) — CSS2DObject DOM pills positioned at 3D points by
+       main.js. Themed from tokens; never intercept pointer events (orbit through). */
+    .vlabel {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      line-height: 1;
+      color: var(--color-ink);
+      background: color-mix(in srgb, var(--color-paper) 88%, transparent);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xs);
+      padding: 2px 5px;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    /* Plane labels — CSS2DObject pills naming the two reference planes (HP / VP)
+       in the 3D viewport. Each carries its plane's domain hue (teal HP / amber VP,
+       Two-Cue Rule: the text "HP"/"VP" plus the colour) so they read against the
+       grids and survive the fold into the 2D drawing. The VP pill is parented to
+       the fold pivot in main.js, so it swings down and stays on the flattened sheet. */
+    .plane-label {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      line-height: 1;
+      padding: 3px 7px;
+      border-radius: var(--radius-xs);
+      border: 1px solid currentColor;
+      background: color-mix(in srgb, var(--color-paper) 88%, transparent);
+      white-space: nowrap;
+      user-select: none;
+    }
+    .plane-label--hp { color: var(--color-hp-line); }
+    .plane-label--vp { color: var(--color-vp-line); }
+    .plane-label--pp { color: var(--color-pp-line); }
+
+    /* Reference-line labels — small mono x/y (HP∩VP ground line) and x1/y1 (VP∩PP line)
+       set at the ends of the fold hinges. CSS2DObjects like the plane pills, but quieter
+       (no pill, ink-secondary): they annotate the folded 2D drawing, faded in over the
+       last of the fold by main.js (opacity driven on the element). */
+    .ref-line-label {
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      font-style: italic;
+      line-height: 1;
+      color: var(--color-ink-secondary);
+      user-select: none;
+      pointer-events: none;
+    }
+
+    /* View-name captions — "Top View" / "Front View" / "Side View" labelling each
+       drawing once the solid flattens to 2D. Quiet sans muted ink (no pill): they
+       name the three orthographic views on the answer sheet, faded in alongside the
+       x/y reference lines over the last of the fold by main.js. */
+    .view-name-label {
+      font-family: var(--font-sans);
+      font-size: var(--text-sm);
+      line-height: 1;
+      color: var(--color-ink-secondary);
+      white-space: nowrap;
+      user-select: none;
+      pointer-events: none;
+    }
+
+    /* ---- Wizard hide/show toggle: a floating control pinned to the viewport's
+       top-right. Present in BOTH states (it overlays the canvas), so the learner
+       can collapse the step panel for a larger 3D view and bring it back. The
+       chevron flips when collapsed; the viewport reflows to full width via flex. */
+    .wizard-toggle {
+      position: absolute;
+      /* Standard top-corner inset (--space-3) — NOT the .vp-cluster 44px+space-5 clearance
+         (that value is for the top-LEFT stack, one quick-view button-height down plus the
+         host a11y-scaler header gap; the top-right toggle has no button above it). The
+         Compare card's compact top (calc(space-3 + 44px + space-2)) already assumes this
+         button sits at space-3, so the two stayed silently mismatched until this fix. */
+      top: var(--space-3);
+      right: var(--space-3);
+      z-index: 4;
+      width: 44px;  /* DESIGN.md 44px target floor (was 40px) */
+      height: 44px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .wizard-toggle:active { transform: scale(0.97); }
+    .wizard-toggle:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .wizard-toggle__icon {
+      width: 20px;
+      height: 20px;
+      transition: transform var(--dur-base) var(--ease-standard);
+    }
+    /* Collapsed: drop the wizard out of the flex row (viewport takes the space)
+       and flip the chevron to point back toward where the panel will reappear. */
+    body.wizard-collapsed #wizard { display: none; }
+    body.wizard-collapsed .wizard-toggle__icon { transform: rotate(180deg); }
+
+    /* ---- Top-left viewport cluster: groups the quick-view camera chips and the
+       connector-line toggle into one stack, so the corner reads as a single quiet
+       control region instead of two independently-pinned floaters. The container is
+       click-through (pointer-events:none) so its transparent gaps still orbit the
+       canvas; only the controls inside it take pointer events. (critique: group the
+       top-left cluster) */
+    .vp-cluster {
+      position: absolute;
+      top: calc(44px + var(--space-3)); /* mirrors the 44px quick-view hit target — one button-height down (Fix 2, supersedes the old 10% host-overlay clearance); + --space-5 clears the host a11y text-scaler header */
+      left: var(--space-3);
+      z-index: 4;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      /* Tight stack (Module 1 .vp-cluster): the pill group + the projection pill sit close
+         together; their centred 44px hit bands stay clear at this gap (≈1px), so touch targets
+         don't collide while the chrome reads as one compact corner cluster. */
+      gap: var(--space-2);
+      pointer-events: none;
+    }
+    .vp-cluster > * { pointer-events: auto; }
+    /* Dormant placeholders: the quick-view + connector controls ship HIDDEN in the starter
+       template (their projection/fold features were stripped). Their explicit `display` below
+       would otherwise beat the UA `[hidden] { display:none }` rule, so honour `hidden` here. */
+    .quick-views[hidden],
+    .connector-toggle[hidden] { display: none; }
+    /* ---- Quick-view buttons (Top/Front/Side): a segmented pill group adopted from Module 1's
+       .qv-group — a panel-tinted rounded container holding three transparent view chips; the
+       latched view (.is-active; clicking it again returns to perspective orbit) fills solid accent. */
+    .quick-views {
+      display: inline-flex;
+      gap: 2px;
+      padding: 3px;
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+    }
+    .quick-view {
+      position: relative;  /* anchors the 44px hit-area ::before below */
+      min-height: 32px;    /* painted pill; ::before still lifts the HIT area to 44px */
+      padding: 0 var(--space-3);
+      font-family: var(--font-sans);
+      font-size: 0.8125rem;
+      font-weight: 600;    /* Module 1 pill: bolder + more legible than the old quiet 400 chip */
+      line-height: 1;
+      color: var(--color-ink-secondary);
+      background: transparent;  /* the .quick-views pill group carries the panel shell now */
+      border: 0;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .quick-view:active { transform: scale(0.97); }
+    .quick-view:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    /* Latched view: solid accent fill (Module 1 pill) so the active ortho view reads at a glance. */
+    .quick-view.is-active {
+      background: var(--color-accent);
+      color: var(--color-paper);
+    }
+    /* Orbit-lock cue: a drag on a rotate-locked ortho view nudges the latched chip (main.js
+       cueOrthoLock) — "disengage this view to orbit". Reduced motion keeps the ring, drops the shake. */
+    @keyframes qvLockNudge {
+      0%, 100% { transform: translateX(0); }
+      20% { transform: translateX(-3px); }
+      40% { transform: translateX(3px); }
+      60% { transform: translateX(-2px); }
+      80% { transform: translateX(2px); }
+    }
+    .qv-lock-cue { animation: qvLockNudge 320ms var(--ease-standard); box-shadow: var(--ring-focus); }
+    @media (prefers-reduced-motion: reduce) { .qv-lock-cue { animation: none; } }
+
+    /* ---- Connector-line toggle: a pill toggle adopted from Module 1's .vp-chip — a rounded chip
+       beneath the quick-view group that fills solid accent when on. The checkbox is hidden, so the
+       chip itself is the on/off affordance; the two controls read as one pill family. */
+    .connector-toggle {
+      position: relative; /* anchors its own centred 44px hit-area ::before; stacked in .vp-cluster */
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      min-height: 36px;
+      padding: 0 var(--space-3);
+      font-family: var(--font-sans);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      line-height: 1;
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .connector-toggle:active { transform: scale(0.97); }
+    .connector-toggle svg { flex: none; width: 16px; height: 16px; }  /* Module 1 .vp-chip icon */
+    /* Hidden but still focusable + clickable (the wrapping label toggles it); the pill shows state. */
+    .connector-toggle input {
+      position: absolute;
+      width: 1px; height: 1px;
+      margin: 0; padding: 0; border: 0;
+      opacity: 0;
+      pointer-events: none;
+    }
+    /* On = filled accent; reflects the checkbox state via :has() (already used elsewhere in M2). */
+    .connector-toggle:has(input:checked) {
+      background: var(--color-accent);
+      color: var(--color-paper);
+      border-color: var(--color-accent);
+    }
+    .connector-toggle:has(input:focus-visible) { outline: none; box-shadow: var(--ring-focus); }
+
+    /* ---- 44px hit-area floor (DESIGN.md). These viewport-corner controls stay visually
+       compact so the chrome stays quiet, but a transparent, centred ::before guarantees a
+       44px-minimum pointer/touch target around each — the same thin-visual / full-hit
+       pattern the sliders use. It enlarges only what the finger or mouse can hit, never
+       the painted control. The real element keeps the focus ring, so focus stays crisp. */
+    .quick-view::before,
+    .connector-toggle::before,
+    .vp-hint__dismiss::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100%;
+      height: 100%;
+      min-width: 44px;
+      min-height: 44px;
+    }
+
+    /* ============================================================
+       Compare view — ported from the Points topic (ADR-012, narrowed by ADR-080).
+       DOM + CSS SCAFFOLDING ONLY. The enter/exit-workbench logic, the 2D
+       drawCompare() renderer, and the #compare-chip that opens the card all live in
+       main.js in Points and are NOT ported here (this template's main.js is a stub) —
+       wire them when you build the template's own domain. Compare has exactly one
+       shape — always a cell of the body.compare-split grid (grid-area: compare,
+       assigned below) — never a floating/compact card; see ADR-080.
+       ============================================================ */
+    .compare-card {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+    }
+    .compare-card[hidden] { display: none; }
+    .compare-card__stage {
+      flex: 1 1 auto;
+      position: relative;
+      min-height: 0;
+      background: var(--color-paper);
+    }
+    /* The 2D drawing canvas fills the stage; wire a drawCompare() in main.js to size its
+       backing store to the stage rect × devicePixelRatio and redraw from your data. */
+    .compare-card__stage canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    /* ---- Compare-split workbench (ADR-037) — the true 50/50. body flips from the
+       wizard-beside-viewport flex row into a grid:
+         "view compare"   (minmax(0,1fr) row, two 1fr columns)
+         "rail  rail"      (auto row spanning both panes)
+       The wizard drops out; wire main.js to re-parent your drivers into #workbench-rail.
+       Because #sim-viewport IS the left pane, handleResize() (which measures it) sizes the
+       renderer to half-width with no JS sizing change. Compare has exactly one shape at
+       every viewport width (ADR-080 — no floating/compact fallback); the mobile @media
+       block below restyles this same grid into a single stacked column instead of
+       switching to a different Compare UI. Synced to the Module 2 master's floating-card
+       chrome 2026-07-16: the split's own
+       background is the gray --color-panel surface, with a --space-4 gap/padding so the three
+       panes read as floating rounded cards, not flush edge-to-edge regions. */
+    body.compare-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: minmax(0, 1fr) auto;
+      grid-template-areas:
+        "view compare"
+        "rail rail";
+      background: var(--color-panel);
+      gap: var(--space-4);
+      padding: var(--space-4);
+    }
+    body.compare-split #sim-viewport {
+      grid-area: view;
+      min-width: 0;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      overflow: hidden; /* clip the WebGL canvas to the rounded corners */
+    }
+    body.compare-split #compare-card { grid-area: compare; }
+    body.compare-split #workbench-rail { grid-area: rail; }
+    /* The wizard is collapsed BY the split; the chevron (main.js) exits it to bring it back. */
+    body.compare-split #wizard { display: none; }
+    /* The Compare card has no head chrome to hide anymore (ADR-080) — the still-visible,
+       pressed Compare chip in the 3D pane is the split's only exit, same as the viewport
+       chevron is redundant and hidden here. */
+    body.compare-split #wizard-toggle { display: none; }
+
+    /* The docked driver rail — spans both panes, a paper-white rounded card (matching the
+       viewport and compare panes) hosting whatever drivers a module re-parents into it.
+       DESIGN.md §5.13: only this card chrome (tone/border/radius/padding) is the shared,
+       platform-level part — the internal control FLOW below is a generic row and is meant to
+       be re-tuned per module once you know your own driver count (Module 2's tuned
+       column-major grid is domain-specific, not copied here). */
+    #workbench-rail { display: none; }
+    body.compare-split #workbench-rail {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: var(--space-6) var(--space-5);
+      padding: var(--space-4) var(--space-5);
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+    }
+    #workbench-rail .field { margin: 0; gap: var(--space-1); }
+    /* A per-step reveal used `hidden`; in the rail every driver is live. */
+    #workbench-rail .field[hidden] { display: flex !important; }
+
+    /* ---- Rail hide/reveal toggle: a dedicated control, independent of the wizard chevron,
+       for a full-screen 3D/2D read of the split. A labelled "Hide"/"Show" pill: it claims
+       grid-area:view (the 3D pane, NOT #workbench-rail's cell) so it floats at the viewport's
+       bottom-left corner, sitting above the rail's top edge in both open and collapsed states.
+       Ported from the Module 2 master 2026-07-16 as CSS+markup scaffolding — wire its click
+       handler (toggling body.rail-collapsed) when you wire the split in main.js. */
+    .rail-toggle {
+      display: none; /* shown only in the split, see body.compare-split #rail-toggle below */
+      position: relative;
+      align-items: center;
+      gap: var(--space-2);
+      z-index: 95; /* above the Compare card (--z-compare 90), below the mobile notice (100) */
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0 var(--space-3);
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    body.compare-split #rail-toggle {
+      display: inline-flex;
+      grid-area: view;
+      align-self: end;
+      justify-self: start;
+      margin: var(--space-4);
+    }
+    .rail-toggle:active { transform: scale(0.97); }
+    .rail-toggle:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .rail-toggle__icon {
+      width: 20px;
+      height: 20px;
+      flex: none;
+      transition: transform var(--dur-base) var(--ease-standard);
+    }
+    .rail-toggle__text {
+      font-family: var(--font-sans);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      line-height: 1;
+    }
+    /* Collapsed: drop the rail out of the grid (its row + gap reclaimed) and flip the
+       chevron to point back down toward where the rail will reappear. */
+    body.rail-collapsed #workbench-rail { display: none !important; }
+    body.rail-collapsed .rail-toggle__icon { transform: rotate(180deg); }
+    body.compare-split.rail-collapsed {
+      grid-template-rows: minmax(0, 1fr);
+      grid-template-areas: "view compare";
+    }
+
+    /* Compare split, narrow viewport (ADR-080): no floating/bottom-sheet fallback — the
+       same docked split just restacks to a single column, 3D on top, the 2D drawing
+       under it, the rail at the bottom. */
+    @media (max-width: 767px) {
+      body.compare-split {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) auto;
+        grid-template-areas: "view" "compare" "rail";
+      }
+      body.compare-split.rail-collapsed {
+        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-areas: "view" "compare";
+      }
+    }
+
+    /* ---- Empty-start overlay: orients the eye in the empty viewport toward the
+       panel's "Add" action (the viewport is most of the screen on boot). Quiet,
+       no card, pointer-events:none so it never blocks. Hidden once a solid exists. */
+    .vp-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: var(--space-3);
+      padding: var(--space-5);
+      text-align: center;
+      pointer-events: none;
+    }
+    .vp-overlay[hidden] { display: none; }
+    .vp-overlay__icon { width: 52px; height: 52px; color: var(--color-bench-grey); }
+    .vp-overlay__title { margin: 0; font-size: var(--text-base); color: var(--color-ink-secondary); }
+    .vp-overlay__hint  { margin: 0; font-size: var(--text-sm); color: var(--color-ink-secondary); } /* AA on paper */
+
+    /* ---- Orbit-discovery hint: one-time, dismissible chip shown when the first
+       solid appears; auto-dismisses on the first view drag (onboarding.js). ---- */
+    .vp-hint {
+      position: absolute;
+      left: 50%;
+      bottom: var(--space-5);
+      /* Centering offset carried in both states so the entrance translate doesn't fight it. */
+      transform: translateX(-50%) translateY(6px);
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+      font-size: var(--text-sm);
+      color: var(--color-ink);
+      opacity: 0; /* fades in via .is-visible; collapses instantly under reduced motion */
+      transition: opacity var(--dur-base) var(--ease-standard),
+                  transform var(--dur-base) var(--ease-standard);
+    }
+    .vp-hint.is-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .vp-hint[hidden] { display: none; }
+    .vp-hint__icon { flex: none; width: 18px; height: 18px; color: var(--color-ink-secondary); }
+    .vp-hint__dismiss {
+      position: relative; /* anchors the 44px hit-area ::before below */
+      flex: none;
+      width: 28px;  /* painted glyph stays small; ::before lifts the HIT area to 44px */
+      height: 28px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      font-size: 18px;
+      line-height: 1;
+      color: var(--color-ink-secondary);
+      background: none;
+      border: 0;
+      border-radius: var(--radius-xs);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard);
+    }
+    .vp-hint__dismiss:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+
+    /* ---- Contextual spotlight hint: reuses the .vp-hint chip (bottom-centre, fade) with
+       a leading colour dot tying the hint to its linework — teal HP / amber VP / ink
+       connectors — so it carries colour PLUS the label (Two-Cue Rule). Dot colours read
+       the design tokens, never a hard-coded hex. onboarding.js plays these one at a time
+       so they never stack (DESIGN.md Quiet Chrome). ---- */
+    .vp-spotlight__dot {
+      flex: none;
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: var(--color-ink-secondary); /* default; tone modifiers override below */
+    }
+    .vp-spotlight--hp  .vp-spotlight__dot { background: var(--color-hp-line); }
+    .vp-spotlight--vp  .vp-spotlight__dot { background: var(--color-vp-line); }
+    .vp-spotlight--ink .vp-spotlight__dot { background: var(--color-ink-secondary); }
+    .vp-spotlight__text { text-wrap: balance; }
+
+    /* ---- Reflow note: a brief accent-wash hint floated top-centre of the viewport,
+       shown in step with an edit-triggered unfold (stepper.js reflowFrom → main.js
+       flowNote) so the flat drawing's spring-back to 3D has a visible reason, not just
+       an sr-only one. Mirrors the hint-callout tokens (accent wash + info icon, full
+       tint never a side-stripe). aria-hidden: #sim-status already narrates it, so this
+       must not be a second live region (no double-announce). Auto-dismisses. ---- */
+    .vp-note {
+      position: absolute;
+      left: 50%;
+      top: var(--space-5);
+      /* Centering offset carried in both states so the entrance translate doesn't fight it. */
+      transform: translateX(-50%) translateY(-6px);
+      z-index: 3;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      max-width: min(30rem, calc(100% - var(--space-6)));
+      padding: var(--space-2) var(--space-3);
+      background: var(--color-accent-soft);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      font-size: var(--text-sm);
+      line-height: 1.35;
+      color: var(--color-ink);
+      pointer-events: none; /* informational only; never intercepts an orbit drag */
+      opacity: 0; /* fades in via .is-visible; collapses instantly under reduced motion */
+      transition: opacity var(--dur-base) var(--ease-standard),
+                  transform var(--dur-base) var(--ease-standard);
+    }
+    .vp-note.is-visible { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .vp-note[hidden] { display: none; }
+    .vp-note__icon { flex: none; width: 18px; height: 18px; color: var(--color-accent); }
+    .vp-note__text { text-wrap: balance; }
+
+    /* ============================================================
+       Mobile advisory — banner only, never blocks the sim
+       (Platform contract: dismissible notice at < 768px.)
+       ============================================================ */
+    #mobile-notice {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: var(--z-notice);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      padding: var(--space-3) var(--space-4);
+      background: var(--color-panel);
+      color: var(--color-ink);
+      border-bottom: 1px solid var(--color-border);
+    }
+    #mobile-notice[hidden] { display: none; }
+    .notice__text { margin: 0; font-size: var(--text-sm); }
+    .notice__dismiss {
+      flex: none;
+      min-height: 44px; /* 44px minimum touch target */
+      padding: 0 var(--space-4);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-paper);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .notice__dismiss:active { background: var(--color-border); transform: scale(0.97); }
+    .notice__dismiss:focus-visible { outline: none; box-shadow: var(--ring-focus); } /* house halo, not the global outline */
+
+    /* ============================================================
+       Boot / runtime failure fallback — shown ONLY when the sim cannot start
+       (CDN module blocked, connection dropped, or WebGL unavailable). A calm
+       drafting-paper panel, never a raw error: the struggling learner must read
+       "something external went wrong, here is what to do", not "you broke it".
+       Flat ink-on-paper (no decorative shadow), 44px reload target.
+       ============================================================ */
+    .sim-fallback {
+      position: fixed;
+      inset: 0;
+      z-index: 200; /* above the mobile notice and every viewport overlay */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-5);
+      background: var(--color-paper);
+    }
+    .sim-fallback[hidden] { display: none; }
+    .sim-fallback__inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-4);
+      max-width: 42ch;
+      text-align: center;
+    }
+    .sim-fallback__icon { width: 48px; height: 48px; color: var(--color-bench-grey); }
+    .sim-fallback__title {
+      margin: 0;
+      font-size: var(--text-title);
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -0.01em;
+      color: var(--color-ink);
+    }
+    .sim-fallback__body {
+      margin: 0;
+      font-size: var(--text-base);
+      line-height: 1.6;
+      color: var(--color-ink-secondary);
+    }
+    .sim-fallback .btn { margin-top: var(--space-1); }
+
+    /* Transient WebGL context-loss recovery chip — floats over the live viewport
+       while the GPU resets, so it earns the overlay shadow (the Flat-Ink Rule's
+       transient-overlay exception). Auto-hidden once the context is restored. */
+    .sim-restoring {
+      position: fixed;
+      left: 50%;
+      top: var(--space-5);
+      transform: translateX(-50%);
+      z-index: 150;
+      padding: var(--space-2) var(--space-4);
+      font-size: var(--text-sm);
+      color: var(--color-ink);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+    }
+    .sim-restoring[hidden] { display: none; }
+
+    /* Success toast (Feature 1) — a calm win confirmation for "Complete & next problem".
+       Fixed top-centre, ABOVE the Problem Library overlay (z 120) so it reads as the library
+       opens, but below the context-lost chip (150). Success green + a check glyph (Two-Cue
+       Rule), never gamified fanfare (DESIGN.md). Transient floating surface, so it earns the
+       overlay shadow (Flat-Ink exception). Fades via .is-visible (instant under reduced motion). */
+    .sim-toast {
+      position: fixed;
+      left: 50%;
+      top: var(--space-5);
+      transform: translateX(-50%);
+      z-index: 130;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-3) var(--space-4);
+      font-size: var(--text-sm);
+      color: var(--color-ink);
+      background: var(--color-success-soft);
+      border: 1px solid var(--color-success);
+      border-radius: var(--radius-md);
+      box-shadow: var(--shadow-md);
+      opacity: 0;
+      transition: opacity var(--dur-base) var(--ease-standard);
+    }
+    .sim-toast.is-visible { opacity: 1; }
+    .sim-toast[hidden] { display: none; }
+    .sim-toast__icon { flex: none; width: 20px; height: 20px; color: var(--color-success); }
+
+    /* Visible keyboard focus everywhere (never removed without replacement). */
+    :focus-visible {
+      outline: 2px solid var(--color-focus);
+      outline-offset: 2px;
+    }
+
+    /* Reduced motion: collapse chrome transitions + step animations (DESIGN.md / WCAG). */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* ============================================================
+       Guided Stepper chrome — step rail (progress spine) + step card
+       (the tutor panel). Quiet chrome beside the loud viewport. (DESIGN.md)
+       ============================================================ */
+    #wizard {
+      flex: 0 0 auto;
+      width: clamp(340px, 34vw, 460px);
+      height: 100%;
+      display: flex;
+      flex-direction: column; /* [library entry] / [problem header] stacked ABOVE the [card | rail] row */
+      gap: var(--space-3);
+      padding: var(--space-5) var(--space-4);
+      background: var(--color-panel);
+      border-left: 1px solid var(--color-border); /* Ink Border Rule — flat seam, no shadow */
+      order: 2; /* wizard on the RIGHT; viewport (order 1) takes the left */
+    }
+
+    /* The card + rail sit side by side in their own row beneath the column-level
+       entry / problem header, so those two can pin across the full panel width. */
+    .wizard-main {
+      flex: 1 1 auto;
+      min-height: 0;
+      display: flex;
+      flex-direction: row;
+      gap: var(--space-4);
+    }
+
+    /* --- Step rail: vertical numbered spine with a hairline connector --- */
+    #step-rail {
+      position: relative;
+      flex: 0 0 auto;
+      order: 2; /* rail sits to the RIGHT of the card (card comes first) */
+      width: 64px;
+      margin: 0; padding: var(--space-2) 0;
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    /* The connecting spine sits behind the markers; opaque markers cover it
+       between steps so it reads as a continuous line (non-decorative aid). */
+    #step-rail::before {
+      content: "";
+      position: absolute;
+      left: 50%;
+      top: 30px;
+      bottom: 30px;
+      width: 2px;
+      transform: translateX(-50%);
+      background: var(--color-border);
+    }
+    .rail__item {
+      position: relative;
+      display: flex; /* lays out the single full-height button child */
+    }
+    /* Marker + label are wrapped in a real button so completed and current steps
+       are keyboard-focusable jump targets. Upcoming steps render disabled (and so
+       leave the tab order), keeping forward progress gated by completion: the rail
+       is a map you can only walk back along, never skip ahead on. */
+    .rail__btn {
+      flex: 1 1 auto;
+      min-width: 44px; /* honours the 44px target floor even for short labels */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-1);
+      margin: 0;
+      padding: var(--space-1) 0; /* lifts the hit area past the 34px marker */
+      border: 0;
+      background: none;
+      font: inherit;
+      color: inherit;
+      text-align: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .rail__btn:disabled { cursor: default; }
+    .rail__marker {
+      width: 34px;
+      height: 34px;
+      display: grid;
+      place-items: center;
+      border: 1.5px solid var(--color-border);
+      border-radius: 50%;
+      background: var(--color-paper); /* opaque — masks the spine between markers */
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      font-weight: 700;
+      color: var(--color-ink-secondary);
+      transition: background var(--dur-base) var(--ease-standard),
+                  border-color var(--dur-base) var(--ease-standard),
+                  color var(--dur-base) var(--ease-standard),
+                  box-shadow var(--dur-base) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .rail__label {
+      font-size: var(--text-xs);
+      line-height: 1.2;
+      color: var(--color-ink-secondary);
+      max-width: 60px;
+    }
+    /* Upcoming = hollow + faint (shape cue, not colour alone); the button is
+       disabled, so it is also out of the tab order. */
+    .rail__item.is-upcoming .rail__marker { opacity: 0.5; }
+    .rail__item.is-upcoming .rail__label  { opacity: 0.5; }
+    /* Current = filled accent + bold label. */
+    .rail__item.is-current .rail__marker {
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+      color: var(--color-paper);
+      box-shadow: 0 0 0 4px var(--color-accent-soft);
+    }
+    .rail__item.is-current .rail__label { color: var(--color-ink); font-weight: 700; }
+    /* Complete = filled success + check glyph (JS swaps the marker text to ✓). */
+    .rail__item.is-complete .rail__marker {
+      background: var(--color-success);
+      border-color: var(--color-success);
+      color: var(--color-paper);
+    }
+    .rail__item.is-complete .rail__label { color: var(--color-ink-secondary); }
+    /* Press feedback: the round marker depresses when its jump button is pressed
+       (slightly deeper than the 0.97 chrome press, so the small 34px marker reads it). */
+    .rail__btn:active:not(:disabled) .rail__marker { transform: scale(0.94); }
+    /* Keyboard focus ring on the marker (matches the dock controls' --ring-focus). */
+    .rail__btn:focus-visible { outline: none; }
+    .rail__btn:focus-visible .rail__marker { box-shadow: var(--ring-focus); }
+
+    /* --- Step card: where the tutor speaks --- */
+    #step-card {
+      flex: 1 1 auto;
+      min-width: 0;
+      order: 1; /* card first (left within the wizard), rail after it */
+      display: flex;
+      flex-direction: column;
+      background: var(--color-paper); /* content area reads pure white on the grey panel shell */
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-5) var(--space-4);
+      overflow: hidden; /* the card itself no longer scrolls — .card__scroll owns scrolling; this just clips the rounded corners */
+    }
+    /* Pinned nav footer: the header + step body scroll inside .card__scroll while
+       .card__nav (Back / Next / Reset) stays fixed at the bottom of the card, always in
+       reach no matter how tall a step's controls get. The scroller moved here off
+       #step-card so the footer sits OUTSIDE the scroll region. overflow-x stays hidden to
+       keep the panelIn translate from flashing a horizontal scrollbar (Fix 3). */
+    .card__scroll {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: var(--space-3); /* +12px scrollbar gutter (ADR-032) — keep the floating pill clear of the content */
+    }
+    /* Floating padded scrollbar pill — platform standard (DESIGN.md §5.11, ADR-032). A 10px WebKit
+       channel with a ~4px thumb that floats clear of both edges via a 3px transparent border +
+       background-clip:padding-box, tinted to --color-border on a transparent track. IMPORTANT:
+       `scrollbar-width` stays UNSET on the base rule so Chrome 121+ keeps the pseudo-elements; it is
+       set to `thin` for Firefox only, in the @supports guard below. Moved off #step-card onto the
+       .card__scroll region that now owns the scroll. */
+    .card__scroll::-webkit-scrollbar { width: 10px; }
+    .card__scroll::-webkit-scrollbar-track { background: transparent; }
+    .card__scroll::-webkit-scrollbar-thumb {
+      background: var(--color-border);
+      background-clip: padding-box;
+      border: 3px solid transparent;
+      border-radius: 999px;
+    }
+    @supports (-moz-appearance: none) {
+      .card__scroll {
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-border) transparent;
+      }
+    }
+
+    .card__eyebrow {
+      margin: 0 0 var(--space-1);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--color-ink-secondary);
+    }
+    .card__title {
+      margin: 0 0 var(--space-2);
+      font-size: var(--text-title);
+      line-height: 1.2;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+    }
+    .card__lead {
+      margin: 0 0 var(--space-5);
+      max-width: 60ch;
+      font-size: var(--text-sm);
+      line-height: 1.55;
+      color: var(--color-ink-secondary);
+    }
+    .card__body { flex: 1 1 auto; }
+
+    /* Step panels — only the active step's controls are present (progressive
+       disclosure). Hidden ones are display:none via [hidden]. */
+    .step-panel { display: flex; flex-direction: column; gap: var(--space-5); }
+    .step-panel[hidden] { display: none; }
+    @keyframes panelIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: none; }
+    }
+    .step-panel.is-active { animation: panelIn var(--dur-step) var(--ease-standard); }
+
+    .card__nav {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      margin-top: var(--space-5);
+      padding-top: var(--space-4);
+      border-top: 1px solid var(--color-border);
+    }
+    #reset-control { margin-right: auto; } /* ghost Reset (+ its confirm) pinned left of Back / Next */
+    .card__nav .btn--nav { min-width: 88px; }
+    .btn[hidden] { display: none; }
+
+    /* Inline two-state Reset confirm (harden). The ghost Reset arms into a quiet
+       "Reset everything? · Yes / Cancel" on this same spot, so a stray click can't
+       wipe the drawing. Back / Next step aside while armed so the choice stands
+       alone; only "Yes" calls simAPI.reset() (uiManager.js owns the behaviour). */
+    .card__nav.is-reset-armed .btn--nav { display: none; }
+    .reset-confirm {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap; /* fall to two lines before overflowing the 340px panel */
+      gap: var(--space-1) var(--space-2);
+      font-size: var(--text-sm);
+      animation: resetConfirmIn var(--dur-fast) var(--ease-standard);
+    }
+    .reset-confirm[hidden] { display: none; } /* beat the author .reset-confirm display:flex */
+    .reset-confirm__prompt { color: var(--color-ink); }
+    .reset-confirm__sep { color: var(--color-bench-grey); user-select: none; }
+    /* Verbs stay ghost like Reset itself, but meet the 44px target floor (compound
+       selector so it wins over .btn--ghost's 36px regardless of source order). */
+    .reset-confirm .reset-confirm__action { min-height: 44px; padding: 0 var(--space-2); }
+    @keyframes resetConfirmIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* ============================================================
+       Control primitives (reused inside step panels). The Drafting-Bench
+       sliders, numeric fields, selects, toggles, and buttons — unchanged from
+       the Live-Sandbox dock, only relocated into the wizard. (DESIGN.md)
+       ============================================================ */
+    .dock__group { display: flex; flex-direction: column; gap: var(--space-3); }
+    /* Unlike a .dock__group nested inside a .step-panel (whose OWN [hidden] guard
+       already forces display:none on its whole subtree), #fold-controls sits directly
+       in .card__body and carries `hidden` on itself — needs the same explicit guard,
+       or the class's unconditional display:flex above wins and the block stays
+       visually shown regardless of the hidden attribute. */
+    #fold-controls[hidden] { display: none; }
+    .dock__group-title {
+      margin: 0 0 var(--space-1);
+      padding-bottom: var(--space-2);
+      font-size: var(--text-xs);
+      font-weight: 700;  /* Two-Weight Rule: this is the Label role (700, uppercase eyebrow) per DESIGN.md */
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--color-ink-secondary);
+      border-bottom: 1px solid var(--color-border);
+    }
+    .dock__note {
+      margin: 0;
+      max-width: 60ch;
+      font-size: var(--text-sm);
+      line-height: 1.45;
+      color: var(--color-ink-secondary);
+    }
+
+    /* --- Slider + numeric field --- */
+    .field { display: flex; flex-direction: column; gap: var(--space-1); }
+    .field__label {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-2);
+      font-size: var(--text-sm);
+    }
+    .field__name { color: var(--color-ink); }
+    .field__row {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      min-height: 44px; /* touch target */
+    }
+    .field__range {
+      flex: 1 1 auto;
+      min-width: 0;
+      height: 44px;            /* full 44px touch/hit target around a thin 4px track (--target-min) */
+      margin: 0;
+      background: transparent; /* track is drawn on the pseudo-elements below */
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+    }
+    .field__range::-webkit-slider-runnable-track { height: 3px; border-radius: 999px; background: var(--color-track); }
+    .field__range::-moz-range-track { height: 3px; border-radius: 999px; background: var(--color-track); }
+    .field__range::-moz-range-progress { height: 3px; border-radius: 999px; background: var(--color-accent); }
+    .field__range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      margin-top: -5.5px;      /* centre the 14px dot on the 3px track */
+      border-radius: 50%;
+      background: var(--color-accent);
+      border: none;            /* minimal borderless dot */
+      box-shadow: none;
+      transition: box-shadow var(--dur-fast) var(--ease-standard),
+                  background var(--dur-fast) var(--ease-standard);
+    }
+    .field__range::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--color-accent);
+      border: none;
+      box-shadow: none;
+      transition: box-shadow var(--dur-fast) var(--ease-standard),
+                  background var(--dur-fast) var(--ease-standard);
+    }
+    .field__range:focus-visible { outline: none; }
+    .field__range:focus-visible::-webkit-slider-thumb,
+    .field__range:active::-webkit-slider-thumb {
+      background: var(--color-accent-strong);
+      box-shadow: var(--ring-focus);
+    }
+    .field__range:focus-visible::-moz-range-thumb,
+    .field__range:active::-moz-range-thumb {
+      background: var(--color-accent-strong);
+      box-shadow: var(--ring-focus);
+    }
+    .field__range:disabled { cursor: not-allowed; }
+    .field__range:disabled::-webkit-slider-thumb { background: var(--color-bench-grey); }
+    .field__range:disabled::-moz-range-thumb     { background: var(--color-bench-grey); }
+    .field__num {
+      flex: 0 0 auto;
+      width: 4.5rem; /* fits "360.0" with border-box padding; uniform numeric column */
+      padding: var(--space-2);
+      text-align: right;
+      font-family: var(--font-mono);
+      font-size: var(--text-sm);
+      font-variant-numeric: tabular-nums;
+      color: var(--color-ink);
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xs);
+      transition: border-color var(--dur-fast) var(--ease-standard),
+                  box-shadow var(--dur-fast) var(--ease-standard);
+    }
+    .field__num:focus,
+    .field__select:focus {
+      outline: none;
+      border-color: var(--color-accent);
+      box-shadow: var(--ring-focus);
+    }
+    .field__unit {
+      flex: 0 0 auto;
+      width: 1ch;
+      font-family: var(--font-mono);
+      color: var(--color-ink-secondary);
+    }
+    .field__select {
+      width: 100%;
+      min-height: 44px;
+      padding: var(--space-2) var(--space-5) var(--space-2) var(--space-3);
+      font: inherit;
+      color: var(--color-ink);
+      background-color: var(--color-paper);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%23564e3c' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right var(--space-3) center;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xs);
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+      transition: border-color var(--dur-fast) var(--ease-standard),
+                  box-shadow var(--dur-fast) var(--ease-standard);
+    }
+    input:disabled, select:disabled { opacity: 0.45; cursor: not-allowed; }
+    .field--disabled .field__name { opacity: 0.55; }
+
+    /* --- Toggle (checkbox) field --- */
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: var(--space-3);
+      min-height: 44px;
+      cursor: pointer;
+    }
+    .toggle input {
+      flex: none;
+      width: 18px;
+      height: 18px;
+      margin: 0;
+      border: 1px solid var(--color-bench-grey);
+      border-radius: var(--radius-xs);
+      background-color: var(--color-paper);
+      background-repeat: no-repeat;
+      background-position: center;
+      cursor: pointer;
+      -webkit-appearance: none;
+      appearance: none;
+      transition: background-color var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  box-shadow var(--dur-fast) var(--ease-standard);
+    }
+    .toggle input:checked {
+      background-color: var(--color-accent);
+      border-color: var(--color-accent);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='10' viewBox='0 0 12 10' fill='none'%3E%3Cpath d='M1 5L4.5 8.5L11 1.5' stroke='%23faf8f3' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    }
+    .toggle input:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .toggle__text { font-size: var(--text-sm); }
+    .toggle:has(input:disabled) { opacity: 0.5; cursor: not-allowed; }
+    .toggle:has(input:disabled) input { cursor: not-allowed; }
+    /* Lock cue (DESIGN.md iconography) so a hierarchy-disabled toggle reads as
+       "locked for now", not broken. Shown only while the control is disabled. */
+    .toggle__lock {
+      display: none;
+      flex: none;
+      width: 14px;
+      height: 14px;
+      margin-left: auto;
+      color: var(--color-bench-grey);
+    }
+    .toggle:has(input:disabled) .toggle__lock { display: block; }
+
+    /* --- Buttons --- */
+    .btn {
+      font: inherit;
+      min-height: 44px;
+      padding: 0 var(--space-4);
+      color: var(--color-ink);
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .btn:active { background: var(--color-border); transform: scale(0.97); }
+    /* House focus treatment: the accent halo, matching every other control (DESIGN.md
+       §5 Buttons — "the accent focus halo, never removed"). Without this override the
+       .btn family fell through to the global 2px solid outline, leaving the most
+       prominent controls (primary Next / Add / Draw) as the one family not speaking the
+       sim's shared focus language. Wins over the global :focus-visible by specificity. */
+    .btn:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+    .btn--primary {
+      color: var(--color-paper);
+      background: var(--color-accent);
+      border-color: var(--color-accent);
+    }
+    .btn--primary:active { background: var(--color-accent-strong); border-color: var(--color-accent-strong); }
+    .btn--block { width: 100%; }
+    .btn--ghost {
+      min-height: 36px;
+      padding: 0 var(--space-3);
+      font-size: var(--text-sm);
+      color: var(--color-ink-secondary);
+      background: transparent;
+      border-color: transparent;
+    }
+
+    /* --- Step-action hint + completion badge (Steps 3–5) --- */
+    .hint {
+      display: flex;
+      gap: var(--space-2);
+      padding: var(--space-3);
+      background: var(--color-accent-soft);
+      border-radius: var(--radius-sm);
+      font-size: var(--text-sm);
+      line-height: 1.5;
+      color: var(--color-ink);
+    }
+    .hint__icon { flex: none; width: 18px; height: 18px; color: var(--color-accent); }
+    .done-badge {
+      display: none;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--text-sm);
+      font-weight: 700;
+      color: var(--color-success);
+    }
+    .done-badge.is-on { display: flex; }
+    .done-badge__icon { width: 18px; height: 18px; }
+
+    /* --- Inline term definition (DESIGN.md): dotted-underline word that reveals a
+       plain-language popover on hover / keyboard focus / tap. The struggling
+       first-year gets the vocabulary defined in place without losing the real
+       term. Screen readers get it via aria-describedby on the button. --- */
+    .term {
+      font: inherit;
+      color: var(--color-accent-strong);
+      background: none;
+      border: 0;
+      padding: 0;
+      cursor: help;
+      text-decoration: underline dotted;
+      text-underline-offset: 2px;
+      position: relative;
+    }
+    .term:focus-visible {
+      outline: none;
+      border-radius: var(--radius-xs);
+      box-shadow: var(--ring-focus);
+    }
+    .term__pop {
+      /* Fixed so it escapes the step card's overflow clip; placed by terms.js. */
+      position: fixed;
+      z-index: 30;
+      width: max-content;
+      max-width: 32ch;
+      padding: var(--space-3);
+      font-size: var(--text-sm);
+      font-weight: 400;
+      line-height: 1.45;
+      text-align: left;
+      text-decoration: none;
+      white-space: normal;
+      color: var(--color-ink);
+      background: var(--color-accent-soft);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      /* Animate transform/opacity only; collapses instantly under reduced motion. */
+      opacity: 0;
+      visibility: hidden;
+      /* Origin-aware reveal: grow out of the term, not slide from nowhere. terms.js
+         sets transform-origin to top (opens below the word) or bottom (flipped above). */
+      transform: translateY(4px) scale(0.96);
+      transform-origin: top center;
+      transition: opacity var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard),
+                  visibility var(--dur-fast) var(--ease-standard);
+      pointer-events: none;
+    }
+    /* Reveal is JS-driven (.is-open) so the fixed popover is positioned before it
+       shows; terms.js adds .is-open on hover, focus, and tap alike. */
+    .term.is-open .term__pop {
+      opacity: 1;
+      visibility: visible;
+      transform: none;
+    }
+
+    /* ============================================================
+       Textbook Problem Library — quiet wizard-panel entry, the active-problem
+       header (the tutor reading the problem + the self-check), and the full-viewport
+       overlay of problem cards. Token-only; flat ink-on-paper; the overlay is a
+       transient floating surface so it earns the overlay shadow (Flat-Ink exception).
+       (problemLibrary.js drives all of these.)
+       ============================================================ */
+
+    /* --- Entry: a quiet ghost action sharing the step card's eyebrow row, right of the
+       "Step X of 6" label. Anchored in the header (not floating above the column), so it
+       never steals the panel's opening from the guided flow. Ghost like Reset. --- */
+    .card__eyebrow-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2);
+      margin: 0 0 var(--space-1);
+    }
+    .card__eyebrow-row .card__eyebrow { margin: 0; }
+    .library-entry {
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      min-height: 44px; /* full tap/click target even though it reads as a compact link */
+      margin-right: calc(var(--space-2) * -1); /* pull the ghost flush to the card's right edge */
+      padding: 0 var(--space-2);
+      font: inherit;
+      font-size: var(--text-sm);
+      color: var(--color-ink-secondary);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .library-entry:active { transform: scale(0.97); }
+    .library-entry:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .library-entry__icon { flex: none; width: 18px; height: 18px; }
+
+    /* --- Active-problem header: a quiet paper card (NOT an accent wash — Quiet-Chrome
+       Rule) carrying the statement + the self-check, pinned above the step card while a
+       problem is loaded. Colour is rationed to the match-success state below. --- */
+    #active-problem {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      padding: var(--space-3);
+      background: var(--color-paper); /* content surface reads pure white on the grey panel shell */
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+    }
+    #active-problem[hidden] { display: none; }
+    .active-problem__head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: var(--space-2);
+    }
+    .active-problem__eyebrow {
+      margin: 0;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--color-ink-secondary);
+    }
+    .active-problem__toggle { flex: none; }
+    .active-problem__statement {
+      margin: 0;
+      font-size: var(--text-sm);
+      line-height: 1.5;
+      color: var(--color-ink);
+    }
+    #active-problem.is-collapsed .active-problem__statement {
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    /* Scaffolded hints (Feature 3) — a soft accent-wash callout holding the revealed
+       reasoning steps, with a ghost "Need a hint?" trigger above it that reveals them one
+       at a time. Full accent-wash tint, no coloured side-stripe (DESIGN.md "Hint Callout").
+       Gaps come from #active-problem's column flex gap, so no explicit margins here. */
+    .active-problem__hint-btn { align-self: flex-start; }
+    .active-problem__hints {
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-sm);
+      background: var(--color-accent-soft);
+      font-size: var(--text-sm);
+      line-height: 1.5;
+      color: var(--color-ink);
+    }
+    .active-problem__hints[hidden] { display: none; }
+    .hint-steps {
+      margin: 0;
+      padding-left: var(--space-5);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+    .hint-steps li { padding-left: var(--space-1); }
+    /* Each freshly revealed step fades up (collapses instantly under reduced motion). */
+    .hint-steps li { animation: hintStepIn var(--dur-step) var(--ease-standard); }
+    @keyframes hintStepIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to   { opacity: 1; transform: none; }
+    }
+    #active-problem.is-collapsed .active-problem__hints,
+    #active-problem.is-collapsed .active-problem__hint-btn { display: none; }
+    .active-problem__actions {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-2);
+    }
+    /* Self-check status — neutral while differing (no alarming red, DESIGN.md), success
+       green + a check glyph only on a full match (Two-Cue Rule: colour + icon). */
+    .match-status {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin: 0;
+      font-size: var(--text-sm);
+      line-height: 1.4;
+      color: var(--color-ink-secondary);
+    }
+    .match-status__icon { flex: none; width: 16px; height: 16px; }
+    /* The matched moment is the lesson's small payoff: a calm success pop (soft green +
+       the check glyph — Two-Cue Rule), the one place colour is spent in this card. */
+    .match-status--ok {
+      color: var(--color-success);
+      font-weight: 700;
+      padding: var(--space-1) var(--space-2);
+      background: var(--color-success-soft);
+      border-radius: var(--radius-xs);
+    }
+
+    /* --- Full-viewport overlay --- */
+    .problem-library {
+      position: fixed;
+      inset: 0;
+      z-index: var(--z-overlay);
+      display: flex;
+      flex-direction: column;
+      background: var(--color-paper); /* the problems page is a white content surface */
+      box-shadow: var(--shadow-md); /* transient floating surface (Flat-Ink exception) */
+    }
+    .problem-library[hidden] { display: none; }
+    /* Calm slide-and-fade in; collapses to instant under reduced motion (global rule). */
+    @keyframes libraryIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+    .problem-library:not([hidden]) { animation: libraryIn var(--dur-step) var(--ease-standard); }
+
+    .problem-library__header {
+      flex: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      padding: var(--space-4) var(--space-5);
+      border-bottom: 1px solid var(--color-border);
+    }
+    /* Counterweight for the 44px close button, so the title reads on true centre
+       without un-anchoring the button from its top-right corner (§5.12 convention). */
+    .problem-library__header::before {
+      content: "";
+      flex: none;
+      width: 44px;
+    }
+    .problem-library__title {
+      flex: 1 1 auto;
+      min-width: 0;
+      text-align: center;
+      margin: 0;
+      font-size: var(--text-title);
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -0.01em;
+      color: var(--color-ink);
+    }
+    .problem-library__close {
+      flex: none;
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .problem-library__close:active { transform: scale(0.97); }
+    .problem-library__close:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .problem-library__close svg { width: 20px; height: 20px; }
+
+    /* "Clears your work" confirm strip — only when loading would discard progress. */
+    #problem-library-confirm {
+      flex: none;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-1) var(--space-2);
+      padding: var(--space-3) var(--space-5);
+      background: var(--color-accent-soft);
+      border-bottom: 1px solid var(--color-border);
+      font-size: var(--text-sm);
+    }
+    #problem-library-confirm[hidden] { display: none; }
+    .confirm__text { color: var(--color-ink); }
+
+    .problem-library__body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      padding: var(--space-5);
+      padding-right: var(--space-3); /* scrollbar gutter — pill floats centered in its track (ADR-032) */
+    }
+    /* Floating padded scrollbar pill — platform standard (DESIGN.md §5.11, ADR-032); matches #step-card. */
+    .problem-library__body::-webkit-scrollbar { width: 10px; }
+    .problem-library__body::-webkit-scrollbar-track { background: transparent; }
+    .problem-library__body::-webkit-scrollbar-thumb {
+      background: var(--color-border);
+      background-clip: padding-box;
+      border: 3px solid transparent;
+      border-radius: 999px;
+    }
+    @supports (-moz-appearance: none) {
+      .problem-library__body {
+        scrollbar-width: thin;
+        scrollbar-color: var(--color-border) transparent;
+      }
+    }
+    .problem-library__inner { max-width: 920px; margin: 0 auto; }
+
+    .problem-group { margin: 0 0 var(--space-6); }
+    .problem-group__title {
+      margin: 0 0 var(--space-1);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--color-ink-secondary);
+    }
+    .problem-group__blurb {
+      margin: 0 0 var(--space-3);
+      font-size: var(--text-sm);
+      color: var(--color-ink-secondary);
+    }
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: var(--space-3);
+    }
+    .problem-card {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-1);
+      min-height: 44px;
+      padding: var(--space-3) var(--space-4);
+      text-align: left;
+      color: var(--color-ink);
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .problem-card:active { transform: scale(0.97); }
+    .problem-card:focus-visible { outline: none; border-color: var(--color-accent); box-shadow: var(--ring-focus); }
+    .problem-card__title { font-size: var(--text-base); font-weight: 700; }
+    .problem-card__hint {
+      font-size: var(--text-sm);
+      color: var(--color-ink-secondary);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    /* Decorative hover only fires for a real pointing device (hover: hover + pointer:
+       fine). On touch, faked hover would latch a "stuck" highlight after a tap; gating
+       keeps tap clean while preserving full hover feedback on desktop. Rules below are
+       in original source order so the cascade is unchanged. */
+    @media (hover: hover) and (pointer: fine) {
+      .wizard-toggle:hover {
+        background: var(--color-paper);
+        border-color: var(--color-bench-grey);
+        color: var(--color-ink);
+      }
+      .quick-view:hover {
+        background: var(--color-paper);
+        color: var(--color-ink);
+      }
+      /* Keep the latched view / the on-connector solid-accent even on hover (Module 1 pill). */
+      .quick-view.is-active:hover { background: var(--color-accent-strong); color: var(--color-paper); }
+      .connector-toggle:hover {
+        background: var(--color-paper);
+        border-color: var(--color-bench-grey);
+        color: var(--color-ink);
+      }
+      .connector-toggle:has(input:checked):hover { background: var(--color-accent-strong); border-color: var(--color-accent-strong); color: var(--color-paper); }
+      .vp-hint__dismiss:hover { background: var(--color-border); color: var(--color-ink); }
+      .notice__dismiss:hover { background: var(--color-panel); border-color: var(--color-bench-grey); }
+      /* Hover on a jumpable, non-current step previews the jump with the accent halo
+         + a darkened label (an interactivity cue beyond the cursor alone). */
+      .rail__item:not(.is-current) .rail__btn:not(:disabled):hover .rail__marker {
+        box-shadow: 0 0 0 4px var(--color-accent-soft);
+      }
+      .rail__item:not(.is-current) .rail__btn:not(:disabled):hover .rail__label {
+        color: var(--color-ink);
+      }
+      .field__range:hover::-webkit-slider-thumb { background: var(--color-accent-strong); }
+      .field__range:hover::-moz-range-thumb     { background: var(--color-accent-strong); }
+      .field__num:hover { border-color: var(--color-bench-grey); }
+      .field__select:hover { border-color: var(--color-bench-grey); }
+      .toggle input:hover { border-color: var(--color-ink-secondary); }
+      .btn:hover { background: var(--color-panel); border-color: var(--color-bench-grey); }
+      .btn:disabled:hover { background: var(--color-paper); border-color: var(--color-border); }
+      .btn--primary:hover { background: var(--color-accent-strong); border-color: var(--color-accent-strong); }
+      .btn--primary:disabled:hover { background: var(--color-accent); border-color: var(--color-accent); }
+      .btn--ghost:hover { background: var(--color-panel); border-color: var(--color-border); }
+      .term:hover { color: var(--color-accent); }
+      .library-entry:hover { background: var(--color-paper); border-color: var(--color-border); color: var(--color-ink); }
+      .problem-library__close:hover { background: var(--color-paper); border-color: var(--color-bench-grey); color: var(--color-ink); }
+      .problem-card:hover { background: var(--color-accent-soft); border-color: var(--color-accent); }
+    }
+
+    /* ============================================================
+       Narrow viewports: stack vertically so the sim is never squeezed to
+       nothing (platform contract: advise, never block). Mobile reading order
+       top→bottom: 3D viewport, then the parameter card, then the step rail as
+       a horizontal progress strip at the very bottom.
+       ============================================================ */
+    @media (max-width: 767px) {
+      body { flex-direction: column; }
+
+      /* 1) Viewport on top — give it a fixed slice so it always stays visible. */
+      #sim-viewport {
+        order: 0;
+        width: 100%;
+        flex: 0 0 42%;
+        height: auto;
+        min-height: 0;
+      }
+
+      /* Wizard folded away → viewport reclaims the freed height (overrides the 42%
+         slice above; grow=1 lets it fill the column once #wizard is display:none). */
+      body.wizard-collapsed #sim-viewport { flex: 1 1 100%; }
+
+      /* The panel now stacks BELOW the viewport, so the chevron points along that
+         axis instead of sideways: down = push the panel closed, up = pull it back
+         open (drawer-from-bottom). +90° offset over the desktop right/left states. */
+      .wizard-toggle__icon { transform: rotate(90deg); }
+      body.wizard-collapsed .wizard-toggle__icon { transform: rotate(-90deg); }
+
+      /* 2)+3) Wizard below the viewport, its children stacked as a column so the
+         parameter card comes first and the step rail drops underneath it. */
+      #wizard {
+        order: 1;
+        width: 100%;
+        height: auto;
+        min-height: 0;
+        flex: 1 1 auto;
+        flex-direction: column;
+        border-left: none;
+        border-top: 1px solid var(--color-border);
+      }
+
+      /* Stack the card above the rail on mobile (their order props carry the
+         card-first reading order set below). */
+      .wizard-main { flex-direction: column; }
+
+      /* 2) Parameter card — first within the wizard, takes the scrollable space. */
+      #step-card {
+        order: 1;
+        flex: 1 1 auto;
+        min-height: 0;
+      }
+
+      /* 3) Step rail — last, reflowed from a vertical spine into a horizontal
+         strip spanning the full width beneath the parameters. */
+      #step-rail {
+        order: 2;
+        flex: 0 0 auto;
+        flex-direction: row;
+        width: 100%;
+        padding: var(--space-3) 0 0;
+      }
+      /* Spine runs horizontally, threading through the marker centres. */
+      #step-rail::before {
+        left: 30px;
+        right: 30px;
+        top: calc(var(--space-3) + 17px);
+        bottom: auto;
+        width: auto;
+        height: 2px;
+        transform: translateY(-50%);
+      }
+    }
+
+    /* ============================================================
+       Topic-specific additions (First & Third Angle Projection).
+       Ported from graphics_module_1_topic_2_spatial_framework/index.html:
+       the singleton #term-pop popover (this topic's terms.js uses the
+       data-t + TERMS-glossary pattern, not the starter's per-button
+       .term__pop markup) and the .lbl CSS2D label family (HP/VP/PP tags).
+       ============================================================ */
+    #term-pop {
+      position: fixed;
+      z-index: var(--z-term, 60);
+      max-width: 32ch;
+      padding: var(--space-3);
+      font-size: var(--text-sm);
+      line-height: 1.45;
+      color: var(--color-ink);
+      background: var(--color-accent-soft);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-md);
+      pointer-events: none;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(4px) scale(0.96);
+      transform-origin: top left;
+      transition: opacity var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard),
+                  visibility 0s linear var(--dur-fast);
+    }
+    #term-pop.is-open { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+    #term-pop .term-pop__title { display: block; font-weight: 700; margin-bottom: 2px; }
+
+    .lbl {
+      line-height: 1;
+      white-space: nowrap;
+      user-select: none;
+      pointer-events: none;
+      font-family: var(--font-sans);
+      font-weight: 700;
+      font-size: var(--text-sm);
+    }
+    .lbl--hp { color: var(--color-hp-line); }
+    .lbl--vp { color: var(--color-vp-line); }
+    .lbl--pp { color: var(--color-pp-line); }
+    /* Quadrant numerals I-IV: the object's own quadrant reads ink+700; the other
+       three recede to bench-grey+400 (Two-Cue — colour is never the only cue).
+       Boxed chip so each pops off the grid "cage" underneath. */
+    .lbl--quad {
+      color: var(--color-bench-grey);
+      font-weight: 400;
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xs);
+      padding: 1px 7px;
+    }
+    .lbl--quad.is-active { color: var(--color-ink); font-weight: 700; border-color: var(--color-ink-secondary); }
+    /* The "F" chip beside the pictorial front-view arrow (solidViews.js's fArrow). */
+    .lbl--f {
+      color: var(--color-ink);
+      background: var(--color-paper);
+      border: 1px solid var(--color-ink-secondary);
+      border-radius: 999px;
+      padding: 1px 8px;
+      font-family: var(--font-mono);
+    }
+
+    /* Step body copy — stepper.js prepends a .step-copy host into the active
+       .step-panel and fills it with the step's paragraphs + hint (ported from the
+       Module-2-family .card__hint treatment; this starter's own step-card has no
+       dedicated body element between the lead and the per-step controls). */
+    .step-copy p { margin: 0 0 var(--space-2); font-size: var(--text-sm); line-height: 1.55; }
+    .step-copy p:last-of-type { margin-bottom: var(--space-3); }
+    .card__hint {
+      margin: var(--space-2) 0 0;
+      padding: var(--space-3) var(--space-4);
+      background: var(--color-accent-soft);
+      border: 1px solid color-mix(in srgb, var(--color-accent) 25%, var(--color-border));
+      border-radius: var(--radius-sm);
+      font-size: var(--text-sm);
+      line-height: 1.5;
+    }
+
+    /* Projection-system toggle (steps 6/7) — same treatment as the Spatial
+       Framework topic's .quad-btn picker. */
+    .system-toggle { display: flex; gap: var(--space-2); }
+    .system-btn { flex: 1 1 0; }
+    .system-btn[aria-pressed="true"] {
+      background: var(--color-accent-soft);
+      border-color: var(--color-accent);
+      box-shadow: inset 0 0 0 1px var(--color-accent);
+    }
+
+    /* BIS projection-system symbol badge — bottom-right of the viewport, toggled by
+       src/main.js on the steps that set showSymbol. Two SVG variants (mirror images,
+       SP 46:2003) swapped by data-system on the badge itself; a plain-text fallback
+       sits alongside so the convention reads even without the glyph. */
+    .fa-symbol {
+      position: absolute;
+      right: var(--space-4);
+      bottom: var(--space-4);
+      z-index: 6;
+      width: 96px;
+      padding: var(--space-2) var(--space-3);
+      background: color-mix(in srgb, var(--color-paper) 90%, transparent);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      color: var(--color-ink);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity var(--dur-base) var(--ease-standard);
+      text-align: center;
+    }
+    .fa-symbol.is-visible { opacity: 1; }
+    .fa-symbol svg { display: block; width: 100%; height: auto; }
+    .fa-symbol__label {
+      display: block;
+      margin-top: var(--space-1);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+  </style>
+</head>
+<body>
+  <!-- Boot/runtime failure fallback: shown only when the sim cannot start (CDN
+       blocked, connection dropped, or WebGL unavailable). Calm, on-brand, never a
+       raw error trace. role="alert" so assistive tech announces it when revealed. -->
+  <div id="sim-fallback" class="sim-fallback" role="alert" hidden>
+    <div class="sim-fallback__inner">
+      <svg class="sim-fallback__icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M24 8 40 17 24 26 8 17Z" />
+        <path d="M40 17V31L24 40 8 31V17" />
+        <path d="M8.5 8.5 39.5 39.5" />
+      </svg>
+      <h1 class="sim-fallback__title" id="sim-fallback-title">We could not load the simulation</h1>
+      <p class="sim-fallback__body" id="sim-fallback-body">It looks like the connection dropped while the 3D tools were starting up. Check your internet connection, then reload to try again.</p>
+      <button type="button" class="btn btn--primary" id="sim-fallback-reload">Reload the simulation</button>
+    </div>
+  </div>
+
+  <!-- Transient WebGL context-loss recovery chip (GPU reset / long backgrounding).
+       main.js shows it on 'webglcontextlost' and hides it once the context is
+       restored and the scene rebuilt. -->
+  <div id="sim-context-lost" class="sim-restoring" role="status" hidden>
+    <span>Restoring the 3D view&hellip;</span>
+  </div>
+
+  <!-- Mobile advisory. Hidden until main.js confirms a < 768px viewport. -->
+  <aside id="mobile-notice" role="status" hidden>
+    <p class="notice__text">Best experienced on desktop.</p>
+    <button id="mobile-notice-dismiss" class="notice__dismiss" type="button">Dismiss</button>
+  </aside>
+
+  <!-- Practice-problems library: a full-viewport, focus-trapped dialog. The card list
+       is built by problemLibrary.js from src/problems.js, grouped by tier and filtered to
+       the build's ENABLED_TIERS, so a topic clone inherits this and only shows solvable
+       problems. The rAF loop is paused while it is open (it hides the live viewport). -->
+  <div id="problem-library" class="problem-library" role="dialog" aria-modal="true" aria-labelledby="problem-library-title" hidden>
+    <header class="problem-library__header">
+      <h1 class="problem-library__title" id="problem-library-title">Practice problems</h1>
+      <button id="problem-library-close" class="problem-library__close" type="button" aria-label="Close practice problems">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
+    </header>
+
+    <!-- Shown only when loading would discard in-progress work (sim.hasSolid). -->
+    <div id="problem-library-confirm" role="group" aria-label="Confirm loading a problem" hidden>
+      <span class="confirm__text" id="problem-library-confirm-text">Loading this problem clears your current work.</span>
+      <span class="reset-confirm__sep" aria-hidden="true">·</span>
+      <button id="problem-confirm-load" class="btn btn--ghost reset-confirm__action" type="button">Load problem</button>
+      <span class="reset-confirm__sep" aria-hidden="true">/</span>
+      <button id="problem-confirm-cancel" class="btn btn--ghost reset-confirm__action" type="button">Cancel</button>
+    </div>
+
+    <div class="problem-library__body">
+      <div id="problem-library-list" class="problem-library__inner"></div>
+    </div>
+  </div>
+
+  <!-- Guided Stepper chrome — step rail + step card. stepper.js drives it. -->
+  <aside id="wizard" aria-label="Guided steps">
+    <!-- Active-problem header: shown only while a textbook problem is loaded. The
+         statement is the tutor reading the problem; the self-check status sits beside the
+         parameters the student is matching. "Exit problem" clears this framing only — it
+         never wipes the drawing. problemLibrary.js drives it. -->
+    <section id="active-problem" aria-label="Current problem" hidden>
+      <div class="active-problem__head">
+        <p class="active-problem__eyebrow">Textbook problem</p>
+        <button id="active-problem-toggle" class="btn btn--ghost active-problem__toggle" type="button" aria-expanded="true">Hide text</button>
+      </div>
+      <p class="active-problem__statement" id="active-problem-statement"></p>
+      <!-- Scaffolded hints (Feature 3): "Need a hint?" reveals one reasoning step per click
+           (sourced from each problem's hints[] in src/problems.js). problemLibrary.js drives
+           the reveal + announces each step; revealed steps accumulate in the list below. -->
+      <button id="active-problem-hint-btn" class="btn btn--ghost active-problem__hint-btn" type="button" hidden>Need a hint?</button>
+      <div class="active-problem__hints" id="active-problem-hints" hidden>
+        <ol class="hint-steps" id="active-problem-hint-list"></ol>
+      </div>
+      <div class="active-problem__actions">
+        <p class="match-status" id="active-problem-status"></p>
+        <button id="exit-problem" class="btn btn--ghost" type="button">Exit problem</button>
+      </div>
+    </section>
+
+    <div class="wizard-main">
+    <ol id="step-rail" aria-label="Progress">
+      <li class="rail__item" data-step="1"><button type="button" class="rail__btn"><span class="rail__marker">1</span><span class="rail__label">Reference Planes</span></button></li>
+      <li class="rail__item" data-step="2"><button type="button" class="rail__btn"><span class="rail__marker">2</span><span class="rail__label">First-Angle Setup</span></button></li>
+      <li class="rail__item" data-step="3"><button type="button" class="rail__btn"><span class="rail__marker">3</span><span class="rail__label">First-Angle Fold</span></button></li>
+      <li class="rail__item" data-step="4"><button type="button" class="rail__btn"><span class="rail__marker">4</span><span class="rail__label">Third-Angle Setup</span></button></li>
+      <li class="rail__item" data-step="5"><button type="button" class="rail__btn"><span class="rail__marker">5</span><span class="rail__label">Third-Angle Fold</span></button></li>
+      <li class="rail__item" data-step="6"><button type="button" class="rail__btn"><span class="rail__marker">6</span><span class="rail__label">Compare</span></button></li>
+      <li class="rail__item" data-step="7"><button type="button" class="rail__btn"><span class="rail__marker">7</span><span class="rail__label">Verify</span></button></li>
+    </ol>
+
+    <!--
+      Not a live region. #sim-status (role="status", aria-live="polite") is the single
+      announcement channel — stepper.js narrates "Step X of N" there on every transition.
+      A live region on this whole card double-announced step changes and re-read the entire
+      swapped-in panel on value-text updates (critique P2). Let #sim-status own it.
+    -->
+    <section id="step-card">
+      <!-- .card__scroll: header + step body scroll here; .card__nav stays pinned below. -->
+      <div class="card__scroll">
+      <header>
+        <div class="card__eyebrow-row">
+          <p class="card__eyebrow">Step <span id="step-current">1</span> of <span id="step-total">7</span></p>
+          <!-- Practice-problems entry: a quiet ghost action sharing the eyebrow baseline,
+               so it is anchored in the header instead of floating above the column. Opens
+               the full-viewport library. -->
+          <button id="open-problem-library" class="library-entry" type="button" aria-haspopup="dialog">
+            <svg class="library-entry__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5Z" />
+              <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5A1.5 1.5 0 0 1 20 20.5Z" />
+            </svg>
+            <span>Practice problems</span>
+          </button>
+        </div>
+        <h2 class="card__title" id="step-title">Step one</h2>
+        <p class="card__lead" id="step-lead"></p>
+      </header>
+
+      <div class="card__body">
+        <!-- STEP 1 — Reference Planes: reading-only, no controls. -->
+        <section class="step-panel" data-step="1"></section>
+
+        <!-- STEP 2 — First-Angle Setup: reading-only, view flags pin system='first'. -->
+        <section class="step-panel" data-step="2" hidden></section>
+
+        <!-- STEP 3 — First-Angle Fold: reading-only panel; the fold control itself
+             lives outside the per-step panels (see #fold-controls below the step
+             list) so it's a SINGLE element shared by steps 3 and 5 without being
+             physically nested — and therefore invisible — inside either one's
+             hidden <section>. stepper.js shows/hides the whole block per-step via
+             each step's `controls` array, independent of which panel is active. -->
+        <section class="step-panel" data-step="3" hidden></section>
+
+        <!-- STEP 4 — Third-Angle Setup: reading-only, view flags pin system='third'. -->
+        <section class="step-panel" data-step="4" hidden></section>
+
+        <!-- STEP 5 — Third-Angle Fold: same fold control (see #fold-controls). -->
+        <section class="step-panel" data-step="5" hidden></section>
+
+        <!-- STEP 6 — Compare: the live First/Third toggle. -->
+        <section class="step-panel" data-step="6" hidden>
+          <div class="dock__group">
+            <h3 class="dock__group-title">Projection system</h3>
+            <div class="system-toggle" role="group" aria-label="Projection system">
+              <button type="button" class="btn system-btn" data-system="first" aria-pressed="true">First-angle</button>
+              <button type="button" class="btn system-btn" data-system="third" aria-pressed="false">Third-angle</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- STEP 7 — Verify: the same toggle, for use against a loaded problem. -->
+        <section class="step-panel" data-step="7" hidden>
+          <div class="dock__group">
+            <h3 class="dock__group-title">Projection system</h3>
+            <div class="system-toggle" role="group" aria-label="Projection system">
+              <button type="button" class="btn system-btn" data-system="first" aria-pressed="true">First-angle</button>
+              <button type="button" class="btn system-btn" data-system="third" aria-pressed="false">Third-angle</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- Fold controls: NOT nested in a per-step .step-panel — shared as-is by
+             steps 3 and 5 (stepper.js toggles this whole block's `hidden` from each
+             step's own `controls` array, so it's independent of which .step-panel is
+             showing). A singleton DOM node nested inside one hidden panel would be
+             invisible on every OTHER step, including the other one that needs it. -->
+        <div id="fold-controls" class="dock__group" hidden>
+          <button id="btn-fold" type="button" class="btn btn--primary">Fold planes flat</button>
+          <button id="btn-unfold" type="button" class="btn btn--ghost" hidden>Unfold back to 3D</button>
+          <p id="done-fold" class="dock__note" hidden>Folded — the flat layout is on screen. Next unlocked.</p>
+        </div>
+      </div>
+      </div><!-- /.card__scroll -->
+
+      <footer class="card__nav">
+        <!-- Ghost Reset, guarded by an inline two-state confirm (harden): a stray
+             click can't wipe your work in progress. Arming swaps "Reset" for the confirm
+             on this same control and steps Back / Next aside; only "Yes" fires
+             simAPI.reset() — the single reset path (CLAUDE.md). Wiring: uiManager.js. -->
+        <div id="reset-control">
+          <button id="btn-reset" class="btn btn--ghost" type="button">Reset</button>
+          <div id="reset-confirm" class="reset-confirm" role="group" aria-label="Reset confirmation" hidden>
+            <span class="reset-confirm__prompt">Reset everything?</span>
+            <span class="reset-confirm__sep" aria-hidden="true">·</span>
+            <button id="btn-reset-yes" class="btn btn--ghost reset-confirm__action" type="button" aria-label="Yes, reset everything">Yes</button>
+            <span class="reset-confirm__sep" aria-hidden="true">/</span>
+            <button id="btn-reset-cancel" class="btn btn--ghost reset-confirm__action" type="button" aria-label="Cancel reset">Cancel</button>
+          </div>
+        </div>
+        <button id="btn-back" class="btn btn--nav" type="button" hidden>Back</button>
+        <button id="btn-next" class="btn btn--primary btn--nav" type="button">Next</button>
+        <!-- Finish-button pattern (ADR-078 addendum, revised): takes over #btn-next's footer
+             slot at the terminal step (stepper.js hides one exactly when the other shows).
+             Fires sim:complete — no latch, every click reposts. Own element, own listener: NOT
+             a relabel of #btn-next. UNGATED here (no `disabled` attribute) because this starter
+             has no domain state to gate on; a real topic built from this template should decide
+             its OWN gate condition rather than copying this ungated form by default — see
+             MODULE-STARTER.md's Finish-button section. -->
+        <button id="btn-finish" class="btn btn--primary btn--nav" type="button" hidden>Finish lesson</button>
+      </footer>
+    </section>
+    </div>
+  </aside>
+
+  <!-- The 3D teaching viewport. main.js mounts the WebGL canvas + label overlay here. -->
+  <main id="sim-viewport" aria-label="3D simulation viewport. Drag to orbit.">
+    <!-- Hide/show the guided-steps panel to enlarge the 3D view. Floats over the
+         canvas so it stays reachable in both states (main.js toggles the body class). -->
+    <button id="wizard-toggle" class="wizard-toggle" type="button" aria-controls="wizard" aria-expanded="true" title="Hide steps panel">
+      <svg class="wizard-toggle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 6l6 6-6 6" />
+      </svg>
+      <span class="sr-only">Toggle steps panel</span>
+    </button>
+
+    <!-- Top-left viewport cluster: the quick-view camera chips and the connector-line
+         toggle, grouped into one stack so the corner reads as a single control region.
+         The container is click-through; only the controls inside it take pointer events. -->
+    <div class="vp-cluster">
+      <!-- Quick-view camera buttons: snap the (ortho) camera square to each reference plane.
+           Clear of the top-right wizard toggle. main.js wires them via [data-quick-view];
+           clicking the active one returns to perspective orbit. -->
+      <div class="quick-views" role="group" aria-label="Quick camera views">
+        <button class="quick-view" type="button" data-quick-view="top" aria-pressed="false" title="Top view (look down on HP)">Top</button>
+        <button class="quick-view" type="button" data-quick-view="front" aria-pressed="false" title="Front view (look at VP)">Front</button>
+        <button class="quick-view" type="button" data-quick-view="side" aria-pressed="false" title="Side view (look at PP)">Side</button>
+      </div>
+
+      <!-- Connector-line visibility: de-clutter the drawing by hiding the dashed 3D→2D
+           connectors and the flattened projectors. main.js wires #connector-toggle via
+           simController.setConnectors; the choice persists across rebuilds. -->
+      <label class="connector-toggle" title="Show or hide the dashed connector lines" hidden>
+        <input type="checkbox" id="connector-toggle" checked />
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+          <path d="M5 5v14M19 5v14" stroke-dasharray="3 3"/><path d="M5 12h14"/>
+        </svg>
+        <span>Connector lines</span>
+      </label>
+    </div>
+
+    <!-- BIS projection-system symbol badge (SP 46:2003) — bottom-right, faded in by
+         src/main.js on the steps that set showSymbol. Two mirrored SVG variants swapped
+         by data-system; plain-text fallback beneath so the convention reads without the
+         glyph too. -->
+    <div id="fa-symbol" class="fa-symbol" aria-hidden="true" hidden>
+      <svg id="fa-symbol-svg" viewBox="0 0 96 40" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round" aria-hidden="true">
+        <path d="M8 8 L8 32 L40 26 L40 14 Z"/>
+        <circle cx="66" cy="20" r="12"/><circle cx="66" cy="20" r="6"/>
+      </svg>
+      <span id="fa-symbol-label" class="fa-symbol__label">FIRST ANGLE PROJECTION</span>
+    </div>
+
+    <!-- Compare card (ADR-012, narrowed by ADR-080) — the docked 2D "drawing sheet" frame,
+         ported from the Points topic as scaffolding. The stage owns a plain 2D <canvas> that
+         a drawCompare() routine (wire in main.js) would live-redraw. Hidden until opened; the
+         #compare-chip toggle + the enter/exit-workbench logic live in main.js (not ported —
+         this template's main.js is a stub). Compare has exactly one shape (ADR-080): the
+         docked 50/50 split — no floating/compact state and no head chrome to scaffold. -->
+    <div id="compare-card" class="compare-card" role="region" aria-label="Compare: the 2D drawing" hidden>
+      <div class="compare-card__stage">
+        <canvas id="compare-canvas" aria-label="2D drawing surface"></canvas>
+      </div>
+    </div>
+
+    <!-- One-time orbit hint: appears with the first solid, dismisses on first drag. -->
+    <div id="vp-orbit-hint" class="vp-hint" role="status" hidden>
+      <svg class="vp-hint__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12a9 9 0 1 1-2.64-6.36" />
+        <path d="M21 3.5v4h-4" />
+      </svg>
+      <span>Drag to rotate the view</span>
+      <button id="vp-orbit-dismiss" class="vp-hint__dismiss" type="button" aria-label="Dismiss hint">&times;</button>
+    </div>
+
+    <!-- Contextual spotlight hint: a queued, first-seen chip pointing out the top view,
+         front view (Step 4), and connector lines (Step 6 flatten) the first time each is
+         revealed. Shares the bottom-centre slot with the orbit hint; onboarding.js shows
+         one at a time. The leading dot's colour ties to the linework (teal HP / amber VP /
+         ink), so it carries colour AND label (Two-Cue Rule). Dismisses on click/orbit/timeout. -->
+    <div id="vp-spotlight" class="vp-hint vp-spotlight" role="status" hidden>
+      <span class="vp-spotlight__dot" aria-hidden="true"></span>
+      <span class="vp-spotlight__text"></span>
+      <button id="vp-spotlight-dismiss" class="vp-hint__dismiss" type="button" aria-label="Dismiss hint">&times;</button>
+    </div>
+
+    <!-- Reflow note: flashed in step with an edit-triggered unfold (stepper.js reflowFrom),
+         so a sighted learner sees WHY the flat drawing sprang back to 3D. aria-hidden —
+         the #sim-status live region already narrates this, so this note is not a second
+         live region. Text + visibility driven by main.js flowNote(); auto-dismisses. -->
+    <div id="vp-flow-note" class="vp-note" aria-hidden="true" hidden>
+      <svg class="vp-note__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 11v5" />
+        <path d="M12 7.5h.01" />
+      </svg>
+      <span class="vp-note__text"></span>
+    </div>
+  </main>
+
+  <!-- Docked driver rail for the Compare workbench split (ADR-037). A direct child of
+       <body> so it can be the grid's full-width bottom row under body.compare-split; stays
+       display:none until the split is on. In the Points topic main.js creates this lazily and
+       re-parents the point drivers into it — here it is a static empty target: wire main.js to
+       move your controls in on enterWorkbench(). -->
+  <div id="workbench-rail" role="group" aria-label="Controls"></div>
+
+  <!-- Rail hide/reveal toggle (ADR-037 pattern): a direct <body> child, NOT a child of
+       #workbench-rail — a child would vanish along with the rail on collapse and become
+       impossible to reveal again. Only visible while body.compare-split is active (see CSS
+       above); it claims grid-area:view (the 3D pane) so it floats at the viewport's
+       bottom-left, above the rail, in both open and collapsed states — the rail itself never
+       reserves space for this button. A "Hide"/"Show" pill. Ported from the Module 2 master
+       2026-07-16 as CSS+markup scaffolding: wire its click handler (toggling
+       body.rail-collapsed + swapping the label/aria-expanded) in main.js when you wire the
+       split. Independent of #wizard-toggle: collapsing the rail never exits the split. -->
+  <button id="rail-toggle" class="rail-toggle" type="button" aria-controls="workbench-rail" aria-expanded="true" aria-label="Hide controls" title="Hide controls">
+    <svg class="rail-toggle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+    <span class="rail-toggle__text">Hide</span>
+  </button>
+
+  <!-- Inline term-definition popover (DESIGN.md §5.7) — the ONE fixed tooltip
+       src/terms.js fills from the TERMS glossary and anchors to whichever `.term`
+       button is hovered/focused/tapped. Singleton because the step bodies re-render
+       each step (Module-1 family pattern, ported from spatial_framework). -->
+  <div id="term-pop" role="tooltip"></div>
+
+  <!-- Live region: main.js + stepper.js narrate step + mode changes for screen readers. -->
+  <div id="sim-status" class="sr-only" role="status" aria-live="polite"></div>
+
+  <!-- Success toast (Feature 1): a calm, on-brand win confirmation for "Complete & next
+       problem" — success green + a check glyph (Two-Cue Rule), NOT gamified fanfare.
+       aria-hidden: #sim-status already narrates the win, so this is not a second live
+       region. main.js showToast() sets the text + fades it in/out; auto-dismisses. -->
+  <div id="sim-toast" class="sim-toast" aria-hidden="true" hidden>
+    <svg class="sim-toast__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="sim-toast__text"></span>
+  </div>
+
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

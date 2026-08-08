@@ -4038,6 +4038,58 @@ projected into two SVG panes by one shared layout function, not duplicated per-v
 
 ---
 
+## ADR-098: Diploma track grows a Module 3 ("Projection Systems"), skipping Module 2 — the module-numbering ADR ADR-095 left open
+
+**Date:** 2026-08-06
+**Decision:** The Diploma Engineering Graphics track gains a **Module 3**, "Projection Systems,"
+whose first topic — `graphics_diploma_module_3_topic_1_1_first_third_angle` (First and Third Angle
+Projection) — compares first-angle and third-angle orthographic projection on one solid: a shared
+HP/VP/PP glass-box setup, one rabatment fold reused identically by both systems, the resulting view
+layout, and the BIS title-block symbol for each. **Module 2 is deliberately skipped, not filled**:
+the module number was set explicitly to 3 by the requester, not derived from a "next available"
+rule; ADR-095 does not require sequential, no-gap module numbering, only that the track's own
+docs/ADR sequence stay shared. Namespaced `graphics_diploma_module_3_topic_1_1_first_third_angle`
+— `M=3` (module), `K=1` (first topic in that module), `N=1` (first subtopic under that topic,
+leaving `_1_2`/`_1_3` open for the CONTENT SPEC's explicitly out-of-scope future work: the full
+six-view glass box and surface-type/inclined-plane behavior) — per ADR-095's own
+`module_<M>_topic_<K>_<N>_<slug>` convention.
+**Why:** ADR-095's own Consequences field states plainly: *"Future module numbering for this track,
+if it grows beyond Module 1, is left fully open pending a future ADR if/when that happens."* This
+is that ADR — a new module was not silently assumed permissible; the gap was surfaced explicitly
+during planning (Phase A of this build) before any file was touched, and confirmed by the requester
+before Phase B began. The module boundary itself (not a third Topic inside Module 1) is justified
+independently of the numbering question: Module 1 is architecturally committed to a 2D SVG/Canvas
+orchestrator specifically *because* "none of these subtopics involve 3D solid geometry" (ADR-095);
+first-vs-third-angle projection is a genuine 3D projection-system comparison (glass box, rabatment
+fold, an object literally re-positioned between Quadrant I and Quadrant III) — the opposite premise.
+Forcing it into Module 1 would have repeated, in the wrong direction, the exact architecture-fit
+question ADR-097 already resolved once for Helix.
+**Alternatives rejected:** *A third Topic inside Module 1* — rejected for the architecture-mismatch
+reason above (Module 1's 2D-only premise). *Deriving the module number as "next available" (i.e.
+Module 2)* — not chosen; the requester set it to 3 explicitly after the numbering gap was surfaced,
+and ADR-095 places no sequential constraint on this track's module numbers. *Cutting this topic from
+an existing Diploma Module 1 sibling's 2D SVG skeleton* — rejected: this topic needs a real Three.js
+scene (glass box, fold, camera), so per MODULE-STARTER.md's Case A/B decision table it is
+structurally a Case-A build (cut from `template_starter/`) regardless of which curriculum track it
+belongs to; patterns were ported from `graphics_module_1_topic_2_spatial_framework` (the
+pivot-hinged fold, the CSS2D label layer, the BIS symbol badge) and
+`graphics_module_1_topic_3_points` (the generic Problem Library contract) as **technical reference
+only**, explicitly not curriculum lineage — this track's own root-doc-sharing model (ADR-095) is
+unrelated to those two topics' original-syllabus content.
+**Consequences:** Invokes ADR-095 (not superseded) — the shared-root-docs model is unchanged, this
+ADR only exercises the module-numbering decision ADR-095 deferred. `template_starter/`'s copied
+`src/uiManager.js` turned out to be leftover Module-2-specific slider code (not the emptied stub
+MODULE-STARTER.md's own text claims ships) and was deleted rather than adapted, along with the
+unused `src/onboarding.js`; the Reset two-state confirm normally living in `uiManager.js` was ported
+inline into `main.js` instead (RULES §2.9/§4.19 still holds — one reset path, guarded). The fold
+geometry's key claim — that a single constant fold rotation per plane reproduces both systems'
+correct flattened layout, with only the object's quadrant and PP's hinge-offset side differing by
+system — was verified numerically (a standalone Node script replicating THREE's rotation matrices)
+*before* any Three.js code was written, not asserted from visual inspection alone.
+**Status:** Active.
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*
