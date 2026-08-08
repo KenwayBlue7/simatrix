@@ -96,6 +96,18 @@ density; one pattern recovers `ELBOW_SCALE = 0.70`. Bhatt's own Fig. 15-15(v) st
 pieces of its three-piece elbow "are similar" — the same relationship this simplification relies on
 for a two-piece elbow.
 
+**Development-plate numeral count (2026-08-08, `../DECISIONS.md` ADR-144, supersedes ADR-116's
+numeral-count clause):** the development plate numbers all 13 stations
+(`1,2,3,4,5,6,7,8,9,10,11,12,1`), not ADR-116's thinned Bhatt Fig. 15-11 set
+(`1,2,4,7,10,12,1`) it originally shipped with. This is a **requirements override**, per direct
+faculty feedback that full station coverage is pedagogically required — it does not disprove
+ADR-116's density arithmetic, which is confirmed correct at realistic narrow embed widths (a
+comfortable desktop window's auto-fit zoom had been masking the collision ADR-116 predicted). At
+~600px embed width the numerals collide (worse at smaller diameter) — a known, accepted, **open**
+risk, not mitigated. Do not read the full-13 set as evidence the density problem was solved; see
+ADR-144 before touching `THIN_K` in `constructions.js`. The front-view horizontal-piece thinning
+below (`1, 2, 4, 7`) is unrelated and unaffected by this change.
+
 **A documented simplification within the simplification:** the horizontal piece's twelve generators
 have no genuine third (side) auxiliary view to project from in this topic's two-view-plus-
 development layout, so they're placed directly along that piece's own flat end and tied to the

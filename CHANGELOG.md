@@ -54,6 +54,15 @@ topic deploy copies). Per-module changelogs live inside each module folder.
   (n=12, side=42) still shows light residual crowding among the densest division labels. See
   `DECISIONS.md` ADR-143 (updated in place, not superseded — nothing from the original entry had
   been committed yet) and the new `graphics_diploma_module_1_topic_1_4_regular_polygons/CHANGELOG.md`.
+- Changed: `graphics_diploma_module_2_topic_1_1_development_of_surfaces`'s Two-Piece 90° Elbow
+  development plate now numbers all 13 stations (`1,2,3,4,5,6,7,8,9,10,11,12,1`), reverting
+  ADR-116's thinned 7-station set (`1,2,4,7,10,12,1`, Bhatt Fig. 15-11's own numbering). Kept per
+  direct faculty feedback that full station coverage is pedagogically required — a requirements
+  override, not a correction of ADR-116's density arithmetic, which was re-verified and confirmed
+  correct at realistic narrow embed widths (a comfortable desktop window had been masking it via
+  auto-fit zoom). At ~600px embed width, numerals collide (`10/11/12/1` at D=50, `9/10/11/12/1` at
+  D=30, the slider minimum) — recorded as a known, accepted, open risk, not fixed this pass. See
+  `DECISIONS.md` ADR-144.
 
 ## 2026-08-07
 - Fixed: Vishnu's 3 merged topics (`graphics_module_1_topic_1_1_dimensioning`,

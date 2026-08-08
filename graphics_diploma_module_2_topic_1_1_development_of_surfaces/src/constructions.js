@@ -776,11 +776,17 @@ function buildElbow(params) {
   const sideB = L(dev0(devPts[devPts.length - 1].x, 0), dev0(devPts[devPts.length - 1].x, devPts[devPts.length - 1].z), 'result', OUTLINE_W, FAST_MS);
   const foldLines = devPts.slice(1, -1).map((p) => L(dev0(p.x, 0), dev0(p.x, p.z), 'result', FOLD_W, FAST_MS));
 
-  // Thinned numeral set — Bhatt Fig. 15-11's own set for a 45° single-truncation cylinder
-  // (1,2,4,7,10,12,1), not the full 13: at ELBOW_SCALE the full set collides (≈9.2px
-  // spacing vs a ≈14px two-digit knockout box), the same density problem ADR-115 solved
-  // for the cylinder, worse here since ELBOW_SCALE < CYL_SCALE. Confirmed with the user.
-  const THIN_K = [0, 1, 3, 6, 9, 11, 12];
+  // Full numeral set — all 13 stations (1..12, closing at 1), NOT ADR-116's original thinned
+  // Bhatt Fig. 15-11 set (1,2,4,7,10,12,1). Kept per ADR-144: a faculty-requirements override,
+  // not a correction — ADR-116's density math (≈9.2px spacing vs a ≈14px two-digit knockout box
+  // at ELBOW_SCALE) is CONFIRMED correct at realistic narrow embed widths (~600px and below);
+  // it only looks fine at a comfortable desktop window because viewTransform's auto-fit zoom
+  // expands station spacing there. This is a KNOWN, OPEN, unmitigated collision risk at small
+  // embed widths, worse at smaller diameter — see DECISIONS.md ADR-144 before touching THIN_K.
+  // TODO(ADR-144): narrow-embed numeral collision (~600px and below) is unmitigated — candidates
+  // considered and deferred: two-row stagger, zoom-aware conditional thinning, responsive
+  // knockout-box sizing. See ADR-144 for the full verification and rejected-alternatives list.
+  const THIN_K = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
   const devNumerals = THIN_K.map((k) => NUM(dev0(devPts[k].x, 0), String((k % ELBOW_GENERATORS) + 1), 'below'));
 
   // Cross-region (front view → development) transfer lines, DASH_CARRY — the ONE thing

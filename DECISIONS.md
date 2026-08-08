@@ -6562,6 +6562,81 @@ rendering. See the module's own `CHANGELOG.md` (new this pass) for the itemised 
 
 ---
 
+## ADR-144: Development of Surfaces (Diploma) Elbow — ADR-116's development-plate numeral thinning is overridden by faculty requirement; the full 13-station set ships, the collision risk it was thinned to avoid is real and stays open
+
+**Date:** 2026-08-08
+**Decision:** In `graphics_diploma_module_2_topic_1_1_development_of_surfaces`, `buildElbow()`'s
+development-plate `THIN_K` (`src/constructions.js`) reverts from ADR-116's thinned
+`[0, 1, 3, 6, 9, 11, 12]` (printed labels `1,2,4,7,10,12,1`) to the full `[0..12]` (printed
+`1,2,3,4,5,6,7,8,9,10,11,12,1`), permanently. Per RULES §8.4 this supersedes ADR-116's numeral-count
+clause by explicit new ADR, not a silent code change — ADR-116 itself is otherwise unchanged and its
+other decisions (ONE development pattern, `ELBOW_SCALE = 0.70`, left-seam renumbering, transfer
+lines, the front-view horizontal-piece `1,2,4,7` thinning, all Bhatt/K.C. John citations) all stand.
+**This is a requirements override, not a correction — ADR-116's density math was never wrong.**
+Driven by direct faculty feedback (domain expert, teaches Engineering Graphics): all 13 stations are
+pedagogically required on the development plate, full stop, independent of whether they fit cleanly.
+**Bhatt Fig. 15-11 is no longer the followed numbering convention for this one element** — its own
+thinned set was the ADR-116 rationale being overridden here; every other citation in ADR-116/the
+topic `CLAUDE.md` for the elbow construction itself (Bhatt Fig. 15-10/15-11 as the single-truncation
+source, Fig. 15-15(v) for the mirror-image simplification) is untouched and still followed.
+**Verification, done twice, because the first pass was misleading:**
+1. First pass (comfortable desktop browser window, default zoom): D=50 (the report's own value,
+   157.1mm stretch-out) and D=30 (slider minimum, 94.2mm, the worst-case density) both showed all 13
+   numerals rendering legibly with clear gaps, zero console errors. Read in isolation this looked
+   like it overturned ADR-116's arithmetic outright.
+2. That reading doesn't survive a second pass. `renderConstruction.js`'s own header states numeral
+   font size is a literal, zoom-invariant canvas-px constant (`NUMERAL_PX = 9`) while station
+   *positions* are geometry that scales with `viewTransform`'s pan/zoom. The app auto-fits the plate
+   to its viewport on load, and a comfortable desktop window auto-fits to a zoom well past
+   `ELBOW_SCALE`'s raw 1:1 — stretching station spacing while the font stays fixed, giving more
+   headroom than ADR-116's math assumed. That headroom is a function of window width, not a property
+   of the fix. Re-tested at realistic embed widths via a same-origin `<iframe>` harness (a truer
+   model of "this sim embedded in a host page" than resizing the outer browser chrome, and this
+   session's `resize_window` tool did not reliably resize the actual rendered viewport anyway —
+   confirmed via `window.innerWidth` staying pinned across repeated calls with different targets):
+   - 600px width, D=50: numerals `1`–`9` stay legible; `10, 11, 12, 1` collide into an unreadable
+     jammed cluster.
+   - 600px width, D=30 (worse, as ADR-116's own arithmetic predicts): the jam starts one station
+     earlier — `9, 10, 11, 12, 1` all collide.
+   - 400px width: not attributable to this numeral set specifically — the entire plate (front view,
+     top view, development, both region captions) overlaps at that width regardless of `D`, a
+     pre-existing general layout limit of the fixed two-pane design, unrelated to `THIN_K` and out of
+     scope for this ADR. Flagged below, not fixed here.
+   - Console stayed clean (zero errors) through every width/D combination in both passes, including
+     the fully-overlapping 400px states — this is a legibility defect, not a functional break.
+   - `buildCylinder()` (unaffected by this change, still ships all 13 numerals at `CYL_SCALE = 1.10`)
+     re-checked as a regression control and found unchanged — its own headroom over the 14px knockout
+     box is real and structural (`CYL_SCALE > ELBOW_SCALE`), not an artifact of viewport width.
+**This is recorded as a KNOWN, ACCEPTED, OPEN risk — not resolved, not mitigated.** The full-13 set
+ships as-is with no zoom-aware fallback, no responsive knockout-box sizing, and no second-row
+stagger. A future fix along any of those lines was considered and explicitly deferred, not rejected:
+a reader must not take "kept" as "solved." Anyone revisiting this: the collision is real at ~600px
+embed widths and below, worse at smaller `D`, and is currently unmitigated.
+**Why:** Pedagogical completeness, per the domain expert who teaches this subject, outranks
+textbook-literal numbering fidelity and this construction's own display-density limit at narrow
+embed widths — the numerals exist to teach station correspondence, and a teacher's judgment that all
+12 stations (13 with the closing repeat) must be visible for that to work is a requirement this
+project takes at face value, not a claim that the density problem stopped existing.
+**Alternatives rejected:**
+- *Two-row stagger (odd stations below the flat edge, even stations above)* — considered, not
+  implemented. Would very likely clear the 14px collision (roughly doubles effective per-row
+  spacing) but changes the plate's own drawing convention away from every cited source figure and
+  needs its own layout work; deferred, not ruled out for a future pass.
+- *Zoom-aware/responsive thinning (fall back to ADR-116's 7-station set below some viewport-width or
+  computed-spacing threshold)* — considered, not implemented. Same reasoning: real fix, real scope,
+  deferred rather than done under this pass's docs-only mandate.
+- *Keep ADR-116's thinned set and decline the faculty request* — rejected outright: this override
+  exists because the requirement, not the arithmetic, changed. The unthinned math was never disputed.
+**Consequences:** Easier: matches direct domain-expert teaching requirements; the development plate
+always shows the same station count as the top-view circle, closing a visible asymmetry a reader
+could otherwise question. Harder: the plate is confirmed to become illegible at realistic small
+embed widths (≤600px) at every diameter tested, worst at the slider minimum — a real, open,
+documented UX regression risk for any host page narrower than a comfortable desktop window, left for
+a future pass to actually fix.
+**Status:** Active — supersedes ADR-116's numeral-count clause only; ADR-116 otherwise stands.
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*
