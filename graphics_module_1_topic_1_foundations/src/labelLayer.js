@@ -27,6 +27,12 @@ import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
  *  matching the annotation linework (annotations.js FACE_PROUD). */
 const FACE_PROUD = 0.06;
 
+/** Gap between a dimension line and its value-text pill (world units) — mirrors
+ *  annotations.js DIM_TEXT_GAP. Applied here (not in annotations.js) because this is
+ *  also the one place that knows which dimMode is active, and rotation + offset must
+ *  agree on which side of the line is "above" for the current mode. */
+const DIM_TEXT_GAP = 0.22;
+
 /**
  * Build the CSS2D label layer. Mirrors the line drawer / annotation lifecycle so
  * main.js manages it identically.
@@ -41,7 +47,7 @@ const FACE_PROUD = 0.06;
  * @returns {{
  *   group: THREE.Group,
  *   setCallout: (key: 'visible'|'hidden'|'centre'|'dimension', on: boolean) => void,
- *   addDimensionValues: (list: { text: string, position: THREE.Vector3, isVertical?: boolean }[]) => void,
+ *   addDimensionValues: (list: { text: string, anchor: THREE.Vector3, normalAligned: {x:number,y:number}, normalUni: {x:number,y:number}, isVertical?: boolean }[]) => void,
  *   showDimensionValues: (on: boolean) => void,
  *   setDimMode: (mode: 'aligned'|'uni') => void,
  *   setOpacity: (o: number) => void,
@@ -96,19 +102,28 @@ export function createLabelLayer(scene, dims, options = {}) {
     new THREE.Vector3(dims.halfLength * 0.5, dims.baseBottomY - 1.25, zF));
 
   // --- Dimension value pills (added by main.js from annotations.getDimensionValueLabels).
-  //     Each entry keeps its inner text span + vertical flag so setDimMode can re-rotate
-  //     it without rebuilding the DOM. ---
-  /** @type {{ obj: CSS2DObject, inner: HTMLElement, isVertical: boolean }[]} */
+  //     Each entry keeps its inner text span + anchor/normals + vertical flag so setDimMode
+  //     can re-rotate AND reposition it in place, without rebuilding the DOM. ---
+  /** @type {{ obj: CSS2DObject, inner: HTMLElement, isVertical: boolean, anchor: THREE.Vector3, normalAligned: {x:number,y:number}, normalUni: {x:number,y:number} }[]} */
   let dimValues = [];
   let dimValuesVisible = false;
 
-  /** Rotate one pill's inner text span for the current dimMode. Only values on a vertical
-   *  dimension line rotate, and only in Aligned mode; everything else stays horizontal.
-   *  The rotation lives on the INNER span because CSS2DRenderer owns the outer element's
-   *  transform (it positions the pill). */
-  function applyRotation(inner, isVertical) {
-    inner.style.transform =
-      isVertical && dimMode === 'aligned' ? 'rotate(-90deg)' : 'rotate(0deg)';
+  /** Apply the current dimMode to one pill: rotate its inner text span AND reposition the
+   *  outer CSS2DObject off the dimension line, in one place — rotation and offset must
+   *  agree on which side of the line reads as "above", so neither can be decided alone.
+   *  Only values on a vertical dimension line rotate, and only in Aligned mode; everything
+   *  else stays horizontal. The rotation lives on the INNER span because CSS2DRenderer
+   *  owns the outer element's transform (it positions the pill). */
+  function applyMode(entry) {
+    const { obj, inner, isVertical, anchor, normalAligned, normalUni } = entry;
+    const aligned = isVertical && dimMode === 'aligned';
+    inner.style.transform = aligned ? 'rotate(-90deg)' : 'rotate(0deg)';
+    const n = dimMode === 'aligned' ? normalAligned : normalUni;
+    obj.position.set(
+      anchor.x + n.x * DIM_TEXT_GAP,
+      anchor.y + n.y * DIM_TEXT_GAP,
+      anchor.z,
+    );
   }
 
   /** Remove a CSS2DObject's DOM node and detach it from the group (RULES.md §3.5). */
@@ -131,27 +146,27 @@ export function createLabelLayer(scene, dims, options = {}) {
      * rebuild with annotations.getDimensionValueLabels(); the new pills inherit the
      * current shown/hidden state so a rebuild mid-lesson doesn't flash them on, and the
      * current dimMode so an in-flight Aligned/Unidirectional choice survives the rebuild.
-     * @param {{ text: string, position: THREE.Vector3, isVertical?: boolean }[]} list
+     * @param {{ text: string, anchor: THREE.Vector3, normalAligned: {x:number,y:number}, normalUni: {x:number,y:number}, isVertical?: boolean }[]} list
      */
     addDimensionValues(list) {
       for (const { obj } of dimValues) removeObject(obj);
       dimValues = [];
-      for (const { text, position, isVertical } of list) {
+      for (const { text, anchor, normalAligned, normalUni, isVertical } of list) {
         const el = document.createElement('span');
         el.className = 'vp-dim-value';
         el.style.pointerEvents = 'none';
         // Text lives in an INNER span so it can be rotated independently of the outer
-        // element's CSS2DRenderer-owned positioning transform (see applyRotation).
+        // element's CSS2DRenderer-owned positioning transform (see applyMode).
         const inner = document.createElement('span');
         inner.className = 'vp-dim-value__text';
         inner.textContent = text;
-        applyRotation(inner, !!isVertical);
         el.appendChild(inner);
         const obj = new CSS2DObject(el);
-        obj.position.copy(position);
         obj.center.set(0.5, 0.5);
         obj.visible = dimValuesVisible;
-        dimValues.push({ obj, inner, isVertical: !!isVertical });
+        const entry = { obj, inner, isVertical: !!isVertical, anchor, normalAligned, normalUni };
+        applyMode(entry);
+        dimValues.push(entry);
         group.add(obj);
       }
     },
@@ -162,11 +177,11 @@ export function createLabelLayer(scene, dims, options = {}) {
       for (const { obj } of dimValues) obj.visible = on;
     },
 
-    /** Switch the dimensioning system (Aligned ↔ Unidirectional) and re-rotate the value
-     *  text in place — no DOM rebuild. */
+    /** Switch the dimensioning system (Aligned ↔ Unidirectional) and re-rotate + reposition
+     *  the value text in place — no DOM rebuild. */
     setDimMode(mode) {
       dimMode = mode === 'uni' ? 'uni' : 'aligned';
-      for (const { inner, isVertical } of dimValues) applyRotation(inner, isVertical);
+      for (const entry of dimValues) applyMode(entry);
     },
 
     /** Fade every pill (DOM opacity). Kept for lifecycle parity with the line layers. */

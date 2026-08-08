@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-08-08
+- Fixed: the H (height) dimension value ("46") rendered on the wrong side of its vertical
+  dimension line in Aligned mode — BIS/ISO convention wants aligned text "above" the line, which
+  after the −90° CCW rotation this topic already applies means screen-LEFT, not the screen-RIGHT
+  offset the code actually used. `annotations.js`'s offset and `labelLayer.js`'s rotation
+  disagreed about which side that was, since the offset was baked into a world position before
+  rotation was ever decided, and the rotation logic never repositioned anything. Reworked the
+  label contract: `annotations.js` now emits an anchor plus `normalAligned`/`normalUni` direction
+  vectors per value, and `labelLayer.js` (the one place that actually knows `dimMode`) applies
+  rotation and offset together in a single `applyMode()`, called both when pills are (re)built and
+  when `setDimMode()` toggles — no DOM rebuild needed to reposition. Unidirectional mode is
+  unchanged (right-side, unrotated). Added a shared `DIM_TEXT_GAP` constant, retiring two
+  previously mismatched magic-number gaps (L's `0.22` vs H's `0.3`). Verified live in Chrome:
+  toggled Aligned ↔ Unidirectional repeatedly, correct every time, console clean. (`src/annotations.js`, `src/labelLayer.js`.)
+
 ## 2026-07-31
 - Added: "Finish lesson" button (Module 2 Finish-button pilot rollout) — `#btn-finish` takes over the footer's primary slot at Step 4 exactly when `#btn-next` vacates it. Gated on `state.dimensions` (the Step-4 dimensions reveal — the lesson's real content payoff, not mere step arrival). Click posts `sim:complete` and announces "Lesson marked complete." (`src/main.js`, `src/stepper.js`, `index.html`.)
 - Changed: `sim:complete` (`markComplete()`) drops its one-shot `window.__simComplete` latch — fires on every "Finish lesson" click now, replacing the old auto-fire from `completeLesson()` on dimensions reveal. `completeLesson()` keeps its toast + narration as a standalone content-milestone celebration, decoupled from the host signal. (`src/main.js`, `src/stepper.js`.)

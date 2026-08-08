@@ -79,6 +79,12 @@ const OVERSHOOT = 0.35;
 const DIM_OFFSET = 0.85;
 const EXT_OVERSHOOT = 0.25;
 
+/** Gap between a dimension line and its value-text pill (world units), measured along
+ *  the line's outward normal — same for every dimension so the L and H labels sit an
+ *  equal visual distance from their lines. labelLayer.js applies this against whichever
+ *  normal (`normalAligned`/`normalUni`) is active for the current dimMode. */
+const DIM_TEXT_GAP = 0.22;
+
 /**
  * Arrowhead geometry (world units) — BIS SP 46:2003 / N.D. Bhatt: a CLOSED, solid-filled
  * triangle at a strict 3:1 length:width ratio. `len` is the tip-to-back length along the
@@ -203,7 +209,7 @@ function pushArrowTriangle(out, tip, dir, perp) {
  *   group: THREE.Group,
  *   showCentreLines: (v: boolean) => void,
  *   showDimensions: (v: boolean) => void,
- *   getDimensionValueLabels: () => { text: string, position: THREE.Vector3, isVertical: boolean }[],
+ *   getDimensionValueLabels: () => { text: string, anchor: THREE.Vector3, normalAligned: {x:number,y:number}, normalUni: {x:number,y:number}, isVertical: boolean }[],
  *   getArrowFocus: () => { position: THREE.Vector3, normal: THREE.Vector3 },
  *   setResolution: (w: number, h: number) => void,
  *   dispose: () => void,
@@ -260,7 +266,7 @@ export function createAnnotations(dims, options = {}) {
   // --- Type B — dimensions (overall length L, overall height H, bore Ø) -------
   const dimPos = [];
   const arrowPos = []; // filled arrowhead triangles (separate MeshBasicMaterial batch)
-  /** @type {{ text: string, position: THREE.Vector3 }[]} */
+  /** @type {{ text: string, anchor: THREE.Vector3, normalAligned: {x:number,y:number}, normalUni: {x:number,y:number}, isVertical?: boolean }[]} */
   const valueLabels = [];
 
   const X = new THREE.Vector3(1, 0, 0);
@@ -280,7 +286,10 @@ export function createAnnotations(dims, options = {}) {
     pushArrowTriangle(arrowPos, V(xR, yDim), X, Y);
     valueLabels.push({
       text: String(Math.round(dims.baseLength * MM_PER_UNIT)),
-      position: V(0, yDim + 0.22),
+      anchor: V(0, yDim),
+      // Horizontal text never rotates, so both modes want the same side: up, off the line.
+      normalAligned: { x: 0, y: 1 },
+      normalUni: { x: 0, y: 1 },
     });
   }
 
@@ -296,9 +305,13 @@ export function createAnnotations(dims, options = {}) {
     pushArrowTriangle(arrowPos, V(xDim, yT), Y, X);
     valueLabels.push({
       text: String(Math.round(dims.height * MM_PER_UNIT)),
-      position: V(xDim + 0.3, (yB + yT) / 2),
+      anchor: V(xDim, (yB + yT) / 2),
       // The height value runs alongside a VERTICAL dimension line, so labelLayer rotates
-      // it −90° in Aligned mode (BIS default) and leaves it horizontal in Unidirectional.
+      // it −90° (CCW on screen) in Aligned mode (BIS default) and leaves it horizontal in
+      // Unidirectional. A −90° CCW turn maps "above the line" to screen-LEFT, not right —
+      // so the two modes need opposite-sign normals, not one shared offset.
+      normalAligned: { x: -1, y: 0 }, // left = "above" once rotated −90°
+      normalUni: { x: 1, y: 0 }, // unrotated text stays right of the line
       isVertical: true,
     });
   }
@@ -319,7 +332,11 @@ export function createAnnotations(dims, options = {}) {
     pushArrowTriangle(arrowPos, rim, rimDir.clone().negate(), rimPerp);
     valueLabels.push({
       text: `Ø${Math.round(dims.boreDiameter * MM_PER_UNIT)}`,
-      position: out.clone().add(new THREE.Vector3(0.45, 0.12, 0)),
+      // Leader terminus, not a dimension-line label — the offset is already baked into
+      // the anchor, so a zero normal makes getDimensionValueLabels() a no-op for it.
+      anchor: out.clone().add(new THREE.Vector3(0.45, 0.12, 0)),
+      normalAligned: { x: 0, y: 0 },
+      normalUni: { x: 0, y: 0 },
     });
   }
 
@@ -361,11 +378,16 @@ export function createAnnotations(dims, options = {}) {
     },
     /** World anchors + text for the three dimension VALUES (rendered by labelLayer).
      *  `isVertical` flags a value that runs along a vertical dimension line, so labelLayer
-     *  can rotate it in Aligned mode. */
+     *  can rotate it in Aligned mode. `normalAligned`/`normalUni` are unit-ish direction
+     *  vectors (world XY) telling labelLayer which side of the anchor "above the line"
+     *  falls on for each dimMode — labelLayer applies DIM_TEXT_GAP itself, since it is
+     *  also the one place that knows which mode is currently active. */
     getDimensionValueLabels() {
       return valueLabels.map((l) => ({
         text: l.text,
-        position: l.position.clone(),
+        anchor: l.anchor.clone(),
+        normalAligned: { ...l.normalAligned },
+        normalUni: { ...l.normalUni },
         isVertical: !!l.isVertical,
       }));
     },
