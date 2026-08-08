@@ -544,6 +544,19 @@ export const CONSTRUCTIONS = [
         }
       }
       for (const d of divisions) steps.push(P(d.point, 'result', d.label));
+      // Practical tip, corner-anchored (true bottom-left, small font — kept narrow/low so
+      // it stays clear of the ray, which always runs down-RIGHT from A) — reuses
+      // renderConstruction.js's generic text-only fallback (any kind outside
+      // line/arc/point/dim), not a new render path.
+      const tipLines = [
+        "pick the auxiliary ray's length",
+        'such that it is the closest',
+        'multiple of n just above',
+        'length of AB.',
+      ];
+      tipLines.forEach((text, i) => {
+        steps.push({ kind: 'note', p: { x: 4, y: 124 + i * 4.5 }, dx: 0, dy: 0, fontSize: 4, text });
+      });
       return { steps, resultText: `AB divided into ${parts} equal parts of ${(length / parts).toFixed(1)} mm each` };
     },
   },

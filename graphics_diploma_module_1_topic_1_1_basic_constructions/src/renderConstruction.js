@@ -195,7 +195,7 @@ function buildStepNode(step) {
   // 'label' kind — text only, no geometry.
   const node = el('text', {
     x: step.p.x + (step.dx ?? 4), y: step.p.y + (step.dy ?? -4),
-    fill: 'var(--color-ink-secondary)', 'font-family': 'var(--font-sans)', 'font-size': 6.5,
+    fill: 'var(--color-ink-secondary)', 'font-family': 'var(--font-sans)', 'font-size': step.fontSize ?? 6.5,
   });
   node.textContent = step.text;
   const reveal = (t) => { node.style.opacity = String(t); };
