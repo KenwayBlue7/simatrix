@@ -1,0 +1,6 @@
+{
+  "title": "Isometric Construction",
+  "description": "A guided conceptual lesson on how an isometric drawing is constructed. Choose one of ten solids, set its dimensions, read its orthographic views, then build the drawing phase by phase — axes, bounding box, shape, finish — and see why Isometric Projection and Isometric View share exactly the same method.",
+  "difficulty": "beginner",
+  "tags": ["engineering-graphics", "isometric-drawing", "isometric-projection", "isometric-view", "orthographic-projection", "construction-method", "solids"]
+}
