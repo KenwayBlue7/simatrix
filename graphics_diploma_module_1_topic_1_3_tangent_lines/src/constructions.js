@@ -171,7 +171,7 @@ export const CONSTRUCTIONS = [
 
   {
     id: 'tangent-two-circles-ext',
-    label: 'Common External Tangents to Two Circles',
+    label: 'Common External Tangents to Two Circles (Open Belt)',
     shortLabel: 'Tangent (2 Circles, Ext)',
     principle: "Shrink circle 1 by circle 2's radius and the problem becomes 'find the tangent from centre 2 to this smaller circle' — the real tangent line is that same line, shifted back out by circle 2's radius on both circles at once. The auxiliary circle's radius is the DIFFERENCE of the two given radii, because the tangent line stays the same distance from both original circles' edges.",
     given: [
@@ -226,7 +226,7 @@ export const CONSTRUCTIONS = [
 
   {
     id: 'tangent-two-circles-int',
-    label: 'Common Internal Tangents to Two Circles',
+    label: 'Common Internal Tangents to Two Circles (Cross Belt)',
     shortLabel: 'Tangent (2 Circles, Int)',
     principle: "Internal tangents cross BETWEEN the two circles, so the auxiliary circle now has to be grown, not shrunk — its radius is the SUM of the two given radii, the reverse of the external case, because the tangent line has to reach past centre 1 to arrive at circle 2 from the far side.",
     given: [
