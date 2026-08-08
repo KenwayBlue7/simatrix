@@ -723,13 +723,13 @@ const simController = {
   fold() {
     if (folded) return;
     folded = true;
-    driveFold(FOLD_ANGLE);
+    driveFold(FOLD_ANGLE, { snap: true });
     labelLayer?.setSymbol(true); // the BIS first-angle badge rides the fold
   },
   unfold() {
     if (!folded) return;
     folded = false;
-    driveFold(0);
+    driveFold(0, { snap: true });
     labelLayer?.setSymbol(false);
   },
 
@@ -811,6 +811,18 @@ function completeAndNext() {
  *  instead of dragging a short arc over the full 1600 ms. Pure transforms every
  *  frame — no rebuild while swinging.
  *
+ *  `snap` (the two explicit simController entry points — fold()/unfold(), whatever UI
+ *  path calls them: the wizard's Animate-Unfolding/Fold-back buttons, the Front quick-view
+ *  chip's re-click reversal, enterWorkbench's return-to-3D) forces foldAngle to the CLEAN
+ *  rest state opposite `toAngle` (0 or FOLD_ANGLE) before the arc is computed, so arc is
+ *  always 1 and the swing always plays the full FOLD_MS — a deliberately WATCHED animation
+ *  must always take the same visible time, never a shortened resume caught mid-reversal
+ *  (bug: unfolding, then re-folding before the reverse settled, could arc down to a few
+ *  percent of FOLD_MS — a near-instant snap that read as "the fold is broken/too fast").
+ *  Unsnapped (default) is applyView()'s own silent step-navigation sync — that path isn't a
+ *  moment the learner is watching a hinge swing on, so it keeps the proportional resume:
+ *  stepping back while already reversing shouldn't stall nav behind a fixed 1600 ms wait.
+ *
  *  ADR-036 (orthographic fold swoop — OVERTURNS ADR-013's held-angle hold): the fold OWNS the
  *  camera. Any in-flight quadrant flight is cancelled and the open Compare card closes (it
  *  re-opens against the new fold state on demand — ADR-012). Forward, the ORTHOGRAPHIC camera
@@ -823,9 +835,17 @@ function completeAndNext() {
  *  curve, so they read as one movement. Held-angle perspective folds are FORBIDDEN (RULES.md).
  *  Reduced motion snaps both (anim.js lands tweens on their end value immediately;
  *  restorePerspective's guard hands off instantly). */
-function driveFold(toAngle) {
+function driveFold(toAngle, { snap = false } = {}) {
   foldTween?.cancel();
   foldTarget = toAngle;
+  if (snap) {
+    // Land the hinge (+ every leaf riding it) at the clean rest state BEFORE the arc
+    // calc, so an interrupted prior swing can never shrink this one's duration.
+    foldAngle = toAngle === FOLD_ANGLE ? 0 : FOLD_ANGLE;
+    hvPlanes?.setFoldAngle(foldAngle);
+    pointRig?.setFoldAngle(foldAngle);
+    labelLayer?.setFoldAngle(foldAngle);
+  }
   const arc = Math.abs(toAngle - foldAngle) / FOLD_ANGLE;
   const duration = FOLD_MS * arc;
 
