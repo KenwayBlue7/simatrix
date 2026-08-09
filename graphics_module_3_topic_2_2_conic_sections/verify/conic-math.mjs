@@ -8,6 +8,8 @@ import { defaultConicState, METHODS, curveForEccentricity, classifySection, gene
   setupStageFor,
   methodInfo, methodsByTier, defaultMethodFor }
   from 'file:///C:/xampp/htdocs/SImatrix/graphics_module_3_topic_2_2_conic_sections/src/conicData.js';
+import { PROBLEMS, ENABLED_METHODS, enabledProblems, groupByTier }
+  from 'file:///C:/xampp/htdocs/SImatrix/graphics_module_3_topic_2_2_conic_sections/src/problems.js';
 
 let fails = 0;
 const ok = (name, cond, detail = '') => {
@@ -642,11 +644,12 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
   }
 
   // WHERE the trace is triggered from (ADR-115). main.js used to fire it on the LAST stage,
-  // which is the same stage for most constructions but NOT for the tangent method, whose
-  // envelope is drawn at 6 and whose focus and directrix are marked at 7 — so its curve simply
-  // appeared. The trigger now asks the layout which stage introduces the `outline`, and this
-  // proves the two are different things for at least one real method, so a regression back to
-  // "last stage" cannot pass silently.
+  // which is the same stage for most constructions but not for all of them — so those curves
+  // simply appeared. The trigger now asks the layout which stage introduces the `outline`, and
+  // this proves the two are different things for at least one real method, so a regression back
+  // to "last stage" cannot pass silently. The witness used to be the tangent method; ADR-133 made
+  // its envelope its last stage, so it is now the focus-directrix construction, whose curve is
+  // drawn at stage 6 and whose tangent and normal are stage 7.
   const curveStage = (id) => {
     const n = buildStagesFor(id).length;
     const m = METHODS.find((x) => x.id === id);
@@ -662,9 +665,17 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
   const missing = staged.filter((id) => curveStage(id) < 0);
   ok('every staged construction has a stage that puts the curve on the paper',
     missing.length === 0, missing.join(',') || `${staged.length} constructions`);
-  ok('…and for the tangent method that is NOT the last stage — which is why the trigger asks',
-    curveStage('parabola-tangent') === 8 && buildStagesFor('parabola-tangent').length - 1 === 9,
-    `curve at ${curveStage('parabola-tangent')}, last is ${buildStagesFor('parabola-tangent').length - 1}`);
+  ok('…and for the focus-directrix construction that is NOT the last stage — which is why the trigger asks',
+    curveStage('eccentricity') === 6 && buildStagesFor('eccentricity').length - 1 === 7,
+    `curve at ${curveStage('eccentricity')}, last is ${buildStagesFor('eccentricity').length - 1}`);
+
+  // ADR-133 — the tangent method now ENDS on its curve. Nine stages at the default seven
+  // divisions, the last of them the envelope, and the focus and directrix on it rather than on a
+  // tenth. This is the assertion that fails if the tangent stage is ever put back.
+  ok('the tangent method ends on the stage that draws its curve',
+    curveStage('parabola-tangent') === buildStagesFor('parabola-tangent').length - 1
+      && buildStagesFor('parabola-tangent').length === 9,
+    `curve at ${curveStage('parabola-tangent')} of ${buildStagesFor('parabola-tangent').length - 1}`);
 }
 
 // ---- 4t. A construction OPENS on its given data, never on its answer (ADR-118) ------------
@@ -870,8 +881,9 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
   for (let d = 4; d <= 12; d++) {
     const half = tangentFirstHalf(d);
     const total = d - 1;
-    // 4 set-up + `half` chord stages + 1 mirror + 1 envelope + 1 focus/directrix.
-    if (stagesAt(d).length !== 4 + half + 3) { sized = false; worstD ??= d; }
+    // 4 set-up + `half` chord stages + 1 mirror + 1 envelope. NOT a further stage for the focus
+    // and directrix: they arrive with the curve, and the tangent belongs to its toggle (ADR-133).
+    if (stagesAt(d).length !== 4 + half + 2) { sized = false; worstD ??= d; }
 
     // One chord per press through the first half, then the rest together.
     for (let i = 1; i <= half; i++) {
@@ -915,6 +927,111 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
   // `dim3` is ONE field shared by every construction that takes a third given, and it holds 70
   // by default — the parallelogram method's included angle. Unclamped, a sheet built straight
   // from the default state drew a sixty-nine-chord tangent construction (ADR-116).
+  // ADR-133 — the tangent belongs to its toggle, not to a stage. Walk the WHOLE stage list with
+  // the toggle off: no stage may put a tangent or a normal on the paper. With it on, they appear
+  // once the curve does, and not before — there is nothing to touch until the envelope is drawn.
+  const tangentDrawn = (L) => L.items.some((i) => i.k === 'label' && /^(Tangent, TT|Normal, NN)$/.test(i.text));
+  const withTangent = (buildStage) => layoutFor('methods',
+    { ...defaultConicState(), method: 'parabola-tangent', dim1: 120, dim2: 90, dim3: 7,
+      buildStage, showTangent: true });
+  const lastStage = stagesAt(7).length - 1;
+  let leaked = [];
+  for (let s = 0; s <= lastStage; s++) if (tangentDrawn(at(s))) leaked.push(s);
+  ok('no stage of the tangent method draws the tangent while its toggle is off',
+    leaked.length === 0, leaked.join(',') || `${lastStage + 1} stages walked`);
+  ok('…and with the toggle on it arrives with the curve, never a step later',
+    tangentDrawn(withTangent(lastStage)) && !tangentDrawn(withTangent(lastStage - 1)));
+
+  // …and what the last stage DOES add, besides the curve, is what Example 6.8 asks to be located.
+  const marks = (L) => L.items.filter((i) => i.k === 'label' && /^(Focus, F|Directrix, DD)$/.test(i.text)).length;
+  ok('the focus and the directrix arrive on the same stage as the envelope',
+    marks(at(lastStage)) === 2 && marks(at(lastStage - 1)) === 0,
+    `${marks(at(lastStage))} at ${lastStage}, ${marks(at(lastStage - 1))} before it`);
+
+  // ADR-134 — the envelope is traced CLOCKWISE, the way a hand moves through this curve. The
+  // sheet is y-DOWN, so the drawn path has to start at the FOOT of the double ordinate (+y),
+  // round the vertex, and finish at its head (−y). Checked as a signed area sweep about the
+  // figure's own centroid rather than on two endpoints, so a reversed middle cannot slip past.
+  const traced = at(lastStage).curvePts;
+  const cx = traced.reduce((s, p) => s + p.x, 0) / traced.length;
+  const cy = traced.reduce((s, p) => s + p.y, 0) / traced.length;
+  let sweep = 0;
+  for (let i = 1; i < traced.length; i++) {
+    const a = { x: traced[i - 1].x - cx, y: traced[i - 1].y - cy };
+    const b = { x: traced[i].x - cx, y: traced[i].y - cy };
+    sweep += Math.atan2(a.x * b.y - a.y * b.x, a.x * b.x + a.y * b.y);
+  }
+  // In a y-down space a POSITIVE cross product turns clockwise on screen.
+  ok('the parabola is traced clockwise, from A round the vertex to B',
+    sweep > 0 && traced[0].y > 0 && traced[traced.length - 1].y < 0,
+    `sweep ${(sweep * 180 / Math.PI).toFixed(0)}°, y ${traced[0].y.toFixed(1)} → ${traced[traced.length - 1].y.toFixed(1)}`);
+
+  // ADR-138 — A is the FOOT of the double ordinate and B its head. Read off the COORDINATES the
+  // layout carries, not off the captions: a swap done in the labelling alone would leave the
+  // tangent AE, its divisions and the chords hanging off the wrong ends, and would still pass a
+  // check that only looked at which letter is drawn where. The sheet is y-DOWN, so the foot is +y.
+  const named = (L, t) => L.items.find((i) => i.k === 'label' && i.text === t)?.p;
+  const finished = at(lastStage);
+  const pA = named(finished, 'A'); const pB = named(finished, 'B');
+  ok('A is the foot of the double ordinate and B its head',
+    pA && pB && pA.y > 0 && pB.y < 0 && Math.abs(pA.y + pB.y) < 1e-12 && pA.x === pB.x,
+    `A ${pA?.y.toFixed(1)}, B ${pB?.y.toFixed(1)}`);
+  // …and the trace begins ON A and ends ON B, so "drawn from A to B" is the drawing and not a
+  // description of it.
+  ok('…and the envelope starts at A and finishes at B',
+    Math.abs(traced[0].y - pA.y) < 1e-9 && Math.abs(traced[traced.length - 1].y - pB.y) < 1e-9
+      && Math.abs(traced[0].x - pA.x) < 1e-9,
+    `${traced[0].y.toFixed(1)} → ${traced[traced.length - 1].y.toFixed(1)}`);
+  // The tangents are the swapped ones too: AE runs to the LOWER half of the paper, BE the upper.
+  const through = (L, p) => L.items.some((i) => i.k === 'line' && i.role === 'construction'
+    && ((Math.abs(i.a.x - p.x) < 1e-9 && Math.abs(i.a.y - p.y) < 1e-9)
+      || (Math.abs(i.b.x - p.x) < 1e-9 && Math.abs(i.b.y - p.y) < 1e-9)));
+  ok('…and both tangents are struck from the swapped points, not from the old ones',
+    through(finished, pA) && through(finished, pB));
+  // Reversing the ORDER is all that changed: the same points, so the same envelope.
+  ok('…and reversing it changed the order and nothing else',
+    traced.every((p) => Math.abs((p.y * p.y) / (4 * ((120 * 120) / (16 * 90))) - p.x) < 1e-9));
+
+  // ADR-137 — the FRAME is pinned to the finished figure, so the sheet's scale cannot change
+  // between stages. The sheet locks its millimetre scale to this bbox (ADR-053), and the last
+  // stage draws the one thing that reaches past A and B: the directrix, at ±0.6·AB against their
+  // ±0.5. Measured on the shipped page, the drawing held a 729 × 431 px ink box through stages
+  // 1–8 and jumped to 729 × 530 on stage 9 — the visual jump the review reported, arriving at
+  // exactly the moment the freehand curve begins. Checked across the whole slider range, and with
+  // the tangent toggle on at both ends of P, since that apparatus reaches further still.
+  const frameKey = (L) => [L.bbox.minX, L.bbox.maxX, L.bbox.minY, L.bbox.maxY]
+    .map((v) => v.toFixed(6)).join('|');
+  let frameDrift = [];
+  for (let d = 4; d <= 12; d++) {
+    const total = stagesAt(d).length;
+    const seen = new Set();
+    for (let s = 0; s < total; s++) seen.add(frameKey(at(s, d)));
+    if (seen.size !== 1) frameDrift.push(`dim3 ${d}: ${seen.size} frames`);
+  }
+  ok('the tangent method draws every stage inside one fixed frame',
+    frameDrift.length === 0, frameDrift.join(' · ') || 'divisions 4–12 walked');
+
+  const withP = (buildStage, pointT) => layoutFor('methods',
+    { ...defaultConicState(), method: 'parabola-tangent', dim1: 120, dim2: 90, dim3: 7,
+      buildStage, showTangent: true, pointT });
+  // …and holds it with the tangent shown too — for a FIXED P. P itself may move the frame, and
+  // deliberately does: reserving the tangent at both ends of the curve instead would widen the
+  // frame to 258 × 187 mm and drop the drawing to 1.1 px/mm in a 1124 × 565 pane, under the
+  // 1.3 px/mm gate below which every caption is dropped. Stages must not move the frame; a slider
+  // the learner is dragging is allowed to (ADR-137).
+  let tangentDrift = [];
+  for (const t of [0, 0.25, 0.5, 0.75, 1]) {
+    const seen = new Set();
+    for (let s = 0; s <= lastStage; s++) seen.add(frameKey(withP(s, t)));
+    if (seen.size !== 1) tangentDrift.push(`P ${t}: ${seen.size} frames`);
+  }
+  ok('…and holds it with the tangent shown, at every position of P',
+    tangentDrift.length === 0, tangentDrift.join(' · ') || '5 positions walked');
+  // Not vacuous: the toggle DOES enlarge the frame, so these are genuinely different drawings
+  // being held still — the checks above are not passing because nothing ever moves.
+  ok('…which is a pinned frame, not an unchanging one',
+    frameKey(at(lastStage)) !== frameKey(withP(lastStage, 0)));
+
   ok('a stale dim3 cannot run the construction past its own slider',
     chords(at(99, 70)) === chords(at(99, 12)), `${chords(at(99, 70))} vs ${chords(at(99, 12))}`);
   // Only the constructions that READ the shared points slider may offer it.
@@ -1281,6 +1398,69 @@ for (const e of [0.5, 1, 1.8]) {
     worst = Math.max(worst, Math.abs(Math.hypot(p.x - m.focus.x, p.y) - e * Math.abs(p.x)));
   }
   ok(`pointOnConic e=${e}`, worst < 1e-6, `worst=${worst.toExponential(2)}`);
+}
+
+// ---- 8. The problem library is inside the syllabus, and pre-solves nothing (ADR-135/129) ---
+{
+  const dealt = enabledProblems();
+  const outside = dealt.filter((p) => !ENABLED_METHODS.includes(p.target.method));
+  ok('every problem the library deals is answered with a syllabus construction',
+    outside.length === 0, outside.map((p) => `${p.id}:${p.target.method}`).join(',') || `${dealt.length} dealt`);
+  // The focus-and-directrix exercises are answered with `e` and `fa` and name no method at all —
+  // an absent method must be EXCLUDED, not waved through the filter.
+  ok('…and none of them is a focus-and-directrix exercise',
+    dealt.every((p) => p.type !== 'eccentricity-method' && !!p.target.method));
+  ok('…while the chapter\'s fifteen are all still in the file, verbatim',
+    PROBLEMS.filter((p) => /^(ellipse|parabola|hyperbola)-/.test(p.id)).length === 15,
+    `${PROBLEMS.length} problems in all`);
+
+  // The four practice questions, checked against the exact wording they were set in.
+  const WANTED = [
+    ['practice-concentric-100-70', 'ellipse-concentric', 100, 70,
+      'Draw an ellipse having a Major Axis of 100mm and Minor Axis of 70mm using concentric circle method.'],
+    ['practice-concentric-120-80', 'ellipse-concentric', 120, 80,
+      'Draw an ellipse having a Major Axis of 120mm and Minor Axis of 80mm using concentric circle method.'],
+    ['practice-oblong-100-70', 'ellipse-oblong', 100, 70,
+      'Draw an ellipse by rectangular method, given the major and minor axes as 100mm and 70mm respectively.'],
+    ['practice-oblong-120-80', 'ellipse-oblong', 120, 80,
+      'Draw an ellipse by rectangular method, given the major and minor axes as 120mm and 80mm respectively.'],
+  ];
+  for (const [id, method, dim1, dim2, statement] of WANTED) {
+    const p = dealt.find((x) => x.id === id);
+    ok(`practice problem ${id} is dealt, and maps to its own construction`,
+      !!p && p.target.method === method && p.target.dim1 === dim1 && p.target.dim2 === dim2
+        && p.statement === statement && p.hints?.length > 0,
+      p ? `${p.target.method} ${p.target.dim1}×${p.target.dim2}` : 'missing');
+  }
+
+  ok('the library deals seven problems, in two curve groups',
+    dealt.length === 7 && groupByTier(dealt).length === 2,
+    `${dealt.length} problems, ${groupByTier(dealt).length} groups`);
+
+  // ADR-136 — the construction is selected for the learner, and the dimension sliders land at
+  // their FLOOR so that selecting it can never hand over a figure. `ellipse-concentric` is why
+  // this is checked rather than assumed: its authored defaults are 120 × 80, which is one of the
+  // practice answers exactly, so loading with the method's own defaults would have lit green.
+  const SIZE_TOL = 0.5;   // problemLibrary.js's own tolerance
+  let preSolved = [];
+  for (const p of dealt) {
+    const m = methodById(p.target.method);
+    const onLoad = { curve: m.curve, method: p.target.method,
+      dim1: m.dim1.min, dim2: m.dim2.min, dim3: m.dim3?.min };
+    const solved = Object.entries(p.target).every(([k, want]) => (typeof want === 'number'
+      ? Math.abs((onLoad[k] ?? NaN) - want) <= SIZE_TOL
+      : onLoad[k] === want));
+    if (solved) preSolved.push(p.id);
+  }
+  ok('no problem is already matched by the state it loads into',
+    preSolved.length === 0, preSolved.join(',') || `${dealt.length} checked`);
+  const defaulted = dealt.filter((p) => {
+    const m = methodById(p.target.method);
+    return Math.abs(m.dim1.value - p.target.dim1) <= SIZE_TOL
+      && Math.abs(m.dim2.value - p.target.dim2) <= SIZE_TOL;
+  });
+  ok('…and that is not vacuous: at least one WOULD be, on the method\'s own defaults',
+    defaulted.length > 0, defaulted.map((p) => p.id).join(',') || 'none');
 }
 
 console.log(fails === 0 ? '\nALL GREEN' : `\n${fails} FAILURE(S)`);

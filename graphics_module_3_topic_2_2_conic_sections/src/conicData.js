@@ -807,6 +807,11 @@ const ELLIPSE_CONCENTRIC_STAGES = Object.freeze([
  * individually-drawn chords instead would either dead-press at four divisions (three chords
  * cannot be split into "three by hand, then the rest") or bunch them at twelve.
  *
+ * The list ENDS on the envelope (ADR-133): nine stages at the default seven divisions, not ten.
+ * The focus and the directrix are what Example 6.8 asks this construction to produce, so they
+ * arrive with the curve; the tangent and normal at P are an optional element and belong to their
+ * own toggle, exactly as they do in the concentric and oblong methods.
+ *
  * @param {number} divisions  `dim3` of the parabola-tangent method.
  * @returns {ReadonlyArray<{label: string, say: string}>}
  */
@@ -828,8 +833,7 @@ function parabolaTangentStages(divisions = 7) {
     { label: 'Divide them', say: 'Divide AE and BE into the same number of equal parts, numbered from each end.' },
     ...chords,
     { label: 'Mirror the rest', say: 'The remaining chords are the reflection of the ones just drawn. Take them in one step rather than repeating the same join.' },
-    { label: 'The envelope', say: 'Every chord just touches the curve. The parabola is the envelope they all touch — watch it traced on freehand against them, the same way every other construction here finishes.' },
-    { label: 'Focus and directrix', say: 'Mark the focus on the axis and the directrix square across it, the same distance the other side of the vertex.' },
+    { label: 'The envelope, with the focus and directrix', say: 'Every chord just touches the curve. The parabola is the envelope they all touch — watch it traced on freehand against them, from A round the vertex up to B, with the focus marked on the axis and the directrix square across it the same distance the other side of the vertex.' },
   ]);
 }
 

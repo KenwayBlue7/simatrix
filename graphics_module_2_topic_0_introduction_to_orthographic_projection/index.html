@@ -220,7 +220,11 @@
       position: absolute;
       /* Same band as `.vp-controls` opposite it, matching the benchmark's own pairing. */
       top: calc(44px + var(--space-5));
-      right: var(--space-3);
+      /* The benchmark's inset plus a requested 2 mm inboard nudge. Right-anchored, so moving the
+         button LEFT means a LARGER `right`. `mm` for the same reason as `.vp-controls`: millimetres
+         are what was asked for and CSS resolves them exactly (2 mm = 7.56 px at 96 dpi). The
+         vertical position, the 44 px box and every other style are untouched. */
+      right: calc(var(--space-3) + 2mm);
       z-index: 7; /* above the flow note (6), which is pointer-events:none and may pass under it */
       width: 44px;
       height: 44px;
@@ -1055,6 +1059,11 @@
       fill: var(--color-ink);
       font-family: var(--font-mono);
       font-size: 4.4px;                /* millimetres of the sheet, not CSS px */
+      /* Anchor the value on its CENTRE, not on its baseline. Method 1 turns each value through
+         its own angle, and a baseline-anchored string swings about a point below itself — so the
+         same 3.2 mm lift would clear the line on a horizontal dimension and cut through it on a
+         vertical one. `DIM_STYLE.textLift` is a centre offset and this is what makes it one. */
+      dominant-baseline: central;
     }
     .psheet__caption {
       font-family: var(--font-sans);
@@ -1203,7 +1212,11 @@
     .vp-controls {
       position: absolute;
       top: calc(44px + var(--space-5));
-      left: var(--space-4);
+      /* The benchmark's own inset, plus a requested inboard nudge — 5 mm right, then 3 mm back
+         left, so 2 mm net. The vertical position, the gap and every chip style stay the
+         benchmark's to the pixel; `mm` rather than a px count because millimetres are what was
+         asked for and CSS resolves them exactly (2 mm = 7.56 px at 96 dpi). */
+      left: calc(var(--space-4) + 2mm);
       display: flex;
       gap: var(--space-2);
       z-index: 5;
@@ -1346,21 +1359,26 @@
       color: var(--color-ink-secondary);
     }
 
-    /* --- Dimension values on the SOLID. The benchmark's `.vp-value` register exactly: mono,
-         --text-xs, tabular, a paper wash so the value breaks the line it sits on. Billboarded by
-         CSS2D, so no Method-1 rotation is needed or wanted. --- */
+    /* --- Dimension values on the SOLID. The benchmark's `.vp-value` / `.vp-value__text` pairing
+         exactly: mono, --text-xs, tabular, a paper wash so the value breaks the line it sits on.
+         The pill is the INNER span because CSS2DRenderer rewrites the outer element's transform
+         every frame, and Method 1's turn has to survive that. --- */
     .vp-dim {
       font-family: var(--font-mono);
       font-size: var(--text-xs);
       line-height: 1;
       color: var(--color-ink);
-      background: color-mix(in srgb, var(--color-paper) 92%, transparent);
-      border-radius: var(--radius-xs);
-      padding: 1px 4px;
       font-variant-numeric: tabular-nums;
       white-space: nowrap;
       pointer-events: none;
       user-select: none;
+    }
+    .vp-dim__text {
+      display: inline-block;
+      background: color-mix(in srgb, var(--color-paper) 92%, transparent);
+      border-radius: var(--radius-xs);
+      padding: 1px 4px;
+      transform-origin: center;
     }
     .vp-dim--note { color: var(--color-ink-secondary); }
 

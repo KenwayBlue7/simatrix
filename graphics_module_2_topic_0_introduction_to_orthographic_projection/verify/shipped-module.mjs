@@ -203,15 +203,27 @@ const chip = JSON.parse(await evaluate(`(() => {
     w: Math.round(hit.width),
   });
 })()`));
-// `calc(44px + var(--space-5))` = 44 + 24 = 68 down, `var(--space-4)` = 16 across — the
-// benchmark's own numbers, not an approximation of them.
-ok('the Dimensions chip is at the benchmark inset', chip.dx === 16 && chip.dy === 68,
+// `calc(44px + var(--space-5))` = 44 + 24 = 68 down — the benchmark's own number, untouched.
+// Across is the benchmark's `var(--space-4)` = 16 plus a requested 2 mm nudge = 16 + 7.6 = 24.
+ok('the Dimensions chip keeps the benchmark band, nudged 2 mm in',
+  Math.abs(chip.dx - 24) <= 1 && chip.dy === 68,
   `${chip.dx}, ${chip.dy}`);
 ok('...and the wizard toggle shares that band', await evaluate(`(() => {
   const t = document.getElementById('wizard-toggle').getBoundingClientRect();
   const c = document.getElementById('vp-dims').getBoundingClientRect();
   return Math.abs((t.top + t.height / 2) - (c.top + c.height / 2)) < 6;
 })()`));
+// The panel toggle is right-anchored, so a 2 mm move LEFT is 2 mm more inset: `var(--space-3)` = 12
+// plus 7.6 = 20 from the viewport's right edge. Its 44 px box is asserted alongside, because "move
+// it" must not have turned into "resize it".
+const wiz = JSON.parse(await evaluate(`(() => {
+  const t = document.getElementById('wizard-toggle').getBoundingClientRect();
+  const v = document.getElementById('sim-viewport').getBoundingClientRect();
+  return JSON.stringify({ gap: v.right - t.right, w: Math.round(t.width), h: Math.round(t.height) });
+})()`));
+ok('the panel toggle sits 2 mm further in from the right edge',
+  Math.abs(wiz.gap - 20) <= 1, `${wiz.gap.toFixed(1)}px`);
+ok('...at the same 44 px size', wiz.w === 44 && wiz.h === 44, `${wiz.w} x ${wiz.h}`);
 ok('...34 px tall, pill radius, 0.8125rem/700 like the benchmark',
   chip.h === 34 && chip.radius === '999px' && chip.size === '13px' && chip.weight === '700',
   `${chip.h}px ${chip.radius} ${chip.size}/${chip.weight}`);
@@ -261,6 +273,80 @@ for (const [key, view] of [['front', 'front'], ['top', 'top'], ['right', 'side']
 ok('the dimension layer draws real Type-B linework, not just values', await evaluate(
   `!!document.querySelector('#sim-viewport canvas')`));
 
+// ...and the values on the SOLID are aligned too. Measured on the ELEVATION, which is the set that
+// carries vertical dimension lines — a side view whose only size is a horizontal depth could not
+// tell a turned value from a level one. Both media draw one dimension set through one
+// placement function, so a value that reads along its line on the sheet and lies flat on the model
+// is two conventions on one drawing — which is the single thing Method 1 forbids. The turn has to
+// be on the INNER span: CSS2DRenderer rewrites the outer element's transform every frame.
+await evaluate(`document.querySelector('#view-buttons [data-view="front"]').click()`);
+await wait(1800);
+const solidTurn = JSON.parse(await evaluate(`(() => {
+  const out = [];
+  for (const el of document.querySelectorAll('#sim-viewport .vp-dim')) {
+    const inner = el.querySelector('.vp-dim__text');
+    const m = inner && /rotate\\(([-0-9.]+)/.exec(inner.style.transform || '');
+    out.push({ t: el.textContent, inner: !!inner, rot: m ? parseFloat(m[1]) : 0 });
+  }
+  return JSON.stringify(out);
+})()`));
+ok('every value on the solid carries its turn on an inner span',
+  solidTurn.length > 0 && solidTurn.every((v) => v.inner),
+  `${solidTurn.filter((v) => v.inner).length} of ${solidTurn.length}`);
+ok('...and the ones on vertical dimension lines really are turned',
+  solidTurn.some((v) => Math.abs(Math.abs(v.rot) - 90) < 0.5)
+  && solidTurn.every((v) => Math.abs(v.rot) <= 90.001),
+  solidTurn.map((v) => `${v.t}@${v.rot}`).join(' '));
+// THE FRONT LABEL IS PART OF THE MARK, not a caption parked near it. It rides the arrow's tail at a
+// fixed fraction of the arrow's own size, so shaft, head and name turn together and hold their
+// spacing from every direction. Two things are measured, on every object and at every direction the
+// arrow is shown in: that the name has not drifted off into clear paper, and that it is not sitting
+// on a dimension value.
+//
+// "Has not drifted" is measured against the CANVAS, and the band DEPENDS ON THE DIRECTION, because
+// the front face is not in the middle of the frame from every direction — only from the front. Seen
+// from above the front face is the near edge of the plan, so the mark belongs low and centred; seen
+// from the right it is the left-hand edge of the frame, so the mark belongs left and level. Pinning
+// the mark to the side of the frame its face is actually on is what makes this a drift test rather
+// than a "somewhere on the canvas" test. The bands are loose; they are not a pixel spec.
+const FRONT_MARK_BAND = {
+  front: { x: [0.30, 0.70], y: [0.20, 0.80] },
+  top: { x: [0.30, 0.70], y: [0.55, 0.95] },
+  right: { x: [0.02, 0.45], y: [0.25, 0.75] },
+};
+const frontMark = async () => JSON.parse(await evaluate(`(() => {
+  const l = document.querySelector('#sim-viewport .vp-label--front');
+  const c = document.querySelector('#sim-viewport canvas').getBoundingClientRect();
+  if (!l) return JSON.stringify({ none: true });
+  const a = l.getBoundingClientRect();
+  const hits = [...document.querySelectorAll('#sim-viewport .vp-dim')]
+    .map(v => ({ t: v.textContent, r: v.getBoundingClientRect() }))
+    .filter(v => a.left < v.r.right && v.r.left < a.right && a.top < v.r.bottom && v.r.top < a.bottom);
+  return JSON.stringify({
+    hits: hits.map(h => h.t),
+    fx: ((a.left + a.right) / 2 - c.left) / c.width,
+    fy: ((a.top + a.bottom) / 2 - c.top) / c.height,
+  });
+})()`));
+
+for (const id of ['cylblock', 'shaftsupport', 'bearingblock', 'block']) {
+  await evaluate(`(() => { const s = document.getElementById('object-select'); s.value = '${id}'; s.dispatchEvent(new Event('change')); })()`);
+  await wait(1900);
+  for (const dir of ['front', 'top', 'right']) {
+    await evaluate(`document.querySelector('#view-buttons [data-view="${dir}"]').click()`);
+    await wait(1900);
+    const m = await frontMark();
+    const band = FRONT_MARK_BAND[dir];
+    ok(`${id}/${dir}: the Front label is still on the mark, not adrift`,
+      m.none !== true
+      && m.fx > band.x[0] && m.fx < band.x[1]
+      && m.fy > band.y[0] && m.fy < band.y[1],
+      m.none ? 'no label' : `x ${m.fx.toFixed(2)} y ${m.fy.toFixed(2)}`);
+    ok(`${id}/${dir}: ...and clears every value on the solid`,
+      m.none !== true && m.hits.length === 0, m.hits ? m.hits.join(',') : 'no label');
+  }
+}
+
 // It follows the OBJECT too, not just the direction.
 await evaluate(`document.querySelector('#view-buttons [data-view="front"]').click()`);
 await wait(1600);
@@ -288,6 +374,93 @@ await wait(400);
 ok('the Dimensions switch does not touch the Front arrow', (await arrowShown()) === true);
 await evaluate('document.getElementById("vp-dims").click()');
 await wait(400);
+
+// SCROLLING IS A ZOOM, NOT A TURN — in every one of the four directions.
+//
+// The measurement is the zoom's FIXED POINT. A pure zoom about `controls.target` maps every screen
+// point p to s·(p − F) + F, where F is the target's own projection and s is the scale; solve that
+// from the values' centroid before and after and F falls out. If the camera zooms about the object,
+// F lands on the pane centre. If the scroll instead handed the view back to perspective, re-framed
+// it, or dollied about a target left on the last object, F is somewhere else entirely — which is
+// what the learner sees as the object jumping out from under the pointer.
+//
+// The direction button must also still be lit afterwards: a scroll is a request to look closer at
+// the view you are in, and leaving it would take the orthographic projection and the view's own
+// dimension set with it.
+const paneMark = async () => JSON.parse(await evaluate(`(() => {
+  const c = document.querySelector('#sim-viewport canvas').getBoundingClientRect();
+  const vs = [...document.querySelectorAll('#sim-viewport .vp-dim')]
+    .map((v) => v.getBoundingClientRect())
+    .map((r) => [(r.left + r.right) / 2, (r.top + r.bottom) / 2]);
+  if (vs.length < 2) return JSON.stringify({ none: true });
+  const cx = vs.reduce((s, p) => s + p[0], 0) / vs.length;
+  const cy = vs.reduce((s, p) => s + p[1], 0) / vs.length;
+  const spread = Math.sqrt(vs.reduce((s, p) => s + (p[0] - cx) ** 2 + (p[1] - cy) ** 2, 0) / vs.length);
+  return JSON.stringify({
+    cx, cy, spread, n: vs.length,
+    paneX: c.left + c.width / 2, paneY: c.top + c.height / 2, paneW: c.width, paneH: c.height,
+  });
+})()`));
+
+const scroll = async (steps) => evaluate(`(() => {
+  const c = document.querySelector('#sim-viewport canvas');
+  const r = c.getBoundingClientRect();
+  for (let i = 0; i < ${steps}; i++) {
+    c.dispatchEvent(new WheelEvent('wheel', {
+      deltaY: -120, clientX: r.left + r.width / 2, clientY: r.top + r.height / 2,
+      bubbles: true, cancelable: true,
+    }));
+  }
+})()`);
+
+// On the bearing block, whose side views carry more than one size — the measurement needs at least
+// two values on screen to have a centroid and a spread at all.
+await evaluate(`(() => { const s = document.getElementById('object-select'); s.value = 'bearingblock'; s.dispatchEvent(new Event('change')); })()`);
+await wait(1800);
+for (const dir of ['front', 'top', 'left', 'right']) {
+  await evaluate(`document.querySelector('#view-buttons [data-view="${dir}"]').click()`);
+  await wait(1900);
+  const before = await paneMark();
+  await scroll(4);
+  await wait(700);
+  const after = await paneMark();
+  const lit = await evaluate(
+    `document.querySelector('#view-buttons [data-view="${dir}"]').classList.contains('is-active')`,
+  );
+  ok(`${dir}: a scroll stays in the view it was given`, lit === true, String(lit));
+  const s = before.none || after.none ? 0 : after.spread / before.spread;
+  ok(`${dir}: ...and the scroll really did zoom`, s > 1.02, `x${s.toFixed(3)}`);
+  const fx = (after.cx - s * before.cx) / (1 - s);
+  const fy = (after.cy - s * before.cy) / (1 - s);
+  const dx = Math.abs(fx - before.paneX) / before.paneW;
+  const dy = Math.abs(fy - before.paneY) / before.paneH;
+  ok(`${dir}: ...about the object, not about somewhere else on the bench`,
+    s > 1.02 && dx < 0.08 && dy < 0.08,
+    `fixed point off centre by ${(dx * 100).toFixed(1)}% x, ${(dy * 100).toFixed(1)}% y`);
+}
+await evaluate(`(() => { const s = document.getElementById('object-select'); s.value = 'cylblock'; s.dispatchEvent(new Event('change')); })()`);
+await wait(1800);
+await evaluate(`document.querySelector('#view-buttons [data-view="front"]').click()`);
+await wait(1700);
+
+// ...but a DRAG still does leave it. The other half of the same rule, and the half that breaks if
+// the drag is ever detected by something narrower than "one pointer down, and it moved".
+await evaluate(`(() => {
+  const c = document.querySelector('#sim-viewport canvas');
+  const r = c.getBoundingClientRect();
+  const x = r.left + r.width / 2;
+  const y = r.top + r.height / 2;
+  const ev = (type, dx) => c.dispatchEvent(new PointerEvent(type, {
+    pointerId: 1, isPrimary: true, button: 0, buttons: type === 'pointerup' ? 0 : 1,
+    clientX: x + dx, clientY: y, bubbles: true, cancelable: true,
+  }));
+  ev('pointerdown', 0); ev('pointermove', 40); ev('pointerup', 40);
+})()`);
+await wait(600);
+ok('a drag DOES leave the named direction, for free orbit', await evaluate(
+  `document.querySelectorAll('#view-buttons .segmented__btn.is-active').length === 0`));
+await evaluate(`document.querySelector('#view-buttons [data-view="front"]').click()`);
+await wait(1700);
 
 // Pressing a direction flies the camera and re-writes the explanation panel.
 const noteBefore = await evaluate('document.getElementById("view-note").textContent');
@@ -349,6 +522,65 @@ ok('...and lands square on the Right view', await evaluate(
   `document.querySelector('#view-buttons [data-view="right"]').getAttribute('aria-pressed') === 'true'`));
 ok('...with the horizon still level (camera up is world up)', await evaluate(
   `document.querySelector('#view-buttons [data-view="right"]').classList.contains('is-active')`));
+
+// --- 4c. A view change is CONTINUOUS, frame by frame ---------------------------------------------
+// Both ends of a flight can be perfectly correct while the first frame of it teleports, and nothing
+// about the settled view can tell you that happened. So this samples the flight itself: the Front
+// label is the one DOM node glued to the solid from every direction, and its pane position is
+// recorded on every animation frame across a switch.
+//
+// A JUMP IS A SPIKE, and that is what the measurement keys on rather than raw distance. An eased
+// flight speeds up and slows down, so its biggest frame is simply its fastest one and its
+// neighbours are nearly as big; a teleport is one enormous frame between two still ones. Comparing
+// each frame with the larger of its two neighbours separates the two cleanly — the ratio is about
+// 1.3 for the peak of a smooth flight and was 80 to 140 for the pop this caught, where re-aiming
+// the pivot at the newly-rebuilt annotation box swung the camera in a single frame before the
+// flight had moved at all.
+const SAMPLER = `(() => {
+  window.__path = [];
+  const c = document.querySelector('#sim-viewport canvas').getBoundingClientRect();
+  const step = () => {
+    const l = document.querySelector('#sim-viewport .vp-label--front');
+    if (l) {
+      const a = l.getBoundingClientRect();
+      window.__path.push([(a.left + a.right) / 2 - c.left, (a.top + a.bottom) / 2 - c.top]);
+    }
+    window.__sampling = requestAnimationFrame(step);
+  };
+  step();
+})()`;
+
+const flightPath = async (dir) => {
+  await evaluate(SAMPLER);
+  await evaluate(`document.querySelector('#view-buttons [data-view="${dir}"]').click()`);
+  await wait(2100);                                   // the 1200 ms flight, plus room to settle
+  await evaluate('cancelAnimationFrame(window.__sampling)');
+  const path = JSON.parse(await evaluate('JSON.stringify(window.__path)'));
+  const steps = [];
+  for (let i = 1; i < path.length; i++) {
+    steps.push(Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]));
+  }
+  // +0.5 px of floor, so two consecutive still frames cannot divide by zero.
+  const spike = Math.max(...steps.map((s, i) => s / (Math.max(steps[i - 1] ?? 0, steps[i + 1] ?? 0) + 0.5)));
+  return {
+    total: steps.reduce((a, b) => a + b, 0),
+    spike,
+    tail: steps.slice(-12).reduce((a, b) => a + b, 0),
+  };
+};
+
+await evaluate(`document.querySelector('#view-buttons [data-view="front"]').click()`);
+await wait(1800);
+// Every ordering that matters: a quarter turn, a climb to the plan, the steep drop off it, and the
+// half turn. The dimension layer is ON, which is the case that had the defect — the set is rebuilt
+// for the new direction before the flight starts, and it is that rebuild the flight has to absorb.
+for (const dir of ['top', 'left', 'right', 'front', 'right', 'top', 'front']) {
+  const f = await flightPath(dir);
+  ok(`-> ${dir}: the flight moves the picture at all`, f.total > 40, `${f.total.toFixed(0)}px of path`);
+  ok(`-> ${dir}: ...with no frame that teleports`, f.spike < 4,
+    `worst frame is ${f.spike.toFixed(1)}x its neighbours`);
+  ok(`-> ${dir}: ...and it is still once it has landed`, f.tail < 2, `${f.tail.toFixed(2)}px in the last 12 frames`);
+}
 
 // --- 5. Step 2: the sheet, and the FIRST-ANGLE layout ------------------------------------------
 await evaluate('document.getElementById("btn-next").click()');
@@ -591,23 +823,93 @@ for (const id of ['cylblock', 'shaftsupport', 'bearingblock', 'block']) {
 // far denser part. This topic lays out four, by hand, in fixed lanes — so it borrows the PRINCIPLE
 // rather than the pass: measure every value's box on the finished sheet and prove none of them
 // touch. A lane discipline nobody checks is a lane discipline that quietly rots.
+//
+// MEASURED THROUGH `getBoundingClientRect()`, NOT `getBBox()`. `getBBox` reports a node's geometry
+// in its OWN user space and ignores the element's own transform, so it is blind to exactly the
+// thing Method 1 adds: a turned value's box comes back axis-aligned and unturned, and two values
+// that cross on the sheet measure as clear. The client rect is in screen space, after the rotation.
 const overlaps = async () => JSON.parse(await evaluate(`(() => {
   const boxes = [...document.querySelectorAll('#proj-sheet-stage .psheet__stage--dimension text')]
-    .map(t => { const b = t.getBBox(); return { t: t.textContent, x0: b.x, y0: b.y, x1: b.x + b.width, y1: b.y + b.height }; });
+    .map(t => { const b = t.getBoundingClientRect(); return { t: t.textContent, x0: b.left, y0: b.top, x1: b.right, y1: b.bottom }; });
+  const caps = [...document.querySelectorAll('#proj-sheet-stage .psheet__caption')]
+    .map(t => { const b = t.getBoundingClientRect(); return { t: t.textContent, x0: b.left, y0: b.top, x1: b.right, y1: b.bottom }; });
+  const over = (a, b) => a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1;
   const hits = [];
   for (let i = 0; i < boxes.length; i++) {
     for (let j = i + 1; j < boxes.length; j++) {
-      const a = boxes[i], b = boxes[j];
-      if (a.x0 < b.x1 && b.x0 < a.x1 && a.y0 < b.y1 && b.y0 < a.y1) hits.push(a.t + ' / ' + b.t);
+      if (over(boxes[i], boxes[j])) hits.push(boxes[i].t + ' / ' + boxes[j].t);
     }
   }
-  return JSON.stringify({ n: boxes.length, hits });
+  // A view's caption hangs on the far side of it from the XY line, which is exactly where an
+  // overall size wants to go — so the caption's clearance is measured against what is DRAWN, and
+  // this is the assertion that keeps it honest when a lane or a text lift moves.
+  const capHits = [];
+  for (const c of caps) for (const v of boxes) if (over(c, v)) capHits.push(c.t + ' / ' + v.t);
+  return JSON.stringify({ n: boxes.length, hits, caps: caps.length, capHits });
+})()`));
+
+// --- 7a3. METHOD 1 — every value lies along its own dimension line ------------------------------
+// The claim, measured rather than assumed: each value on the sheet is PARALLEL to a dimension line,
+// sits exactly one standard lift off that line's midpoint, and is turned into the half-circle that
+// reads from the bottom edge or the right-hand edge. Nothing here consults the authored data, so a
+// value that had quietly gone back to level — Method 2 — fails whatever the registry says.
+//
+// Pairing is by geometry, not by DOM order: a value belongs to the parallel dimension line whose
+// midpoint is a lift away. Extension lines are perpendicular to their own dimension line and so can
+// never be mistaken for one, and a leader's note is level over a level landing, which is Method 1's
+// own rule for a note rather than an exception to it.
+const alignment = async () => JSON.parse(await evaluate(`(() => {
+  const svg = document.querySelector('#proj-sheet-stage svg');
+  const stage = svg.querySelector('.psheet__stage--dimension');
+  const fold = (deg) => { let a = deg % 180; if (a > 90) a -= 180; if (a <= -90) a += 180; return a; };
+  const lines = [...stage.querySelectorAll('line.psheet__ink--dimension')].map(l => {
+    const x1 = l.x1.baseVal.value, y1 = l.y1.baseVal.value;
+    const x2 = l.x2.baseVal.value, y2 = l.y2.baseVal.value;
+    return { angle: fold(Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI), mx: (x1 + x2) / 2, my: (y1 + y2) / 2 };
+  });
+  const out = [], notes = [];
+  for (const t of stage.querySelectorAll('text')) {
+    const m = /rotate\\(([-0-9.]+)/.exec(t.getAttribute('transform') || '');
+    const rot = m ? parseFloat(m[1]) : 0;
+    // A LEADER's note is anchored start/end on its landing, not centred on a dimension line, and
+    // it is level in both BIS methods. Kept out of the parallel test and asserted separately.
+    if (t.getAttribute('text-anchor') !== 'middle') { notes.push({ t: t.textContent, rot }); continue; }
+    const x = t.x.baseVal[0].value, y = t.y.baseVal[0].value;
+    let best = null;
+    for (const l of lines) {
+      if (Math.abs(fold(l.angle - rot)) > 0.5) continue;
+      const d = Math.hypot(x - l.mx, y - l.my);
+      if (best === null || d < best) best = d;
+    }
+    out.push({ t: t.textContent, rot, lift: best });
+  }
+  return JSON.stringify({ values: out, notes });
 })()`));
 
 for (const id of ['cylblock', 'shaftsupport', 'bearingblock', 'block']) {
   await pickObject(id);
   await revealAll();
   await wait(500);
+
+  const { values, notes } = await alignment();
+  const LIFT = 3.2;                       // DIM_STYLE.textLift — textGap + textHeight / 2
+  const strays = values.filter((v) => v.lift === null || Math.abs(v.lift - LIFT) > 0.15);
+  ok(`${id}: every value lies along a dimension line, one lift off it`,
+    values.length > 0 && strays.length === 0,
+    strays.length ? strays.map((s) => `"${s.t}" rot ${s.rot} lift ${s.lift === null ? 'no parallel line' : s.lift.toFixed(2)}`).join(' | ')
+      : `${values.length} values, all ${LIFT} mm off a parallel line`);
+  ok(`${id}: no value is turned past the upside-down line`,
+    values.every((v) => Math.abs(v.rot) <= 90.001),
+    values.map((v) => v.rot.toFixed(0)).join(','));
+  // A drawing whose dimension lines were all horizontal would prove nothing about the turn, so say
+  // out loud that this object HAS vertical ones and that their values turned with them.
+  const turned = values.filter((v) => Math.abs(v.rot) > 45);
+  ok(`${id}: values on vertical dimension lines are turned, not left level`,
+    turned.length > 0 && turned.every((v) => Math.abs(Math.abs(v.rot) - 90) < 0.5),
+    `${turned.length} of ${values.length} turned`);
+  ok(`${id}: leader notes stay level, as a note on a landing must`,
+    notes.every((n) => n.rot === 0), `${notes.length} notes`);
+
   const audit = JSON.parse(await evaluate(`
     import('./src/objectData.js').then(m => {
       const o = m.getObject('${id}');
@@ -620,6 +922,8 @@ for (const id of ['cylblock', 'shaftsupport', 'bearingblock', 'block']) {
   const o = await overlaps();
   ok(`${id}: no two dimension values overlap`, o.hits.length === 0,
     o.hits.length ? o.hits.join(' | ') : `${o.n} values clear`);
+  ok(`${id}: no value runs into a view's caption`, o.caps === 3 && o.capHits.length === 0,
+    o.capHits.length ? o.capHits.join(' | ') : `${o.caps} captions clear`);
 }
 
 // --- 7b. The side-view choice draws the OTHER side, on the OTHER side of the sheet -------------

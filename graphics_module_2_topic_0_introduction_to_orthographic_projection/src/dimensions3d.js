@@ -40,7 +40,7 @@ import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
-import { toWorld, DIM_STYLE } from './objectData.js';
+import { toWorld, DIM_STYLE, alignedDim } from './objectData.js';
 import { roleColor, WEIGHT } from './tokens.js';
 
 /**
@@ -122,11 +122,28 @@ export function buildDimensions3D(data, view, sideView, box, resolution) {
     segments.push(p.x, p.y, p.z, q.x, q.y, q.z);
   };
 
-  /** A live DOM value at a point of the frame. Billboarded by CSS2D, so it always reads square. */
-  const value = (p, text, cls = 'vp-dim') => {
+  /**
+   * A live DOM value at a point of the frame, turned through `rotationDeg` for Method 1.
+   *
+   * CSS2DRenderer owns the OUTER element's transform — it parks the node in screen space every
+   * frame — so the turn has to live on an INNER span or the next frame wipes it. That is the
+   * benchmark topic's `.vp-value` / `.vp-value__text` pairing, for the same reason.
+   *
+   * The angle is the view frame's, negated: the frame's y runs UP and the screen's runs DOWN.
+   * It is a constant rather than a per-frame reprojection because this layer is only ever drawn
+   * for the direction the camera is AT, and at each of the four principal directions the view's
+   * own frame lands on the screen square — local +x to the right, local +y up, no rotation. In
+   * free orbit the whole set foreshortens together and the value rides its plane, which is what
+   * the sheet's values do too.
+   */
+  const value = (p, text, cls = 'vp-dim', rotationDeg = 0) => {
     const el = document.createElement('span');
     el.className = cls;
-    el.textContent = text;
+    const inner = document.createElement('span');
+    inner.className = 'vp-dim__text';
+    inner.textContent = text;
+    if (rotationDeg) inner.style.transform = `rotate(${-rotationDeg}deg)`;
+    el.appendChild(inner);
     const node = new CSS2DObject(el);
     node.position.copy(at(p[0], p[1]));
     group.add(node);
@@ -144,21 +161,16 @@ export function buildDimensions3D(data, view, sideView, box, resolution) {
     seg(tip, [back[0] - n[0] * ARROW_HALF, back[1] - n[1] * ARROW_HALF]);
   };
 
-  /** One aligned linear dimension: two extension lines, a dimension line, two heads, one value. */
-  const linear = (d) => {
-    const a = fx(d.a);
-    const b = fx(d.b);
-    const off = mirror ? -d.off : d.off;
-    const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
-    const u = [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
-    const n = [-u[1], u[0]];
-    const s = Math.sign(off) || 1;
-    const o = Math.abs(off);
+  /**
+   * One aligned linear dimension: two extension lines, a dimension line, two heads, one value.
+   * The placement is `alignedDim()`'s — the SAME function the sheet lays out with, so a size
+   * reads the same way on the solid as it does on the paper it is about to be drawn on.
+   */
+  const linear = (d0) => {
+    const d = mirror ? { ...d0, a: fx(d0.a), b: fx(d0.b), off: -d0.off } : d0;
+    const { u, n, s, A, B, angle, textAt } = alignedDim(d);
 
-    const A = [a[0] + n[0] * s * o, a[1] + n[1] * s * o];
-    const B = [b[0] + n[0] * s * o, b[1] + n[1] * s * o];
-
-    for (const [p, P] of [[a, A], [b, B]]) {
+    for (const [p, P] of [[d.a, A], [d.b, B]]) {
       seg(
         [p[0] + n[0] * s * DIM_STYLE.extGap, p[1] + n[1] * s * DIM_STYLE.extGap],
         [P[0] + n[0] * s * DIM_STYLE.extOver, P[1] + n[1] * s * DIM_STYLE.extOver],
@@ -167,17 +179,15 @@ export function buildDimensions3D(data, view, sideView, box, resolution) {
     seg(A, B);
     arrowHead(A, [-u[0], -u[1]]);
     arrowHead(B, u);
-
-    // The value is billboarded, so it needs no Method-1 rotation — it is lifted off the dimension
-    // line along the same normal the line was offset by, and CSS2D turns it to face the learner.
-    value(
-      [(A[0] + B[0]) / 2 + n[0] * s * DIM_STYLE.textLift * 2,
-        (A[1] + B[1]) / 2 + n[1] * s * DIM_STYLE.textLift * 2],
-      d.text,
-    );
+    value(textAt, d.text, 'vp-dim', angle);
   };
 
-  /** A leader: a sloping leg off the feature, a short landing, the note above it. */
+  /**
+   * A leader: a sloping leg off the feature, a short landing, the note above it.
+   *
+   * The note stays LEVEL, and that is not a lapse back into Method 2: a leader's note is written
+   * along its horizontal landing, in both systems. Method 1 governs the value on a DIMENSION line.
+   */
   const leader = (d) => {
     const from = fx(d.at);
     const to = fx(d.to);
@@ -188,7 +198,7 @@ export function buildDimensions3D(data, view, sideView, box, resolution) {
     seg(from, to);
     seg(to, land);
     arrowHead(from, [back[0] / m, back[1] / m]);
-    value([land[0] + dir * 2, land[1] + DIM_STYLE.textLift * 2], d.text, 'vp-dim vp-dim--note');
+    value([land[0] + dir * 2, land[1] + DIM_STYLE.textLift], d.text, 'vp-dim vp-dim--note');
   };
 
   for (const d of data.dims[view] ?? []) {

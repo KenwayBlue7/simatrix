@@ -18,6 +18,12 @@
 // syllabus ban is a one-line data change rather than an authoring convention (§6.22).
 // Chapter 6 declares no banned KIND of conics problem, so the list ships empty — an empty
 // filter is an honest "nothing excluded", not a missing mechanism.
+//
+// The axis that DOES cut here is the METHOD (ENABLED_METHODS, ADR-135): Course 1003 names
+// three constructions and says "only" twice, and neither the tier axis (which cuts by curve)
+// nor the type axis (which straddles the line) can express that. Everything the three cannot
+// answer — the focus-and-directrix exercises, the parallelogram, arc, rectangle and offset
+// methods — stays in this file verbatim and is filtered out of the deal.
 
 import { CurveType } from './conicData.js';
 
@@ -53,6 +59,31 @@ export const ENABLED_TIERS = Object.freeze(['ellipse', 'parabola']);
  * @type {ReadonlyArray<string>}
  */
 export const EXCLUDED_TYPES = Object.freeze([]);
+
+/**
+ * THE SYLLABUS METHOD FILTER (ADR-135) — the constructions a dealt problem may be answered with.
+ *
+ * Course 1003, Module II names three and says "only" twice: *"Ellipse - Rectangular Method &
+ * Concentric Circle Method only, Parabola- Tangent method only"*. The tier axis above cannot
+ * express that, because it cuts by CURVE: the ellipse tier holds the two syllabus constructions
+ * and four beyond it, and the type axis cannot either, because "eccentricity-method" and
+ * "given-dimensions" both straddle the line. So the third axis is the METHOD the answer uses,
+ * read off the problem's own `target`.
+ *
+ * A problem with no `target.method` is answered with the focus-and-directrix construction (its
+ * givens are `e` and `fa`), and that is not one of the three — so an absent method is excluded,
+ * not waved through.
+ *
+ * The excluded exercises STAY in PROBLEMS below, verbatim, exactly as the four hyperbola ones do
+ * (ADR-115): the chapter has fifteen and this file is the chapter. Widening this list is the
+ * one-line lever that brings any of them back.
+ * @type {ReadonlyArray<string>}
+ */
+export const ENABLED_METHODS = Object.freeze([
+  'ellipse-concentric',
+  'ellipse-oblong',
+  'parabola-tangent',
+]);
 
 /**
  * Human labels for every field the self-check may report as "still differs". The three
@@ -91,7 +122,8 @@ export const FIELD_LABELS = Object.freeze({
  */
 
 /**
- * The fifteen exercises of Chapter 6, verbatim.
+ * The fifteen exercises of Chapter 6, verbatim, followed by the syllabus practice set (ADR-135).
+ * `enabledProblems()` decides which of them are dealt; nothing is deleted from here.
  * @type {ReadonlyArray<Problem>}
  */
 export const PROBLEMS = Object.freeze([
@@ -295,12 +327,76 @@ export const PROBLEMS = Object.freeze([
     ],
     target: { curve: CurveType.Hyperbola, method: 'hyperbola-asymptotes', dim1: 75, dim2: 25, dim3: 40 },
   },
+
+  // ---- Syllabus practice set (ADR-135) --------------------------------------------------
+  // NOT chapter exercises — these are the plain drill questions for the three constructions
+  // Course 1003, Module II names, added verbatim as set. Each one states its METHOD and both
+  // AXES in the statement itself, so the learner never has to infer which construction is
+  // wanted; the chapter's own exercises above ask for a tangent, a normal or a located point
+  // on top of the same figure, which is what keeps both sets worth having.
+  {
+    id: 'practice-concentric-100-70',
+    tier: 'ellipse',
+    type: 'given-dimensions',
+    title: 'Concentric circle method, axes 100 mm and 70 mm',
+    statement: 'Draw an ellipse having a Major Axis of 100mm and Minor Axis of 70mm using concentric circle method.',
+    hints: [
+      'The concentric circle method is §6.5’s Example 6.2 — two circles on the two axes, sharing one centre.',
+      'In Step 5 the construction is already chosen for you; the two dimension fields read Major axis and Minor axis.',
+      'Dial the major axis to 100 mm and the minor axis to 70 mm, then play the construction through.',
+    ],
+    target: { curve: CurveType.Ellipse, method: 'ellipse-concentric', dim1: 100, dim2: 70 },
+  },
+  {
+    id: 'practice-concentric-120-80',
+    tier: 'ellipse',
+    type: 'given-dimensions',
+    title: 'Concentric circle method, axes 120 mm and 80 mm',
+    statement: 'Draw an ellipse having a Major Axis of 120mm and Minor Axis of 80mm using concentric circle method.',
+    hints: [
+      'The concentric circle method is §6.5’s Example 6.2 — two circles on the two axes, sharing one centre.',
+      'Each point takes its x from the outer circle and its y from the inner one, so both axes have to be set before the crossings mean anything.',
+      'Dial the major axis to 120 mm and the minor axis to 80 mm, then play the construction through.',
+    ],
+    target: { curve: CurveType.Ellipse, method: 'ellipse-concentric', dim1: 120, dim2: 80 },
+  },
+  {
+    id: 'practice-oblong-100-70',
+    tier: 'ellipse',
+    type: 'given-dimensions',
+    title: 'Rectangular method, axes 100 mm and 70 mm',
+    statement: 'Draw an ellipse by rectangular method, given the major and minor axes as 100mm and 70mm respectively.',
+    hints: [
+      'The rectangular (oblong) method is §6.5’s Example 6.3 — the ellipse is boxed in a rectangle whose sides ARE the two axes.',
+      'Divide half the major axis and the side above it into the same number of parts; the joins from C and D cross on the curve.',
+      'Dial the major axis to 100 mm and the minor axis to 70 mm, then play the construction through.',
+    ],
+    target: { curve: CurveType.Ellipse, method: 'ellipse-oblong', dim1: 100, dim2: 70 },
+  },
+  {
+    id: 'practice-oblong-120-80',
+    tier: 'ellipse',
+    type: 'given-dimensions',
+    title: 'Rectangular method, axes 120 mm and 80 mm',
+    statement: 'Draw an ellipse by rectangular method, given the major and minor axes as 120mm and 80mm respectively.',
+    hints: [
+      'The rectangular (oblong) method is §6.5’s Example 6.3 — the ellipse is boxed in a rectangle whose sides ARE the two axes.',
+      'The rectangle is 120 mm across and 80 mm high, because the largest ellipse in it touches all four sides.',
+      'Dial the major axis to 120 mm and the minor axis to 80 mm, then play the construction through.',
+    ],
+    target: { curve: CurveType.Ellipse, method: 'ellipse-oblong', dim1: 120, dim2: 80 },
+  },
 ]);
 
-/** Problems whose tier is enabled AND whose type is not banned (the ADR-062 filter). */
+/**
+ * Problems whose tier is enabled, whose type is not banned (the ADR-062 filter), and whose answer
+ * uses one of the syllabus constructions (ADR-135).
+ */
 export function enabledProblems() {
   return PROBLEMS.filter(
-    (p) => ENABLED_TIERS.includes(p.tier) && !EXCLUDED_TYPES.includes(p.type),
+    (p) => ENABLED_TIERS.includes(p.tier)
+      && !EXCLUDED_TYPES.includes(p.type)
+      && ENABLED_METHODS.includes(p.target.method),
   );
 }
 

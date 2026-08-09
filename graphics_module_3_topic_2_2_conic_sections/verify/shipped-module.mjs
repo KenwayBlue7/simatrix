@@ -386,15 +386,21 @@ ok('reset closes the sheet', await evaluate('document.getElementById("compare-ca
 // --- 8. Problem library ---------------------------------------------------------------
 await evaluate('document.getElementById("open-problem-library").click()');
 await wait(250);
-// Eleven of the chapter's fifteen: the hyperbola tier is off (ADR-115) because three of its four
-// exercises are answered with §6.9's constructions, which this module no longer offers. All
-// fifteen are still in src/problems.js verbatim — ENABLED_TIERS decides which are dealt.
-ok('library lists the 11 problems this module can answer',
-  (await evaluate('document.querySelectorAll(".problem-card").length')) === 11,
+// Seven: three of the chapter's fifteen plus the four-question practice set (ADR-135). The
+// hyperbola tier is off (ADR-115), and ENABLED_METHODS keeps the deal to the three constructions
+// Course 1003 names — so the focus-and-directrix, parallelogram, arc, rectangle and offset
+// exercises are filtered out. Every one of them is still in src/problems.js verbatim.
+ok('library lists the 7 problems the syllabus asks for',
+  (await evaluate('document.querySelectorAll(".problem-card").length')) === 7,
   await evaluate('String(document.querySelectorAll(".problem-card").length)'));
 ok('library groups by curve', (await evaluate('document.querySelectorAll(".problem-group").length')) === 2);
 ok('…and sets no problem it cannot answer',
   (await evaluate(`[...document.querySelectorAll('.problem-group')].every(g => !/hyperbola/i.test(g.textContent))`)) === true);
+// The three constructions, and nothing else: an eccentricity or offset-method card here would be
+// a problem the syllabus does not set (ADR-135).
+ok('…and none of the cards asks for a construction outside the syllabus',
+  (await evaluate(`[...document.querySelectorAll('.problem-card')]`
+    + `.every(c => !/eccentricity|conjugate|intersecting arc|offset|rectangle method|parallelogram/i.test(c.textContent))`)) === true);
 await evaluate('document.getElementById("problem-library-close").click()');
 
 const lateErrors = errorEntries();

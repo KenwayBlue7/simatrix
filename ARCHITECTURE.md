@@ -64,6 +64,40 @@ C:\xampp\htdocs\Simatrix\
 │                                              orchestrator + a folder of small,
 │                                              single-purpose modules in src/.
 │
+├── graphics_module_2_topic_0_introduction_to_orthographic_projection\
+│                                              MODULE-2 SUBJECT and the module's FIRST topic
+│                                              ("Introduction to Orthographic Projection"), built
+│                                              on Module 2's orchestrator pattern, standalone.
+│                                              BUILT (2026-08-06). TWO steps and two is the whole
+│                                              topic: Step 1 is four textbook machine parts under
+│                                              free orbit with the four principal directions as
+│                                              buttons and a panel that says what each shows;
+│                                              Step 2 draws the same object in FIRST ANGLE one
+│                                              press at a time — elevation, plan, side view, each
+│                                              built as construction lines → outline → hidden
+│                                              detail → centre lines, then dimensioned in the
+│                                              aligned system. Cut from
+│                                              graphics_module_4_topic_2_isometric_construction
+│                                              (RULES.md §1.15), the only sibling already carrying
+│                                              an SVG first-angle sheet and a named-direction
+│                                              camera rig; anim.js re-copied from Module2/ and
+│                                              md5-verified. Leaves: objectData (the four parts
+│                                              from Chapter 19 pp. 252-254 — 3D part specs PLUS
+│                                              authored 2D view linework, ADR-127), objectRig (one
+│                                              switch over `extrude`/`lathe`), projectionSheet
+│                                              (the sheet, laid out in MILLIMETRES with one
+│                                              viewBox, deriving its projectors, its 45° mitre and
+│                                              its whole stage list from the views — ADR-129),
+│                                              cameraRig, uiManager, orthoSteps. NOTE: it carries
+│                                              the platform's DUAL-CAMERA pair and lands every
+│                                              principal view in a true ORTHOGRAPHIC projection via
+│                                              the §5.18 morph — free orbit is perspective, a named
+│                                              view is not (ADR-128). No meshAnalyzer, no
+│                                              projectionDrawer, no shape generators, no Problem
+│                                              Library. One Node oracle in verify/ asserts the
+│                                              first-angle LAYOUT out of the live SVG. See root
+│                                              DECISIONS.md ADR-127..129.
+│
 ├── graphics_module_2_topic_1_introduction\    DEPLOYED COPY of Module2, scoped down
 │                                              to "Introduction to Solids" — a 3D
 │                                              anatomy gallery (apex, axis, generators,
@@ -252,9 +286,14 @@ C:\xampp\htdocs\Simatrix\
 │                                              MODULE 2's orchestrator pattern per ADR-033.
 │                                              BUILT (2026-07-29), feature-complete: teaches
 │                                              textbook Chapter 6 in SIX guided steps — the
-│                                              double cone, its six section planes, the conic as
-│                                              a locus, the nomenclature, the eccentricity
-│                                              construction, and the other eleven constructions.
+│                                              double cone, its six section planes, the FOCAL
+│                                              SPHERE that produces the focus and the directrix
+│                                              on the solid (§6.2, ADR-089), the conic as a
+│                                              locus, the nomenclature, the eccentricity
+│                                              construction, and the other twelve constructions.
+│                                              Syllabus-audited 2026-08-01 against the chapter
+│                                              itself; ADR-089 to ADR-094 close the gaps it
+│                                              found.
 │                                              Scaffolded from the SIBLING topic above rather
 │                                              than template_starter/, with every shared engine
 │                                              file re-copied from Module2/ and md5-verified
@@ -273,16 +312,34 @@ C:\xampp\htdocs\Simatrix\
 │                                              CURVE EXTRACTOR — the cone is never cut away
 │                                              (ADR-085). The problem library ships all fifteen
 │                                              chapter exercises verbatim and stamps NOTHING on
-│                                              load. See root DECISIONS.md ADR-082..085.
+│                                              load. Sequenced as a LESSON, not exposed as a
+│                                              parameter set (ADR-086), and its labels are
+│                                              drawing ANNOTATIONS — leader lines, screen-space
+│                                              anchors, a concealed axis drawn to convention,
+│                                              and a collision pass on the sheet's captions
+│                                              (ADR-087). The cut is the LEARNER's (a "Cut the
+│                                              cone" checkbox, the reference topic's
+│                                              interaction) and truncates for real, with the
+│                                              removed material kept as a ghost; the drawing
+│                                              sheet draws the curve of the LIVE cut,
+│                                              e = sin θ / sin g, for Steps 1-4 (ADR-088,
+│                                              superseding ADR-085). FOUR Node oracles live in
+│                                              verify/ (tooling, excluded from the ZIP): the
+│                                              mathematics, the shipped module, the
+│                                              annotations and the interactions. See root
+│                                              DECISIONS.md ADR-082..088.
 │
 └── (src_csharp\)                              Old C# Unity prototype. NOT documented
                                                here. (Not present in the working tree
                                                at the time of writing.)
 ```
 
-**Master → Deploy relationship.** **Module 2 is the master.** The two
-`graphics_module_2_topic_*` folders are **deployed copies** of Module 2, each adapted
-for a specific teaching topic. Changes originate in Module 2 first and are then
+**Master → Deploy relationship.** **Module 2 is the master.** `graphics_module_2_topic_1_introduction`
+and `graphics_module_2_topic_2_simple_positions` are **deployed copies** of Module 2, each adapted
+for a specific teaching topic. **`graphics_module_2_topic_0_introduction_to_orthographic_projection`
+is NOT one of them** — despite the `module_2` prefix it is a standalone topic on the orchestrator
+PATTERN, cut from the Module-4 sibling, sharing no engine file with the master except `anim.js`
+(ADR-127; RULES.md §1.7 — the topic number never encodes lineage). Changes originate in Module 2 first and are then
 copied/adapted into a topic folder. There is no automated sync — the copies are full
 duplications of the source (confirmed: many files are byte-for-byte identical between
 the master and the copies, which is only possible with manual copying). The two

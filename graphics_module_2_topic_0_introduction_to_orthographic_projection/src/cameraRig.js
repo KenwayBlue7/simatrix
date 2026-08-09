@@ -32,7 +32,7 @@
 // rig which camera to render with each frame.
 
 import * as THREE from 'three';
-import { tween, easeCamera } from './anim.js';
+import { tween, easeCamera, easeStandard } from './anim.js';
 
 /**
  * Named viewing DIRECTIONS (unit vectors from the target toward the camera).
@@ -84,6 +84,9 @@ const ORTHO_HALF_H = 1;
 
 /** How long the drag-away hand-off from an orthographic view back to perspective takes. */
 const RELEASE_MS = 340;
+
+/** How long an idle re-aim onto new content takes. Short — it is a correction, not a move. */
+const RETARGET_MS = 260;
 
 /** Scratch vectors for the flight path — allocated once, not per frame. */
 const _dir = new THREE.Vector3();
@@ -175,6 +178,7 @@ export function initCameraRig({ camera, controls, prefersReducedMotion, aspect }
   let flying = false;
   let handle = null;
   let releaseHandle = null;
+  let retargetHandle = null;
 
   /**
    * Point the rig at some content.
@@ -185,6 +189,68 @@ export function initCameraRig({ camera, controls, prefersReducedMotion, aspect }
     box.getSize(half).multiplyScalar(0.5);
     half.set(Math.max(half.x, 0.05), Math.max(half.y, 0.05), Math.max(half.z, 0.05));
     radius = Math.max(half.length(), 0.5);
+
+    // THE TARGET MOVES WITH THE CONTENT — BUT IT MOVES, IT DOES NOT TELEPORT.
+    //
+    // Orbit and zoom both pivot on `controls.target`, so a target left on the previous object's
+    // centre — or on the centre of the same object before its dimension layer changed the box —
+    // makes the next scroll pull the part sideways across the pane instead of growing it in place.
+    // That is why the target has to follow the content at all (RULES.md §5.22).
+    //
+    // Setting it in one step, though, IS the view-change jump. Pressing a direction rebuilds the
+    // annotation layer BEFORE the flight starts; the new view's dimension set is a different shape
+    // from the old one, so the content box and its centre move. Re-aiming the pivot at the new
+    // centre swings the camera about a fixed eye point, and the flight's first `lookAt` applied the
+    // whole of that swing in a single frame — measured on the Front label, 71–219 px of the pane
+    // between one frame and the next, at the head of a 1200 ms flight that was otherwise perfectly
+    // smooth. Translating the eye by the same delta to hold the offset does not help and is
+    // slightly worse: the eye-to-target vector is preserved, but the eye has still MOVED, so the
+    // whole scene slides across the pane by the parallax of that move. There is no instant target
+    // change that the learner cannot see.
+    //
+    // So it is a tween, on the same engine as everything else that moves here. Two consequences,
+    // and both are the point:
+    //   • A FLIGHT cancels it and reads `controls.target` where it stands — which is still the old
+    //     centre, because the tween has only applied t = 0. The flight then carries the target the
+    //     whole way itself, alongside the eye, exactly as it already did. The pop disappears
+    //     because the instant step it was made of no longer exists.
+    //   • An IDLE re-frame — a new object, or the Dimensions switch — eases onto the new centre
+    //     over a quarter of a second instead of snapping to it.
+    if (flying) return;   // the flight owns the target for its whole duration and lands it exactly
+    retargetHandle?.cancel();
+    retargetHandle = null;
+    if (controls.target.distanceToSquared(center) < 1e-8) return;
+
+    const from = controls.target.clone();
+    const to = center.clone();
+    retargetHandle = tween({
+      from: 0,
+      to: 1,
+      duration: prefersReducedMotion ? 0 : RETARGET_MS,
+      ease: easeStandard,
+      onUpdate: (t) => { controls.target.lerpVectors(from, to, t); },
+      onComplete: () => {
+        retargetHandle = null;
+        controls.target.copy(to);
+        settle();
+      },
+    });
+  }
+
+  /**
+   * Apply a pose change to the controls with the damping loop SILENT.
+   *
+   * `controls.update()` with damping on also spends whatever rotation and dolly inertia the last
+   * drag left in the controls — so a learner who flicks the object and then presses Front gets the
+   * flight's exact landing pose plus a residue of their own flick, and the view creeps off square in
+   * the frames after it lands. Turning damping off for the one flushing update discards that residue
+   * instead of applying it; the setting is restored immediately, so the next real drag still eases.
+   */
+  function settle() {
+    const damping = controls.enableDamping;
+    controls.enableDamping = false;
+    controls.update();
+    controls.enableDamping = damping;
   }
 
   /**
@@ -268,6 +334,10 @@ export function initCameraRig({ camera, controls, prefersReducedMotion, aspect }
     handle?.cancel();
     releaseHandle?.cancel();
     releaseHandle = null;
+    // The flight takes the target over from here — including any idle re-aim that has only just
+    // started, which is what keeps the head of the flight continuous.
+    retargetHandle?.cancel();
+    retargetHandle = null;
 
     const wantOrtho = PRINCIPAL.has(name);
     const target = pose(name);
@@ -316,7 +386,7 @@ export function initCameraRig({ camera, controls, prefersReducedMotion, aspect }
           syncOrthoFrustum();
           morphK = toK;
         }
-        controls.update();
+        settle();
         controls.enabled = true;
         flying = false;
         handle = null;
@@ -365,8 +435,10 @@ export function initCameraRig({ camera, controls, prefersReducedMotion, aspect }
   function cancel() {
     handle?.cancel();
     releaseHandle?.cancel();
+    retargetHandle?.cancel();
     handle = null;
     releaseHandle = null;
+    retargetHandle = null;
     flying = false;
     controls.enabled = true;
   }
@@ -377,7 +449,7 @@ export function initCameraRig({ camera, controls, prefersReducedMotion, aspect }
     releaseOrtho();
     camera.position.copy(target.pos);
     controls.target.copy(target.target);
-    controls.update();
+    settle();
   }
 
   /** Keep the ortho frustum square with the pane. Unconditional: a resize while the perspective

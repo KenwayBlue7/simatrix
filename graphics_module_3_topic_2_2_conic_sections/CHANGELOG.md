@@ -3,6 +3,170 @@
 Notable changes to this topic. (The sibling topic's history was intentionally not carried over —
 this changelog starts fresh at the build, per MODULE-STARTER §3.2.)
 
+## 2026-08-09 — The tangent method's frame stops moving; its labels are set outward (ADR-137)
+
+**1. Fixed: the drawing rescaled on the final step (ADR-137).**
+- The report: "a noticeable visual jump/glitch in the final (freehand) step ONLY in the Tangent
+  Method", with the cause given as a fresh rebuild or a second drawing mode, to be fixed by
+  suppressing `scene.clear()` and not re-instantiating geometry groups.
+- **The cause was arithmetic, not rendering.** This sheet is a display list: `layoutFor()` returns
+  typed primitives and `drawSheet()` repaints the whole list every frame. There is no scene to
+  clear, no geometry group to re-instantiate, and no second drawing mode — every stage already
+  redraws all of the linework before it, and the reveal is a trim on path length applied by that
+  same renderer. Nothing needed preserving because nothing was being discarded.
+- What was actually wrong: the sheet locks its millimetre scale to the layout's analytic bbox
+  (ADR-053), and that bbox was measured from what the CURRENT stage had drawn. The last stage adds
+  the directrix, which runs to ±0.6 · AB where every earlier stage stops at A and B, ±0.5 · AB — so
+  the frame grew from 224 × 120 mm to 224 × 144 at the exact moment the freehand curve began.
+- Measured, stepping the construction by hand and reading the pixel length of the double ordinate
+  (120 mm at every stage):
+
+  | pane | stages 1–8 | stage 9 |
+  |---|---|---|
+  | 964 × 805 | AB = 219 px | AB = 219 px — width binds, nothing moves |
+  | 1124 × 565 | AB = 225 px | **AB = 189 px, sliding 54 px left** |
+
+  A 16 % rescale of the whole drawing in one frame, on a short viewport; invisible on a tall one,
+  which is why it read as intermittent.
+- Fixed: `parabolaTangent()` returns the frame of the FINISHED figure and `methodsLayout()` passes a
+  builder's own bbox through to `finish()`. AB now measures 188 px at every stage of the short pane
+  and 192 in the tall one. The sheet is laid out for the finished drawing from stage 1.
+- This is the only one of the three syllabus constructions that had the fault: the concentric
+  method's frame is its two auxiliary circles and the oblong method's is its rectangle, both drawn
+  at stage 0. Neither was touched.
+- Rejected, and recorded: also reserving the tangent and normal at BOTH ends of the curve, so that
+  dragging P could not move the frame either. Measured at 258 × 187 mm, which took the 1124 × 565
+  pane to **1.1 px/mm** — under the 1.3 gate at which `drawSheet` drops every caption. A drawing
+  with no names on it is worse than one that resizes while a slider is dragged.
+- Oracle: three new assertions in `verify/conic-math.mjs` — one frame across every stage at every
+  division count 4–12, one across every stage at five positions of P, and a non-vacuity check that
+  the tangent toggle does enlarge the frame, so the first two are not passing because nothing moves.
+
+**2. Fixed: a replay could run against a live curve trace.**
+- `playConstruction()` cleared the stage timer but not the reveal tween, so a trace still running
+  from the previous pass kept writing the global `curveReveal` while the new playback laid down its
+  construction lines. It now calls `cancelCurveReveal()`, the other half of `stopBuildPlayback()`.
+- Not changed, because it was not broken: **"Draw it step by step" already starts from the given
+  data alone.** Probed on the shipped page — the first frame reads `1 of 9 · The given sizes` with
+  the same 2963-px ink as arrival: the axis, the double ordinate, the abscissa and V/A/B/C, and
+  nothing constructed. That is ADR-118/ADR-119 working. The tangent method's triangle looks like a
+  frame and is not one, because E at its apex has to be found first.
+
+**3. Changed: every point name on the tangent method is set OUTWARD from the figure.**
+- A and B both pointed inward, toward the line AB they sit on, which put them among the chords. A
+  now reads up-right and B down-right — mirrored about the axis, as the construction is.
+- The division numbers had `dy: 0`, setting the baseline at the point, so each number sat across the
+  very tangent whose divisions it counts. They are now above AE and below EB.
+- `Directrix, DD` was offset `dx: -30` and ran back across its own line; it is right-aligned off the
+  line with `textWidthGuess`, the way the double-ordinate caption already was.
+- The two dimension captions take opposite sides of the axis so they cannot land in one row.
+- Font sizes were already correct and are untouched: `labelWeight()` infers them from the text, so
+  the division numbers are the bold size and the point names the size below it.
+
+**4. Changed: A is the FOOT of the double ordinate and B its head (ADR-138).**
+- ADR-134 reversed the trace so the pencil comes up out of the base, and deliberately left the
+  labelling alone. That made the drawing read **B → A**: the curve began at B and finished at A,
+  while every sentence describing the construction names A first — "draw the double ordinate AB",
+  "tangents to the parabola at A and at B". The two orders disagreed.
+- Fixed at the coordinates, not in the drawing:
+
+  ```js
+  const A = pt(abs, dOrd / 2);    // the FOOT — the sheet is y-DOWN, so +y is the bottom
+  const B = pt(abs, -dOrd / 2);   // its head
+  ```
+
+- Everything derived from those two points followed with no further edit: the tangents AE and BE,
+  the division marks along them, the chords 1–1′, the dimension text on AB, and the frame. The trace
+  is untouched — `parabolaPts().reverse()` still runs +y to −y, which is now A → B by construction.
+- Three annotation offsets moved with the points, since every name here is set outward: A reads
+  down-right and B up-right, and the division numbers hang below AE and above BE.
+- No geometry changed. The figure is symmetric about its axis, so the swap maps the construction
+  onto its own mirror image: same envelope, same f, same focus, same directrix, same bbox.
+- Narration updated to match ("from A round the vertex up to B"). `conicData.js` and
+  `conicEngine.js` cannot import each other, so the oracle checks the two agree.
+- Oracle: four assertions read the COORDINATES rather than the captions — A at +y, B at −y,
+  symmetric about the axis; the trace beginning on A and ending on B; and a construction line struck
+  from each of them. A caption-only swap fails all but the first.
+
+**Untouched:** the concentric circle method, the rectangular (oblong) method, every other module,
+and all geometry. `parabolaPts()` is unchanged, `f = (dOrd²)/(16·abs)` is unchanged, and the
+envelope still satisfies y² = 4f·x to 1e-9. All five oracles green.
+
+## 2026-08-08 — Tangent method ends on its curve, traced clockwise; the library is cut to the syllabus (ADR-133 … ADR-136)
+
+**1. The tangent method is nine steps, not ten (ADR-133).**
+- Changed: the construction now **ENDS on the envelope**. The tenth stage is gone; the focus and
+  the directrix — what Example 6.8 asks this method to LOCATE — are drawn on the envelope stage
+  with the curve.
+- Fixed: the tangent and normal at P are gated on **`conic.showTangent` alone**. They used to ride
+  on the tenth stage as well, so a learner with the toggle on saw them arrive on the last press of
+  "Next line", as if they were a step of the construction. Neither sibling syllabus method does
+  that — the concentric and oblong methods end on "join the curve" and leave optional elements to
+  their own controls.
+- Not removed: the focus and the directrix. They are what the construction is asked to produce, are
+  named in `METHOD_INFO`'s `output`, and are asked for by name in a shipped exercise. Deleting the
+  tenth stage outright would have deleted the answer to the question.
+- Note: this cost the oracle its witness that "the stage that draws the curve" and "the last stage"
+  are different things (ADR-115's trigger). The witness moved to the focus-directrix construction
+  — curve at stage 6, tangent and normal at 7 — and a new assertion pins the tangent method's curve
+  to its own last stage, so the tenth cannot come back unnoticed.
+- Note: `METHOD_INFO['parabola-tangent'].steps` still reads 7. It is the chapter's written
+  procedure count, not the playback length, which is a function of the divisions slider.
+
+**2. The parabola is traced clockwise (ADR-134).**
+- Changed: `parabolaTangent()` reverses its `curvePts`. The reveal now runs from **B at the foot of
+  the double ordinate, round the vertex, up to A** — clockwise on screen, the way a hand moves
+  through a curve of this shape.
+- Root cause: `parabolaPts()` samples y from −yMax upward and the sheet is y-DOWN (ADR-083), so the
+  pencil started at the TOP of the base and swept anticlockwise.
+- Untouched: the geometry. Same samples, same focal length, same envelope, same bbox, same analytic
+  scale — order only. The oracle re-checks every reversed point against y² = 4f·x, and checks the
+  direction as a **signed sweep about the figure's own centroid** (+270°) rather than on two
+  endpoints, so a reversal that only fixed the ends would fail.
+- Not done: reversing inside `parabolaPts()` (shared with two parabolas that open the other way up)
+  or swapping the labels A and B (that would relabel the drawing).
+
+**3. The Problem Library is cut to the syllabus (ADR-135).**
+- Added: `ENABLED_METHODS` in `src/problems.js` — a **third filter axis**, holding
+  `ellipse-concentric`, `ellipse-oblong` and `parabola-tangent`. `enabledProblems()` now deals only
+  problems whose `target.method` is one of the three, so the focus-and-directrix exercises (which
+  name no method at all) are excluded rather than waved through.
+- Why a third axis: `ENABLED_TIERS` cuts by CURVE and the ellipse tier holds two syllabus methods
+  and four beyond them; `EXCLUDED_TYPES` cuts by problem KIND and `'given-dimensions'` covers the
+  oblong method and the offset method alike. Neither can say "these three constructions only".
+- Removed from the DEAL, not from the file: the three eccentricity-method exercises and the
+  parallelogram, intersecting-arc, rectangle, parabola-parallelogram and offset ones. All fifteen
+  chapter exercises stay in `src/problems.js` verbatim, exactly as the four hyperbola ones have
+  since ADR-115. Widening the list is a one-line change.
+- Added: the **four syllabus practice problems**, verbatim as set — concentric circle method at
+  100 × 70 and 120 × 80, rectangular method at 100 × 70 and 120 × 80 — in their own labelled block,
+  each with the three-step hint scaffold and a target that maps straight onto the construction.
+- The library now deals **seven** problems in two curve groups: three chapter exercises plus the
+  four new ones.
+- Flagged, not resolved: two of the new four overlap chapter exercises in dimensions (100 × 70
+  concentric, 120 × 80 rectangular). The chapter's versions ask for a tangent, a normal or a
+  located point on top of the same figure. Dropping either set is a content call.
+
+**4. A loaded problem selects the construction it names (ADR-136, amending RULES §6.2).**
+- Added: `armMethodForStep5()` in `src/problemLibrary.js`. Loading a problem arms it; on the
+  learner's **first arrival at Step 5** it selects the construction the statement names in words,
+  once, and then hands the picker back.
+- The dimension sliders land at their **FLOOR**, never at the method's own defaults.
+  `ellipse-concentric` defaults to 120 × 80, which is one of the practice answers exactly —
+  committing the method with its defaults would have lit the self-check green on load.
+- At Step 5 rather than at load, because Steps 1–4 re-derive the sheet's CURVE from the live cut
+  (`syncSheetToCut`, ADR-117) and would leave the method beside a curve that had drifted.
+- RULES §6.2 is amended, not withdrawn: **a measured quantity is never auto-filled; the named
+  construction is.** Verified in the browser — the picker shows "Concentric (auxiliary) circles"
+  and the self-check still reads "Still to match: major axis and minor axis."
+
+**Oracles.** All five green. `verify/conic-math.mjs` gains a section 8 for the library (syllabus
+methods only, the four new problems by exact statement, seven dealt in two groups, nothing
+pre-solved on load, and a non-vacuity check) and four new assertions in section 4o (no stage draws
+the tangent with the toggle off; it arrives with the curve when on; the focus and directrix arrive
+with the envelope; the trace is clockwise). `verify/shipped-module.mjs` counts seven cards and
+asserts none names a construction outside the syllabus.
+
 ## 2026-08-05 (c) — One thumbnail box on every step; the docked mode is deleted (ADR-125, supersedes ADR-120)
 
 - Changed: **Steps 4 and 6 now show the thumbnail at exactly the box Step 5 uses** — 420 × 320,
@@ -1098,3 +1262,4 @@ to the curve, which this topic had skipped entirely.
   the headless Chrome walkthrough of the shipped module (clean boot, platform contract, six steps,
   all eleven constructions painting, the six section classifications through the real sliders, the
   reset path, fifteen problems, and a flat WebGL buffer count across 50 rapid rebuilds) both green.
+

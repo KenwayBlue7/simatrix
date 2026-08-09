@@ -12,11 +12,14 @@
 // The self-check compares the RAW input the student dials — sim.conicState() — against the
 // problem's target with per-field tolerances: ±0.02 on the eccentricity (one slider step
 // is 0.05, so a dialled 0.65 never passes for 2/3 while the typed 0.67 does) and ±0.5 on
-// every millimetre and degree (the sibling topics' ADR-063 value). NOTHING is ever
-// auto-filled — not even the dimensions the statement quotes: unlike the two sibling
+// every millimetre and degree (the sibling topics' ADR-063 value). No MEASURED quantity is
+// ever auto-filled — not one of the dimensions the statement quotes: unlike the two sibling
 // topics, every quantity here IS dial-able, so injecting any of them would hand over part
-// of the answer. Driven by sim.onStateChange, which main.js fires at the end of every
-// commit (the one seam every parameter change passes through).
+// of the answer. The one thing that IS set for the learner is the CONSTRUCTION the statement
+// names in words, on first arrival at Step 5 (armMethodForStep5, ADR-136) — and it lands the
+// dimension sliders at their floor precisely so that selecting it can never pre-solve a
+// figure. Driven by sim.onStateChange, which main.js fires at the end of every commit (the
+// one seam every parameter change passes through).
 //
 // Layering (CLAUDE.md): imports only the data layer (src/problems.js + the pure catalogue
 // src/conicData.js, RULES.md §3.6a) plus the injected `sim` controller; never reaches into
@@ -75,6 +78,7 @@ export function initProblemLibrary(sim) {
   let pendingProblem = null; // awaiting the "clears your work" confirm
   let matched = false;       // last self-check result, so we announce the match once
   let hintsShown = 0;        // how many scaffolded hint steps are currently revealed
+  let methodArmed = false;   // the problem names a construction and Step 5 has not been reached
 
   const el = (tag, cls) => {
     const node = document.createElement(tag);
@@ -112,6 +116,38 @@ export function initProblemLibrary(sim) {
       if (spec) return spec.label.toLowerCase();
     }
     return FIELD_LABELS[key] ?? key;
+  }
+
+  /**
+   * Select the construction the statement NAMES, once, on the learner's first arrival at Step 5
+   * (ADR-136).
+   *
+   * Every statement in the syllabus practice set says which method to use in words — "using
+   * concentric circle method", "by rectangular method" — so hunting for it in the picker is
+   * transcription, not drawing. What is NOT selected is any measured quantity: the dimension
+   * fields are set to the bottom of their own sliders, deliberately away from whatever the
+   * statement quotes, so the self-check still has real work to report. That is the line RULES.md
+   * §6.2 draws, and the `ellipse-concentric` defaults show why it matters — they are 120 × 80,
+   * which is one of the practice problems' answers exactly.
+   *
+   * It fires at Step 5 rather than on load because Steps 1–4 re-derive the sheet's CURVE from the
+   * live cut (`syncSheetToCut`, ADR-117), which would leave a curve and a method that disagree.
+   * And it fires ONCE: after it, the picker is the learner's.
+   */
+  function armMethodForStep5() {
+    if (!methodArmed || !activeProblem || sim.stage() !== 5) return;
+    const want = activeProblem.target.method;
+    const method = methodById(want);
+    if (!method) { methodArmed = false; return; }
+    methodArmed = false;   // before the commit — this runs off the bus the commit fires
+    sim.commitConic({
+      curve: method.curve,
+      method: want,
+      dim1: method.dim1.min,
+      dim2: method.dim2.min,
+      ...(method.dim3 ? { dim3: method.dim3.min } : {}),
+    });
+    sim.announce(`${method.label} is selected for you — the statement names it. Now dial the sizes it gives.`);
   }
 
   /** Re-evaluate the match and paint the status line. Cheap; runs on every commit. */
@@ -221,20 +257,23 @@ export function initProblemLibrary(sim) {
     headerEl.hidden = false;
     setCollapsed(false);
 
-    // Single reset path (CLAUDE.md): defaults + Step 1. NOTHING from the statement is
-    // stamped in — every quantity this topic checks is one the learner can dial, so
-    // injecting any of them would pre-solve part of the answer (RULES.md §6.2).
+    // Single reset path (CLAUDE.md): defaults + Step 1. No MEASURED quantity from the
+    // statement is stamped in — every one of them is dial-able, so injecting any would
+    // pre-solve part of the answer (RULES.md §6.2). The named CONSTRUCTION is a different
+    // thing and is selected on arrival at Step 5 (armMethodForStep5, ADR-136).
     sim.reset();
+    methodArmed = !!problem.target.method;
     evaluate();  // ensure the status is painted even if no subscriber ran yet
     sim.announce(problem.type === 'eccentricity-method'
       ? `Problem loaded: ${problem.title}. Work through to Step 3 and set the eccentricity model.`
-      : `Problem loaded: ${problem.title}. Work through to Step 6 and choose the construction.`);
+      : `Problem loaded: ${problem.title}. Work through to Step 5 — the construction it names is already chosen; dial the sizes it gives.`);
     closeOverlay({ focusSolve: true });
   }
 
   function exitProblem() {
     activeProblem = null;
     matched = false;
+    methodArmed = false;
     setEntryLabel('Practice problems');
     resetHints(); // clears revealed steps + hides the button (no active problem now)
     headerEl.hidden = true;
@@ -378,8 +417,13 @@ export function initProblemLibrary(sim) {
   hintBtn?.setAttribute('aria-controls', 'active-problem-hint-list');
   hintBtn?.addEventListener('click', onHintBtn, listen);
 
-  // Drive the self-check off the single state-change seam.
-  const unsubscribe = sim.onStateChange(() => evaluate());
+  // Drive the self-check off the single state-change seam. The step change is a state change
+  // too, which is what lets the construction be selected on arrival at Step 5 (ADR-136) without
+  // this leaf reaching into the orchestrator's stepper.
+  const unsubscribe = sim.onStateChange(() => {
+    armMethodForStep5();
+    evaluate();
+  });
 
   return {
     // Surfaced for main.js's terminal-step "Complete & next problem" flow.

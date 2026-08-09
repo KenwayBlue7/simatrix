@@ -737,7 +737,12 @@ const METHOD_BUILDERS = {
 function methodsLayout(conic) {
   const build = METHOD_BUILDERS[conic.method] ?? ellipseConcentric;
   const built = build(conic);
-  return finish('methods', built.items, built.model ?? null, built.curvePts, null, built.results ?? []);
+  // A builder MAY pin its own frame, and one that does wins over the ink it happens to have drawn
+  // (ADR-137): the sheet's scale comes from this bbox (ADR-053), so a construction whose last
+  // stage reaches further than its earlier ones would otherwise rescale the whole drawing mid-
+  // playback. Builders that return no bbox keep the old behaviour — `finish()` measures the items.
+  return finish('methods', built.items, built.model ?? null, built.curvePts,
+    built.bbox ?? null, built.results ?? []);
 }
 
 /** The named quantities of an ellipse from its two semi-axes — shared by the four ellipse
@@ -1322,9 +1327,16 @@ function circleCross(c1, r1, c2, r2) {
 
 // ---- Example 6.8, Fig. 6.13 — parabola by the tangent method -----------------
 /**
- * The tangent method's stage plan (ADR-116). Four stages set the figure up, then the first half
- * of the chords arrives one per press, then the second half — the reflection of the first about
- * the axis — arrives whole, then the envelope, then the focus and directrix.
+ * The tangent method's stage plan (ADR-116, narrowed by ADR-133). Four stages set the figure up,
+ * then the first half of the chords arrives one per press, then the second half — the reflection
+ * of the first about the axis — arrives whole, and the LAST stage draws the envelope together
+ * with the focus and the directrix Example 6.8 asks to be located.
+ *
+ * The construction ENDS with the curve. It used to carry a tenth stage after the envelope, and
+ * that stage also let `showTangent` through — so the tangent and normal, which have their own
+ * toggle, arrived as if they were a step of the construction. Nothing else in the syllabus tier
+ * works that way: the concentric and oblong methods end on "join the curve" and leave every
+ * optional element to its own control (ADR-133).
  *
  * `conicData.js` generates the NARRATION from the same rule. The two modules cannot import each
  * other (both are pure leaves that import nothing — CLAUDE.md), so the rule is stated twice and
@@ -1341,14 +1353,24 @@ const TANGENT_CHORDS_FROM = 4;
  */
 const tangentDivisions = (dim3) => Math.min(12, Math.max(4, Math.round(dim3 ?? 7)));
 const tangentFirstHalf = (n) => Math.ceil((tangentDivisions(n) - 1) / 2);
+/** Half-length of the directrix, as a fraction of the double ordinate — the one thing this
+ *  construction draws that reaches past A and B, so the frame has to know it too (ADR-137). */
+const DIRECTRIX_HALF = 0.6;
 
 function parabolaTangent(conic) {
   const dOrd = conic.dim1;   // double ordinate AB
   const abs = conic.dim2;    // abscissa CV
   const V = pt(0, 0);
   const C = pt(abs, 0);
-  const A = pt(abs, -dOrd / 2);
-  const B = pt(abs, dOrd / 2);
+  // A is the FOOT of the double ordinate and B its head (ADR-138). The sheet is y-DOWN, so +y is
+  // the bottom of the paper: A below the axis, B above it. Named this way round because the
+  // envelope is traced from A, round the vertex, up to B (ADR-134) — the hand starts at A, and a
+  // curve that runs B → A on a drawing labelled A at the top asks the learner to read it
+  // backwards. The two are coordinates, not captions: everything built from A and B — the
+  // tangents AE and BE, their divisions, the chords, the dimension text on AB — follows from
+  // here, and the figure is symmetric about the axis, so the envelope is untouched by the swap.
+  const A = pt(abs, dOrd / 2);
+  const B = pt(abs, -dOrd / 2);
   const E = pt(-abs, 0);     // CV produced to E with VE = CV
   const stage = conic.buildStage ?? LAST_STAGE;
 
@@ -1357,8 +1379,7 @@ function parabolaTangent(conic) {
   const n = tangentDivisions(conic.dim3);
   const half = tangentFirstHalf(n);
   const TANGENT_MIRROR = TANGENT_CHORDS_FROM + half;   // the second half, whole
-  const TANGENT_ENVELOPE = TANGENT_MIRROR + 1;         // the curve
-  const TANGENT_MARKS = TANGENT_ENVELOPE + 1;          // focus and directrix
+  const TANGENT_ENVELOPE = TANGENT_MIRROR + 1;         // the curve, the focus and the directrix
   const numbers = conic.buildStage !== undefined && stage >= 3 && stage < TANGENT_ENVELOPE;
   const items = [
     line(pt(-abs - 10, 0), pt(abs + 14, 0), 'axis', [10, 3, 2, 3]),
@@ -1368,12 +1389,17 @@ function parabolaTangent(conic) {
     // of it — outboard it ran off the sheet, since the analytic bbox measures geometry, not
     // captions (ADR-113).
     label(mid(A, B), `Double ordinate (base) ${dOrd.toFixed(0)}`,
-      -8 - textWidthGuess(`Double ordinate (base) ${dOrd.toFixed(0)}`), 0),
+      -8 - textWidthGuess(`Double ordinate (base) ${dOrd.toFixed(0)}`), -6),
     label(mid(V, C), `Abscissa (axis) ${abs.toFixed(0)}`, -18, 18, 'axis'),
-    dot(V), label(V, 'V', -12, -8),
-    label(A, 'A', 8, 8), label(B, 'B', 8, -4), label(C, 'C', 10, 16, 'axis'),
+    // Every point name is set OUTWARD from the figure, on the same pair of offsets, and the two
+    // dimension captions take opposite sides of the axis so they cannot land in one row. A is
+    // BELOW the axis on a y-DOWN sheet and B above it, so A reads down-right and B up-right,
+    // mirrored about the axis exactly as the construction is. They used to point inward — both
+    // toward the line AB they sit on — which put them among the chords instead of clear of them.
+    dot(V), label(V, 'V', -14, -7),
+    label(A, 'A', 9, 15), label(B, 'B', 9, -7), label(C, 'C', 9, -7, 'axis'),
   ];
-  if (stage >= 1) items.push(dot(E), label(E, 'E', -12, -6));
+  if (stage >= 1) items.push(dot(E), label(E, 'E', -14, -7));
   if (stage >= 2) items.push(line(A, E, 'construction'), line(B, E, 'construction'));
 
   // Divide AE and BE into the same number of parts and join 1-1', 2-2' … — the
@@ -1393,24 +1419,74 @@ function parabolaTangent(conic) {
       items.push(dot(p1, 'construction'), dot(p2, 'construction'));
       if (stage >= chordStage(i)) items.push(line(p1, p2, 'construction'));
       if (numbers) {
-        items.push(label(p1, String(i), -12, 0, 'construction'));
-        items.push(label(p2, `${i}'`, 6, 0, 'construction'));
+        // Off the tangent they divide, not on it: `dy: 0` set the baseline at the point, so the
+        // number sat across the very line whose divisions it counts. AE is the LOWER tangent now
+        // that A is the foot of the base (ADR-138), so its numbers hang below it and BE's above —
+        // outward on each edge, mirrored about the axis like everything else here.
+        items.push(label(p1, String(i), -12, 14, 'construction'));
+        items.push(label(p2, `${i}'`, -12, -6, 'construction'));
       }
     }
   }
 
   // y² = 4f·x through A: f = (dOrd/2)² / (4·abs).
   const f = (dOrd * dOrd) / (16 * abs);
-  const curvePts = parabolaPts(V, f, abs, 1);
-  if (stage >= TANGENT_ENVELOPE) items.push(poly(curvePts, 'outline'));
-  if (stage >= TANGENT_MARKS) {
+  // Traced CLOCKWISE (ADR-134): from A at the foot of the double ordinate, round the vertex, up
+  // to B. `parabolaPts` runs the other way — it samples y from −yMax up — and on a y-DOWN sheet
+  // that starts at the HEAD of the base and sweeps anticlockwise, which is not the way a hand
+  // moves through a curve of this shape. Reversing the sample order changes the order the points
+  // are visited and nothing else: the same points, the same f, the same envelope. Since ADR-138
+  // the trace also runs A → B rather than B → A, because A and B are the swapped coordinates.
+  const curvePts = parabolaPts(V, f, abs, 1).reverse();
+  if (stage >= TANGENT_ENVELOPE) {
+    items.push(poly(curvePts, 'outline'));
+    // Example 6.8 is "draw the parabola and LOCATE ITS FOCUS AND DIRECTRIX", so the two arrive
+    // WITH the curve rather than on a stage of their own — they are what this construction is
+    // asked to produce, not an optional extra (ADR-133).
     items.push(dot(pt(f, 0)), label(pt(f, 0), 'Focus, F', 6, -8));
-    items.push(line(pt(-f, -dOrd * 0.6), pt(-f, dOrd * 0.6), 'axis'));
-    items.push(label(pt(-f, -dOrd * 0.6), 'Directrix, DD', -30, -8, 'axis'));
-    if (conic.showTangent) items.push(...parabolaTangentItems(V, f, abs, conic.pointT));
+    items.push(line(pt(-f, -dOrd * DIRECTRIX_HALF), pt(-f, dOrd * DIRECTRIX_HALF), 'axis'));
+    items.push(label(pt(-f, -dOrd * DIRECTRIX_HALF), 'Directrix, DD',
+      -8 - textWidthGuess('Directrix, DD'), -6, 'axis'));
   }
+  // The tangent and normal at P belong to the "Show tangent" toggle ALONE (ADR-133). They are
+  // gated on the curve being on the paper — there is nothing to touch before that — and never
+  // on a stage of their own, so pressing Next can no longer draw them.
+  if (stage >= TANGENT_ENVELOPE && conic.showTangent) {
+    items.push(...parabolaTangentItems(V, f, abs, conic.pointT));
+  }
+
+  // THE FRAME IS PINNED TO THE FINISHED FIGURE, not to what this stage happens to have drawn
+  // (ADR-137). The sheet's scale is locked by the layout's analytic bbox (ADR-053), so a stage
+  // that reaches further than the one before it rescales the WHOLE drawing — and this
+  // construction's last stage does exactly that: the directrix runs to ±0.6·AB where every
+  // earlier stage stopped at A and B, ±0.5·AB, taking the frame from 224 × 120 mm to 224 × 144.
+  // Measured on the shipped page in a 1124 × 565 pane, stepping by hand and reading the pixel
+  // length of the double ordinate — 120 mm at every stage — it ran 225 px through stages 1–8 and
+  // 189 px at stage 9, the whole drawing shrinking 16 % and sliding 54 px left at the moment the
+  // freehand curve begins. In a taller pane WIDTH binds and nothing moves, which is why it reads
+  // as intermittent. It is not a rebuild and there is nothing to preserve: the sheet is a display
+  // list repainted whole every frame, so every stage already carries all the linework before it.
+  // This is the only one of the three syllabus constructions whose frame grows — the concentric
+  // method's is its auxiliary circles and the oblong method's is its rectangle, both drawn first.
+  //
+  // `eccentricityLayout` pins its frame for the same reason and says so. The extents are the
+  // FINISHED ones — the axis, the double ordinate, the directrix, E, the focus, the curve — plus
+  // the tangent apparatus WHERE IT IS, when its toggle is on.
+  //
+  // Reserving the tangent at both ends of the curve instead, so that sliding P could not move the
+  // frame either, was tried and rejected: it widens the frame from 224 × 144 mm to 258 × 187 and
+  // in a 1124 × 565 pane that took the drawing from 1.9 px/mm to 1.1 — under the 1.3 px/mm gate
+  // below which `drawSheet` drops every caption. A construction whose names have gone is worse
+  // than one that resizes when a slider is dragged, and the reported defect is the STAGE change.
+  const frame = [
+    line(pt(-abs - 10, 0), pt(abs + 14, 0)),
+    line(A, B),
+    line(pt(-f, -dOrd * DIRECTRIX_HALF), pt(-f, dOrd * DIRECTRIX_HALF)),
+    dot(E), dot(pt(f, 0)), poly(curvePts),
+  ];
+  if (conic.showTangent) frame.push(...parabolaTangentItems(V, f, abs, conic.pointT));
   // "Draw the parabola and LOCATE ITS FOCUS AND DIRECTRIX" (Example 6.8 / exercise 8).
-  return { items, curvePts, results: parabolaResults(f) };
+  return { items, curvePts, bbox: bboxOf(frame), results: parabolaResults(f) };
 }
 
 /** Samples of y² = 4f·x from the vertex out to x = depth, opening toward +x·`sign`. */

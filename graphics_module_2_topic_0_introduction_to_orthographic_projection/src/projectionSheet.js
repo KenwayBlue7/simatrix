@@ -42,7 +42,7 @@
 // it places against, and nothing else — no THREE, no sibling behaviour leaf. It owns its own SVG
 // subtree and hands main.js a stage list.
 
-import { FIRST_ANGLE_PLACEMENT, DIM_STYLE } from './objectData.js';
+import { FIRST_ANGLE_PLACEMENT, DIM_STYLE, alignedDim } from './objectData.js';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 
@@ -227,46 +227,32 @@ export function initProjectionSheet(mount, { prefersReducedMotion = false } = {}
   }
 
   /**
-   * One ALIGNED linear dimension (BIS Method 1): the value parallel to its dimension line and
-   * above it, turned so it reads from the bottom edge or the right-hand edge of the sheet. That
-   * last normalisation is the whole of "aligned" — without it a vertical dimension reads upside
-   * down half the time, which is Method 2's problem, not Method 1's.
+   * One ALIGNED linear dimension (BIS Method 1). Every placement decision — where the dimension
+   * line lands, how far the value is turned and which side of the line it sits on — is
+   * `alignedDim()`'s, shared with the dimension layer on the solid so the two media cannot drift
+   * into two conventions. This function only adds the view's origin and strokes the result.
    */
   function emitDim(g, ox, oy, d) {
-    const a = [ox + d.a[0], oy + d.a[1]];
-    const b = [ox + d.b[0], oy + d.b[1]];
-    const len = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
-    const u = [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
-    const n = [-u[1], u[0]];
-    const s = Math.sign(d.off) || 1;
-    const o = Math.abs(d.off);
+    const P = ([x, y]) => [ox + x, oy + y];
+    const { u, n, s, A, B, angle, textAt } = alignedDim(d);
+    const ends = [[P(d.a), P(A)], [P(d.b), P(B)]];
 
-    const A = [a[0] + n[0] * s * o, a[1] + n[1] * s * o];
-    const B = [b[0] + n[0] * s * o, b[1] + n[1] * s * o];
-
-    for (const [p, P] of [[a, A], [b, B]]) {
+    for (const [p, q] of ends) {
       g.appendChild(el('line', {
         class: 'psheet__ink psheet__ink--dimension',
         x1: PX(p[0] + n[0] * s * EXT_GAP), y1: PY(p[1] + n[1] * s * EXT_GAP),
-        x2: PX(P[0] + n[0] * s * EXT_OVER), y2: PY(P[1] + n[1] * s * EXT_OVER),
+        x2: PX(q[0] + n[0] * s * EXT_OVER), y2: PY(q[1] + n[1] * s * EXT_OVER),
       }));
     }
+    const [, a2] = ends[0];
+    const [, b2] = ends[1];
     g.appendChild(el('line', {
       class: 'psheet__ink psheet__ink--dimension',
-      x1: PX(A[0]), y1: PY(A[1]), x2: PX(B[0]), y2: PY(B[1]),
+      x1: PX(a2[0]), y1: PY(a2[1]), x2: PX(b2[0]), y2: PY(b2[1]),
     }));
-    arrowHead(g, A, [-u[0], -u[1]]);
-    arrowHead(g, B, u);
-
-    let angle = (Math.atan2(u[1], u[0]) * 180) / Math.PI;
-    if (angle > 90) angle -= 180;
-    if (angle <= -90) angle += 180;
-    // The lift must go to the side the text is meant to sit on AFTER that flip, or a re-read
-    // dimension puts its value under its own line.
-    const lift = angle === (Math.atan2(u[1], u[0]) * 180) / Math.PI ? 1 : -1;
-    const ln = [-Math.sin((angle * Math.PI) / 180), Math.cos((angle * Math.PI) / 180)];
-    const mid = [(A[0] + B[0]) / 2 + ln[0] * TEXT_LIFT * lift, (A[1] + B[1]) / 2 + ln[1] * TEXT_LIFT * lift];
-    text(g, mid, d.text, { angle });
+    arrowHead(g, a2, [-u[0], -u[1]]);
+    arrowHead(g, b2, u);
+    text(g, P(textAt), d.text, { angle });
   }
 
   /** A leader: arrow on the feature, a sloping leg, a short horizontal landing, the note above it. */
@@ -503,7 +489,12 @@ export function initProjectionSheet(mount, { prefersReducedMotion = false } = {}
         let reach = key === 'top' ? b.minY : b.maxY;
         for (const d of dims[key]) {
           const pts = d.k === 'dim' ? [d.a, d.b] : [d.at, d.to];
-          const pad = d.k === 'dim' ? Math.abs(d.off) + 4 : 6;
+          // How far outboard a dimension actually REACHES: its own lane, plus the value standing
+          // one lift off that lane, plus half the value's own height. Derived rather than guessed,
+          // because a guessed clearance is one that goes stale the moment the lift changes.
+          const pad = d.k === 'dim'
+            ? Math.abs(d.off) + TEXT_LIFT + DIM_STYLE.textHeight / 2 + 3
+            : 6;
           for (const [, y] of pts) {
             reach = away > 0 ? Math.max(reach, y + pad) : Math.min(reach, y - pad);
           }

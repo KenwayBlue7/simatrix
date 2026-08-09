@@ -152,12 +152,20 @@ const ctr = (a, b) => line(a, b, 'centre');
 // negative one. Getting it backwards puts the dimension line inside the material, which is
 // legal-looking and wrong; every value below has been checked against the view it annotates.
 //
-// LANES. Dimensions stack outward in fixed lanes so two of them can never share a line. `LANE(n)`
-// is the n-th lane out from the feature; because `off` is measured from the dimension's OWN
-// endpoints, a dimension taken at a raised datum has to add that datum's own height to reach the
-// same visual lane as one taken at the baseline — which is why a few calls below read
-// `-(t + LANE(2))` rather than a bare lane number. Smallest size innermost, overall size outermost,
-// as the drawing office does it.
+// LANES. Dimensions stack outward in fixed lanes, one lane per dimension that OVERLAPS another
+// along the same direction, so no two dimension lines can ever run into each other. `LANE(n)` is
+// the n-th lane out; smallest size innermost, overall size outermost, as the drawing office does
+// it, so a detail's extension lines never have to cross an overall dimension line to reach home.
+//
+// Two consequences of `off` being measured from the dimension's OWN endpoints rather than from the
+// view's edge, and both of them are why several calls below read as arithmetic instead of a bare
+// lane number:
+//   * a dimension taken at a raised datum must add that datum's own height to reach the same
+//     VISUAL lane as one taken at the baseline — `-(t + LANE(1))`;
+//   * two dimensions that do NOT overlap — consecutive stretches of one line, like a lug and the
+//     gap beside it, or two treads of a stair — CHAIN in a single lane, head to head. Stacking
+//     those in separate lanes spends a lane saying nothing, and puts the inner one closer to the
+//     material than the lane discipline allows.
 const LANE = (n) => 12 + (n - 1) * 13;
 
 /**
@@ -167,13 +175,71 @@ const LANE = (n) => 12 + (n - 1) * 13;
  * draws it as fat lines on the solid. The same standard in two media, so the numbers live once,
  * here, in the pure-data module a leaf is allowed to import (§3.6a).
  */
+const TEXT_GAP = 1.0;      // clear air between the dimension line and the value above it
+const TEXT_HEIGHT = 4.4;   // the value's own height — `.psheet__value`'s font-size, in sheet mm
+
 export const DIM_STYLE = Object.freeze({
   arrow: 3.2,        // arrowhead length; 3:1 length-to-width, so half-width = length / 6
   extGap: 1.2,       // extension line starts this clear of the outline
   extOver: 2.2,      // and overruns the dimension line by this
-  textLift: 1.5,     // the value sits this far above its dimension line
+  textGap: TEXT_GAP,
+  textHeight: TEXT_HEIGHT,
+  // The value is anchored on its CENTRE in both renderers (SVG `dominant-baseline: central`,
+  // CSS2D's own 0.5/0.5 centre), so the offset from the line has to carry half the text with it.
+  textLift: TEXT_GAP + TEXT_HEIGHT / 2,
   leaderLand: 8,     // horizontal landing on a leader
 });
+
+/**
+ * ALIGNED (BIS SP 46 Method 1) placement for one linear dimension, in the view's own 2-D frame.
+ *
+ * ONE implementation, because there are TWO renderers. `projectionSheet.js` strokes this on paper
+ * and `dimensions3d.js` strokes it on the solid, and a drawing whose value lies along its line in
+ * one medium and lies flat in the other is not one drawing — it is two conventions mixed, which is
+ * the one thing Method 1 forbids. Everything either renderer needs to place a dimension is decided
+ * here; they add their own origin and stroke it.
+ *
+ * @param {{a:number[], b:number[], off:number}} d  A `dim()` entry, already mirrored if the view is.
+ * @returns {{ u:number[], n:number[], s:number, A:number[], B:number[], angle:number, textAt:number[] }}
+ *   `u` the measured direction, `n` its +90 deg normal, `s` the sign of the offset, `A`/`B` the
+ *   ends of the dimension line, `angle` the degrees the value is turned through, `textAt` its centre.
+ */
+export function alignedDim(d) {
+  const [ax, ay] = d.a;
+  const [bx, by] = d.b;
+  const span = Math.hypot(bx - ax, by - ay) || 1;
+  const u = [(bx - ax) / span, (by - ay) / span];
+  const n = [-u[1], u[0]];
+  const s = Math.sign(d.off) || 1;
+  const o = Math.abs(d.off);
+
+  const A = [ax + n[0] * s * o, ay + n[1] * s * o];
+  const B = [bx + n[0] * s * o, by + n[1] * s * o];
+
+  // Fold the reading direction into (-90, 90] so every value reads from the BOTTOM edge of the
+  // sheet, or from the RIGHT-hand edge where its line is vertical. That fold IS "aligned"; without
+  // it a dimension measured leftwards or downwards prints upside down.
+  let angle = (Math.atan2(u[1], u[0]) * 180) / Math.PI;
+  let flip = false;
+  if (angle > 90) { angle -= 180; flip = true; } else if (angle <= -90) { angle += 180; flip = true; }
+
+  // "Above the dimension line" means above AS READ, so the lift follows the normal of the FOLDED
+  // direction — re-reading a dimension from the other end moves its value to the other side of the
+  // line. Lifting along the raw normal instead prints half the sheet's values UNDER their own line.
+  const lift = flip ? [-n[0], -n[1]] : n;
+  return {
+    u,
+    n,
+    s,
+    A,
+    B,
+    angle,
+    textAt: [
+      (A[0] + B[0]) / 2 + lift[0] * DIM_STYLE.textLift,
+      (A[1] + B[1]) / 2 + lift[1] * DIM_STYLE.textLift,
+    ],
+  };
+}
 
 const dim = (a, b, off, text) => ({ k: 'dim', a, b, off, text });
 const note = (at, to, text) => ({ k: 'note', at, to, text });
@@ -247,8 +313,12 @@ const BLOCK = (() => {
       front: [
         dim([-hx, 0], [hx, 0], -LANE(1), '80'),        // overall length
         dim([hx, 0], [hx, y1], -LANE(1), '10'),        // base slab thickness
+        // The two treads CHAIN in one lane above the block, meeting at the top step's face. The
+        // middle tread is 10 mm lower than the top one, so its offset carries that drop up to the
+        // shared lane; at a bare LANE(1) off its own face it sat 2 mm above the block's top edge,
+        // with its extension lines cutting straight through the corner they spring from.
         dim([x2, H], [-hx, H], -LANE(1), '40'),        // top tread
-        dim([x1, y2], [x2, y2], -LANE(1), '20'),       // middle tread
+        dim([x1, y2], [x2, y2], -((H - y2) + LANE(1)), '20'),  // middle tread
         // The risers chain up the tall face, which is the one edge with clear paper beside it.
         dim([-hx, y1], [-hx, y2], LANE(1), '20'),
         dim([-hx, y2], [-hx, H], LANE(1), '10'),
@@ -335,8 +405,13 @@ const CYLBLOCK = (() => {
     dims: {
       front: [
         dim([-hx, 0], [hx, 0], -LANE(1), '100'),       // overall length
+        // The plate thickness and the boss height CHAIN up the left-hand edge, head to head at the
+        // plate's top face, so the two together read as the overall height without repeating it.
+        // The boss height carries the plate's own half-width down to that lane first: taken at a
+        // bare LANE(1) off the boss it would land at x = -37, where its lower extension line runs
+        // back along 25 mm of the plate's top edge instead of springing off clear paper.
         dim([-hx, t], [-hx, 0], -LANE(1), '12'),       // plate thickness
-        dim([-rB, t], [-rB, H], LANE(1), '28'),        // boss height above the plate
+        dim([-rB, t], [-rB, H], (hx - rB) + LANE(1), '28'),   // boss height above the plate
         dim([hx, 0], [hx, H], -LANE(1), '40'),         // overall height
         // Measured off the BORE, but its dimension line is thrown clear of the boss it is sunk in.
         dim([rH, yFloor], [rH, H], -(rB - rH) - LANE(1), '18'),
@@ -439,10 +514,13 @@ const SHAFTSUP = (() => {
     },
     dims: {
       front: [
-        dim([-hx, 0], [hx, 0], -LANE(1), '100'),       // overall length
-        // The bolt pitch is measured at the plate's top face, so its offset carries that datum
-        // down to the baseline first and then out to lane 2.
-        dim([-xBolt, t], [xBolt, t], -(t + LANE(2)), '68'),
+        // Smallest size innermost, overall size outermost — so the bolt pitch takes lane 1 and the
+        // overall length lane 2 behind it. The other way round, the pitch's extension lines have to
+        // cross the overall dimension line to reach their own, which is the one crossing the lane
+        // discipline exists to prevent. The pitch is measured at the plate's TOP face, so its
+        // offset carries that datum down to the baseline before it goes out to the lane.
+        dim([-xBolt, t], [xBolt, t], -(t + LANE(1)), '68'),
+        dim([-hx, 0], [hx, 0], -LANE(2), '100'),       // overall length
         dim([-hx, 0], [-hx, t], LANE(1), '12'),        // plate thickness
         dim([-hl, H], [hl, H], LANE(1), '20'),         // lug thickness
         dim([hx, 0], [hx, H], -LANE(1), '64'),         // overall height
@@ -589,8 +667,11 @@ const BEARING = (() => {
       ],
       side: [
         dim([-hz, 0], [hz, 0], -LANE(1), '44'),        // overall depth
+        // A lug and the gap beside it are consecutive along the same line, so they CHAIN in one
+        // lane, arrow head to arrow head at the lug's inner face. Stacking them in two lanes would
+        // spend a lane saying nothing — the second dimension starts exactly where the first ends.
         dim([-hz, H], [-hz + lugT, H], LANE(1), '11'), // one lug's thickness
-        dim([-hz + lugT, H], [hz - lugT, H], LANE(2), '22'), // the gap between them
+        dim([-hz + lugT, H], [hz - lugT, H], LANE(1), '22'), // the gap between them
       ],
     },
     viewNotes: {

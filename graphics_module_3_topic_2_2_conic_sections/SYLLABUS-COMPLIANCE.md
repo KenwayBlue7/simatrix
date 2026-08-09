@@ -57,14 +57,23 @@ different Simatrix topic. Nothing is missing here on that account.
 | **Ellipse — Rectangular Method** | **Step 5** | **`ellipse-oblong`** | **Example 6.3, Fig. 6.7** | **✓ built, oracle-verified** |
 | **Ellipse — Concentric Circle Method** | **Step 5** | **`ellipse-concentric`** | **Example 6.2, Fig. 6.6** | **✓ built, oracle-verified** |
 | **Parabola — Tangent Method** | **Step 5** | **`parabola-tangent`** | **Example 6.8, Fig. 6.13** | **✓ built, oracle-verified** |
-| CO2 "construct geometrical figures" | Steps 5 + 6 + Practice | Problem Library, 15 exercises, hand-dialled self-check | Exercises 1–15 | ✓ Full |
+| CO2 "construct geometrical figures" | Steps 5 + 6 + Practice | Problem Library, 7 dealt (3 chapter exercises + 4 practice), hand-dialled self-check | Exercises 1–15 (all 15 still in the file) | ✓ Full |
 | ESE drawing competence | Step 5 + Practice | all three methods have a practice problem | — | △ see §3 |
 
 **Verified, not assumed.** All three required constructions are checked by
 `verify/conic-math.mjs`: every plotted point satisfies `x²/a² + y²/b² = 1` for the two ellipse
 methods and a zero discriminant for the tangent method's envelope, to 1e-9. All three have a
 Problem Library exercise (`ellipse-oblong-120-80`, `ellipse-auxiliary-100-70`,
-`parabola-tangent-110-80`) with scaffolded hints and a never-auto-fill check.
+`parabola-tangent-110-80`) with scaffolded hints and a check that auto-fills no measured quantity.
+
+**The library is now scoped to the syllabus (ADR-135).** `ENABLED_METHODS` deals only problems
+answered with the three constructions above, so the focus-and-directrix, parallelogram,
+intersecting-arc, rectangle and offset exercises no longer surface — they remain in
+`src/problems.js` verbatim, and widening the list restores them. Four practice questions for the
+three syllabus methods are added beside them (concentric 100 × 70 and 120 × 80, rectangular
+100 × 70 and 120 × 80), which is what takes the dealt total to seven. Loading any of them selects
+the named construction on first arrival at Step 5 and leaves every dimension to the learner
+(ADR-136).
 
 ---
 

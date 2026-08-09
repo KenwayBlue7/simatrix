@@ -103,6 +103,65 @@ function buildPart(part) {
 }
 
 /**
+ * WHERE ON THE FRONT FACE THE ARROW POINTS.
+ *
+ * The middle of the bounding box is the right answer only for a part whose front face is a full
+ * rectangle. The bearing block is an L: its box centre is the empty air above the base and beside
+ * the arm, so an arrow aimed there points at nothing and reads as a mark that has come loose from
+ * the object. The stepped block and the shaft support have the same hole in the middle of their
+ * outline to a lesser degree.
+ *
+ * So the anchor is found rather than assumed: drop a column of rays down the part's mid-width, keep
+ * the stretch of it that actually strikes material, and aim at the MIDDLE of the stretch nearest the
+ * box centre. On a full rectangle that is the box centre again, so nothing moves on the parts that
+ * were already right. The z it comes back with is the face's OWN depth at that point, not the box's
+ * maximum, so on a part with a boss the arrow stops at the boss and not a plate-depth behind it.
+ *
+ * This is a handful of rays once per object rebuild, not per frame.
+ *
+ * @returns {{ y: number, z: number }}
+ */
+function frontFaceAnchor(bounds, centre, solid) {
+  // `isMesh` alone is not the filter: the fat-line addons' `LineSegments2` extends `Mesh`, and its
+  // instanced geometry makes a nonsense of a ray test. The bodies are the plain-geometry meshes.
+  const meshes = [];
+  solid.traverse((o) => {
+    if (o.isMesh && !o.geometry?.isInstancedBufferGeometry) meshes.push(o);
+  });
+  const fallback = { y: centre.y, z: bounds.max.z };
+  if (!meshes.length) return fallback;
+
+  const ray = new THREE.Raycaster();
+  const from = new THREE.Vector3(centre.x, 0, bounds.max.z + Math.max(1, bounds.max.z - bounds.min.z));
+  const along = new THREE.Vector3(0, 0, -1);
+  const SAMPLES = 81;
+
+  const hits = [];                                   // { y, z } for every sample that struck material
+  for (let i = 0; i < SAMPLES; i++) {
+    const y = bounds.min.y + ((bounds.max.y - bounds.min.y) * i) / (SAMPLES - 1);
+    from.y = y;
+    ray.set(from, along);
+    const hit = ray.intersectObjects(meshes, false)[0];
+    if (hit) hits.push({ y, z: hit.point.z });
+  }
+  if (!hits.length) return fallback;
+
+  // Split the column into runs of consecutive samples, and take the run whose middle sits closest to
+  // the box centre — the tallest piece of face at this width, near where the eye expects the mark.
+  const step = (bounds.max.y - bounds.min.y) / (SAMPLES - 1);
+  const runs = [[hits[0]]];
+  for (let i = 1; i < hits.length; i++) {
+    if (hits[i].y - hits[i - 1].y > step * 1.5) runs.push([]);
+    runs[runs.length - 1].push(hits[i]);
+  }
+  const best = runs
+    .map((run) => ({ run, mid: (run[0].y + run[run.length - 1].y) / 2 }))
+    .sort((a, b) => Math.abs(a.mid - centre.y) - Math.abs(b.mid - centre.y))[0];
+
+  return { y: best.mid, z: Math.max(...best.run.map((h) => h.z)) };
+}
+
+/**
  * The FRONT arrow — the chapter's own `F`, the mark that says which way the elevation is taken.
  *
  * Every worked figure in Chapter 19 carries it, and it is the thing that makes "the front view" a
@@ -118,25 +177,31 @@ function buildPart(part) {
  *
  * @returns {{ group: THREE.Group, label: CSS2DObject, dispose: () => void }}
  */
-function buildFrontArrow(bounds, resolution) {
+function buildFrontArrow(bounds, resolution, solid) {
   const group = new THREE.Group();
   const owned = { geometries: [], materials: [] };
 
   const size = bounds.getSize(new THREE.Vector3());
   const centre = bounds.getCenter(new THREE.Vector3());
   const span = Math.max(size.x, size.y, size.z);
+  const anchor = frontFaceAnchor(bounds, centre, solid);
 
   // The arrow lies ENTIRELY in front of the part: its point stops just short of the front face and
   // its tail runs away from there. Sizing it from a length and then subtracting put the point
   // inside the material on any part deeper than the arrow is long, which reads as an arrow stuck
   // THROUGH the object rather than one aimed at it.
-  const tipZ = bounds.max.z + span * 0.05;
+  // The standoff is small on purpose: far enough that the point never buries itself in the face,
+  // close enough that the two read as touching. At a twentieth of the part it left a finger's width
+  // of clear paper between point and face, and the mark looked parked next to the object.
+  const tipZ = anchor.z + span * 0.03;
   const len = span * 0.20;
   const tailZ = tipZ + len;
   const head = Math.min(len * 0.20, span * 0.032);
-  // Kept low, at the height of the front face rather than the middle of the part, so it reads as
-  // an eye-level sight line onto the front rather than as a feature hanging in space.
-  const y = bounds.min.y + size.y * 0.32;
+  // ON THE FRONT FACE ITSELF. The arrow names a FACE, so it is aimed at material on that face and
+  // nowhere else (see `frontFaceAnchor`). It used to sit at 32% of the height, which read as a sight
+  // line at eye level; the box centre that replaced it is right on a rectangular part and points at
+  // clear air on an L-shaped one.
+  const y = anchor.y;
 
   const material = new LineMaterial({
     color: roleColor('guide'),
@@ -169,11 +234,23 @@ function buildFrontArrow(bounds, resolution) {
   el.className = 'vp-label vp-label--front';
   el.textContent = 'Front';
   const label = new CSS2DObject(el);
-  // BELOW the part, not on the arrow's tail. Seen from the front the arrow points straight at the
-  // camera and foreshortens to a dot, so a label at the tail lands in the middle of the object it
-  // is naming. Dropped clear, it reads from every direction the arrow is shown in — which is only
-  // the front, but the front is exactly the degenerate one.
-  label.position.set(centre.x, bounds.min.y - span * 0.10, tailZ + span * 0.03);
+  // ON THE MIDDLE OF THE SHAFT, a fixed drop of one arrow-head below it. The offset is a fraction of
+  // the ARROW, not of the part and not of anything else on screen, which is what keeps the mark
+  // reading as one object: shaft, head and name move and turn together, at the same relative spacing,
+  // from every direction and at every zoom.
+  //
+  // The middle rather than the tail. Looked at from the front the two are the same point, because
+  // the shaft foreshortens to a dot; from any other direction the tail is the far END of a mark a
+  // fifth of the part long, and a name out there reads as a caption that has come loose. Halfway
+  // along, the chip sits ON the shaft — the line runs into it and out the other side, which is how a
+  // labelled leader reads, and it cannot be mistaken for anything but this arrow's name.
+  //
+  // It used to hang below the part instead, on the reasoning that the arrow foreshortens to a dot
+  // when you look straight down it and a label on it would land on the object. It does land on the
+  // object — on the face the arrow is naming, which is where a label saying "Front" belongs. What
+  // the old placement actually produced was a name floating in clear paper under the part, with
+  // nothing to connect it to the mark, and standing in the lane the overall length wants.
+  label.position.set(centre.x, y - head * 1.6, (tipZ + tailZ) / 2);
   group.add(label);
 
   return {
@@ -270,7 +347,7 @@ export function buildObject(data, resolution) {
 
   // The annotation layer. Its own child group, so one flag hides every mark the topic adds to the
   // part without touching the part itself.
-  const arrow = buildFrontArrow(partBounds, resolution);
+  const arrow = buildFrontArrow(partBounds, resolution, group);
   group.add(arrow.group);
 
   // Framed WITH the arrow. The front view is unaffected either way — it frames x and y, and the

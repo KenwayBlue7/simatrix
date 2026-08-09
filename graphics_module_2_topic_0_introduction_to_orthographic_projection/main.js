@@ -421,7 +421,33 @@ function buildScene(container) {
   controls.enablePan = false;
   controls.minDistance = 2;
   controls.maxDistance = 90;
-  controls.addEventListener('start', noteFreeOrbit);
+  // A DRAG leaves the named direction. A ZOOM DOES NOT.
+  //
+  // OrbitControls fires its own `start` for the wheel as well as for a drag, and listening to that
+  // meant every scroll in a principal view was treated as the learner turning the object: the
+  // projection was handed back to perspective mid-gesture, the dimension set swapped to the free-
+  // orbit one and the frame was recomputed around it — three changes at once, under a pointer the
+  // learner had only rolled. That is the jump. Scrolling is a request to look CLOSER at the view
+  // they are in, so it must leave the direction, the projection and the dimension set alone and
+  // change nothing but the zoom, which OrbitControls already does about `controls.target`.
+  //
+  // A drag is detected as movement while exactly ONE pointer is down: a click that never moves is
+  // not a turn, and a two-finger pinch is a zoom, not a turn.
+  let pointersDown = 0;
+  let dragFrom = null;
+  const dropPointer = () => { pointersDown = Math.max(0, pointersDown - 1); dragFrom = null; };
+  renderer.domElement.addEventListener('pointerdown', (e) => {
+    pointersDown += 1;
+    dragFrom = pointersDown === 1 ? { x: e.clientX, y: e.clientY } : null;
+  });
+  renderer.domElement.addEventListener('pointermove', (e) => {
+    if (!dragFrom || pointersDown !== 1) return;
+    if (Math.hypot(e.clientX - dragFrom.x, e.clientY - dragFrom.y) < 3) return;
+    dragFrom = null;
+    noteFreeOrbit();
+  });
+  renderer.domElement.addEventListener('pointerup', dropPointer);
+  renderer.domElement.addEventListener('pointercancel', dropPointer);
   controls.update();
 }
 

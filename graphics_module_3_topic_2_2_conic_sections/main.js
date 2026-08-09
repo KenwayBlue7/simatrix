@@ -3019,6 +3019,12 @@ function playConstruction() {
   const stages = buildStagesFor(conicState.method, conicState);
   if (!stages) return;                 // this construction has no staged form
   clearTimeout(buildTimer);
+  // A replay starts from BARE PAPER, so a trace still running from the last time through has to
+  // be abandoned here and not merely overwritten when the envelope stage comes round again:
+  // `curveReveal` is global, and a tween left alive keeps writing it while the new playback lays
+  // down its construction lines. Same pair as `stopBuildPlayback()`, which this is the other half
+  // of — that one stops; this one restarts.
+  cancelCurveReveal();
   buildPaused = false;
   buildPlayed = true;
   conicState = { ...conicState, buildStage: 0 };

@@ -25,9 +25,13 @@ The six steps are a story, and each one shows only the controls its own question
 | 5 | Now draw it | §6.5, §6.6, §6.7, §6.9 · **syllabus 1003 Module II** | Watches the eccentricity construction draw itself, steps it a line at a time, hides the construction lines to read the finished figure, and tries the other nine methods. Reads off what the drawing MEASURES. Points at anything on the sheet to be told what it is. On a parabola, watches §6.6's three properties drawn one at a time. | Draw it step by step · back/next a line · show the construction lines · *e* · focus-to-directrix · the construction · its given dimensions · points · tangent at P · show its three properties (parabola only) |
 | 6 | Your turn | assessment | Is dealt a cut nobody chose, names it before checking, and is marked against the same classifier the lesson taught with. | Set up a cut · six answer chips |
 
-The **Practice problems** entry (top of the step card) carries all fifteen exercises from the end
-of the chapter, verbatim, grouped by curve. Nothing is ever auto-filled: the learner dials the
-construction and the check recognises the match.
+The **Practice problems** entry (top of the step card) deals **seven** problems, grouped by curve:
+the three chapter exercises that are answered with the syllabus constructions, plus the four
+practice questions for those same three (ADR-135). All fifteen chapter exercises are still in
+`src/problems.js` verbatim — `ENABLED_METHODS` decides which are dealt, and widening it is a
+one-line change. No measured quantity is ever auto-filled: the learner dials every dimension and
+the check recognises the match. The one thing that IS set for them is the construction the
+statement names in words, once, on their first arrival at Step 5 (ADR-136).
 
 ---
 
@@ -58,7 +62,8 @@ src/
   anim.js           }
   stepper.js        The six-step guided sequence and its copy.
   uiManager.js      The parameter dock: six control groups, one per step.
-  problems.js       PURE DATA. The chapter's fifteen exercises, verbatim, with targets + hints.
+  problems.js       PURE DATA. The chapter's fifteen exercises verbatim + the four syllabus
+                    practice questions, with targets + hints. ENABLED_METHODS deals seven.
   problemLibrary.js The library overlay, the scaffolded hints, and the self-check.
   terms.js          The inline term-definition popovers (markup-driven).
   onboarding.js     The orbit hint and the two first-seen spotlight chips.
@@ -131,7 +136,7 @@ node verify/proof.mjs            # Step 4's six proof stages, walked by hand (~5
    headlessly over the DevTools Protocol to assert a clean boot (no console errors, watchdog cleared), the platform contract
    (`simAPI`, `<title>` = `meta.json.title`), six rail steps with one panel visible at a time, the
    sheet painting for each of the eleven constructions, the six section classifications through
-   the real sliders, the reset path, the fifteen problems — and a flat WebGL buffer count across
+   the real sliders, the reset path, the seven dealt problems — and a flat WebGL buffer count across
    50 rapid rebuilds (the disposal contract, ADR-004/ADR-042). Anything that waits on a tween
    POLLS for the result; a fixed sleep against the 700 ms plane travel failed about one run in two
    under SwiftShader while the product was correct.

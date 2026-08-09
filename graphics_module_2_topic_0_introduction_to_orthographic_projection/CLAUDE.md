@@ -100,6 +100,12 @@ generator, no `meshAnalyzer.js`, no `iShape.js`, no `problems.js`.
   names. Owns and frees everything it builds, DOM label included (RULES.md §3.5). Note
   `setVisible()` toggles the label BY NAME as well as the group: `CSS2DRenderer` tests each
   object's own `visible` flag and never consults its ancestors.
+- **`alignedDim()`** in `objectData.js` is the ONE place BIS Method 1 is implemented, and both
+  renderers call it: it takes a `dim()` entry and returns the dimension line's ends, the angle the
+  value is turned through and where the value's centre goes. Sharing only `DIM_STYLE` was not
+  enough — each renderer used to carry its own copy of the same trigonometry, and one copy had a
+  sign error that printed every RE-READ value under its own line (RULES.md §3.71). Do not re-derive
+  a placement in a renderer; add what you need to the function's return.
 - **`src/dimensions3d.js`** — leaf. BIS Type-B dimensions on the SOLID, so Step 1 can be checked
   against the textbook. Reads the SAME `objectData.dims` the sheet draws and lifts each 2-D view
   frame onto the matching face; draws the set for the direction the camera is at, and no other.
@@ -176,6 +182,43 @@ generator, no `meshAnalyzer.js`, no `iShape.js`, no `problems.js`.
   which disables `pathLength="1"` and turns every drawn-on outline into a 1 px dotted line — while
   the dashoffset property still animates to 0, so it does not show up in a property check. The
   oracle asserts no drawn-on stroke is non-scaling for exactly this reason.
+- Dimensioning is **aligned (BIS Method 1) in BOTH media**, and that is not negotiable: a value lies
+  along its own dimension line, sits one 3.2 mm lift above it, and is turned into the half-circle
+  that reads from the bottom edge or the right-hand edge. It applies to the SOLID as much as to the
+  sheet — "a CSS2D label is billboarded, so the rotation is about paper" was the reasoning behind
+  the defect, not behind the design (ADR-132 amended). Two things that look like exceptions and are
+  not: a **leader's note stays level**, because a note is written along its horizontal landing in
+  both systems; and the turn on the solid is a **constant**, because the layer is only drawn for the
+  direction the camera is AT, where the view's own frame lands on the screen square.
+- The turn on the solid lives on the **inner `.vp-dim__text` span**. `CSS2DRenderer` rewrites the
+  outer element's transform every frame, so a rotation set on the node itself lasts one frame.
+- Values are anchored on their **centre** in both media — SVG `dominant-baseline: central`, CSS2D's
+  own 0.5/0.5 — which is what makes `DIM_STYLE.textLift` one derived number. Remove the baseline
+  rule and every turned value swings about a point below itself.
+- **Lanes**: one lane per dimension that OVERLAPS another along the same direction, smallest
+  innermost. Two dimensions that do NOT overlap — consecutive stretches of one line, like a lug and
+  the gap beside it, or two treads of a stair — **chain in a single lane**, head to head. The `off`
+  is measured from a dimension's own endpoints, so one taken at a raised datum adds that datum to
+  reach the same visual lane. `verify/shipped-module.mjs` measures all of this on the finished sheet
+  in SCREEN space; do not go back to `getBBox()`, which ignores an element's own transform and is
+  therefore blind to exactly what Method 1 adds.
+- The **Front mark is one object**: the arrow points at material on the front face (`frontFaceAnchor()`
+  finds it by ray, because a box centre is mid-air on an L-shaped face), and the label rides the
+  MIDDLE of the shaft one arrow-head below it. Every offset in it is a fraction of the ARROW, so it
+  holds its spacing at every direction and zoom. Do not park the label on the paper and then push it
+  clear of the dimension lane — that was tried, and it is how the name ended up adrift (RULES.md
+  §3.72). Note `LineSegments2` extends `Mesh`: filter it out of any ray test.
+- **A scroll is a zoom; only a drag is a turn.** Never hang "the learner has taken over" on
+  `OrbitControls`' `start` — it fires for the wheel too, and in this topic that swaps the projection,
+  the dimension set and the frame in one notch. A drag is 3 px of movement with exactly ONE pointer
+  down. `focusOn()` retargets when idle and flights `settle()` with damping off (RULES.md §5.21/§5.22).
+- **`controls.target` is EASED onto new content, never assigned.** A view change rebuilds the
+  annotation layer before the flight starts, so the content box moves; setting the target in one step
+  swung the camera in a single frame and was the whole of the "view switching jumps" report.
+  `focusOn()` tweens it over 260 ms and `flyToNamed()` cancels that tween and carries the target
+  itself. Holding the eye-to-target offset instead does NOT help — the eye has still moved, so the
+  scene slides by the parallax. Prove a transition by sampling it per FRAME, not by checking where it
+  landed (RULES.md §5.22/§5.23, ADR-140).
 - Read all colours from CSS custom properties at runtime (through `tokens.js` in JS, `var(--…)` in
   the sheet's CSS); never hard-code hex. Blue stays in the chrome only.
 - The sheet is authored and laid out in **millimetres** and fitted with one `viewBox`, so a real

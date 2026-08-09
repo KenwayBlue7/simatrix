@@ -189,3 +189,94 @@
 - **Do not replace `--ink-scale` with a fixed millimetre width:** the fit scale runs 1.95-2.30 px/mm
   across these four sheets, so one authored number lands anywhere in an 8% band.
 
+
+## 2026-08-08 - One aligned system, in both media
+
+- **The solid's values were level while the sheet's were turned.** Two conventions on one dimension
+  set, which is the single thing BIS Method 1 forbids. ADR-132 had argued that a CSS2D label is
+  billboarded so "the rotation is about paper"; aligned is not about paper, it is about how a value
+  is written against the line it measures.
+- **One placement function, `alignedDim()` in `objectData.js`.** It returns the dimension line's
+  ends, the angle and the value's centre; each renderer adds its own origin and strokes it. Shared
+  constants were not enough - both renderers had their own copy of the same trigonometry, and one
+  copy lifted every RE-READ value to the wrong side of its own line.
+- **The turn goes on `.vp-dim__text`, an inner span.** `CSS2DRenderer` rewrites the outer element's
+  transform every frame. The benchmark's `.vp-value` / `.vp-value__text` pairing, for this reason.
+- **Values anchor on their CENTRE** in both media, so `DIM_STYLE.textLift` is `textGap +
+  textHeight / 2` = 3.2 mm. Baseline anchoring swings a turned value about a point below itself.
+- **Four lane fixes:** the Shaft Support's overall length was inside its bolt pitch; two Stepped
+  Block treads, a Bearing Block lug and its gap, and the Cylindrical Block's plate thickness and
+  boss height are consecutive stretches of one line and now CHAIN in a single lane.
+- **`rig.setFrontLabelFloor()`** - the Front label and the overall length wanted the same paper.
+  `main.js` measures the dimension layer's box and drops the label below it; neither leaf can see
+  the other, and composing them is the orchestrator's job.
+  *(Superseded 2026-08-09: the drop is what put the name out in clear paper. See below.)*
+- **The oracle was measuring with `getBBox()`**, which ignores an element's own transform - blind to
+  exactly what Method 1 adds. Screen-space rects now, and a new pass that finds each value's own
+  parallel dimension line and proves it sits one lift off its midpoint. 163 assertions green.
+
+## 2026-08-09 (later) - A re-frame is a move
+
+- **Fixed** the jump on the FIRST FRAME of every view change. The flight was never the problem: it
+  already swung the eye round the target on an ease curve for 1200 ms, lerping position and target
+  together every frame, and both ends of it were correct — which is why nothing that looked at the
+  settled view could see the fault. Sampling the Front label's pane position on every animation
+  frame across a switch showed the whole shape of it at once: 71 px on the cylindrical block's climb
+  to the plan and 219 px on the bearing block's drop to the side view, in ONE frame, with the
+  neighbouring frames a tenth of a pixel and the remaining 1199 ms perfectly smooth.
+  Pressing a direction rebuilds the annotation layer BEFORE the flight starts (the flight has to be
+  aimed at the framing it will land in), the new direction's dimension set is a different shape, so
+  the content box and its centre move — and `focusOn()` re-aimed `controls.target` at the new centre
+  in a single assignment while the eye stood still. The flight's first `lookAt` spent that entire
+  swing in one frame.
+- **Changed** `focusOn()` to EASE the target onto the new centre over 260 ms instead of setting it,
+  and `flyToNamed()` to cancel that ease and take the target over. Because a tween applies `t = 0`
+  on the frame it starts, a flight still reads the OLD centre — so it captures the pose the picture
+  is really in and carries the target the rest of the way itself, as it always did. The instant step
+  the pop was made of does not exist anywhere now. Worst frame across seven switches: 1.1–1.5× its
+  neighbours, from 27–245×.
+- **Recorded** the fix that does NOT work, because it is the obvious one. Translating the eye by the
+  same delta to hold the eye-to-target offset — "never move one without the other" — made it
+  slightly worse (84 px, 103 px). The offset is preserved, so the camera faces the same way from the
+  same distance, but the eye has still MOVED, and the whole scene slides across the pane by the
+  parallax of that move. Only the point at the target is unaffected, and the target is what moved.
+  There is no instant target change the learner cannot see.
+- **Added** a frame-by-frame continuity oracle. A jump is a SPIKE, so each frame is compared with the
+  larger of its two neighbours rather than with an absolute distance: an eased flight speeds up and
+  slows down, so its biggest frame is simply its fastest and its neighbours are nearly as big, while
+  a teleport is one enormous frame between two still ones. Calibrated by restoring the instant
+  assignment — five of the seven checks fail, at up to 245×. The two that survive are the switches
+  whose dimension set does not change, which is the population that never had the bug.
+- **Moved** the guided-steps panel toggle 2 mm further in from the viewport's right edge. It is
+  right-anchored, so moving it LEFT is a larger `right`; the 44 px box, the vertical band it shares
+  with the Dimensions chip, every style and the panel's own behaviour are untouched.
+- **Kept** the 1200 ms flight. A 300 ms one was asked for; the duration is deliberate (DESIGN.md
+  §5.10 — the movement between viewpoints is what teaches that the four principal views are one
+  object), and shortening it would have hidden the defect rather than fixed it.
+
+## 2026-08-09 - The mark sits on the thing it names, and a scroll is a scroll
+
+- **The Front arrow pointed at mid-air on the Bearing Block.** It was aimed at the bounding-box
+  centre, which on an L-shaped front face is the empty paper above the base and beside the arm.
+  `frontFaceAnchor()` drops a column of rays down the part's mid-width, keeps the stretch that
+  strikes material, and aims at the middle of the stretch nearest the box centre. It returns that
+  face's OWN depth too, so a part with a boss is met at the boss and not a plate behind it. On a
+  full-rectangle face it returns the box centre again - the Cylindrical Block is pixel-identical.
+- **`isMesh` is not the filter for a ray test here.** `LineSegments2` extends `Mesh`, and its
+  instanced geometry makes a nonsense of `intersectObjects` - the whole sim failed to boot until the
+  bodies were selected by `!geometry.isInstancedBufferGeometry`.
+- **The Front label rides the middle of the shaft**, one arrow-head below it, and
+  `setFrontLabelFloor()` is gone from `objectRig.js` and `main.js`. Yesterday's drop cleared the
+  overlap by moving the name away from its mark; halfway along the shaft, the line runs into the chip
+  and out the other side and there is no lane to contest. The point stands 3% of the part off the
+  face rather than 5%, close enough to read as touching.
+- **Scrolling in a principal view jumped.** Not a missing `controls.target` update - the flight sets
+  it throughout and lands it exactly. `noteFreeOrbit` was bound to `OrbitControls`' `start`, which
+  fires for the WHEEL as well as for a drag, so one notch handed the ortho camera back to
+  perspective, swapped the dimension set and re-framed the scene, discarding the learner's zoom in
+  the hand-off. A drag is now 3 px of pointer movement with exactly ONE pointer down.
+- **`focusOn()` retargets when idle; flights and snaps `settle()`** - one `controls.update()` with
+  damping off, so a flick before pressing Front does not leak its inertia into the landing pose.
+- **The zoom is measured by its FIXED POINT.** `after = s·(before - F) + F`, solved from the values'
+  centroid across a scroll, must land within 8% of the pane centre in all four directions. The old
+  binding fails it by up to ten pane-widths. 196 assertions green.
