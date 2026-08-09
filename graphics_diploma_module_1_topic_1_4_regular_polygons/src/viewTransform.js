@@ -10,7 +10,7 @@
 // animation is about to draw outside it).
 
 const BASE_W = 200;
-const BASE_H = 140;
+const BASE_H = 200;
 const MIN_ZOOM = 0.4; // zoom OUT to 2.5x the default view area, to see past wide overshoot/pan
 const MAX_ZOOM = 5;
 
@@ -164,6 +164,37 @@ export function initViewTransform(svg, viewportEl) {
   viewportEl.addEventListener('pointerup', endDrag, listen);
   viewportEl.addEventListener('pointercancel', endDrag, listen);
   viewportEl.addEventListener('dblclick', resetView, listen);
+
+  // Keyboard equivalents of drag-to-pan/scroll-to-zoom/double-click-reset (RULES §4.12 — an
+  // interactive target needs a keyboard path, not just pointer/touch). Phase A audit found
+  // the drawing reachable ONLY by mouse; `viewportEl` (svgEl, tabindex="0" in index.html) is
+  // the sole keydown target. Arrow keys pan proportionally to the CURRENT zoom (a fraction of
+  // vw/vh, matching drag's own feel — the same client-pixel movement pans less once zoomed
+  // in); +/-/0 reuse zoomAt()/resetView() exactly as the wheel and dblclick handlers do,
+  // anchored on the viewport's own centre (there's no cursor position to anchor to from a
+  // keypress).
+  viewportEl.addEventListener('keydown', (e) => {
+    const PAN_FRACTION = 0.08;
+    switch (e.key) {
+      case 'ArrowLeft': vx -= vw * PAN_FRACTION; clampPan(); apply(); break;
+      case 'ArrowRight': vx += vw * PAN_FRACTION; clampPan(); apply(); break;
+      case 'ArrowUp': vy -= vh * PAN_FRACTION; clampPan(); apply(); break;
+      case 'ArrowDown': vy += vh * PAN_FRACTION; clampPan(); apply(); break;
+      case '+': case '=': {
+        const rect = viewportEl.getBoundingClientRect();
+        zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, 1.2);
+        break;
+      }
+      case '-': case '_': {
+        const rect = viewportEl.getBoundingClientRect();
+        zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, 1 / 1.2);
+        break;
+      }
+      case '0': resetView(); break;
+      default: return; // let every other key (Tab, Space on a focused ancestor, …) through
+    }
+    e.preventDefault();
+  }, listen);
 
   apply();
   return { resetView, ensureVisible, dispose: () => ac.abort() };

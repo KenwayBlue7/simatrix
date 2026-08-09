@@ -30,6 +30,11 @@ const parseNumeric = (str) => parseFloat(String(str).trim().replace(',', '.'));
  * @property {(msg: string) => void} flowNote
  * @property {() => string} getResultText
  * @property {() => string | null} getInvalidReason
+ * @property {() => boolean} hasSlides Step Through feature flag (N-Gon only — true when the
+ *   active recipe carries slide-boundary metadata).
+ * @property {() => Array<{caption: string, startIdx: number, endIdx: number}>} getSlides
+ * @property {(range: {startIdx: number, endIdx: number}, opts?: {onComplete?: () => void}) => void} revealSlide
+ * @property {(endIdx: number) => void} showStepsUpTo
  */
 
 /** @param {SimController} sim */
@@ -50,8 +55,17 @@ export function initUIManager(sim) {
   const btnResetYes = $('btn-reset-yes');
   const btnResetCancel = $('btn-reset-cancel');
   const cardNav = btnReset?.closest('.card__nav');
+  const replayHint = $('construct-replay-hint');
+
+  // Step Through (N-Gon construction only — sim.hasSlides() is the feature flag).
+  const stepThroughEl = $('step-through');
+  const btnStepBack = $('btn-step-back');
+  const btnStepNext = $('btn-step-next');
+  const btnPlayAll = $('btn-play-all');
+  const stepCaption = $('step-through-caption');
 
   let fieldEls = []; // [{ cfg, range, num }] for the currently-active construction
+  let stepIdx = -1; // Step Through progress: -1 = nothing revealed yet
 
   /** (Re)build the given-value sliders for the active construction. Called whenever the
    *  construction changes — the param SET itself differs per construction, so fields are
@@ -143,6 +157,82 @@ export function initUIManager(sim) {
   }
 
   btnPlay?.addEventListener('click', () => sim.play(), listen);
+
+  // --- Step Through (N-Gon only) — click-gated slide navigator, default/primary alongside
+  // "Play All" (sim.play(), unchanged). Cherry-picked from Module2/src/methodController.js:
+  // flat-index goNext/goBack math, and spacebar-as-Next scoped to this container (not
+  // document) so it's a structural no-op everywhere else on the page. NOT cherry-picked:
+  // the Tab-wrap focus-trap / Escape-to-close — those exist there because Show Method is a
+  // full-viewport MODAL takeover with something to trap into and exit from. Step Through is
+  // an inline widget inside the existing Construct step panel; there is nothing to escape
+  // from, and trapping Tab here would block reaching Back/Reset in the step-card footer —
+  // a real accessibility regression, not a faithful port. ---
+  function slideCount() { return sim.getSlides().length; }
+
+  function renderStepThrough() {
+    if (!stepThroughEl || stepThroughEl.hidden) return;
+    const slides = sim.getSlides();
+    const count = slides.length;
+    if (btnStepBack) btnStepBack.disabled = stepIdx < 0;
+    if (stepIdx < 0) {
+      if (btnStepNext) { btnStepNext.textContent = 'Step Through'; btnStepNext.disabled = count === 0; }
+      if (stepCaption) stepCaption.textContent = 'Press Step Through to begin.';
+    } else {
+      if (btnStepNext) {
+        btnStepNext.textContent = 'Next';
+        btnStepNext.disabled = stepIdx >= count - 1;
+      }
+      if (stepCaption) stepCaption.textContent = `Slide ${stepIdx + 1} of ${count} — ${slides[stepIdx].caption}`;
+    }
+  }
+
+  function resetStepThrough() {
+    stepIdx = -1;
+    renderStepThrough();
+  }
+
+  function goStepNext() {
+    const slides = sim.getSlides();
+    if (stepIdx >= slides.length - 1) return;
+    const nextIdx = stepIdx + 1;
+    sim.revealSlide(slides[nextIdx], {});
+    stepIdx = nextIdx;
+    renderStepThrough();
+    sim.announce(`Slide ${stepIdx + 1} of ${slides.length}. ${slides[stepIdx].caption}`);
+  }
+
+  function goStepBack() {
+    if (stepIdx < 0) return;
+    const slides = sim.getSlides();
+    stepIdx -= 1;
+    sim.showStepsUpTo(stepIdx >= 0 ? slides[stepIdx].endIdx : 0);
+    renderStepThrough();
+    sim.announce(stepIdx >= 0
+      ? `Slide ${stepIdx + 1} of ${slides.length}. ${slides[stepIdx].caption}`
+      : 'Back to the start.');
+  }
+
+  btnStepNext?.addEventListener('click', goStepNext, listen);
+  btnStepBack?.addEventListener('click', goStepBack, listen);
+  btnPlayAll?.addEventListener('click', () => {
+    sim.play();
+    // Keep Step Through's own caption/counter/button state truthful about what's actually on
+    // screen — Play All just drew everything, so Step Through's progress catches up to
+    // "fully revealed" instead of going stale (the two consumers share one drawing; this is
+    // the concrete shape of keeping them in sync after either one runs).
+    stepIdx = slideCount() - 1;
+    renderStepThrough();
+  }, listen);
+
+  // Space advances like Next, unless focus is already on Back (which keeps its own native
+  // Space activation) — bound to the container, not document, so it's inert everywhere else.
+  stepThroughEl?.addEventListener('keydown', (e) => {
+    if (e.code !== 'Space' && e.key !== ' ') return;
+    if (document.activeElement === btnStepBack) return;
+    if (e.repeat) { e.preventDefault(); return; }
+    e.preventDefault();
+    goStepNext();
+  }, listen);
 
   /** (Re)build the method-switcher buttons for the active construction. Rebuilt (not just
    *  re-valued) whenever the construction changes, since the button COUNT itself differs
@@ -264,11 +354,21 @@ export function initUIManager(sim) {
     if (resetArmed && resetConfirm && !resetConfirm.contains(e.target)) disarmReset();
   }, listen);
 
-  /** Full refresh — construction change rebuilds fields; a param-only change just re-syncs. */
+  /** Full refresh — construction change rebuilds fields; a param-only change just re-syncs.
+   *  Runs on EVERY sync (not just rebuildFields) because main.js's rebuild() already cleared
+   *  #dynamic-layer unconditionally by the time this is called — Step Through's own progress
+   *  index needs to follow suit on any param/method/construction change, same as Play All's
+   *  existing activePlay?.cancel() does. */
   function sync({ rebuildFields = false } = {}) {
     if (rebuildFields) { renderGivenFields(); renderMethodSwitcher(); }
     else { syncFieldValues(); syncMethodSwitcher(); }
     syncResult();
+
+    const usesSteps = sim.hasSlides();
+    if (btnPlay) btnPlay.hidden = usesSteps;
+    if (stepThroughEl) stepThroughEl.hidden = !usesSteps;
+    if (replayHint) replayHint.hidden = usesSteps;
+    resetStepThrough();
   }
 
   return { sync, dispose: () => ac.abort() };

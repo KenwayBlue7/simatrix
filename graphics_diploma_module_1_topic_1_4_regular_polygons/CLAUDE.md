@@ -62,18 +62,18 @@ Audited file-by-file before building, not assumed:
 | File | Status | Why |
 |---|---|---|
 | `src/anim.js` | EXTRACTED | Renderer-agnostic tween engine, no construction knowledge |
-| `src/viewTransform.js` | EXTRACTED (from Topic 1.2) | Pure viewBox pan/zoom + `ensureVisible()` |
+| `src/viewTransform.js` | EXTRACTED (from Topic 1.2) + **diverged, ADR-145** | Pure viewBox pan/zoom + `ensureVisible()`. **Added (2026-08-09)**: arrow-key pan, `+`/`-` zoom, `0` reset on the same `viewportEl` keydown target — the drawing was previously reachable by pointer/touch only (RULES §4.12) |
 | `src/onboarding.js` | EXTRACTED | Fully generic; its localStorage key is track-scoped, not topic-scoped |
-| `src/renderConstruction.js` | EXTRACTED (from Topic 1.2, incl. its `'circle'` kind) | This topic's given/auxiliary circles reuse the `'circle'` kind Topic 1.2 added — no further change needed |
+| `src/renderConstruction.js` | EXTRACTED (from Topic 1.2, incl. its `'circle'` kind) + **diverged, ADR-145** | This topic's given/auxiliary circles reuse the `'circle'` kind Topic 1.2 added. `assignLabelPositions()` was exported (already existed, internal-only) so `main.js` can pre-resolve label positions once over a full move/result array — Step Through needs this (see below). **ADR-145 (2026-08-09) rewrote it further, no longer a byte-shared file with Topic 1.2's copy**: it now also resolves `'dim'`/`'angledim'` labels (previously fixed-position, collision-blind) against a shared obstacle set that samples line/arc/circle ink, not just marker dots; `buildStepNode()` splits every step's ink and label into separate returns so `renderStatic()`/`playSteps()` can route them into always-on-top `[data-layer="labels"]` vs `[data-layer="ink"]` sub-groups (via `ensureSublayers()`), and stamps `data-role` on ink nodes for `index.html`'s post-construction de-emphasis fade |
 | `src/problemLibrary.js` | EXTRACTED | Picker + persistent active-problem header + `matches()` self-check are generic. `matches()` does plain numeric subtraction per key — `method` is deliberately never a `target` key, same limitation Topic 1.2's `mode` had |
 | `src/onboarding.js`, `src/anim.js` | EXTRACTED | as above |
-| `src/main.js` | EXTRACTED + **one addition** | Orchestrator/simController/render-loop/simAPI/wizard-toggle/verify-actions unchanged. **Added**: `defaultsFor()` sets `method: construction.methods[0].id` — each construction's OWN first method, not a fixed constant (pentagon/hexagon/n-gon each declare a different `methods` list, unlike Topic 1.2's single fixed `'external'` default) |
-| `src/uiManager.js` | EXTRACTED + **one addition** | Slider-building loop, reset-confirm, result sync unchanged. **Added**: `renderMethodSwitcher()`/`syncMethodSwitcher()` — see below. **Changed**: `principle` is now called as a function (`con.principle(method)`), since which derivation is active changes the explanation, not just static text |
+| `src/main.js` | EXTRACTED + **additions** | Orchestrator/simController/render-loop/simAPI/wizard-toggle/verify-actions unchanged. **Added**: `defaultsFor()` sets `method: construction.methods[0].id` — each construction's OWN first method, not a fixed constant (pentagon/hexagon/n-gon each declare a different `methods` list, unlike Topic 1.2's single fixed `'external'` default). **Added** (Step Through): `hasSlides()`/`getSlides()`/`revealSlide()`/`showStepsUpTo()` on `simController`, plus `lastRecipe.resolvedMoveResult` cached in `rebuild()` — see below. **Added (2026-08-09, ADR-145)**: `setComplete()` toggles `.is-complete` on `#dynamic-layer` at the start/end of every redraw path (`rebuild()`, `play()`, `revealSlide()`, `showStepsUpTo()`), driving the post-construction move-role fade; `rebuild()` also keeps `#construction-svg`'s `aria-label` in sync with the active construction's `resultText` |
+| `src/uiManager.js` | EXTRACTED + **additions** | Slider-building loop, reset-confirm, result sync unchanged. **Added**: `renderMethodSwitcher()`/`syncMethodSwitcher()` — see below. **Changed**: `principle` is now called as a function (`con.principle(method)`), since which derivation is active changes the explanation, not just static text. **Added** (Step Through): the N-Gon-only slide-index state machine (`goStepNext`/`goStepBack`/`renderStepThrough`) — see below |
 | `src/terms.js` (mechanics) | EXTRACTED | Hover/focus/popover positioning is generic |
 | `src/terms.js` (data) | INFERRED | New `TERMS`: regular polygon, circumcentre, apothem, constructible |
 | `src/stepper.js` (mechanics) | EXTRACTED | Four-step shape, rail rendering, `restart()`/`goToGivenStep()` unchanged |
 | `src/stepper.js` (copy) | INFERRED | `STEPS[0]`/`STEPS[2]` lead text (construction count; mentions choosing a method) |
-| `src/constructions.js` | INFERRED (new) | Entirely new geometry. Shared ground truth: `regularPolygonVertices(A,B,n)` — every method derives the SAME circumcentre/vertices by a different route, verified programmatically (all methods produce byte-identical vertex sets) |
+| `src/constructions.js` | INFERRED (new) | Entirely new geometry. Shared ground truth: `regularPolygonVertices(A,B,n)` — every method derives the SAME circumcentre/vertices by a different route, verified programmatically (all methods produce byte-identical vertex sets). N-Gon's two `build()`s additionally return `slides` (Step Through's slide-boundary metadata) — see below. **ADR-145 (2026-08-09)**: each construction's raw geometry now lives in a standalone `xRaw(params)` function (`pentagonRaw`/`hexagonRaw`/`ngonRaw`, true side-length units, no clamp); `build(params)` is a thin wrapper calling `centerAt(xRaw(params).steps, calibratedScale(id, xRaw, given, methods))` — a construction-wide fixed scale (calibrated once, cached, from the worst-case param combo across every method) plus a per-call recentre, replacing three separate hard-coded anchors + per-shape scale ceilings that used to freeze the drawing's growth past a threshold. `applyOutwardHints()` fills in a real outward-from-circumcentre label hint for every labelled point that didn't already carry one |
 | `src/problems.js` | INFERRED (new) | New `PROBLEMS` array (shape/`groupByTier()` unchanged); pentagon/hexagon appear three/two times each (once per method, per the source's "by all three named methods"), since the self-check can't enforce which method was used — only which numeric side (and n) — hints steer method choice |
 | `meta.json`, `CLAUDE.md`, `index.html` (picker/copy) | INFERRED (new) | Topic-specific |
 | `DESIGN.md` (appendix) | EXTRACTED (§2) + INFERRED (§3, new) | Token table reused unchanged; §3 documents the method switcher |
@@ -105,10 +105,68 @@ compass-constructible at all). Its perpendicular-bisector method's calibration-a
 computed directly from the same closed-form `O` rather than claiming a literal manual
 re-derivation for arbitrary n — documented in `constructions.js`, not silently implied.
 
+### Step Through (Construct step, N-Gon construction only)
+
+The N-Gon construction's two methods (Semicircle Division, Perpendicular Bisector) additionally
+offer a click-gated slide navigator alongside the existing single-animation "Play All" — DEFAULT/
+primary in the Construct step for N-Gon, secondary for Play All. **Pentagon and Hexagon do NOT
+get this** — their five methods (3 + 2) have no audited slide breakdown, so they keep today's
+single "Play construction" button unchanged. `sim.hasSlides()` (true only when the active
+recipe's `build()` returned a non-empty `slides` array) is the feature flag `uiManager.js`
+branches the Construct-step UI on — not a construction-id check, so this stays correct if the
+scope is ever widened without a UI change.
+
+**Slide sourcing — the two methods are NOT equally "sourced", document this distinction
+faithfully:**
+- **Semicircle Division** slides are a literal match to `polygon.pdf`, a real slide deck —
+  verified against its own pentagon(n=5)/hexagon(n=6)/heptagon(n=7) worked examples (slide
+  count = n+3 for every n checked). Captions are near-verbatim from those slides.
+- **Perpendicular Bisector**'s actual source, *Regular Polygons.pdf* Fig 5.24, is a STATIC book
+  page (a 9-instruction numbered list for its own n=8 octagon example) — there is no slide deck
+  to match. Its "slides" are the book's own 9 numbered instructions, staged as a designed
+  analogue in the same spirit, generalized to any n via the existing `nn===3`/`nn>=5`/`nn>=7`
+  branches. Do not read this as a faithful PDF port the way Semicircle Division's slides are.
+
+**Mechanics.** `buildSemicircleDivision()`/`buildPerpendicularBisector()` (`constructions.js`)
+each build into a local `methodSteps` array plus a `slides: { caption, startIdx, endIdx }[]`
+array via a small `mark(caption, fn)` helper — a slide with zero steps is never recorded, so
+Step Through can never land on a content-empty slide (the same principle
+`Module2/src/methodController.js`'s `hasVisibleContent()` protects there, applied here as a
+structural guarantee since this list is precomputed once, not walked live). Both sources defer
+every polygon SIDE to one final "Join…" slide, well after every vertex is found and labelled —
+this REQUIRED a real reorder of the existing step-emission code, not just a UI grouping layer:
+`walkVerticesByCompass()` (shared by pentagon, hexagon, AND the bisector method) now returns
+`{ arcAndLabelSteps, resultLines }` split instead of pushing directly, so callers control the
+push order. Pentagon/hexagon's own Play All reveal order changed as a result (sides now drawn
+after all arcs instead of interleaved) — verified live, not a regression.
+
+Step Through and Play All share the SAME step array (`resolvedMoveResult`, cached on the recipe
+in `main.js`'s `rebuild()`); Step Through just also gets slide-boundary metadata to gate reveals
+by. **Accepted, stated cost:** any future edit to a N-Gon method's step array must be verified
+against BOTH Play All's flat auto-chain and Step Through's slide-gated click-through — an edit
+that only updates one path silently breaks the other.
+
+Cherry-picked from `methodController.js`: flat forward/back index math, spacebar-as-Next (bound
+to the Step Through container, not `document`). NOT ported: the Tab-wrap focus-trap /
+Escape-to-close — those exist there because Show Method is a full-viewport MODAL takeover with
+something to trap into and exit from; Step Through is an inline widget in the existing Construct
+panel with nothing to escape from, and trapping Tab here would block reaching Back/Reset in the
+step-card footer.
+
+**Next vs. Back are asymmetric by design.** Next (`simController.revealSlide()`) plays the new
+slide's own steps through the existing animated tween (`playSteps()`) — but first re-renders
+everything BEFORE that slide statically (`renderStatic()`), because a Next click can land before
+the PREVIOUS slide's own draw-on animation finished; cancelling an in-flight tween freezes it at
+a partial `t` with no way back to its finished state, so skipping this step would let a rushed
+click leave a permanently stuck partial arc/line behind (reproduced live during verification,
+fixed as described here). Back (`simController.showStepsUpTo()`) is a plain instant redraw of
+everything through a given point — a state jump, not a construction move, so it never animates.
+
 ## The four-step shape (every construction uses the same shape)
 
 Unchanged from Topics 1.1-1.3 — Choose (a 3-item picker) → Given → Construct (method switcher +
-Play/Replay) → Verify (recaps the active method alongside the given values).
+Play/Replay, or — N-Gon only — method switcher + Step Through/Play All) → Verify (recaps the
+active method alongside the given values).
 
 ## Platform contract (wired here — do not add a second path)
 
@@ -135,12 +193,17 @@ graphics_diploma_module_1_topic_1_4_regular_polygons/
     ├── stepper.js                     ← guided-step controller (4-step shape + picker step)
     ├── terms.js                         ← inline glossary popovers (topic vocabulary)
     ├── onboarding.js                      ← first-run hints (byte-copy)
-    ├── uiManager.js                         ← given-value sliders + the method switcher
+    ├── uiManager.js                         ← given-value sliders + the method switcher +
+    │                                           Step Through's slide-index state (N-Gon only)
     ├── problems.js                            ← Problem Library data (tiered)
     ├── problemLibrary.js                        ← Problem Library modal + self-check (byte-copy)
-    ├── constructions.js                           ← the 3 constructions' pure geometry, N methods each
-    ├── renderConstruction.js                        ← draws a recipe into the SVG (incl. 'circle' kind)
-    └── main.js                                        ← orchestrator
+    ├── constructions.js                           ← the 3 constructions' pure geometry, N methods
+    │                                                 each; N-Gon's two build()s also emit `slides`
+    ├── renderConstruction.js                        ← draws a recipe into the SVG (incl. 'circle'
+    │                                                   kind); assignLabelPositions() exported
+    └── main.js                                        ← orchestrator; simController's Step Through
+                                                           surface (hasSlides/getSlides/revealSlide/
+                                                           showStepsUpTo)
 ```
 
 ## Non-negotiables inherited from the platform (apply unchanged)
