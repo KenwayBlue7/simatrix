@@ -2987,6 +2987,21 @@ two `sim:complete` messages (latchless, not two-then-silence).
 **Status:** Active — the Finish-button migration is complete across every file in the repo that
 carries a stepper; there is no remaining "old pattern" instance to track.
 
+**Addendum (2026-08-09): `graphics_diploma_module_1_topic_1_4_regular_polygons` carve-out from
+the Diploma-wide gated form.** Per explicit user decision (not a rediscovery of the Diploma
+rationale above — that reasoning still holds for the other 8 Diploma topics), Topic 1.4 alone
+unlocks `#btn-finish` on reaching the Verify step, no Problem Library match required. `main.js`
+adds a second, separate flag (`verifyReached`, distinct from `solvedAny` — not a reuse of
+`onProblemSolved()`, so "solved" keeps meaning solved) set by a `MutationObserver` on the Verify
+panel's (`.step-panel[data-step="4"]`) `hidden` attribute; `hasSolvedProblem()` returns
+`solvedAny || verifyReached`. `stepper.js` itself is untouched — the observer watches a DOM node
+`stepper.js` already toggles, rather than adding a step-4-entry hook to the per-topic-copied
+`goToStep()`, so this topic's `stepper.js` stays byte-identical to its 8 Diploma siblings
+(CLAUDE.md's EXTRACTED/unchanged audit note for that file holds). Scope is this one topic only;
+the platform-wide `sim:complete` mechanism (`markComplete()`, this ADR's main body) and the other
+8 Diploma topics' gated form are unaffected.
+**Status:** Active.
+
 ---
 
 ## ADR-079: The Lines topics' 3D reference planes are OFFSET into the used quadrant, sized to the typed-field ceiling, overturning the earlier 60→24 `SHEET` shrink's stated rationale
@@ -6483,6 +6498,15 @@ silently point at real but unrelated entries in this same log.
 **Status:** Active — pending Vishnu reconciling the 45 orphaned references and pushing the two
 Module 4 topics as real commits.
 
+**Note (2026-08-09):** the first live collateral of these orphans surfaced. `f8771ab` (2026-08-07,
+the Finish-button rollout) deleted the fix that CONIC's own `CHANGELOG.md` records under its local
+`ADR-121` — one of the 45 references this entry documents as having no body anywhere — while adding
+`#btn-finish` as a new primary button its terminal step had no accent rule for. The fix and the
+re-decided accent rule are recorded in `graphics_module_3_topic_2_2_conic_sections/CHANGELOG.md`
+(2026-08-09 entry), not as a new root `ADR-121`, precisely to avoid creating the 46th orphan/collision
+this entry warns about — this repo's decision record for that topic's local ADR ids is its own
+`CHANGELOG.md`, until Vishnu's reconciliation gives them real root bodies.
+
 ---
 
 ## ADR-143: Regular Polygons' perpendicular-bisector method places its extrapolated centre points at the TRUE apothem, not the book's equal-interval step
@@ -6634,6 +6658,271 @@ embed widths (≤600px) at every diameter tested, worst at the slider minimum �
 documented UX regression risk for any host page narrower than a comfortable desktop window, left for
 a future pass to actually fix.
 **Status:** Active — supersedes ADR-116's numeral-count clause only; ADR-116 otherwise stands.
+
+---
+
+## ADR-145: Regular Polygons' Construct step gets a calibrated-once fixed scale (replacing three per-shape clamps) and a unified, collision-aware label pass (replacing point-only, dot-only placement)
+
+**Date:** 2026-08-09
+**Decision:** In `graphics_diploma_module_1_topic_1_4_regular_polygons`, Phase A of this session's
+audit found five reported drawing defects (not centered, inconsistent label placement, construction
+lines never de-emphasizing, overlapping angle labels, and a scaling bug) traced to three root
+causes, fixed together as Phase B:
+
+1. **Framing (`src/constructions.js`).** Each construction's `build()` previously hard-coded its own
+   fixed anchor plus a per-shape scale ceiling (`Math.min(1, K / side)`), so past that ceiling the
+   drawing silently stopped growing while its own "N mm" dimension label kept climbing, and every
+   construction sat off-centre in the 200×140 viewBox at every param value that wasn't the one the
+   anchor happened to be tuned for. Replaced with `pentagonRaw()`/`hexagonRaw()`/`ngonRaw()` — each
+   construction now builds its geometry in local mm-space at true side length, no clamp — plus two
+   new pure helpers: `calibratedScale(id, rawFn, given, methods)`, which fixes ONE on-screen scale
+   per construction, lazily computed once and cached, from the worst-case natural extent across
+   every one of that construction's methods at max(side)[, max(n)]; and `centerAt(steps, scale)`,
+   which recentres THAT call's own current bounds at the frame centre, redone on every `build()`.
+   Scale is fixed; position is not.
+2. **Labels (`src/renderConstruction.js`).** `assignLabelPositions()` previously resolved only
+   `'point'`-kind labels, searched against marker dots only. Extended to also resolve `'dim'`/
+   `'angledim'` labels (a radial-push search, `'angledim'` additionally searching a small angular
+   shift since two angle marks whose bisectors converge toward each other don't separate at any
+   radius alone), and widened the shared obstacle set to include sampled line/arc/circle ink, not
+   just dots. Paired with a new `applyOutwardHints()` pass in `constructions.js` that fills in a
+   real outward-from-circumcentre hint for every labelled point that didn't already carry one (the
+   given A/B points, every `walkVerticesByCompass()` vertex letter, the bisector ladder numbers) —
+   previously those fell back to a fixed up-right default, which reads as "inward" for any point on
+   the wrong side of centre.
+3. **De-emphasis + a11y.** `buildStepNode()` now stamps `data-role` on every ink node; `main.js`
+   toggles `.is-complete` on `#dynamic-layer` once the full construction (or the last Step Through
+   slide) is on screen, and `index.html` fades every `[data-role="move"]` element via CSS
+   `!important` (several step kinds drive their own reveal-animation opacity inline on the same
+   element, which would otherwise outrank a plain class rule). The move-role auxiliary circle
+   (`circleStep`'s animated sweep/final circle) was also missing the DESIGN.md-mandated dashed
+   second cue that lines/arcs already had — added. Labels moved into a dedicated
+   `[data-layer="labels"]` sub-`<g>` that always paints above `[data-layer="ink"]`, with a
+   paper-coloured `paint-order: stroke` halo, so a later step's ink can never paint over an earlier
+   label. `#construction-svg` gained `tabindex="0"`/`role="img"`/a live `aria-label`
+   (`main.js`'s `rebuild()` keeps it in sync with `resultText`), and `viewTransform.js` gained
+   arrow-key pan / `+`/`-` zoom / `0` reset — previously the drawing was reachable by mouse only.
+
+**Why:** RULES §2.19a — never ship a visual fix on assumed geometry. Every claim above was proved
+with a headless sweep (`constructions.js` imports nothing, so it runs directly under Node) over all
+3 constructions × every method × {min, default, max} side × representative n, replaying
+`computeBounds()`/`assignLabelPositions()` verbatim: pre-fix, centre offset ranged up to 47.2 units
+on a 200×140 frame (never zero) with 4/39 configs clipped at rest, and drawn side length tracked
+requested `side` only up to a knee then froze (`unitsPerMm` swung 1.47× across the param space with
+byte-identical bounds above the knee); post-fix, 0/39 configs clip and `unitsPerMm` is now CONSTANT
+per construction (0.856 pentagon / 0.915 hexagon / 0.575 n-gon) — the drawn side length now tracks
+`side` linearly by construction, which is what "the drawing should scale with the dimension" means.
+Point labels placed inward-of-centre dropped from 355/576 (62%) to 157/576 (27%), the residual being
+mostly the deliberately-unhinted circumcentre `O` label and a few tight small-side/large-apex
+configs. Live-verified against the shipped module (RULES §2.19, §2.7 hard-reload) in Chrome: the
+default pentagon "54° Angle + Circle" construction renders centred, its circumcircle and rays
+visibly dash, both 54° marks and the 108° result angle are legible with clear halos, and every
+`move`-role element visibly fades once the polygon completes.
+
+**A live bug found and fixed mid-implementation, worth recording:** the first framing design
+recomputed scale from each config's OWN current bounds every `build()` call (a live per-config
+fit-to-frame). This is wrong for this topic specifically — every one of these three constructions is
+a literal Euclidean similarity construction, so the raw (pre-fit) bounding box scales EXACTLY
+linearly with `side`; fitting to a constant frame fraction on every call would have made the fit
+scale shrink in exact lockstep with `side` growing, so the on-screen drawing would never visibly
+change size at all — defeating defect 5's fix while appearing to solve defect 1. Caught by re-running
+the bounds sweep and noticing `unitsPerMm` was constant ACROSS every side value tested (the live-fit
+version's actual bug) rather than constant only within one fixed-scale construction (the correct,
+now-shipped behaviour). This is the same distinction RULES §5.19 already draws for Module 2's 2D
+sheet (intrinsic size, recomputed only when the modelled object's own size changes vs. a live/
+positional auto-fit) — applied here for the first time to a topic where EVERY parameter (side, n)
+is a true size parameter, with no positional/view slider to guard against.
+
+A second, subtler bug from the same implementation pass: `assignLabelPositions()`'s obstacle set
+already included every point's own marker-dot box (unconditionally, since before this session too),
+which the OLD fixed +4/-4 default always happened to clear by construction. Once `applyOutwardHints`
+gave real, geometry-derived hints to more points, a hint with a small vertical/horizontal component
+could self-collide with its OWN dot and fall through to an oddly-rotated fallback (reproduced live:
+the given point A's hint was rejected this way, landing back near its pre-fix position while B,
+whose hint pointed away from the line entirely, was unaffected — an asymmetry that would have shipped
+undetected without the live Chrome check). Fixed by tagging each obstacle box with its owning step
+and excluding a point's own box from its own candidate search (`renderConstruction.js`).
+
+**Alternatives rejected:**
+- *Ship the live per-config fit-to-frame framing* — rejected once its self-defeating interaction
+  with these constructions' pure-similarity geometry was caught (see above).
+- *A literal Cache-Control/Apache config change to avoid the stale-module hard-reload gotcha* —
+  out of scope for this session; RULES §2.7 already documents the workaround (hard-reload after
+  every edit), which is what this verification pass used.
+
+**Consequences:** Easier: any construction now visibly, proportionally grows/shrinks with its own
+size parameters, always centred, with labels sitting outward-of-centre and legible over a fading
+construction scaffold, keyboard-reachable. Harder / open: `Topic 1.1`, `Topic 1.2`, and `Topic 1.3`
+were the source this topic was duplicated from (per this topic's own CLAUDE.md) and share the SAME
+`renderConstruction.js`/`viewTransform.js` lineage — they were **not** audited or touched this
+session, but plausibly carry the identical per-shape-clamp framing defect and the same point-only
+label search; worth a follow-up audit, not assumed fixed by this ADR. A handful of extreme
+min-side/large-n or min-side/small-side configs (documented in the audit's label sweep — e.g.
+`hexagon`/`compass` at its own default) still have angle-label overlaps the collision search cannot
+clear within its current candidate range; these are a genuine, narrower residual, not a regression
+(the pre-fix code never attempted to move them at all).
+
+---
+
+## ADR-146: Regular Polygons' fixed drawing frame widened 200×140 → 200×200
+
+**Date:** 2026-08-09
+**Decision:** In `graphics_diploma_module_1_topic_1_4_regular_polygons`, widen the construction
+SVG's fixed viewBox from 200×140 to 200×200 (`index.html`), and the two framing constants that
+mirror it — `calibratedScale()`/`centerAt()`'s `height` default (`src/constructions.js`) and
+`viewTransform.js`'s `BASE_H`.
+
+**Why:** A follow-up audit of a screenshot (N-Gon / Semicircle Division, n=6, side=32, still
+reading small/off-centre despite ADR-145) found ADR-145's scale/centre math correctly wired and
+computing correctly — `unitsPerMm` constant per construction, 0/39 swept configs clipped,
+live-measured centre offset only 5.33 units (≈15 px) — but backing out each construction's
+worst-case RAW bounding box (the box `calibratedScale()` fits to the frame) showed all three are
+square-to-tall: pentagon 150.0×140.2 (aspect 1.070), hexagon 116.4×131.2 (0.887), n-gon
+188.9×208.8 (0.905). Fit against a 1.429-aspect landscape frame, **height was the binding
+constraint for every construction, every time** — width was never the limit, capping n-gon's
+scale worst (its own worst case, n=12, is far larger than pentagon/hexagon's, and that fixed
+scale is what n=6 then inherits). Squaring the frame to 200×200 lets width stop being spare
+capacity: recomputing the same worst-case fit gives scale ×1.40 (pentagon), ×1.50 (hexagon),
+×1.50 (n-gon) versus today. Re-ran the ADR-145 bounds sweep (3 constructions × every method ×
+{min, default, max} side × representative n for the n-gon) against the new frame: 0/39 configs
+clip, `unitsPerMm` still constant per construction (1.2000 pentagon / 1.3723 hexagon / 0.8620
+n-gon) — the ADR-145 invariant holds, this is a scale change, not a re-introduction of the
+live-fit bug ADR-145's own postmortem warns against. Live-verified in Chrome (RULES §2.7
+hard-reload): n=6/side=32 grows from 190×176 px to 256×238 px on screen, frame fill 32.7%W/43.5%H
+→ 44.2%W/41.0%H, not clipped; pentagon/hexagon defaults re-checked at 58–81% fill, none clipped;
+arrow-key pan and double-click reset re-verified against the new `BASE_H` (`viewTransform.js`'s
+pan-clamp and `zoomAt()`/`resetView()` are already expressed purely in terms of `BASE_W`/
+`BASE_H`, so no separate code change was needed there).
+
+Considered widening further to 200×240 to squeeze out more: rejected because the platform-typical
+`#sim-viewport` pane (measured 580×778, portrait) is width-bound at 200×200 already, so the full
+scale gain reaches the screen; 200×240 only pays off once the pane itself turns landscape
+(`innerWidth ≳ innerHeight + 340`), and *loses* a small amount (net ×0.97 vs. today) below that —
+200×200 is the only frame size tested that is never worse than the ADR-145 baseline at any window
+size.
+
+**Consequences:** Easier: the n-gon in particular reads as a real, appreciably-sized drawing at
+its default n=6 instead of floating small in the frame; pentagon and hexagon also gained
+headroom. Harder / open: this only changes the fixed calibration frame, not
+`assignLabelPositions()`/`applyOutwardHints()` — the pre-existing residual label-collision cases
+ADR-145 already documents (e.g. the division-number labels near a polygon's top vertex at small
+n) are unchanged by this ADR and remain a separate, not-yet-scheduled follow-up. Reducing the
+10-unit margin further (an independent, smaller additional gain) was considered and deliberately
+deferred rather than bundled in, to keep this change measurable in isolation.
+
+---
+
+## ADR-147: Regular Polygons' calibration-frame margin narrowed 10 → 6 units — amends ADR-146
+
+**Date:** 2026-08-09
+**Decision:** In `graphics_diploma_module_1_topic_1_4_regular_polygons`, narrow `calibratedScale()`'s
+`margin` default from 10 to 6 units (`src/constructions.js`), the one remaining growth lever ADR-146
+identified and deliberately deferred ("Reducing the 10-unit margin further ... was considered and
+deliberately deferred rather than bundled in, to keep this change measurable in isolation").
+
+**Why:** Since `calibratedScale()` subtracts the margin from BOTH the 200-wide and 200-tall frame
+dimensions equally (`width = height = 200`), the resulting scale ratio — `(200 - 2·6) / (200 - 2·10)
+= 188/180 = 1.0444` — is identical regardless of which dimension (width or height) binds for a given
+construction/method, so the gain is uniform across all three constructions with no narrow-pane
+downside: +4.44% linear, +9.08% area, for every one of the 39 swept configs. Verified no other code
+depends on the margin=10 literal before changing it: `renderConstruction.js`'s dim/angledim label-push
+"reach" constant and `viewTransform.js`'s own `ensureVisible(bounds, margin = 10)` (zoom-to-fit pan/zoom
+padding) each hardcode their own independent `10`, unrelated to `calibratedScale()`'s frame margin —
+narrowing one does not affect the others. Re-ran the ADR-145 bounds sweep (3 constructions × every
+method × {min, default, max} side × representative n for the n-gon, 39 configs) against the new margin:
+0/39 clip, `unitsPerMm` still constant per construction, and each construction's `unitsPerMm` scaled by
+the exact predicted ×1.0444 (pentagon 1.2000 → 1.2533, hexagon 1.3723 → 1.4333, n-gon 0.8620 → 0.9003).
+Live-verified in Chrome (RULES §2.7 hard-reload, foreground tab per the rAF-stall gotcha — automated
+tabs report `document.hidden`, which stalls `anim.js`'s rAF-driven tween queue; drained it with a
+manual `tick(2000)` pump before measuring/screenshotting): pentagon (default 45 mm) and hexagon
+(default 35 mm) at their own default method render centred, un-clipped, both angle-pair labels and the
+result angle legible; N-Gon Semicircle Division at n=6/side=32 (the ADR-146 follow-up's own reported
+case) renders centred and un-clipped, `#dynamic-layer` `getBBox()` measuring 91.5×67.0 of the 200×200
+viewBox, no dimension exceeding frame bounds.
+
+**Alternatives rejected:** none — this was the single lever ADR-146 left open, applied as scoped.
+
+**Consequences:** Easier: all three constructions read slightly larger at every param value, for free,
+with no clipping or aspect-ratio regression. Harder / open: the residual label-collision cases ADR-145
+already documents (e.g. hexagon/compass at its own default) are unchanged by this ADR — a narrower
+margin does not touch `assignLabelPositions()`'s search radius — and remain a separate, not-yet-scheduled
+follow-up, same as ADR-146 left them. No further margin reduction is planned; ADR-146's own frame-size
+reasoning (200×200 is the only size tested that is never worse than the ADR-145 baseline at any window
+size) is unaffected by this change.
+
+---
+
+## ADR-148: Regular Polygons' N-Gon Semicircle Division method separates labels for coincident division-point/vertex pairs, instead of leaving them to fight over one dot
+
+**Date:** 2026-08-09
+**Decision:** In `graphics_diploma_module_1_topic_1_4_regular_polygons`, a Phase A audit (full sweep:
+3 constructions × every method × {min,default,max} side × n∈{3,5,6,7,9,12}, 51 configs) found 38/51
+configs carry ≥1 label collision, from three independent causes. This ADR fixes only the first:
+`buildSemicircleDivision()`'s division point `(n-2)` and polygon vertex `(n-1)` are the exact same
+coordinate (float noise only, <5e-14) at **every n from 3 to 12** — proved algebraically (the
+interior angle at A, `(n-2)·180/n`, is exactly division point `(n-2)`'s own angle from A, and both
+points sit at radius `s` from A) and numerically (n=3..12 swept). Two different labels — a division
+number and a vertex letter (`"4"`/`"G"` at n=6, `"3"`/`"F"` at n=5, etc.) — were being stamped on one
+literal dot. `applyOutwardHints()` (ADR-145) gives each an independent hint (division points
+away-from-A, vertex letters away-from-O) too close in angle to reliably clear two ~7-unit label boxes
+anchored at the same point; `renderConstruction.js`'s `candidateOffsets()` ring-widening search
+(ADR-145) cannot fix a genuinely same-point conflict no matter how far it widens.
+
+Added `separateCoincidentLabels(steps, O)` in `src/constructions.js`, run after `applyOutwardHints()`
+and wired into all three raw builders (`pentagonRaw`/`hexagonRaw`/`ngonRaw`) even though only the
+n-gon's semicircle method hits the case today, so the invariant is construction-wide rather than
+method-specific. For each group of labelled points sharing one coordinate (excluding groups that
+share one identical label — nothing to separate — and points coincident with O itself, no direction
+to derive from, same guard `applyOutwardHints()` uses): computes the tangent-to-O direction at that
+point, splits the group's k members evenly around it (`θ + i·360°/k`), and grows a shared radius
+(starting at `awayFrom()`'s own default of 6, +2 per attempt, up to 20 attempts) until every pair of
+members' label boxes — checked with a duplicated copy of `renderConstruction.js`'s own `labelBox()`/
+`boxesOverlap()`, same duplication discipline as `rawBounds()` mirroring `computeBounds()` — actually
+clears. A first version used a fixed radius of 6 (angle split only) and left one live residual: at
+n=12, `"10"` (two digits, wider box) and `"M"` grazed by ~0.02 units even at opposite angles, because
+`labelBox()` is left/top-anchored, not centred, so opposite ANGLES alone don't guarantee clearance for
+boxes of different widths — the DISTANCE has to be sized to the actual label, not guessed.
+
+Tangential (not radial) split, not each member's own outward hint as one pole: taking a member's own
+`awayFrom()` hint as θ would send its +180° partner straight back toward the crowded interior.
+
+**Why keep both labels (not suppress the redundant one):** the task's own instruction was to check
+`polygon.pdf` (the method's literal slide-deck source) before assuming suppression is cleaner.
+`polygon.pdf` slides 8-9 (its own n=5 pentagon worked example) print BOTH `F` and `3` at the shared
+point, side by side, split along the arc's tangent — the source itself keeps both, so this ADR mirrors
+that layout rather than dropping either label.
+
+**Why:** RULES §2.19a — proved with the same headless-sweep method ADR-145 established
+(`constructions.js` imports nothing, runs directly under Node). Re-ran the 51-config sweep:
+digit-vs-letter identity-class collisions dropped from 14 to 0 (one apparent remaining digit-vs-letter
+pair at n=12, `"C"` vs `"11"`, checked and confirmed NOT coincident — 7.5 units apart, ordinary high-n
+crowding, correctly untouched, in scope of the two causes this ADR explicitly does not fix). No
+regression in the other two causes: point-vs-angledim held at 38, angledim-vs-angledim held at 9,
+label-vs-ink improved 101→99 (side effect of less congestion at the now-separated points). Added a
+standalone coincidence check (n=3..12, both n-gon methods): every coincident-point label group now
+resolves to distinct, non-overlapping boxes — PASS. Live-verified in Chrome (RULES §2.7 hard-reload):
+n=6/side=32/Semicircle Division's `"4"`/`"G"` pair measured via real `getBBox()` on the rendered
+`<text>` nodes, not just the headless box-estimate model — boxes no longer overlap (previously grazed
+by ~0.02-1.8 units depending on config). Reused the [[project_chrome_automation_raf_stall]] gotcha's
+own workaround for measuring: an automated tab is backgrounded, which stalls `anim.js`'s rAF tween
+queue — forced a full static render via a direct `renderConstruction.js`/`constructions.js` dynamic
+`import()` in the page instead of waiting out Play All's animation.
+
+**Alternatives rejected:**
+- *Suppress the redundant division-number label* — the task's own fallback if `polygon.pdf` never
+  double-labels the point. It does (see above), so rejected.
+- *Fixed separation radius (6, angle split only)* — tried first; left a live residual at n=12 where a
+  2-digit division number's wider box still grazed its letter partner at the same fixed distance. A
+  radius search against the actual box model replaced it.
+
+**Consequences:** Easier: every division-number/vertex-letter pair this method produces (10 pairs,
+one per n from 3 to 12) is now guaranteed visually distinct, matching `polygon.pdf`'s own layout.
+Harder / open: this ADR fixes only the coincident-point cause. Two others remain, deliberately
+deferred (not in this ADR's scope): label-vs-ink collisions concentrated at min-side configs (labels
+are fixed-size, geometry is calibrated from max-side, so min-side draws smallest — 99 residual pairs),
+and digit-vs-digit crowding at high n (9, 12) where many division numbers pack a fixed-radius
+semicircle (15 residual pairs, e.g. the `"C"`/`"11"` case found and confirmed out-of-scope above).
+Topics 1.1-1.3 untouched (separate follow-up, see [[project_regular_polygons_adr145_followup]]).
 
 ---
 

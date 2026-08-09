@@ -5,7 +5,7 @@
 > single root `../DESIGN.md`. On any conflict the **root file wins** (RULES.md §4.16). This file
 > records only what is unique to this topic. It is copied from Topic 1.1's own appendix — the
 > construction-line token map (§2) is byte-identical and reused unchanged; §3 (the method
-> switcher) is new.
+> switcher) is new; §4 (Step Through) is new.
 
 ---
 
@@ -55,6 +55,41 @@ Placement: inside the Construct step (step 3), above the Play button — the stu
 method, then presses Play to watch THAT method's derivation animate, exactly mirroring Topic
 1.2's toggle placement. Selected state reuses `--color-accent` fill, same as `.btn--primary` and
 `.rail__item.is-current` — no new colour token, consistent with RULES §4.16.
+
+## 4. Step Through (new, N-Gon construction only)
+
+`#step-through` sits where `#btn-play-construction` sits for pentagon/hexagon — same Construct-
+step slot, toggled by `hidden` on whichever the active construction needs (`uiManager.js`'s
+`sim.hasSlides()` branch), never both at once. Layout only, no new colour tokens: reuses
+`.btn`/`.btn--primary`/`.btn--block` verbatim (RULES §4.1). `.step-through__caption` is a plain
+bordered text block at `--text-sm` — same `--color-paper`/`--color-border`/`--radius-sm` treatment
+`#result-text` already uses, so a slide's caption reads as "a value the sim is reporting", not a
+button or a label.
+
+The primary button relabels by state instead of a separate "start" trigger — "Step Through" at
+rest (nothing revealed yet), "Next" once a slide is showing, disabled at the final slide. Back
+sits to its own left in a row with the caption, matching this topic's other paired-button layouts
+(`#btn-reset`/`#reset-confirm`) rather than introducing a new row pattern. No new focus-ring,
+press, or disabled treatment — `.btn`'s existing states cover all of it.
+
+## 5. Post-construction de-emphasis + label layering (new, ADR-145)
+
+Once a construction finishes drawing (Play completing, or Step Through's last slide), every
+`move`-role element fades to 32% opacity — `#dynamic-layer.is-complete [data-role="move"]` in
+`index.html`, toggled by `main.js`'s `setComplete()`. The finished `result` polygon (and every
+`given` element) stays at full opacity throughout: the fade is what lets the answer read as *the*
+answer once the derivation is done, not one more line among equals. Reduced-motion collapses this
+to instant, for free, via the file's existing blanket `transition-duration: 0.001ms !important`
+rule (§4.13) — no separate branch needed.
+
+Every step's text label lives in a `[data-layer="labels"]` sub-`<g>`, always painted after (on top
+of) that same layer's `[data-layer="ink"]` sibling (`renderConstruction.js`'s `ensureSublayers()`)
+— a later step's line/arc/circle can never paint over an earlier label. Do not reintroduce a
+single flat group mixing ink and text per step. The original fix also added a paper-coloured
+`stroke` halo behind each label (`paint-order: stroke`); that halo was removed once labels became
+proportionally sized via `chromeScale` (a later session) — with chrome density around a label now
+scaled down with the geometry, the halo stopped earning its keep and read as clutter. The
+sublayer-ordering half of this fix stands; the halo does not.
 
 ---
 
