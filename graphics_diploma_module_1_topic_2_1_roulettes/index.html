@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="light only" />
   <!-- <title> MUST equal meta.json.title (ADR-026 / RULES.md §1.12). -->
   <title>Roulettes</title>
-  <meta name="description" content="Twelve curves traced by a circle rolling without slipping — cycloids, trochoids, epicycloids, hypocycloids, and the involute of a circle or polygon — built and verified step by step." />
+  <meta name="description" content="Nine curves traced by a circle rolling without slipping — cycloids, trochoids, epicycloids, hypocycloids — built and verified step by step." />
 
   <!--
     See ../CLAUDE.md and ../DECISIONS.md ADR-095/ADR-096. This is Module 1 Topic 2.1
@@ -192,7 +192,7 @@
     body.wizard-collapsed .wizard-toggle__icon { transform: rotate(180deg); }
 
     .vp-hint {
-      position: absolute; top: calc(44px + var(--space-3)); left: var(--space-4);
+      position: absolute; bottom: var(--space-4); right: var(--space-4);
       padding: var(--space-2) var(--space-4);
       border-radius: var(--radius-sm);
       background: color-mix(in srgb, var(--color-paper) 88%, transparent);
@@ -354,7 +354,7 @@
     .step-panel { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
     .step-panel:first-of-type { border-top: 0; padding-top: 0; margin-top: var(--space-3); }
 
-    /* Construction picker (Step 1) — 12 curves, 2 columns */
+    /* Construction picker (Step 1) — 9 curves, 2 columns */
     .construction-picker { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-top: var(--space-2); }
     .construction-picker__item {
       min-height: 56px; padding: var(--space-3) var(--space-4);
@@ -440,9 +440,9 @@
     .problem-library[hidden] { display: none; }
     @keyframes libraryIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
     .problem-library:not([hidden]) { animation: libraryIn var(--dur-step) var(--ease-standard); }
-    .problem-library__header { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--color-border); }
-    .problem-library__title { margin: 0; font-size: var(--text-title); font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; color: var(--color-ink); }
-    .problem-library__close { flex: none; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; color: var(--color-ink-secondary); background: var(--color-panel); border: 1px solid var(--color-border); border-radius: var(--radius-sm); cursor: pointer; transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard); }
+    .problem-library__header { flex: none; display: grid; grid-template-columns: 44px 1fr 44px; align-items: center; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--color-border); }
+    .problem-library__title { grid-column: 2; text-align: center; margin: 0; font-size: var(--text-title); font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; color: var(--color-ink); }
+    .problem-library__close { grid-column: 3; flex: none; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; color: var(--color-ink-secondary); background: var(--color-panel); border: 1px solid var(--color-border); border-radius: var(--radius-sm); cursor: pointer; transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard); }
     .problem-library__close:active { transform: scale(0.97); }
     .problem-library__close:focus-visible { outline: none; box-shadow: var(--ring-focus); }
     .problem-library__close svg { width: 20px; height: 20px; }
@@ -615,12 +615,10 @@
             Every curve below is a
             <span class="term" data-term="roulette" tabindex="0">roulette<span class="term__pop"></span></span> —
             traced by a circle rolling without slipping along a straight line or another
-            circle — except the last two, traced by unwinding a taut string (an
-            <span class="term" data-term="involute" tabindex="0">involute<span class="term__pop"></span></span>).
-            A <span class="term" data-term="cycloid" tabindex="0">cycloid<span class="term__pop"></span></span>
+            circle. A <span class="term" data-term="cycloid" tabindex="0">cycloid<span class="term__pop"></span></span>
             is the simplest case: a point on the rim of a circle rolling on a straight line.
           </p>
-          <div class="construction-picker" role="group" aria-label="Twelve curves">
+          <div class="construction-picker" role="group" aria-label="Nine curves">
             <button type="button" class="construction-picker__item" data-construction-id="cycloid" aria-pressed="false">Cycloid</button>
             <button type="button" class="construction-picker__item" data-construction-id="superior-trochoid" aria-pressed="false">Superior Trochoid</button>
             <button type="button" class="construction-picker__item" data-construction-id="inferior-trochoid" aria-pressed="false">Inferior Trochoid</button>
@@ -630,9 +628,6 @@
             <button type="button" class="construction-picker__item" data-construction-id="hypocycloid" aria-pressed="false">Hypocycloid</button>
             <button type="button" class="construction-picker__item" data-construction-id="superior-hypotrochoid" aria-pressed="false">Superior Hypotrochoid</button>
             <button type="button" class="construction-picker__item" data-construction-id="inferior-hypotrochoid" aria-pressed="false">Inferior Hypotrochoid</button>
-            <button type="button" class="construction-picker__item" data-construction-id="involute-circle" aria-pressed="false">Involute of a Circle</button>
-            <button type="button" class="construction-picker__item" data-construction-id="involute-triangle" aria-pressed="false">Involute of a Triangle</button>
-            <button type="button" class="construction-picker__item" data-construction-id="involute-square" aria-pressed="false">Involute of a Square</button>
           </div>
         </div>
 

@@ -1,6 +1,6 @@
 // Guided-stepper controller — the four-step shape every construction in this syllabus
 // track shares:
-//   1. Choose  — pick one of the twelve curves to build.
+//   1. Choose  — pick one of the nine curves to build.
 //   2. Given   — the curve's defining measurements, tied to live numeric values.
 //   3. Construct — the rolling circle traces the curve; scrub the Roll Angle slider or
 //      press Play, then the tangent/normal construction resolves at the end.
@@ -10,7 +10,7 @@
 // Layering (CLAUDE.md): leaf module. Imports nothing; main.js injects `sim`.
 
 const STEPS = [
-  { n: 1, title: 'Choose a Curve', lead: 'Pick one of the twelve roulette and involute curves to build.' },
+  { n: 1, title: 'Choose a Curve', lead: 'Pick one of the nine roulette curves to build.' },
   { n: 2, title: 'Given', lead: 'This is what the curve starts from — adjust its measurements below.' },
   { n: 3, title: 'Construct', lead: 'Scrub the Roll Angle slider or press Play to trace the curve, then watch the tangent/normal resolve.' },
   { n: 4, title: 'Verify', lead: 'Check the result, then try it as a stated problem.' },

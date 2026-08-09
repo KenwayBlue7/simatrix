@@ -20,7 +20,7 @@
 //
 // EXTRACTED from Topic 1.2 (which already added the 'circle' kind Topic 1.1 lacks) plus
 // ONE new addition this topic needs: a 'curve' kind — a sampled polyline for a traced
-// roulette (cycloid/epicycloid/involute/...), since no prior topic ever drew a curve that
+// roulette (cycloid/epicycloid/trochoid/...), since no prior topic ever drew a curve that
 // isn't a compass-constructible point/line/arc/circle (this topic's own CLAUDE.md records
 // the reasoning). Drawn as a single <path> of 'L' segments through constructions.js's
 // sample points — dense enough (140-160 samples) to read as smooth without spline math.
@@ -166,7 +166,7 @@ function buildStepNode(step) {
 
   if (step.kind === 'curve') {
     // New this topic: a sampled polyline — the traced roulette (cycloid, epicycloid,
-    // involute, ...) is a genuine locus, not a compass-constructible line/arc/circle.
+    // trochoid, ...) is a genuine locus, not a compass-constructible line/arc/circle.
     // Reuses the exact same stroke-dashoffset draw-on mechanic as a 'line' step, sized to
     // the polyline's own cumulative length so it draws itself at the same visual rate.
     const { points, role } = step;
@@ -192,8 +192,23 @@ function buildStepNode(step) {
     });
     group.appendChild(dot);
     if (step.label) {
+      // DESIGN.md §5.9 "vertex label: a small paper pill... nudged outward off the
+      // linework so it never sits on top of it" — an opaque backing so a label stays
+      // legible even when the linework (or another nearby label) runs underneath it.
+      // dx/dy default to the family's usual up-right nudge, but a step can override them
+      // (e.g. tangentNormalSteps() pushes M and C on opposite corners so their labels
+      // don't collide when the two points land close together — a common case at the
+      // end of a full roll, where the contact point sits right next to the traced point).
+      const lx = step.p.x + (step.dx ?? 4);
+      const ly = step.p.y + (step.dy ?? -4);
+      const lw = step.label.length * 4.2 + 3;
+      group.appendChild(el('rect', {
+        x: lx - 1.5, y: ly - 6.2,
+        width: lw, height: 8, rx: 2,
+        fill: 'var(--color-paper)', opacity: 0.88,
+      }));
       const text = el('text', {
-        x: step.p.x + 4, y: step.p.y - 4,
+        x: lx, y: ly,
         fill: roleColor(step.role), 'font-family': 'var(--font-sans)',
         'font-size': 6.5, 'font-weight': 700,
       });
@@ -234,13 +249,19 @@ function buildStepNode(step) {
     const arrow1 = el('path', { d: arrowPath(oa, -ux, -uy), fill: color });
     const arrow2 = el('path', { d: arrowPath(ob, ux, uy), fill: color });
     const mid = { x: (oa.x + ob.x) / 2 + px * 4, y: (oa.y + ob.y) / 2 + py * 4 };
+    const lw = text.length * 3.4 + 3;
+    const pill = el('rect', {
+      x: (mid.x - lw / 2).toFixed(2), y: (mid.y - 4.5).toFixed(2),
+      width: lw, height: 8.5, rx: 2,
+      fill: 'var(--color-paper)', opacity: 0.88,
+    });
     const label = el('text', {
       x: mid.x.toFixed(2), y: mid.y.toFixed(2),
       fill: color, 'font-family': 'var(--font-mono)', 'font-size': 5.5,
       'text-anchor': 'middle', 'dominant-baseline': 'middle',
     });
     label.textContent = text;
-    group.append(ext1, ext2, dimLine, arrow1, arrow2, label);
+    group.append(ext1, ext2, dimLine, arrow1, arrow2, pill, label);
     const reveal = (t) => { group.style.opacity = String(t); };
     return { node: group, reveal, finalize: () => {} };
   }

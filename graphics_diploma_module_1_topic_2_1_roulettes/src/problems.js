@@ -26,7 +26,6 @@ export const FIELD_LABELS = Object.freeze({
   insetWithin: 'point distance inside rim',
   genDiameter: 'generating circle diameter',
   baseRadius: 'base circle radius',
-  side: 'side length',
 });
 
 export const PROBLEMS = [
@@ -40,18 +39,6 @@ export const PROBLEMS = [
     hints: [
       'Set the Rolling circle diameter slider to 56 mm.',
       'Scrub the Roll Angle slider until the traced point sits about 40 mm above the base line, then read the tangent/normal built at M.',
-    ],
-  },
-  {
-    id: 'involute-circle-40',
-    tier: 'practice',
-    constructionId: 'involute-circle',
-    statement: 'Draw the involute of a circle 40 mm in diameter.',
-    target: { diameter: 40 },
-    tolerance: { diameter: 1 },
-    hints: [
-      'Set the Circle diameter slider to 40 mm.',
-      'Press Play on the Construct step to watch the string unwind one full turn.',
     ],
   },
   {
@@ -102,30 +89,6 @@ export const PROBLEMS = [
       'Set the Generating circle diameter slider to 44 mm.',
       'A 200 mm base circle has radius 100 mm — set Base circle radius to 100 mm.',
       'Scrub Roll Angle to about 270° for the third quarter of the curve.',
-    ],
-  },
-  {
-    id: 'involute-triangle-30',
-    tier: 'challenge',
-    constructionId: 'involute-triangle',
-    statement: 'Draw the involute of an equilateral triangle of side 30 mm; find the tangent/normal at the midpoint of the third segment.',
-    target: { side: 30 },
-    tolerance: { side: 1 },
-    hints: [
-      'Set the Triangle side slider to 30 mm.',
-      'The third segment is the arc of radius 90 mm (3 × 30 mm) — its midpoint is halfway through that arc’s sweep.',
-    ],
-  },
-  {
-    id: 'involute-square-25',
-    tier: 'challenge',
-    constructionId: 'involute-square',
-    statement: 'Draw the involute of a square of side 25 mm; find the tangent/normal at the midpoint of the third segment.',
-    target: { side: 25 },
-    tolerance: { side: 1 },
-    hints: [
-      'Set the Square side slider to 25 mm.',
-      'The third segment is the arc of radius 75 mm (3 × 25 mm) — its midpoint is halfway through that arc’s sweep.',
     ],
   },
 ];

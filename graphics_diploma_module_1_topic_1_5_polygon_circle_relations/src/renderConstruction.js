@@ -196,6 +196,15 @@ function buildStepNode(step) {
     });
     group.appendChild(dot);
     if (step.label) {
+      // DESIGN.md §5.9 "vertex label: a small paper pill... nudged outward off the
+      // linework so it never sits on top of it" — an opaque backing so a label stays
+      // legible even when the linework (or another nearby label) runs underneath it.
+      const lw = step.label.length * 4.2 + 3;
+      group.appendChild(el('rect', {
+        x: step.p.x + 4 - 1.5, y: step.p.y - 4 - 6.2,
+        width: lw, height: 8, rx: 2,
+        fill: 'var(--color-paper)', opacity: 0.88,
+      }));
       const text = el('text', {
         x: step.p.x + 4, y: step.p.y - 4,
         fill: roleColor(step.role), 'font-family': 'var(--font-sans)',
@@ -238,13 +247,19 @@ function buildStepNode(step) {
     const arrow1 = el('path', { d: arrowPath(oa, -ux, -uy), fill: color });
     const arrow2 = el('path', { d: arrowPath(ob, ux, uy), fill: color });
     const mid = { x: (oa.x + ob.x) / 2 + px * 4, y: (oa.y + ob.y) / 2 + py * 4 };
+    const lw = text.length * 3.4 + 3;
+    const pill = el('rect', {
+      x: (mid.x - lw / 2).toFixed(2), y: (mid.y - 4.5).toFixed(2),
+      width: lw, height: 8.5, rx: 2,
+      fill: 'var(--color-paper)', opacity: 0.88,
+    });
     const label = el('text', {
       x: mid.x.toFixed(2), y: mid.y.toFixed(2),
       fill: color, 'font-family': 'var(--font-mono)', 'font-size': 5.5,
       'text-anchor': 'middle', 'dominant-baseline': 'middle',
     });
     label.textContent = text;
-    group.append(ext1, ext2, dimLine, arrow1, arrow2, label);
+    group.append(ext1, ext2, dimLine, arrow1, arrow2, pill, label);
     const reveal = (t) => { group.style.opacity = String(t); };
     return { node: group, reveal, finalize: () => {} };
   }
@@ -267,14 +282,21 @@ function buildStepNode(step) {
     const arcNode = el('path', { d: arcPathD(center, radius, a0, a1), fill: 'none', stroke: color, 'stroke-width': 0.5 });
     const midAngle = a0 + diff / 2;
     const labelR = radius + 4;
+    const labelX = center.x + labelR * Math.cos(midAngle);
+    const labelY = center.y + labelR * Math.sin(midAngle);
+    const lw = text.length * 3.4 + 3;
+    const pill = el('rect', {
+      x: (labelX - lw / 2).toFixed(2), y: (labelY - 4.5).toFixed(2),
+      width: lw, height: 8.5, rx: 2,
+      fill: 'var(--color-paper)', opacity: 0.88,
+    });
     const label = el('text', {
-      x: (center.x + labelR * Math.cos(midAngle)).toFixed(2),
-      y: (center.y + labelR * Math.sin(midAngle)).toFixed(2),
+      x: labelX.toFixed(2), y: labelY.toFixed(2),
       fill: color, 'font-family': 'var(--font-mono)', 'font-size': 5.5,
       'text-anchor': 'middle', 'dominant-baseline': 'middle',
     });
     label.textContent = text;
-    group.append(arcNode, label);
+    group.append(arcNode, pill, label);
     const reveal = (t) => { group.style.opacity = String(t); };
     return { node: group, reveal, finalize: () => {} };
   }

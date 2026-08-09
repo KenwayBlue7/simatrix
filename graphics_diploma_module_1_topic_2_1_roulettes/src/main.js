@@ -104,10 +104,10 @@ function rebuild() {
 }
 
 // ============================================================================
-// playRollAnimation() — the roulette/involute constructions' two-phase Play: (1) the
-// rolling circle (or the involute's unwinding string) actually MOVES, tracing the curve
-// live instead of the curve simply appearing, so the student sees the mechanism that
-// produces the shape, not just the shape; (2) once the roll finishes, the tangent/normal
+// playRollAnimation() — the roulette constructions' two-phase Play: (1) the rolling
+// circle actually MOVES, tracing the curve live instead of the curve simply appearing,
+// so the student sees the mechanism that produces the shape, not just the shape; (2)
+// once the roll finishes, the tangent/normal
 // construction draws on top via the platform's normal per-step reveal. Two phases so the
 // two ideas ("here's how the curve is generated" vs. "here's why the normal lands here")
 // are never happening at once — Topic 1.1's per-step Play never had to solve this, since
@@ -190,8 +190,9 @@ const simController = {
     if (lastRecipe.animateRoll) {
       activePlay = playRollAnimation(lastRecipe.animateRoll);
     } else {
-      // Fixed-step constructions (the two involute-polygon entries) — same per-step
-      // draw-on every other topic in this track uses.
+      // Fixed-step fallback (no current construction in this topic omits animateRoll,
+      // since every roulette entry rolls — kept generic, same per-step draw-on every
+      // other topic in this track uses, in case a future addition needs it).
       const moveAndResult = lastRecipe.steps.filter((s) => s.role !== 'given');
       activePlay = playSteps(dynamicLayer, moveAndResult, {
         onComplete: () => { activePlay = null; },

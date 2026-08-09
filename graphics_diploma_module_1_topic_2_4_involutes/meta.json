@@ -1,0 +1,6 @@
+{
+  "title": "Involutes",
+  "description": "The involute of a circle and of a regular polygon (equilateral triangle, square) — the path traced by a taut string unwinding from a shape — built one construction at a time, with a scrubbable roll angle on the circle case and a tangent/normal construction at the end.",
+  "difficulty": "intermediate",
+  "tags": ["diploma-engineering-graphics", "involute", "guided-stepper", "2d-svg"]
+}

@@ -6926,6 +6926,161 @@ Topics 1.1-1.3 untouched (separate follow-up, see [[project_regular_polygons_adr
 
 ---
 
+## ADR-149: Diploma track grows a Module 3 ("Projection Systems"), skipping Module 2 — the module-numbering ADR ADR-095 left open
+
+**Date:** 2026-08-06
+**Decision:** The Diploma Engineering Graphics track gains a **Module 3**, "Projection Systems,"
+whose first topic — `graphics_diploma_module_3_topic_1_1_first_third_angle` (First and Third Angle
+Projection) — compares first-angle and third-angle orthographic projection on one solid: a shared
+HP/VP/PP glass-box setup, one rabatment fold reused identically by both systems, the resulting view
+layout, and the BIS title-block symbol for each. **Module 2 is deliberately skipped, not filled**:
+the module number was set explicitly to 3 by the requester, not derived from a "next available"
+rule; ADR-095 does not require sequential, no-gap module numbering, only that the track's own
+docs/ADR sequence stay shared. Namespaced `graphics_diploma_module_3_topic_1_1_first_third_angle`
+— `M=3` (module), `K=1` (first topic in that module), `N=1` (first subtopic under that topic,
+leaving `_1_2`/`_1_3` open for the CONTENT SPEC's explicitly out-of-scope future work: the full
+six-view glass box and surface-type/inclined-plane behavior) — per ADR-095's own
+`module_<M>_topic_<K>_<N>_<slug>` convention.
+**Why:** ADR-095's own Consequences field states plainly: *"Future module numbering for this track,
+if it grows beyond Module 1, is left fully open pending a future ADR if/when that happens."* This
+is that ADR — a new module was not silently assumed permissible; the gap was surfaced explicitly
+during planning (Phase A of this build) before any file was touched, and confirmed by the requester
+before Phase B began. The module boundary itself (not a third Topic inside Module 1) is justified
+independently of the numbering question: Module 1 is architecturally committed to a 2D SVG/Canvas
+orchestrator specifically *because* "none of these subtopics involve 3D solid geometry" (ADR-095);
+first-vs-third-angle projection is a genuine 3D projection-system comparison (glass box, rabatment
+fold, an object literally re-positioned between Quadrant I and Quadrant III) — the opposite premise.
+Forcing it into Module 1 would have repeated, in the wrong direction, the exact architecture-fit
+question ADR-097 already resolved once for Helix.
+**Alternatives rejected:** *A third Topic inside Module 1* — rejected for the architecture-mismatch
+reason above (Module 1's 2D-only premise). *Deriving the module number as "next available" (i.e.
+Module 2)* — not chosen; the requester set it to 3 explicitly after the numbering gap was surfaced,
+and ADR-095 places no sequential constraint on this track's module numbers. *Cutting this topic from
+an existing Diploma Module 1 sibling's 2D SVG skeleton* — rejected: this topic needs a real Three.js
+scene (glass box, fold, camera), so per MODULE-STARTER.md's Case A/B decision table it is
+structurally a Case-A build (cut from `template_starter/`) regardless of which curriculum track it
+belongs to; patterns were ported from `graphics_module_1_topic_2_spatial_framework` (the
+pivot-hinged fold, the CSS2D label layer, the BIS symbol badge) and
+`graphics_module_1_topic_3_points` (the generic Problem Library contract) as **technical reference
+only**, explicitly not curriculum lineage — this track's own root-doc-sharing model (ADR-095) is
+unrelated to those two topics' original-syllabus content.
+**Consequences:** Invokes ADR-095 (not superseded) — the shared-root-docs model is unchanged, this
+ADR only exercises the module-numbering decision ADR-095 deferred. `template_starter/`'s copied
+`src/uiManager.js` turned out to be leftover Module-2-specific slider code (not the emptied stub
+MODULE-STARTER.md's own text claims ships) and was deleted rather than adapted, along with the
+unused `src/onboarding.js`; the Reset two-state confirm normally living in `uiManager.js` was ported
+inline into `main.js` instead (RULES §2.9/§4.19 still holds — one reset path, guarded). The fold
+geometry's key claim — that a single constant fold rotation per plane reproduces both systems'
+correct flattened layout, with only the object's quadrant and PP's hinge-offset side differing by
+system — was verified numerically (a standalone Node script replicating THREE's rotation matrices)
+*before* any Three.js code was written, not asserted from visual inspection alone.
+**Status:** Active.
+
+---
+
+## ADR-150: Involute of a circle/polygon splits out of Roulettes into its own Topic 2.4 — Misc Curves grows from three subtopics to four
+
+**Date:** 2026-08-07
+**Decision:** Involute of a circle and involute of a regular polygon move out of
+`graphics_diploma_module_1_topic_2_1_roulettes` into a new **Topic 2.4**,
+`graphics_diploma_module_1_topic_2_4_involutes`. Misc Curves (ADR-096) now has four subtopics —
+2.1 Roulettes, 2.2 Spiral Curves, 2.3 Helix, 2.4 Involutes — appended rather than renumbering
+2.2/2.3, avoiding cascading folder/ADR renames on two already-shipped topics.
+**Why:** Every other Topic 2.1 curve (cycloid, superior/inferior trochoid, epicycloid, superior/
+inferior epitrochoid, hypocycloid, superior/inferior hypotrochoid) is generated by a circle rolling
+without slipping — one equation family, `rollingCurvePoint()`/`contactPoint()` (Topic 2.1's own
+CLAUDE.md calls this "Generator A"). An involute is generated by a taut string/line unwinding — a
+structurally different mechanism (`involuteCirclePoint()`/`involutePolygonArcs()`, called "Generator
+B" and deliberately never unified with Generator A when Topic 2.1 was first built — the polygon case
+isn't even a smooth parametric, it's a chain of compass arcs). Two genuinely different generator
+families sharing one topic muddied "what is this topic teaching"; Topic 2.1's own prior CLAUDE.md
+already flagged the A/B split as deliberate — this completes that separation at the topic level.
+**Alternatives rejected:** *Leave involute in 2.1* — rejected for the reason above. *Renumber 2.2/
+2.3 to make room* — rejected as unnecessary churn on two already-shipped, already-referenced topics
+for a purely additive change. *Generalize the 3 involute picker entries (circle/triangle/square)
+into one construction with an arbitrary-n-gon base-shape selector* — considered per the build
+brief's own "if you want to generalize" note, not taken: kept the existing 3-entry structure
+(unchanged from what Topic 2.1 already shipped), matching the source textbook's exact two worked
+examples (7.6 circle, 7.7 triangle+square) with no speculative n-gon UI ahead of a stated need.
+**Consequences:** Invokes ADR-096 (does not supersede it) — amends its documented three-topic count
+to four; Topic 2.1's own subtopic-count language (CLAUDE.md, meta.json, index.html copy) updates
+from twelve curves to nine. Every primitive Generator A and Generator B share (`tangentNormalSteps()`,
+`P/L/CIRC/CURVE/arcMark/dim` step builders, `boundsOfPoints/fitTransform`, `sampleCircle`, `deg2rad/
+dist/angleOf/pointAt`) gets duplicated into 2.4 per RULES §1.4 (no shared library between topic
+folders), not imported — Topic 2.1 keeps its own copies, untouched. Topic 2.4 uses the family-default
+`200×140` canvas, not Topic 2.1's enlarged `240×190` — that enlargement was sized for the roulette
+family's epi/hypo base circles (up to 100mm radius), a need involute geometry never had (its own
+`INVOLUTE_BUDGET` sub-rect only ever used `200×140` worth of space inside the larger canvas).
+**Status:** Active.
+
+---
+
+## ADR-151: Merging Abhiram's `feat/diplomaMod2` — two ADR-numbering collisions, and a rejected label-pill hunk found to collide live
+
+**Date:** 2026-08-09
+**Decision:** `feat/diplomaMod2` (abhiramkunnath, 6 commits, tip `a041229`) merged into `main`.
+Built in parallel with this session's Regular Polygons (Topic 1.4) work: label/dimension-overlap
+fixes across 9 of the 10 shipped Diploma topics, plus two new topics —
+`graphics_diploma_module_1_topic_2_4_involutes` (Involute of a circle/polygon, split out of
+Roulettes) and `graphics_diploma_module_3_topic_1_1_first_third_angle` (first topic of a new
+Diploma Module 3, "Projection Systems"). Three things recorded here so a future reader does not
+have to re-derive them.
+
+**1. ADR-numbering collision — their ADR-098 vs. this repo's own ADR-098.**
+The merge-base (`90c3e53`) topped out at ADR-097. Both branches then numbered forward from 098
+independently: this repo's own ADR-098 (Show Method's beat-emptiness/mark-novelty rewrite) and
+their ADR-098 ("Diploma track grows a Module 3, skipping Module 2") are unrelated decisions
+sharing one number. Unlike ADR-142's Vishnu merge, this repo's ceiling (ADR-148) has no orphaned-
+citation range to dodge, so the renumber target is simply the next free id: **their ADR-098 →
+ADR-149**. 7 sites updated: the `DECISIONS.md` heading, `CHANGELOG.md`'s First/Third Angle entry,
+and `graphics_diploma_module_3_topic_1_1_first_third_angle/CLAUDE.md` (×5). Their body's own
+citations of ADR-095/096/097 are real, shared decisions on both branches — left untouched.
+
+**2. A second collision INSIDE their own `DECISIONS.md` — a duplicate ADR-080.**
+Their branch's `DECISIONS.md` carried two `## ADR-080` headings: the real, shared one ("Compare
+platform-wide is collapsed to a single docked shape," present on both branches, cited in ~140
+places repo-wide) and a new, unrelated one ("Involute of a circle/polygon splits out of Roulettes
+into its own Topic 2.4") — almost certainly a typo for the next free number on their side, never
+caught because their own branch never diverged from a copy carrying the real ADR-080's citations
+to collide against. **Their duplicate → ADR-150.** This was the dangerous kind of collision to fix
+by a blanket find-and-replace: the literal string `ADR-080` appears on both branches with two
+different meanings, so the renumber was scoped file-by-file, not repo-wide — 16 sites (by line
+count) across exactly `graphics_diploma_module_1_topic_2_1_roulettes/CLAUDE.md` (×3),
+`src/constructions.js` (×1), `graphics_diploma_module_1_topic_2_4_involutes/CLAUDE.md` (×6),
+`index.html` (×2), `src/constructions.js`/`src/problems.js`/`src/renderConstruction.js`/
+`src/viewTransform.js` (×1 each), plus the `DECISIONS.md` heading and one `CHANGELOG.md` line —
+18 sites total. Verified after the edit: every real Compare-collapse ADR-080 citation elsewhere
+in the repo (`Module2/`, topics 5/6, `simple_positions`, `development_of_surfaces`,
+`template_starter`, the new `first_third_angle` topic) is untouched — confirmed by an exact
+before/after count, not spot-checking.
+
+**3. Topic 1.4's label-pill hunk rejected — a real defect found live, not a style call.**
+Their branch also touched `renderConstruction.js`/`index.html` in Topic 1.4 (Regular Polygons),
+this session's own concurrent work. `index.html`'s two hunks (`.vp-hint` repositioned bottom-
+right, `.problem-library__header` regridded to centre the title) don't overlap this session's own
+edits and are kept. `renderConstruction.js`'s hunk adds an opaque paper-coloured `<rect>` "pill"
+behind every vertex/dimension/angle label in `buildStepNode()` — reintroducing, by a different
+mechanism, the `paint-order: stroke` label halo this session's own ADR-145 deliberately removed
+("the halo reads as clutter" — Topic 1.4's `CHANGELOG.md`) once labels became collision-aware.
+Rejected outright rather than partially adopted, on evidence, not preference: live in Chrome
+(pentagon, "54° Angle + Circle" method, finished construction), the left "54°" angle-dimension
+label lands directly on top of vertex label A — the pill's `opacity: 0.88` isn't opaque enough to
+fully hide what's underneath, so "A" ghosts through behind the "5" of "54°", both partially
+legible rather than either being clearly placed. Their pills are a translucency band-aid for
+whatever lands underneath; ADR-145/148's collision-aware pass repositions labels using a real
+obstacle set (line/arc/circle ink plus, as of ADR-148, other labels) so nothing needs to land
+underneath in the first place. Kept ADR-145/148's placement in full — `renderConstruction.js`
+resolved to this session's `17516bc`/`2e255fb` version unchanged, no partial cherry-pick of the
+pill mechanism onto our placement pass.
+
+**Consequences:** `main`'s ADR sequence now runs 001…151 with no duplicate id (`ADR-149`/`ADR-150`
+are this merge's two renumbered decisions). Topic 1.4 keeps its ADR-145/148 label treatment
+unmodified by this merge; the other 8 modified Diploma topics and both new topics land as pushed.
+`ARCHITECTURE.md`'s Diploma topic count bumped 9 → 11 in the same commit as this ADR.
+**Status:** Active.
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*

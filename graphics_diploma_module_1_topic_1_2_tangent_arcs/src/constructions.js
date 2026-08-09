@@ -247,7 +247,7 @@ export const CONSTRUCTIONS = [
         L(A, B, 'given'), P(A, 'given', 'A'), P(B, 'given', 'B'),
         givenCircle(C, circleRadius), P(C, 'given', 'C'),
         dim(C, { x: C.x + circleRadius, y: C.y }, `${circleRadius} mm`, 'given', -13),
-        dim(C, foot, `${distance} mm`, 'given', 16),
+        dim(C, foot, `${distance} mm`, 'given', 24),
       ];
       const offLine = offsetLineToward(A, B, C, radius);
       steps.push(
@@ -292,7 +292,7 @@ export const CONSTRUCTIONS = [
         L(A, B, 'given'), P(A, 'given', 'A'), P(B, 'given', 'B'),
         givenCircle(C, circleRadius), P(C, 'given', 'C'),
         dim(C, { x: C.x + circleRadius, y: C.y }, `${circleRadius} mm`, 'given', -13),
-        dim(C, foot, `${distance} mm`, 'given', 16),
+        dim(C, foot, `${distance} mm`, 'given', 24),
       ];
       if (Math.abs(circleRadius - radius) < 1e-6) {
         return { steps, resultText: 'Change the arc radius so it differs from the circle radius.', invalid: 'degenerate' };
@@ -346,8 +346,8 @@ export const CONSTRUCTIONS = [
         givenCircle(C1, R1), P(C1, 'given', 'C1'),
         givenCircle(C2, R2), P(C2, 'given', 'C2'),
         dim(C1, C2, `${distance} mm`, 'given', 18),
-        dim(C1, { x: C1.x, y: C1.y - R1 }, `${r1} mm`, 'given', -13),
-        dim(C2, { x: C2.x, y: C2.y - R2 }, `${r2} mm`, 'given', -13),
+        dim(C1, { x: C1.x, y: C1.y - R1 }, `${r1} mm`, 'given', -17),
+        dim(C2, { x: C2.x, y: C2.y - R2 }, `${r2} mm`, 'given', -17),
       ];
       if (internal && (radius <= r1 || radius <= r2)) {
         return { steps, resultText: 'The arc must be larger than both circles to wrap around them — increase the arc radius.', invalid: 'degenerate' };

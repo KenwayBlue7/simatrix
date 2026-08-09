@@ -15,7 +15,6 @@ export const TERMS = {
   trochoid: 'Like a cycloid, but the traced point sits beyond or inside the rolling circle’s rim, not on it.',
   epicycloid: 'The path traced by a point on a circle rolling on the outside of a fixed circle.',
   hypocycloid: 'The path traced by a point on a circle rolling on the inside of a fixed circle.',
-  involute: 'The path traced by the end of a taut string as it is unwound from a shape.',
   'generating-circle': 'The circle that rolls to trace a roulette — its radius and the traced point’s offset from its centre are the curve’s defining measurements.',
   'base-circle': 'The fixed circle a generating circle rolls around, for the epicycloid and hypocycloid families.',
 };

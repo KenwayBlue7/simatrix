@@ -494,7 +494,7 @@ into the orchestrator directly.
   surface its "next topic / stay" overlay. Every shipped topic — Module 2, all 9 KTU
   stepper topics (including the last 2 stragglers, `graphics_module_1_topic_1_foundations`
   and `graphics_module_1_topic_4_understanding_orthographic_views`, migrated 2026-07-31),
-  and all 10 Diploma Engineering Graphics topics — is now on the **button-driven,
+  and all 12 Diploma Engineering Graphics topics — is now on the **button-driven,
   latchless** shape: a `#btn-finish` (taking over the footer nav's primary slot once a
   stepper's terminal step is reached) calls `markComplete()` on every click, no latch,
   so a replayed lesson re-fires the signal each time. Most topics gate `#btn-finish` on
@@ -699,10 +699,12 @@ deliberate, narrow exception: a single outbound boot-ready signal (ADR-133).
   topic fires it from a `#btn-finish` click, latchless (re-fires every click) — the
   footer nav for most, `#workbench-rail` for
   `graphics_module_1_topic_4_understanding_orthographic_views` (its footer is CSS-hidden
-  at the terminal step); the 10 Diploma topics additionally gate that button on a solved
-  Problem Library problem. `template_starter` migrated too (2026-07-31), ungated like
-  `understanding_orthographic_views` — no topic remains on the old auto-fired, latched
-  shape.
+  at the terminal step); 11 of the 12 Diploma topics additionally gate that button on a
+  solved Problem Library problem. `template_starter` migrated too (2026-07-31), ungated
+  like `understanding_orthographic_views` —
+  `graphics_diploma_module_3_topic_1_1_first_third_angle` joins that same ungated group
+  (its terminal step's own arrival is already the payoff, matching the KTU precedent) —
+  no topic remains on the old auto-fired, latched shape.
   These are the sim's **only two** outbound messages; it never listens for inbound
   `message` events. One topic (`graphics_module_2_topic_1_introduction`, a free-browse
   gallery with no "finished" state) emits `sim:ready` only.

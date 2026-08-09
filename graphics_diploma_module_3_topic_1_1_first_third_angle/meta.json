@@ -1,0 +1,6 @@
+{
+  "title": "First and Third Angle Projection",
+  "description": "Compare first-angle and third-angle orthographic projection on the same solid: the glass-box setup, the rabatment fold, the resulting view layout, and the BIS title-block symbol for each system.",
+  "difficulty": "beginner",
+  "tags": ["engineering-graphics", "orthographic-projection", "first-angle", "third-angle", "hp-vp-pp", "bis-symbol"]
+}
