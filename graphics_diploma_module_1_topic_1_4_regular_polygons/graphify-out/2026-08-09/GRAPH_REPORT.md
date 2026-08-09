@@ -1,11 +1,11 @@
 # Graph Report - graphics_diploma_module_1_topic_1_4_regular_polygons  (2026-08-09)
 
 ## Corpus Check
-- 15 files · ~34,235 words
+- 15 files · ~33,937 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 163 nodes · 303 edges · 15 communities (13 shown, 2 thin omitted)
+- 162 nodes · 301 edges · 15 communities (13 shown, 2 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 4 edges (avg confidence: 0.57)
 - Token cost: 0 input · 0 output
 
@@ -81,8 +81,8 @@ Cohesion: 0.24
 Nodes (9): initProblemLibrary(), ADR-0015, ENABLED_TIERS, enabledProblems(), FIELD_LABELS, groupByTier(), ADR-0015, PROBLEMS (+1 more)
 
 ### Community 5 - "init"
-Cohesion: 0.29
-Nodes (7): tick(), announce(), frame(), init(), setupVerifyActions(), setupVerifyGate(), setupWizardToggle()
+Cohesion: 0.33
+Nodes (6): tick(), announce(), frame(), init(), setupVerifyActions(), setupWizardToggle()
 
 ### Community 6 - "DESIGN.md — Diploma Engineering Graphics, Module 1 Topic 1.4: Regular Polygons (topic appendix)"
 Cohesion: 0.29
@@ -121,7 +121,7 @@ Nodes (5): applyTransform(), calibratedScale(), centerAt(), chromeScaleFor(), ra
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `assignLabelPositions()` connect `renderConstruction.js` to `main.js`, `rebuild`?**
-  _High betweenness centrality (0.039) - this node is a cross-community bridge._
+  _High betweenness centrality (0.040) - this node is a cross-community bridge._
 - **Why does `renderStatic()` connect `renderConstruction.js` to `main.js`, `rebuild`?**
   _High betweenness centrality (0.007) - this node is a cross-community bridge._
 - **What connects `active`, `easeStandard`, `scaleCache` to the rest of the system?**

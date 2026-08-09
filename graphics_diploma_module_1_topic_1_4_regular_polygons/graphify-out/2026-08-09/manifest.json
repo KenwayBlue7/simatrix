@@ -15,8 +15,8 @@
     "semantic_hash": ""
   },
   "src/main.js": {
-    "mtime": 1786283659.6123333,
-    "ast_hash": "39ed712b3e5fed18dc5b601936776656",
+    "mtime": 1786266342.7831948,
+    "ast_hash": "c9abb489fd17a38f4e103ee589f89cda",
     "semantic_hash": ""
   },
   "src/onboarding.js": {
@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1786283708.0224936,
-    "ast_hash": "dc35463a07ea1b0f37c83f5f7a3fa6a9",
+    "mtime": 1786281649.355394,
+    "ast_hash": "be0eabd64cb9d0b1936ac9066ab613ea",
     "semantic_hash": ""
   }
 }
