@@ -25,7 +25,7 @@
 // file only.
 
 import { CONSTRUCTIONS, findConstruction } from './constructions.js';
-import { clear, renderStatic, playSteps, computeBounds } from './renderConstruction.js';
+import { clear, renderStatic, playSteps, computeBounds, assignLabelPositions } from './renderConstruction.js';
 import { initStepper } from './stepper.js';
 import { initTerms } from './terms.js';
 import { initOnboarding } from './onboarding.js';
@@ -51,6 +51,11 @@ let paused = false;
 let lastFrameTime = 0;
 let rafId = null;
 let solvedAny = false; // a Problem Library problem has matched this page load — gates #btn-finish
+// Topic-only deviation from the platform-wide Finish gate (ADR-078 2026-07-31 addendum):
+// reaching Verify alone unlocks #btn-finish, no problem-solve required. Kept as a SEPARATE
+// flag from solvedAny (not a reuse of onProblemSolved()) so "solved" still means solved and
+// this stays honest about what actually happened. See DECISIONS.md for the recorded carve-out.
+let verifyReached = false;
 
 // ============================================================================
 // DOM references
@@ -63,6 +68,15 @@ const svgEl = document.getElementById('construction-svg');
 const viewTransform = initViewTransform(svgEl, svgEl);
 
 function announce(msg) { if (statusEl) statusEl.textContent = msg; }
+
+/** Toggles the post-construction de-emphasis state (index.html's `.is-complete` rule fades
+ *  every 'move'-role element once true). Cleared at the start of every redraw path (play(),
+ *  revealSlide(), showStepsUpTo(), rebuild()) and set only once the FULL construction is
+ *  actually on screen — never partway through an animation or a Step Through slide that
+ *  isn't the last one. Phase A audit, ADR-145. */
+function setComplete(isComplete) {
+  dynamicLayer?.classList.toggle('is-complete', isComplete);
+}
 
 let flowNoteTimer = null;
 function flowNote(msg) {
@@ -95,6 +109,7 @@ function defaultsFor(construction) {
 function rebuild() {
   clear(givenLayer);
   clear(dynamicLayer);
+  setComplete(false);
   activePlay?.cancel();
   activePlay = null;
 
@@ -106,8 +121,26 @@ function rebuild() {
   } else {
     lastRecipe = construction.build(state.params);
     const givenSteps = lastRecipe.steps.filter((s) => s.role === 'given');
-    renderStatic(givenLayer, givenSteps);
+    renderStatic(givenLayer, givenSteps, lastRecipe.chromeScale);
+    // Resolved ONCE here (not per Play/Step-Through click) over the FULL move/result array —
+    // Step Through reveals it in slide slices, and a slice-local label-collision pass could
+    // only see that slide's own points, so a later slide's label could land on an earlier
+    // one's. See renderConstruction.js's assignLabelPositions() header for why calling it
+    // again per-slice afterward (inside playSteps()/renderStatic()) is safe and idempotent.
+    lastRecipe.resolvedMoveResult = assignLabelPositions(
+      lastRecipe.steps.filter((s) => s.role !== 'given'),
+      lastRecipe.chromeScale,
+    );
   }
+
+  // Keep the SVG's own accessible name in sync with what's actually drawn (RULES §4.12 —
+  // a screen-reader user gets the same "what is this" a sighted student reads off the
+  // dimension label, not a static "drawing area" that never changes). Phase A audit, ADR-145.
+  svgEl?.setAttribute(
+    'aria-label',
+    construction ? `${construction.label} construction drawing. ${lastRecipe.resultText}.`
+      : 'Construction drawing area. Choose a construction to begin.',
+  );
 
   stepper?.sync();
   problemLibrary?.sync();
@@ -145,14 +178,62 @@ const simController = {
     if (!lastRecipe || !dynamicLayer) return;
     activePlay?.cancel();
     clear(dynamicLayer);
+    setComplete(false);
     // A zoomed-in/panned view (viewTransform.js) may not contain the whole construction
     // the animation is about to draw — zoom/pan out just enough to bring it into frame,
     // but only if it isn't already visible (a comfortable manual zoom is left alone).
     viewTransform.ensureVisible(computeBounds(lastRecipe.steps));
-    const moveAndResult = lastRecipe.steps.filter((s) => s.role !== 'given');
-    activePlay = playSteps(dynamicLayer, moveAndResult, {
-      onComplete: () => { activePlay = null; },
+    activePlay = playSteps(dynamicLayer, lastRecipe.resolvedMoveResult, {
+      onComplete: () => { activePlay = null; setComplete(true); },
+      chromeScale: lastRecipe.chromeScale,
     });
+  },
+
+  // Step Through (N-Gon construction only — hasSlides()/getSlides() are empty/false for
+  // every other construction, which is the feature flag uiManager.js branches on, not a
+  // construction-id check). revealSlide() mirrors play()'s own shape but over a slide's
+  // own index RANGE — the "watch it get built" tween mechanism plays for the NEW slide
+  // only, the same reason renderConstruction.js's own header gives for the whole tween
+  // mechanism. showStepsUpTo() is what Back uses instead: an instant, unanimated redraw of
+  // everything through a given point — a state jump, not a construction move.
+  hasSlides: () => !!lastRecipe?.slides?.length,
+  getSlides: () => lastRecipe?.slides ?? [],
+  revealSlide(range, { onComplete } = {}) {
+    if (!lastRecipe?.resolvedMoveResult || !dynamicLayer) return;
+    activePlay?.cancel();
+    activePlay = null;
+    // A Next click can land before the PREVIOUS slide's own draw-on animation finished —
+    // cancel() above stops that tween mid-flight with no way back to its t=1 end state, so
+    // a rushed click would otherwise leave a permanently stuck partial arc/line behind.
+    // Snapping everything before this slide to its finished state first (instant, no
+    // animation) makes revealSlide() correct regardless of click timing; only the NEW
+    // slide itself gets the animated tween.
+    clear(dynamicLayer);
+    setComplete(false);
+    if (range.startIdx > 0) {
+      renderStatic(dynamicLayer, lastRecipe.resolvedMoveResult.slice(0, range.startIdx), lastRecipe.chromeScale);
+    }
+    viewTransform.ensureVisible(computeBounds(lastRecipe.steps));
+    const stepsSlice = lastRecipe.resolvedMoveResult.slice(range.startIdx, range.endIdx);
+    const isLastSlide = range.endIdx >= lastRecipe.resolvedMoveResult.length;
+    activePlay = playSteps(dynamicLayer, stepsSlice, {
+      onComplete: () => {
+        activePlay = null;
+        if (isLastSlide) setComplete(true);
+        onComplete?.();
+      },
+      chromeScale: lastRecipe.chromeScale,
+    });
+  },
+  showStepsUpTo(endIdx) {
+    if (!dynamicLayer) return;
+    activePlay?.cancel();
+    activePlay = null;
+    clear(dynamicLayer);
+    if (endIdx > 0 && lastRecipe?.resolvedMoveResult) {
+      renderStatic(dynamicLayer, lastRecipe.resolvedMoveResult.slice(0, endIdx), lastRecipe.chromeScale);
+    }
+    setComplete(!!lastRecipe?.resolvedMoveResult && endIdx >= lastRecipe.resolvedMoveResult.length);
   },
   reset() {
     state = { constructionId: null, params: {} };
@@ -181,7 +262,7 @@ const simController = {
     stepper.goToGivenStep();
     announce(`${construction.label} selected for this problem. Adjust the given value to match, then continue.`);
   },
-  hasSolvedProblem: () => solvedAny,
+  hasSolvedProblem: () => solvedAny || verifyReached,
   onProblemSolved() {
     solvedAny = true;
     stepper.sync(); // re-render the footer so #btn-finish enables at the Verify step
@@ -244,6 +325,21 @@ function setupVerifyActions() {
   document.getElementById('btn-verify-problems')?.addEventListener('click', () => problemLibrary.open());
 }
 
+// Topic-only Finish-gate deviation (ADR-078 2026-07-31 addendum carve-out — see DECISIONS.md).
+// Watches the Verify panel's `hidden` attribute rather than editing stepper.js's per-topic-
+// copied goToStep() — stepper.js stays byte-identical to sibling Diploma topics (CLAUDE.md's
+// EXTRACTED/unchanged audit note). Fires once; harmless if it fires again (idempotent flag).
+function setupVerifyGate() {
+  const panel = document.querySelector('.step-panel[data-step="4"]');
+  if (!panel) return;
+  const mo = new MutationObserver(() => {
+    if (verifyReached || panel.hidden) return;
+    verifyReached = true;
+    stepper.sync(); // re-render footer so #btn-finish enables
+  });
+  mo.observe(panel, { attributes: true, attributeFilter: ['hidden'] });
+}
+
 // ============================================================================
 // window.simAPI — the platform contract (ADR-002). No second reset path.
 // ============================================================================
@@ -262,6 +358,7 @@ function init() {
   rebuild();
   setupWizardToggle();
   setupVerifyActions();
+  setupVerifyGate();
   rafId = requestAnimationFrame(frame);
   window.__simBooted = true; // clears the boot watchdog fallback (index.html inline script)
   window.parent.postMessage({ type: 'sim:ready' }, '*'); // host signal (ADR-078) — fires once, init() runs once

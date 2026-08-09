@@ -160,6 +160,34 @@
     }
     #construction-svg { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
     #construction-svg:active { cursor: grabbing; }
+    /* RULES §4.12: every interactive target gets a visible accent focus halo — the drawing
+       area is keyboard-operable (viewTransform.js's arrow-key pan / +-/0 zoom-reset), so it
+       needs one too. outline (not box-shadow) since this is drawn inset-safe on an <svg>. */
+    #construction-svg:focus-visible { outline: none; box-shadow: inset var(--ring-focus); }
+
+    /* Every label lives in a [data-layer="labels"] sublayer, painted after (on top of) that
+       same group's [data-layer="ink"] sibling (renderConstruction.js's ensureSublayers()) —
+       so a later step's line/arc/circle can never paint over an earlier label. Phase A audit,
+       ADR-145 (the reported "illegible" defect). The paper-coloured stroke halo that used to
+       sit here was removed once labels became proportionally sized via chromeScale (this
+       session's constructions.js/renderConstruction.js work) — with chrome density around a
+       label now scaled down in lockstep with the geometry, the halo stopped earning its keep
+       and read as clutter. This sublayer ordering is still the fix for painting-over; keep it. */
+
+    /* Once a construction finishes drawing (main.js toggles .is-complete on #dynamic-layer
+       — see setComplete()), every 'move' role element (compass arcs, auxiliary circles,
+       ladder/division points) fades back so the finished 'result' polygon reads as the
+       answer, not one more line among equals. !important: several step kinds (point/dim/
+       angledim) already drive their OWN reveal-animation opacity via inline style on this
+       exact element, which would otherwise out-rank this class rule on the same element —
+       this is deliberately the final word once the construction is done. Reduced-motion
+       collapse is inherited for free from the file's existing blanket
+       `*, *::before, *::after { transition-duration: 0.001ms !important }` rule below.
+       Phase A audit, ADR-145 (the reported "construction lines don't de-emphasize" defect). */
+    #dynamic-layer.is-complete [data-role="move"] {
+      opacity: 0.32 !important;
+      transition: opacity var(--dur-step) var(--ease-standard);
+    }
 
     /* Hide/show the guided-steps wizard to enlarge the viewport (same pattern as
        graphics_module_1_topic_3_points). Floats over the SVG so it stays reachable in
@@ -421,6 +449,21 @@
     .method-switcher__btn[aria-pressed="true"] { background: var(--color-accent); color: var(--color-panel); border-color: var(--color-accent); }
     .method-switcher__btn:focus-visible { outline: none; box-shadow: var(--ring-focus); z-index: 1; position: relative; }
 
+    /* Step Through (Construct step, N-Gon construction only) — click-gated slide navigator,
+       default/primary alongside the unchanged "Play All" secondary button. Layout only:
+       reuses .btn/.btn--primary/.btn--block verbatim, no new button variant, no new colours
+       (RULES §4.1) — every token below is already declared for the rest of this page. */
+    .step-through { display: flex; flex-direction: column; width: 100%; gap: var(--space-3); }
+    .step-through[hidden] { display: none; }
+    .step-through__row { display: flex; align-items: center; gap: var(--space-3); width: 100%; }
+    .step-through__back { flex: 0 0 auto; min-height: 40px; padding: 0 var(--space-3); font-size: var(--text-sm); }
+    .step-through__caption {
+      flex: 1 1 auto; margin: 0; padding: var(--space-2) var(--space-3);
+      font-size: var(--text-sm); line-height: 1.5; color: var(--color-ink-secondary);
+      background: var(--color-paper); border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+      min-height: 40px; display: flex; align-items: center;
+    }
+
     /* --- Buttons --- */
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-height: 44px; padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-paper); color: var(--color-ink); font-size: var(--text-base); font-weight: 400; cursor: pointer; transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard); }
     .btn:active:not(:disabled) { transform: scale(0.97); }
@@ -556,12 +599,13 @@
       <span class="sr-only">Toggle steps panel</span>
     </button>
 
-    <svg id="construction-svg" viewBox="0 0 200 140" preserveAspectRatio="xMidYMid meet">
+    <svg id="construction-svg" viewBox="0 0 200 200" preserveAspectRatio="xMidYMid meet"
+         tabindex="0" role="img" aria-label="Construction drawing area. Choose a construction to begin.">
       <g id="given-layer"></g>
       <g id="dynamic-layer"></g>
     </svg>
 
-    <p class="vp-hint">Scroll to zoom · Drag to pan · Double-click to reset view</p>
+    <p class="vp-hint">Scroll to zoom · Drag to pan · Double-click to reset view · Arrow keys pan, +/− zoom, 0 resets</p>
 
     <div id="vp-empty">
       <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
@@ -653,12 +697,27 @@
         </div>
 
         <!-- Step 3 — Construct. Method switcher (2-3 buttons, built per-construction by
-             uiManager.js) above the Play/Replay trigger; renderConstruction.js animates. -->
+             uiManager.js) above the reveal controls; renderConstruction.js animates.
+             Pentagon/Hexagon (no audited slide breakdown) keep the single Play button below.
+             N-Gon only gets #step-through: a click-gated slide navigator (default/primary)
+             alongside "Play All" (secondary, the same unchanged single-animation reveal) —
+             uiManager.js toggles which block is visible via sim.hasSlides(). -->
         <div class="step-panel" data-step="3" hidden>
           <div class="construct-actions">
             <div class="method-switcher" id="method-switcher" role="group" aria-label="Construction method" hidden></div>
+
             <button type="button" class="btn btn--primary btn--block" id="btn-play-construction">Play construction</button>
-            <p class="card__lead">You can press Play again to replay it.</p>
+
+            <div class="step-through" id="step-through" hidden>
+              <div class="step-through__row">
+                <button type="button" class="btn step-through__back" id="btn-step-back" disabled>Back</button>
+                <p class="step-through__caption" id="step-through-caption" aria-live="polite"></p>
+              </div>
+              <button type="button" class="btn btn--primary btn--block" id="btn-step-next">Step Through</button>
+              <button type="button" class="btn btn--block" id="btn-play-all">Play All</button>
+            </div>
+
+            <p class="card__lead" id="construct-replay-hint">You can press Play again to replay it.</p>
           </div>
         </div>
 
