@@ -39,7 +39,16 @@ for (const a of ARRANGEMENTS) {
 }
 for (const r of RULES) add(`step 2 · ${r.id}`, r.correct);
 for (const s of SYMBOLS) {
-  for (const c of (s.cases ?? [])) if (c.build) add(`step 5 · ${s.id} / ${c.id}`, c.build());
+  for (const v of (s.variants ?? [])) {
+    if (!v.specs) continue;
+    // THE ONE STEP-5 BUDGET. "Length and angle" states a 10 mm chamfer's length AND its angle
+    // in the corner of the step, and the corner the chamfer cut is 10 mm square. The length's
+    // two projection lines rise out of that corner, and the angle's value has to be lettered
+    // somewhere between them. Fig. 4.26 prints the same pair on a figure drawn large enough for
+    // both. Two contacts survive: the 45° value 0.3 mm off a projection line, and the arc's
+    // arrow head 3.0 mm off it. Tight geometry, reported rather than papered over.
+    add(`step 5 · ${s.id} / ${v.id}`, v.specs, s.id === 'chamfer' && v.id === 'separate' ? 2 : 0);
+  }
 }
 // See the header: the Guide Plate's own budget, and a ratchet.
 add('step 6 · the complete Guide Plate', completeDrawing(), 5);

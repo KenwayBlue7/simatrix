@@ -32,6 +32,7 @@ import { buildEdgeMap } from './meshAnalyzer.js';
 import { createLineDrawer } from './lineDrawer.js';
 import { createRig } from './dimensionRig.js';
 import { createDimensionLayer, SPACING, fitDecision } from './dimensionDraw.js';
+import { needsCentreLines } from './dimensionLayout.js';
 import { createLabelLayer } from './dimensionLabels.js';
 import { initUI } from './dimensionUI.js';
 import { initTerms } from './terms.js';
@@ -196,6 +197,9 @@ let compareLayoutId = null;
  * Foundations' `applyLayers()` + `setXray()` have at the end of its rebuild.
  */
 const rigState = { dimmed: false, lineFocus: null, centreLines: false };
+/** Whether the centre lines are actually on screen — the step's wish OR'd with what the specs
+ *  demand. Remembered so `redraw()` can re-apply the rig only when the answer changes. */
+let centreLinesShown = false;
 
 /** Write one or more rig wants and push them at the live rigs. */
 function setRig(patch) {
@@ -203,12 +207,22 @@ function setRig(patch) {
   applyRigState();
 }
 
-/** Replay the whole record onto both sheets. Idempotent, so it is safe after any rebuild. */
+/** Replay the whole record onto both sheets. Idempotent, so it is safe after any rebuild.
+ *
+ *  CENTRE LINES ARE NOT PURELY A STEP'S CHOICE. A diameter written on a leader is ambiguous on
+ *  its own — an arrow head on a circle does not say whether the number spans the full width or
+ *  half of it. The feature's centre cross is what says "right across", so any drawing that
+ *  states a ø or Sø on a leader turns them on whatever the step asked for
+ *  (dimensionLayout.js `needsCentreLines`). A step may switch them ON; it cannot switch them
+ *  off under a diameter. */
 function applyRigState() {
   const mode = poseName === 'rear' ? 'rear' : poseName === 'front' ? 'front' : 'free';
-  rigA?.applyState({ ...rigState, viewMode: mode, authored: mode === 'front' });
+  centreLinesShown = rigState.centreLines
+    || needsCentreLines(drawing.specs) || needsCentreLines(compareSpecs);
+  const shown = { ...rigState, centreLines: centreLinesShown };
+  rigA?.applyState({ ...shown, viewMode: mode, authored: mode === 'front' });
   // Sheet B is only ever a second elevation beside the first, so it keeps its authored set.
-  rigB?.applyState({ ...rigState, viewMode: mode, authored: true });
+  rigB?.applyState({ ...shown, viewMode: mode, authored: true });
 }
 
 /** Step 1 has three studies on one drawing surface; this is which one is live. */
@@ -252,9 +266,11 @@ let lastFrameTime = 0;
 
 /** In-flight camera pose tween handle. */
 let cameraTween = null;
-/** Current camera pose (degrees). */
-let pose = { az: VIEWS.front.azimuthDeg, el: VIEWS.front.elevationDeg };
-let poseName = 'front';
+/** Current camera pose (degrees). The sim OPENS ON THE ISOMETRIC — `VIEWS.pictorial` is
+ *  `camera.position.set(1, 1, 1)` normalised, scaled by `CAM_DISTANCE` and aimed at the part's
+ *  centre by `applyPose()`. Still the one orthographic camera; orbit, zoom and pan unchanged. */
+let pose = { az: VIEWS.pictorial.azimuthDeg, el: VIEWS.pictorial.elevationDeg };
+let poseName = 'pictorial';
 
 const statusRegion = document.getElementById('sim-status');
 
@@ -591,6 +607,10 @@ function redraw() {
     angularStyle: drawing.angularStyle,
   };
   const specs = resolveSpecs();
+  // A step may set its specs AFTER it set the rig, so the centre-line demand is re-checked from
+  // the live list here. Only re-applied when the answer actually changes — this runs per frame.
+  if ((rigState.centreLines || needsCentreLines(specs) || needsCentreLines(compareSpecs))
+    !== centreLinesShown) applyRigState();
   const labels = layerA.draw(specs, { ...opts, progress: resolveProgress(specs) });
   for (const l of labels) l.text = inUnits(l.text);
   labelsA.setLabels(labels);
@@ -1461,9 +1481,10 @@ window.simAPI = {
     missed.clear();
     visited.clear();
     lastPicked = null;
-    pose = { az: VIEWS.front.azimuthDeg, el: VIEWS.front.elevationDeg };
+    // A reset puts back the view the sim OPENS on, which is the isometric.
+    pose = { az: VIEWS.pictorial.azimuthDeg, el: VIEWS.pictorial.elevationDeg };
     camera.zoom = 1;
-    setPoseName('front');
+    setPoseName('pictorial');
     setCompareOffsets(false);
     // Back to the figure the lesson opens on, and to its frame, before the one geometry path.
     currentFigure = DEFAULT_FIGURE;
@@ -1687,7 +1708,7 @@ function init() {
     document.getElementById('btn-rear')?.addEventListener('click', () => setView('rear'));
 
     rebuild();
-    setPoseName('front');
+    setPoseName('pictorial');   // the sim opens on the isometric — see `pose`, above
     updateFigureBadge();
     ui = initUI(simController);          // paints Step 1 and calls enterStep(1)
     initTerms({ terms: TERMS, root: '#wizard' });

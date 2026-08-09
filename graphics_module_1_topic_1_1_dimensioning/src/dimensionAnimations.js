@@ -86,8 +86,14 @@ export const ELEMENT_ORDER = Object.freeze([
 export const VIEWS = Object.freeze({
   /** The drawing itself: a true orthographic front elevation. */
   front: { azimuthDeg: 0, elevationDeg: 0 },
-  /** A three-quarter pictorial, to see the plate is 30 thick and the seat is a real bowl. */
-  pictorial: { azimuthDeg: -32, elevationDeg: 22 },
+  /**
+   * A true ISOMETRIC pictorial, to see the plate is 30 thick and the seat is a real bowl —
+   * and the view the sim opens on. These two angles ARE `camera.position.set(1, 1, 1)`
+   * normalised: azimuth atan2(1, 1) = 45°, elevation asin(1/√3) = 35.264°. `applyPose()` then
+   * scales that direction by the current camera distance and looks at the part's centre, so
+   * nothing about the camera system changes — only which direction it starts from.
+   */
+  pictorial: { azimuthDeg: 45, elevationDeg: 35.264 },
   /** Turned over, to read the countersink from the face it is machined on. */
   rear: { azimuthDeg: 180, elevationDeg: 0 },
 });

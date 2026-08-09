@@ -327,13 +327,27 @@ function shapesFor(spec, ctx) {
 
     case 'diameter': {
       if (spec.mode === 'leader') {
+        // The span across the circle PLUS the leader that carries its value out — see
+        // `drawDiameter` in dimensionDraw.js, which this mirrors stroke for stroke.
+        const c = W(spec.centre);
+        const r = toUnits(spec.diaMm / 2);
         const ang = (spec.dirDeg ?? 45) * DEG;
-        return shapesFor({
-          ...spec, kind: 'leader', head: 'arrow',
-          anchor: [spec.centre[0] + Math.cos(ang) * (spec.diaMm / 2),
-            spec.centre[1] + Math.sin(ang) * (spec.diaMm / 2)],
-          lengthMm: spec.lengthMm ?? 20,
-        }, ctx);
+        const d = { x: Math.cos(ang), y: Math.sin(ang) };
+        const p = add(c, mul(d, -r));
+        const q = add(c, mul(d, r));
+        push('dim', segment(p, q));
+        arrow(p, mul(d, -1));
+        arrow(q, d);
+        const elbow = add(q, mul(d, toUnits(spec.lengthMm ?? 20)));
+        const barDir = d.x >= 0 ? 1 : -1;
+        const bar = add(elbow, { x: toUnits(spec.barMm ?? 10) * barDir, y: 0 });
+        const landing = toUnits(CLEARANCE_MM * 2);
+        const run = toUnits(spec.lengthMm ?? 20);
+        push('leader', segment(add(q, mul(d, Math.min(landing, run))), elbow));
+        push('leader', segment(elbow, bar));
+        const at = add(bar, { x: toUnits(2) * barDir, y: toUnits(SPACING.textGap + SPACING.textHeight / 2) });
+        value(at, 0, barDir > 0 ? 0 : 1);
+        break;
       }
       const c = W(spec.centre);
       const r = toUnits(spec.diaMm / 2);
@@ -356,15 +370,17 @@ function shapesFor(spec, ctx) {
       const ang = (spec.dirDeg ?? 45) * DEG;
       const d = { x: Math.cos(ang), y: Math.sin(ang) };
       const onArc = add(c, mul(d, toUnits(spec.radiusMm)));
-      const start = spec.fromCentre === false
+      const outside = spec.fromCentre === false;
+      const start = outside
         ? add(c, mul(d, toUnits(spec.radiusMm) + toUnits(spec.leadMm ?? 16)))
-        : c;
+        : add(c, mul(d, -toUnits(spec.tailMm ?? 0)));
       push('dim', segment(start, onArc));
-      arrow(onArc, spec.fromCentre === false ? mul(d, -1) : d);
+      arrow(onArc, outside ? mul(d, -1) : d);
+      const onTail = outside || spec.tailMm;
       for (const method of [1, 2]) {
         const pl = textPlacement(start, onArc, method, undefined, 0);
-        const at = lerp2(start, onArc, spec.fromCentre === false ? 1.15 : 0.55);
-        value(spec.fromCentre === false ? at : pl.at, method === 2 ? 0 : pl.rotationDeg);
+        const at = lerp2(start, onArc, onTail ? -0.12 : 0.55);
+        value(onTail ? at : pl.at, method === 2 ? 0 : pl.rotationDeg);
       }
       break;
     }
@@ -744,6 +760,56 @@ const key = (i, j) => `${i}:${j}`;
 const contact = (h) => (h.iA < h.iB
   ? `${h.iA}:${h.iB}:${h.roleA}:${h.roleB}`
   : `${h.iB}:${h.iA}:${h.roleB}:${h.roleA}`);
+
+/**
+ * ENFORCE EXTERNAL, LEADER-BASED DIMENSIONING.
+ *
+ * The house rule for this module is stricter than the chapter: NOTHING may be drawn inside the
+ * object boundary, and the object boundary INCLUDES its voids — the circles, the fillets and the
+ * slots. Fig. 4.20's across-the-circle diameter and its arrows-outside variant both put a
+ * dimension line inside a hole, so neither is used here. Every circular feature is stated on a
+ * LEADER: arrow head on the circumference, note out on clear paper.
+ *
+ * This runs on every draw, so a spec that asks for an internal method cannot reach the paper
+ * however it got written. Where the data already routes a sensible leader, that routing is kept;
+ * a spec converted here falls back to a 45° lead long enough to clear its own feature.
+ *
+ * @param {object[]} specs
+ * @returns {object[]} the same list with every diameter expressed as a leader
+ */
+export function externalise(specs) {
+  let changed = false;
+  const out = specs.map((s) => {
+    if (!s || s.kind !== 'diameter' || s.mode === 'leader') return s;
+    changed = true;
+    return {
+      ...s,
+      mode: 'leader',
+      dirDeg: s.dirDeg ?? 45,
+      lengthMm: s.lengthMm ?? Math.max(20, s.diaMm ?? 20),
+      barMm: s.barMm ?? 14,
+    };
+  });
+  return changed ? out : specs;
+}
+
+/**
+ * DOES THIS DRAWING NEED ITS CENTRE LINES SHOWN?
+ *
+ * A diameter stated on a leader is, on its own, ambiguous: an arrow head touching a circle says
+ * nothing about whether the number spans the full width or only the radius. What removes the
+ * ambiguity is the feature's own CENTRE LINES — a cross through the circle is what tells the
+ * reader the ø is measured right across it. So any drawing that states a diameter on a leader
+ * has to show them, and this works that out from the specs rather than leaving it to each step
+ * to remember.
+ *
+ * @param {object[]} specs
+ * @returns {boolean}
+ */
+export function needsCentreLines(specs) {
+  return (specs || []).some((s) => s && !s.hidden
+    && (s.kind === 'diameter' || (s.kind === 'leader' && /^\s*(ø|Sø|⌀)/.test(String(s.text ?? '')))));
+}
 
 /** The drafting options both entry points read, defaulted once. */
 function contextFor(opts) {

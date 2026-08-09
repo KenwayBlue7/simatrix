@@ -78,10 +78,12 @@ export function anatomyDrawing() {
       from: [0, 0], to: [0, P.height], at: L1.left1, text: String(P.height),
     },
     {
-      // Dot, knee, bar and note all INSIDE the outline: a dot has to sit clearly on the face
-      // it is about, and a bar that ran out past the right-hand edge would cross it.
+      // The DOT stays inside — a dot has to sit clearly on the face it is about (Fig. 4.4) —
+      // but the leader now carries the lettering out ABOVE the top edge, so no text sits on
+      // the part. Up rather than right: the right-hand edge would be crossed by the bar, and
+      // the paper above the plate is empty.
       id: 'a-note', kind: 'leader',
-      anchor: [66, 46], dirDeg: 40, lengthMm: 24, barMm: 14, head: 'dot',
+      anchor: [66, 46], dirDeg: 55, lengthMm: 46, barMm: 14, head: 'dot',
       text: `MS PLATE\n${P.thickness} THICK`,
     },
   ];
@@ -266,9 +268,9 @@ export function methodDrawing() {
       id: 'm-angle', kind: 'angular', vertex: [chamferStart, 0], radiusMm: 14,
       fromDeg: 0, toDeg: 45, legs: 'from', text: '45°',
     },
-    // The note is kept short so its bar and lettering stay well inside the top edge rather than
-    // printing across it (§4.6 rule 3 — a note crosses nothing, least of all an outline).
-    { id: 'm-hole', kind: 'diameter', mode: 'leader', centre: H.at, diaMm: H.dia, dirDeg: 125, lengthMm: 20, barMm: -14, text: `ø${H.dia}` },
+    // ON A LEADER, out past the top-left corner. Arrow head on the circumference, note on clear
+    // paper: nothing of this dimension lies within the outline, the hole included.
+    { id: 'm-hole', kind: 'diameter', mode: 'leader', centre: H.at, diaMm: H.dia, dirDeg: 55, lengthMm: 36, barMm: 14, text: `ø${H.dia}` },
   ];
 }
 
@@ -387,13 +389,25 @@ function runningSpecs(twoDirection, style = 'b') {
  */
 function coordinateSpecs(form = 'a') {
   const pts = [S4.holeA, S4.slot, S4.holeB];
+  // Each point is MARKED on the feature and its lettering is carried off the sheet's edge on a
+  // leader. Fig. 4.19 letters at the point itself, but two of these three points are drilled
+  // holes only 12 across: a number written there sits on metal, and "x = 105 / y = 58" runs
+  // clean across it. The cross still says WHICH point, the leader still ties the lettering to
+  // that cross, and nothing is written on the part.
+  const ROUTE = [
+    { dirDeg: 120, lengthMm: 30, barMm: 12 },   // left hole  — up and out to the left
+    { dirDeg: -80, lengthMm: 34, barMm: 12 },   // slot       — straight down, under the plate
+    { dirDeg: 60, lengthMm: 30, barMm: 12 },    // right hole — up and out to the right
+  ];
   const out = [{ id: 'co-origin', kind: 'origin', at: [0, 0] }];
   pts.forEach((f, i) => {
-    out.push(form === 'b'
-      // Fig. 4.19(b): the co-ordinates are written at the point itself, and there is no table.
-      ? { id: `co-${i}`, kind: 'coordinate', mode: 'values', at: f.at, text: `x = ${f.at[0]}\ny = ${f.at[1]}` }
-      // Figs. 4.19(a) and (c): a numbered point, read against the table beside the view.
-      : { id: `co-${i}`, kind: 'coordinate', at: f.at, text: String(i + 1) });
+    out.push({ id: `co-${i}`, kind: 'coordinate', mode: form === 'b' ? 'values' : undefined, at: f.at });
+    out.push({
+      id: `co-note-${i}`, kind: 'leader', head: 'none', anchor: f.at, ...ROUTE[i],
+      // Fig. 4.19(b) carries the two co-ordinates themselves and has no table; (a) and (c)
+      // carry only a number, read against the table beside the view.
+      text: form === 'b' ? `x = ${f.at[0]}\ny = ${f.at[1]}` : String(i + 1),
+    });
   });
   return out;
 }
@@ -587,13 +601,15 @@ export function completeDrawing() {
     { id: 'd-50', kind: 'linear', axis: 'y', from: [PLATE.length, 0], to: [PLATE.length, PLATE.stepHeight], at: LANE.right1, text: String(PLATE.stepHeight) },
 
     // --- features ---
-    { id: 'd-bore', kind: 'diameter', mode: 'leader', centre: F.bore.at, diaMm: F.bore.dia, dirDeg: 55, lengthMm: 26, barMm: 14, text: `ø${F.bore.dia}` },
+    // ON A LEADER, out through the left-hand edge into clear paper. Arrow head on the
+    // circumference; nothing inside the bore.
+    { id: 'd-bore', kind: 'diameter', mode: 'leader', centre: F.bore.at, diaMm: F.bore.dia, dirDeg: 135, lengthMm: 30, barMm: -14, text: `ø${F.bore.dia}` },
     {
       // The bore's front mouth is chamfered (Fig. 4.26c). The note is routed RIGHT, into the
       // empty pocket above the low step — the only quiet corner of the sheet that is not
       // already a dimension lane, and well clear of the R12 corner note on the far side.
       id: 'd-ch-int', kind: 'leader', anchor: onCircle(F.bore.at, BORE_MOUTH_DIA / 2, 20),
-      dirDeg: 20, lengthMm: 20, barMm: 14, head: 'arrow',
+      dirDeg: 45, lengthMm: 26, barMm: 14, head: 'arrow',
       text: `${F.bore.chamfer.width} × ${F.bore.chamfer.angle}°`,
     },
     {
@@ -607,22 +623,46 @@ export function completeDrawing() {
     // free for the crown radius and no leader has to cross a projection line (§4.6 rule 3).
     { id: 'd-slot-len', kind: 'linear', axis: 'x', from: [slotL, F.slot.at[1]], to: [slotR, F.slot.at[1]], at: LANE.below3, text: String(SLOT_LENGTH) },
     {
-      id: 'd-slot-wid', kind: 'linear', axis: 'y', noExtension: true, arrowsOutside: true,
-      from: [F.slot.at[0], F.slot.at[1] - F.slot.width / 2], to: [F.slot.at[0], F.slot.at[1] + F.slot.width / 2],
-      at: F.slot.at[0], text: String(F.slot.width),
+      // The slot is a void inside the outline, so its width cannot be stated across itself and
+      // a vertical dimension line for it would have to stand at an x that is inside the plate.
+      // It goes on an angled leader instead, off the top flank and up into the clear paper
+      // above the step.
+      id: 'd-slot-wid', kind: 'leader', head: 'arrow',
+      anchor: [F.slot.centres[0][0] + F.slot.width / 2, F.slot.at[1] - F.slot.width / 2],
+      dirDeg: 250, lengthMm: 26, barMm: -12, text: String(F.slot.width),
     },
     { id: 'd-sphere', kind: 'leader', anchor: sphereRim, dirDeg: 75, lengthMm: 36, barMm: 14, head: 'arrow', text: `Sø${F.sphere.dia}` },
-    { id: 'd-fillet', kind: 'radius', centre: [110, 65], radiusMm: PLATE.filletR, dirDeg: 225, text: `R${PLATE.filletR}` },
-    { id: 'd-corner', kind: 'radius', centre: [12, 88], radiusMm: PLATE.cornerR, dirDeg: 135, text: `R${PLATE.cornerR}` },
     {
+      // A CONCAVE arc: the metal is on the outside of it, so the lead cannot come from there.
+      // It runs from the arc back through the centre and out into the open notch above the
+      // step, and the value is written on that tail — angled, on clear paper, one arrow head
+      // on the fillet itself.
+      id: 'd-fillet', kind: 'radius', centre: [110, 65], radiusMm: PLATE.filletR, dirDeg: 240,
+      tailMm: 24, text: `R${PLATE.filletR}`,
+    },
+    {
+      // Taken from OUTSIDE the arc (§4.1 rule 6 allows either), because the corner radius is
+      // small and a lead drawn from its centre would put "R12" inside the metal. One arrow
+      // head, on the feature outline; the value out past the corner on clear paper.
+      id: 'd-corner', kind: 'radius', centre: [12, 88], radiusMm: PLATE.cornerR, dirDeg: 135,
+      fromCentre: false, leadMm: 14, text: `R${PLATE.cornerR}`,
+    },
+    {
+      // The jog runs OUTWARD, above the crowned face, so the broken leg and the value it
+      // carries sit on clear paper instead of inside the step. The stub at the arc is still a
+      // true radius and still carries the one arrow head (Fig. 4.22).
       id: 'd-crown', kind: 'radiusLarge', centre: CROWN_CENTRE, radiusMm: PLATE.crownR,
-      onArcDeg: 90, jogMm: 12, falseCentre: [116, 41.7], text: `R${PLATE.crownR}`,
+      onArcDeg: 90, jogMm: -10, falseCentre: [122, 74], text: `R${PLATE.crownR}`,
     },
     { id: 'd-chamfer', kind: 'leader', anchor: [195, 45], dirDeg: 40, lengthMm: 28, barMm: 14, head: 'arrow', text: `${PLATE.chamfer} × 45°` },
     {
-      id: 'd-spigot-dia', kind: 'linear', axis: 'y', noExtension: true,
-      from: [SPIGOT_MID_X, SPIGOT_RECT.y0], to: [SPIGOT_MID_X, SPIGOT_RECT.y1],
-      at: SPIGOT_MID_X, text: `ø${F.spigot.dia}`,
+      // Projected off the spigot's END FACE and stated 14 mm clear of it, so the value sits on
+      // paper rather than inside the rectangle. The same ø28 across the same two edges — a
+      // cylinder whose axis lies in the drawing plane shows as a rectangle, and only the ø says
+      // it is round (Fig. 4.21).
+      id: 'd-spigot-dia', kind: 'linear', axis: 'y',
+      from: [SPIGOT_RECT.x1, SPIGOT_RECT.y0], to: [SPIGOT_RECT.x1, SPIGOT_RECT.y1],
+      at: SPIGOT_RECT.x1 + 14, text: `ø${F.spigot.dia}`,
     },
   ];
 }
@@ -718,7 +758,7 @@ export const MISTAKES = Object.freeze([
 
   // --- notation faults (Figs. 4.28–4.44) ------------------------------------
   {
-    id: 'm-order', target: 'd-corner', at: [-14, 108],
+    id: 'm-order', target: 'd-corner', at: [-28, 104],
     title: 'Symbol written after the number',
     rule: 'Symbol goes first',
     why: 'R12, not 12R. With the symbol trailing, every reader has to go back and re-read the number to find out what it was.',
@@ -742,7 +782,7 @@ export const MISTAKES = Object.freeze([
     wrong: { text: `${F.sphere.dia} Dia` },
   },
   {
-    id: 'm-dprefix', target: 'd-spigot-dia', at: [SPIGOT_MID_X, SPIGOT_RECT.y1 + 12],
+    id: 'm-dprefix', target: 'd-spigot-dia', at: [SPIGOT_RECT.x1 + 14, SPIGOT_RECT.y1 + 10],
     title: '"D" used for diameter',
     rule: 'Use ø, not D',
     why: 'D is not a shape symbol — it is a hand-lettering habit. And on a rectangle, where nothing else says the feature is round, ø is the only thing making this a cylinder rather than a flat tongue.',

@@ -33,7 +33,7 @@ import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
 import { toUnits, HALF_DEPTH } from './dimensionData.js';
 import {
-  SPACING, TERMINATION, planLayout, linearEnds, textPlacement,
+  SPACING, TERMINATION, planLayout, externalise, linearEnds, textPlacement,
   W, sub, add, mul, len, norm, perp, lerp2,
 } from './dimensionLayout.js';
 
@@ -387,14 +387,40 @@ function drawDiameter(spec, ctx) {
   const q = add(c, mul(d, r));
 
   if (spec.mode === 'leader') {
-    drawLeader({
-      ...spec,
-      anchor: [spec.centre[0] + Math.cos(ang) * (spec.diaMm / 2),
-        spec.centre[1] + Math.sin(ang) * (spec.diaMm / 2)],
-      dirDeg: spec.dirDeg ?? 45,
-      lengthMm: spec.lengthMm ?? 20,
-      head: 'arrow',
-    }, ctx);
+    // THE FULL DIAMETER, IN TWO PARTS.
+    //
+    // A number on a bare leader cannot say whether it spans the whole circle or half of it, so
+    // the span is DRAWN: an inclined dimension line straight through the centre, an arrow head
+    // on the circumference at each end. The value is then carried out of the object on a leader
+    // that continues along that same line past one of the heads and finishes on a short bar.
+    // Together they say "this number is the full width" and put the lettering on clear paper.
+    const tSpan = phase(t, PHASE.line);
+    const tHead = phase(t, PHASE.termination);
+    segGrowFromMiddle(buffers.thin, p, q, tSpan);
+    termination(buffers, term, p, mul(d, -1), tHead);
+    termination(buffers, term, q, d, tHead);
+
+    // The leader runs on from the FAR head, in the same direction, out past the outline.
+    const run = toUnits(spec.lengthMm ?? 20);
+    const elbow = add(q, mul(d, run));
+    const barDir = d.x >= 0 ? 1 : -1;
+    const bar = add(elbow, { x: toUnits(spec.barMm ?? 10) * barDir, y: 0 });
+    const barLen = Math.abs(toUnits(spec.barMm ?? 10));
+    const total = run + barLen;
+    const drawn = total * phase(t, [PHASE.extension[0], PHASE.line[1]]);
+    segGrow(buffers.thin, q, elbow, Math.min(1, drawn / (run || 1)));
+    if (drawn > run && barLen > 0) segGrow(buffers.thin, elbow, bar, (drawn - run) / barLen);
+
+    if (t >= PHASE.text) {
+      const at = add(bar, { x: toUnits(2) * barDir, y: toUnits(SPACING.textGap + SPACING.textHeight / 2) });
+      labels.push({
+        id: spec.id, text: spec.text, tone: spec.tone,
+        position: new THREE.Vector3(at.x, at.y, ZP),
+        rotationDeg: 0,
+        anchorX: barDir > 0 ? 0 : 1,
+        draggable: !!spec.draggable,
+      });
+    }
     return;
   }
 
@@ -425,9 +451,22 @@ function drawDiameter(spec, ctx) {
 }
 
 /**
- * A radius (§4.1 rule 6 + Fig. 4.22): ONE arrowhead only, terminated on the feature
- * outline, with the value carrying the R prefix.
- * spec: { centre:[mm], radiusMm, dirDeg, text, fromCentre:boolean, text }
+ * A radius (§4.1 rule 6 + Fig. 4.22): ONE arrow head only, terminated on the feature outline,
+ * with the value carrying the R prefix — and, in every case, the value written on CLEAR PAPER
+ * at the far end of the lead, never inside the curve it measures.
+ *
+ * There are two ways the lead can reach the arc, and which one is available is decided by the
+ * shape, not by taste:
+ *
+ *   CONVEX arc (an outside corner, a slot end, a ball) — the metal is INSIDE the arc, so the
+ *     lead comes from OUTSIDE it and stops on it: `fromCentre: false`, `leadMm` long. The
+ *     value goes on the outer end.
+ *   CONCAVE arc (a fillet) — the metal is OUTSIDE the arc, so a lead from outside would be
+ *     drawn through solid material. It instead runs from the arc back THROUGH the centre and
+ *     out the far side, where a fillet always has open space: `tailMm` long. The value goes on
+ *     that tail. This is the same one-arrow-on-the-arc construction, read the other way round.
+ *
+ * spec: { centre:[mm], radiusMm, dirDeg, text, fromCentre:boolean, leadMm, tailMm }
  */
 function drawRadius(spec, ctx) {
   const { buffers, labels, t, term } = ctx;
@@ -435,29 +474,32 @@ function drawRadius(spec, ctx) {
   const ang = (spec.dirDeg ?? 45) * DEG;
   const d = { x: Math.cos(ang), y: Math.sin(ang) };
   const onArc = add(c, mul(d, toUnits(spec.radiusMm)));
-  const start = spec.fromCentre === false
+  const outside = spec.fromCentre === false;
+  const start = outside
     ? add(c, mul(d, toUnits(spec.radiusMm) + toUnits(spec.leadMm ?? 16)))
-    : c;
+    : add(c, mul(d, -toUnits(spec.tailMm ?? 0)));
 
   const tLine = phase(t, PHASE.line);
   segGrow(buffers.thin, start, onArc, tLine);
   // A small cross marks the centre when the dimension is taken from it (Fig. 4.22).
-  if (spec.fromCentre !== false && tLine > 0) {
+  if (!outside && tLine > 0) {
     const k = toUnits(2);
     seg(buffers.thin, { x: c.x - k, y: c.y }, { x: c.x + k, y: c.y });
     seg(buffers.thin, { x: c.x, y: c.y - k }, { x: c.x, y: c.y + k });
   }
-  termination(buffers, term, onArc, spec.fromCentre === false ? mul(d, -1) : d,
-    phase(t, PHASE.termination));
+  termination(buffers, term, onArc, outside ? mul(d, -1) : d, phase(t, PHASE.termination));
 
   if (t >= PHASE.text) {
-    const at = lerp2(start, onArc, spec.fromCentre === false ? 1.15 : 0.55);
+    // On the FAR END of the lead in both constructions — past where the line starts, clear of
+    // the arc and of whatever metal the arc encloses.
+    const onTail = outside || spec.tailMm;
+    const at = onTail ? lerp2(start, onArc, -0.12) : lerp2(start, onArc, 0.55);
     const placement = textPlacement(start, onArc, ctx.method, undefined, ctx.viewRotationDeg);
     labels.push({
       id: spec.id, text: spec.text, tone: spec.tone,
       position: new THREE.Vector3(
-        spec.fromCentre === false ? at.x : placement.at.x,
-        spec.fromCentre === false ? at.y : placement.at.y, ZP),
+        onTail ? at.x : placement.at.x,
+        onTail ? at.y : placement.at.y, ZP),
       rotationDeg: ctx.method === 2 ? 0 : placement.rotationDeg,
       draggable: !!spec.draggable,
     });
@@ -601,7 +643,7 @@ function drawCoordinate(spec, ctx) {
     seg(buffers.thin, { x: c.x - k, y: c.y }, { x: c.x + k, y: c.y });
     seg(buffers.thin, { x: c.x, y: c.y - k }, { x: c.x, y: c.y + k });
   }
-  if (t >= PHASE.text) {
+  if (t >= PHASE.text && spec.text) {
     const off = toUnits(spec.mode === 'values' ? 3.5 : 5);
     labels.push({
       id: spec.id, text: spec.text, tone: spec.tone,
@@ -887,11 +929,14 @@ export function createDimensionLayer(options = {}) {
      */
     draw(rawSpecs, opts = {}) {
       clear();
-      // THE SECOND LOOK. Before a single stroke is emitted, the annotations are checked against
-      // one another and whichever of a touching pair matters less is moved clear
-      // (dimensionLayout.js). Nothing about WHAT is measured changes — only where the
-      // apparatus that says so is drawn.
-      const specs = laidOut(rawSpecs, opts);
+      // EVERYTHING GOES OUTSIDE. A diameter may not be stated across its own circle here, so any
+      // spec still asking for an internal method is turned into a leader before anything else
+      // looks at it (dimensionLayout.js `externalise`).
+      //
+      // THE SECOND LOOK. Then the annotations are checked against one another and whichever of a
+      // touching pair matters less is moved clear. Nothing about WHAT is measured changes — only
+      // where the apparatus that says so is drawn.
+      const specs = laidOut(externalise(rawSpecs), opts);
       const method = opts.method === 2 ? 2 : 1;
       const defaultTerm = opts.termination || 'open';
       const progress = opts.progress || null;

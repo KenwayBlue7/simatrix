@@ -358,6 +358,8 @@ export function initUI(sim) {
    * still be able to come back to where they were.
    */
   let maxReached = 1;
+  /** False until Step 1 has been entered once, so the opening isometric survives boot. */
+  let booted = false;
   /**
    * What is left in this step, short enough to sit on the footer's one row beside the buttons.
    * It is a NUDGE, not a barrier: Next is never disabled, so this says what the learner has
@@ -1488,7 +1490,12 @@ export function initUI(sim) {
     // Every Back / Next / rail jump puts the camera back on the drawing, exactly as the
     // sibling Foundations topic does. Manual orbit, zoom and pan stay live — this only
     // undoes them at a step boundary, where a skewed sheet would misrepresent the next step.
-    sim.restoreView?.();
+    //
+    // NOT on the first entry: the sim OPENS on the isometric (main.js's initial pose), and
+    // this call runs once during boot as Step 1 is entered. Restoring there would snap the
+    // opening view back to the elevation before the learner ever sees the solid.
+    if (booted) sim.restoreView?.();
+    booted = true;
 
     renderCopy();
 

@@ -40,9 +40,6 @@ const onCircle = (c, r, deg) => [
   c[1] + Math.sin(deg * Math.PI / 180) * r,
 ];
 
-/** The spigot's axis station (mm) — the middle of its front-view rectangle. */
-const SPIGOT_MID_X = (SPIGOT_RECT.x0 + SPIGOT_RECT.x1) / 2;
-
 /**
  * @type {Array<{
  *   id:string, glyph:string, name:string, bis:boolean,
@@ -59,33 +56,34 @@ export const SYMBOLS = Object.freeze([
     id: 'diameter', glyph: 'ø', name: 'Diameter', bis: true,
     feature: 'bore',
     meaning: 'The number is the width of a circle, right across its middle.',
-    usage: 'Measure straight across the circle, across it with the arrows outside, or on a leader off its edge. A cylinder drawn as a rectangle takes ø too.',
+    usage: 'Take it out to clear paper on a leader off the circle\'s edge. A cylinder drawn as a rectangle takes ø too.',
     placement: 'Tight in front of the number: ø40, never 40ø and never "40 Dia".',
     mistake: 'Dropping ø on a leader. The reader cannot see what the number spans, so it could be anything.',
     variants: [
       {
-        id: 'across', label: 'Across the circle',
-        note: 'The line runs right across through the middle, with an arrow each side. Because you can see it spanning the full width, it can only be a diameter.',
-        specs: [{ id: 's-dia-inside', kind: 'diameter', mode: 'inside', centre: F.bore.at, diaMm: F.bore.dia, dirDeg: 200, text: `ø${F.bore.dia}` }],
-      },
-      {
-        id: 'outside', label: 'Arrows outside',
-        note: 'A small circle has no room for two arrows inside it. Run the line out past the circle and point the arrows back in.',
-        specs: [{ id: 's-dia-small', kind: 'diameter', mode: 'outside', centre: F.cskHole.at, diaMm: F.cskHole.dia, dirDeg: 20, text: `ø${F.cskHole.dia}` }],
-      },
-      {
         id: 'leader', label: 'On a leader',
-        note: 'A leader takes the number clear of a crowded view. Here ø is doing all the work — nothing in the picture shows what the number spans.',
-        specs: [{ id: 's-dia-leader', kind: 'diameter', mode: 'leader', centre: F.bore.at, diaMm: F.bore.dia, dirDeg: 55, lengthMm: 26, barMm: 14, text: `ø${F.bore.dia}` }],
+        note: 'The arrow head lands on the circle and the number goes out on clear paper, clear of the view. ø is doing all the work here — nothing in the picture shows what the number spans, so the symbol can never be left off.',
+        specs: [{ id: 's-dia-leader', kind: 'diameter', mode: 'leader', centre: F.bore.at, diaMm: F.bore.dia, dirDeg: 135, lengthMm: 30, barMm: -14, text: `ø${F.bore.dia}` }],
+      },
+      {
+        id: 'small', label: 'A small hole',
+        note: 'A small circle changes nothing. The leader still starts on the circumference and the number still goes outside — there is simply less room to point at.',
+        specs: [{
+          id: 's-dia-small', kind: 'diameter', mode: 'leader',
+          centre: F.cskHole.at, diaMm: F.cskHole.dia, dirDeg: 225, lengthMm: 40, barMm: 14,
+          text: `ø${F.cskHole.dia}`,
+        }],
       },
       {
         id: 'cylindrical', label: 'On a cylinder',
         note: 'The stub on the right end is round, but lying sideways it draws as a rectangle. Only the ø and the centre line running along it say it is a cylinder and not a flat tongue.',
         specs: [
           {
-            id: 's-cyl', kind: 'linear', axis: 'y', noExtension: true,
-            from: [SPIGOT_MID_X, SPIGOT_RECT.y0], to: [SPIGOT_MID_X, SPIGOT_RECT.y1],
-            at: SPIGOT_MID_X, text: `ø${F.spigot.dia}`,
+            // Projected off the spigot's END FACE and stated 14 mm clear of it, so neither the
+            // line nor the value lies on the rectangle. Same ø28 across the same two edges.
+            id: 's-cyl', kind: 'linear', axis: 'y',
+            from: [SPIGOT_RECT.x1, SPIGOT_RECT.y0], to: [SPIGOT_RECT.x1, SPIGOT_RECT.y1],
+            at: SPIGOT_RECT.x1 + 14, text: `ø${F.spigot.dia}`,
           },
           {
             id: 's-cyl-len', kind: 'linear', axis: 'x',
@@ -96,8 +94,12 @@ export const SYMBOLS = Object.freeze([
       },
       {
         id: 'omitted', label: 'ø left off',
-        note: 'You may drop the symbol where nothing else it could mean. Across the circle, fine — the line shows what it spans. On a leader, never.',
-        specs: [{ id: 's-dia-bare', kind: 'diameter', mode: 'inside', centre: F.bore.at, diaMm: F.bore.dia, dirDeg: 200, text: String(F.bore.dia) }],
+        note: 'The same leader with the symbol dropped. Now the number could be anything — a width, a depth, a length. Nothing on the sheet says it spans a circle. This is why ø is never optional on a leader.',
+        specs: [{
+          id: 's-dia-bare', kind: 'diameter', mode: 'leader', tone: 'bad',
+          centre: F.bore.at, diaMm: F.bore.dia, dirDeg: 135, lengthMm: 30, barMm: -14,
+          text: String(F.bore.dia),
+        }],
       },
     ],
   },
@@ -112,16 +114,29 @@ export const SYMBOLS = Object.freeze([
       {
         id: 'small', label: 'From the centre',
         note: 'Mark the centre with a small cross and run the line out to the curve. One arrow, landing on the curve.',
+        // Both of these arcs are CONCAVE — the metal lies OUTSIDE them — so a lead coming in
+        // from outside would be drawn through solid material. Each runs from the arc back
+        // through its own centre cross and out the far side, into the space the feature itself
+        // opens up, and the value is written there.
         specs: [
-          { id: 's-fillet', kind: 'radius', centre: [110, 65], radiusMm: PLATE.filletR, dirDeg: 225, text: `R${PLATE.filletR}` },
-          { id: 's-corner', kind: 'radius', centre: [12, 88], radiusMm: PLATE.cornerR, dirDeg: 135, text: `R${PLATE.cornerR}` },
+          { id: 's-fillet', kind: 'radius', centre: [110, 65], radiusMm: PLATE.filletR, dirDeg: 240, tailMm: 24, text: `R${PLATE.filletR}` },
+          // The slot's end cap is concave AND buried in the plate, so its through-centre tail
+          // would end inside the slot. It goes out on a leader instead: arrow on the cap, value
+          // below the plate on clear paper.
+          {
+            id: 's-slot-end', kind: 'leader', head: 'arrow',
+            anchor: onCircle(F.slot.centres[1], F.slot.width / 2, 290),
+            dirDeg: 290, lengthMm: 26, barMm: 12, text: `R${F.slot.width / 2}`,
+          },
         ],
       },
       {
         id: 'outside', label: 'From outside',
         note: 'Too small to write inside? Come in along the radius from outside and point the arrow at the curve. Still one arrow.',
+        // CONVEX: the metal is inside this arc, so outside it is clear paper and the lead can
+        // come in from there. This is the only case where it can.
         specs: [
-          { id: 's-slot-end', kind: 'radius', centre: F.slot.centres[1], radiusMm: F.slot.width / 2, dirDeg: 300, fromCentre: false, leadMm: 20, text: `R${F.slot.width / 2}` },
+          { id: 's-corner', kind: 'radius', centre: [12, 88], radiusMm: PLATE.cornerR, dirDeg: 135, fromCentre: false, leadMm: 14, text: `R${PLATE.cornerR}` },
         ],
       },
       {
@@ -129,8 +144,10 @@ export const SYMBOLS = Object.freeze([
         note: 'The top of the step is a very shallow curve, so its centre is far below the plate and off the paper altogether. Keep a short piece of the true radius where it meets the curve, then break the line and jog it in so the number fits.',
         specs: [
           {
+            // Jogged OUTWARD, above the crowned face — jogged inward it laid the value on the
+            // step. The stub at the arc is still a true radius with the one arrow head.
             id: 's-crown', kind: 'radiusLarge', centre: CROWN_CENTRE, radiusMm: PLATE.crownR,
-            onArcDeg: 90, jogMm: 12, falseCentre: [116, 41.7], text: `R${PLATE.crownR}`,
+            onArcDeg: 90, jogMm: -10, falseCentre: [122, 74], text: `R${PLATE.crownR}`,
           },
         ],
       },
@@ -152,10 +169,10 @@ export const SYMBOLS = Object.freeze([
         ],
       },
       {
-        id: 'across', label: 'Across the seat',
-        note: 'Taken straight across, exactly like a plain diameter — so the S is the only thing separating a round seat from a drilled hole the same size. Turn the plate and the difference is obvious. On the flat sheet it is one letter.',
+        id: 'across', label: 'On a leader',
+        note: 'Taken out on a leader, exactly like a plain diameter — so the S is the only thing separating a round seat from a drilled hole the same size. Turn the plate and the difference is obvious. On the flat sheet it is one letter.',
         specs: [
-          { id: 's-sdia-across', kind: 'diameter', mode: 'inside', centre: F.sphere.at, diaMm: F.sphere.dia, dirDeg: 20, text: `Sø${F.sphere.dia}` },
+          { id: 's-sdia-across', kind: 'diameter', mode: 'leader', centre: F.sphere.at, diaMm: F.sphere.dia, dirDeg: 225, lengthMm: 32, barMm: 12, text: `Sø${F.sphere.dia}` },
         ],
       },
     ],
@@ -172,7 +189,16 @@ export const SYMBOLS = Object.freeze([
         id: 'radial', label: 'Along a radius',
         note: 'One arrow, landing on the curve. A ball radius obeys the radius rules exactly.',
         specs: [
-          { id: 's-srad', kind: 'radius', centre: F.sphere.at, radiusMm: F.sphere.radius, dirDeg: 250, fromCentre: false, leadMm: 22, text: `SR${F.sphere.radius}` },
+          // The seat is CONCAVE and it is buried in the middle of the low step: there is metal
+          // on every side of it and only 13 mm of it to the nearest free paper, so neither
+          // radius construction can reach clear space without laying a DIMENSION LINE on solid
+          // material. A LEADER can — pointing is what a leader is for, and one crossing metal
+          // to reach the feature it names is ordinary. Arrow on the curve, value outside.
+          {
+            id: 's-srad', kind: 'leader', head: 'arrow',
+            anchor: onCircle(F.sphere.at, F.sphere.radius, 250),
+            dirDeg: 250, lengthMm: 30, barMm: 12, text: `SR${F.sphere.radius}`,
+          },
         ],
       },
     ],
@@ -193,14 +219,13 @@ export const SYMBOLS = Object.freeze([
         ],
       },
       {
-        id: 'across', label: 'Across the feature',
-        note: 'Where the view has room, put the number straight across. The line spans one side; the symbol says the other matches.',
+        id: 'across', label: 'Off the other side',
+        note: 'The same one number, taken off the opposite face. Either side will do — what matters is that it comes out to clear paper and that the symbol says the other side matches.',
         specs: [
           {
-            id: 's-sq-across', kind: 'linear', axis: 'y', noExtension: true,
-            from: [F.square.at[0], F.square.at[1] - F.square.side / 2],
-            to: [F.square.at[0], F.square.at[1] + F.square.side / 2],
-            at: F.square.at[0], text: `□${F.square.side}`,
+            id: 's-sq-across', kind: 'leader', head: 'arrow',
+            anchor: [F.square.at[0], F.square.at[1] - F.square.side / 2],
+            dirDeg: 250, lengthMm: 24, barMm: 12, text: `□${F.square.side}`,
           },
         ],
       },
@@ -239,7 +264,10 @@ export const SYMBOLS = Object.freeze([
         note: 'The long way, and the only correct way at any angle but 45°: the cut\'s length on a dimension line, the angle on an angle dimension about the corner it replaced.',
         specs: [
           { id: 's-ch-len', kind: 'linear', axis: 'x', from: [PLATE.length - PLATE.chamfer, PLATE.stepHeight], to: [PLATE.length, PLATE.stepHeight], at: 68, text: String(PLATE.chamfer) },
-          { id: 's-ch-ang', kind: 'angular', vertex: [PLATE.length, 40], radiusMm: 24, fromDeg: 90, toDeg: 135, text: '45°' },
+          // R7 keeps the whole arc inside the little wedge the chamfer cut, below the step's top
+          // face — at R24 it swung right out over the length dimension's projection lines and
+          // put an arrow head on one of them.
+          { id: 's-ch-ang', kind: 'angular', vertex: [PLATE.length, 40], radiusMm: 7, fromDeg: 90, toDeg: 135, text: '45°' },
         ],
       },
       {
@@ -247,9 +275,11 @@ export const SYMBOLS = Object.freeze([
         note: 'The big bore has its mouth cut back too — which is why it shows as two circles, one inside the other. An inside chamfer is noted just like an outside one; the leader simply points into the hole.',
         specs: [
           {
+            // Long enough to clear the left-hand edge: at 30 the bar and its note landed on the
+            // metal beside the bore.
             id: 's-ch-int', kind: 'leader',
             anchor: onCircle(F.bore.at, BORE_MOUTH_DIA / 2, 200),
-            dirDeg: 200, lengthMm: 30, barMm: -14, head: 'arrow',
+            dirDeg: 200, lengthMm: 50, barMm: -14, head: 'arrow',
             text: `${F.bore.chamfer.width} × ${F.bore.chamfer.angle}°`,
           },
         ],
@@ -298,10 +328,14 @@ export const SYMBOLS = Object.freeze([
     variants: [
       {
         id: 'overall', label: 'Length and width',
-        note: 'Overall length across the round ends, and the width across the flats. The 16 wide gap has no room for two arrows, so they go outside — the same decision the space slider in Step 1 was about.',
+        note: 'Overall length across the round ends, on a dimension line clear of the part; and the width across the flats, which is a 16 wide gap buried in the plate and so goes out on a leader.',
         specs: [
           { id: 's-slot-len', kind: 'linear', axis: 'x', from: [F.slot.centres[0][0] - F.slot.width / 2, F.slot.at[1]], to: [F.slot.centres[1][0] + F.slot.width / 2, F.slot.at[1]], at: PLATE.stepHeight + 14, text: String(SLOT_LENGTH) },
-          { id: 's-slot-wid', kind: 'linear', axis: 'y', noExtension: true, arrowsOutside: true, from: [F.slot.at[0], F.slot.at[1] - F.slot.width / 2], to: [F.slot.at[0], F.slot.at[1] + F.slot.width / 2], at: F.slot.at[0], text: String(F.slot.width) },
+          {
+            id: 's-slot-wid', kind: 'leader', head: 'arrow',
+            anchor: [F.slot.centres[0][0] + F.slot.width / 2, F.slot.at[1] - F.slot.width / 2],
+            dirDeg: 250, lengthMm: 26, barMm: -12, text: String(F.slot.width),
+          },
         ],
       },
     ],

@@ -1594,10 +1594,11 @@
     </button>
 
     <div class="vp-controls">
-      <!-- The drawing itself: a true orthographic front elevation. Latched by default. -->
-      <button type="button" class="vp-chip" id="btn-front" aria-pressed="true" title="Return to the flat orthographic front view — the drawing">Front view</button>
-      <!-- Proof the drawing describes a solid: a three-quarter pictorial. -->
-      <button type="button" class="vp-chip" id="btn-pictorial" aria-pressed="false" title="See the plate as a solid, so you can check the drawing against it">3-D view</button>
+      <!-- The drawing itself: a true orthographic front elevation. -->
+      <button type="button" class="vp-chip" id="btn-front" aria-pressed="false" title="Return to the flat orthographic front view — the drawing">Front view</button>
+      <!-- Proof the drawing describes a solid: an isometric pictorial. LATCHED BY DEFAULT —
+           the sim opens on this view (VIEWS.pictorial = camera.position.set(1,1,1) normalised). -->
+      <button type="button" class="vp-chip" id="btn-pictorial" aria-pressed="true" title="See the plate as a solid, so you can check the drawing against it">3-D view</button>
       <!-- The countersink is machined on the far face; this reads it from that side. -->
       <button type="button" class="vp-chip" id="btn-rear" aria-pressed="false" title="Turn the plate over to read the far-side countersink">Turn over</button>
       <!--
@@ -1627,7 +1628,7 @@
       <span class="vp-caption__note" id="vp-caption-note" hidden></span>
     </div>
 
-    <p class="vp-hint" id="vp-hint">Drag to orbit · scroll to zoom</p>
+    <p class="vp-hint" id="vp-hint">Drag to orbit · scroll to zoom · “Front view” returns to the drawing</p>
   </main>
 
   <!-- ============================================================
