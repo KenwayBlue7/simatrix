@@ -1,20 +1,19 @@
-// Orchestrator — Diploma Engineering Graphics, Module 1 Topic 2.1: Roulettes.
+// Orchestrator — Diploma Engineering Graphics, Module 1 Topic 2.4: Involutes.
 //
 // No Three.js, no CDN import map (ADR-095): the viewport is inline SVG. Owns `state`
-// (which curve is active, its given params — including the live Roll Angle scrub — and
-// how much of it has been drawn), the single rebuild() pipeline, window.simAPI, and the
-// boot watchdog.
+// (which construction is active, its given params — including the involute-of-a-circle's
+// live Roll Angle scrub — and how much of it has been drawn), the single rebuild()
+// pipeline, window.simAPI, and the boot watchdog.
 //
-// rebuild()'s shape (unchanged from Topic 1.1): dispose previous construction's SVG
+// rebuild()'s shape (unchanged from Topic 2.1/1.1): dispose previous construction's SVG
 // children -> resolve the active construction's given parameters -> compute construction
 // geometry as plain data (constructions.js) -> render the GIVEN elements into
 // #given-layer -> place labels -> notify (drives step-gating + the Problem Library
-// self-check). The MOVE/RESULT elements (the traced curve, the rolling circle at the
-// current Roll Angle, the tangent/normal) are drawn separately by play() into
-// #dynamic-layer, animated, replayable without re-deriving the given elements — exactly
-// like every other topic; `theta` (Roll Angle) is just another `given[]` slider, so
-// scrubbing it re-runs the SAME rebuild() funnel every other param change does (no second
-// state path).
+// self-check). The MOVE/RESULT elements (the traced string, the involute's own tangent/
+// normal, the polygon's chained arcs) are drawn separately by play() into #dynamic-layer,
+// animated, replayable without re-deriving the given elements — exactly like every other
+// topic; `theta` (Roll Angle, involute-of-a-circle only) is just another `given[]` slider,
+// so scrubbing it re-runs the SAME rebuild() funnel every other param change does.
 //
 // Layering (CLAUDE.md): main.js is the orchestrator. Leaf modules (stepper/terms/
 // onboarding/uiManager/problemLibrary/anim) never import each other; they hang off this
@@ -104,14 +103,15 @@ function rebuild() {
 }
 
 // ============================================================================
-// playRollAnimation() — the roulette constructions' two-phase Play: (1) the rolling
-// circle actually MOVES, tracing the curve live instead of the curve simply appearing,
-// so the student sees the mechanism that produces the shape, not just the shape; (2)
-// once the roll finishes, the tangent/normal
+// playRollAnimation() — the involute-of-a-circle construction's two-phase Play: (1) the
+// string actually MOVES, rotating and lengthening as it unwinds, tracing the curve live
+// instead of the curve simply appearing, so the student sees the mechanism that produces
+// the shape, not just the shape; (2) once the unwind finishes, the tangent/normal
 // construction draws on top via the platform's normal per-step reveal. Two phases so the
 // two ideas ("here's how the curve is generated" vs. "here's why the normal lands here")
-// are never happening at once — Topic 1.1's per-step Play never had to solve this, since
-// none of its constructions involve a continuously moving generator.
+// are never happening at once. Involute-of-a-polygon has no roll phase at all (see play()
+// below) — its arcs are fixed-step compass constructions, not a continuously moving
+// generator.
 // ============================================================================
 
 /** @param {{toDeg:number, rollStepsAt:(deg:number)=>Array, tangentStepsAt:(deg:number)=>Array}} animateRoll */
@@ -121,7 +121,7 @@ function playRollAnimation(animateRoll) {
   let activeTween = null;
   let activeSteps = null;
 
-  // Constant angular speed (a real wheel doesn't ease in/out mid-roll) — a deliberate,
+  // Constant angular speed (a real string doesn't ease in/out mid-unwind) — a deliberate,
   // construction-specific departure from the platform's default easeStandard, the same
   // way anim.js's own easeDraw already departs from it for "watch this get built."
   const linear = (x) => x;
@@ -190,9 +190,8 @@ const simController = {
     if (lastRecipe.animateRoll) {
       activePlay = playRollAnimation(lastRecipe.animateRoll);
     } else {
-      // Fixed-step fallback (no current construction in this topic omits animateRoll,
-      // since every roulette entry rolls — kept generic, same per-step draw-on every
-      // other topic in this track uses, in case a future addition needs it).
+      // Fixed-step constructions (the two involute-polygon entries) — same per-step
+      // draw-on every other topic in this track uses.
       const moveAndResult = lastRecipe.steps.filter((s) => s.role !== 'given');
       activePlay = playSteps(dynamicLayer, moveAndResult, {
         onComplete: () => { activePlay = null; },
@@ -206,7 +205,7 @@ const simController = {
     stepper.reset();
     uiManager.sync({ rebuildFields: true });
     viewTransform.resetView();
-    announce('Reset. Choose a curve to begin.');
+    announce('Reset. Choose a construction to begin.');
     // solvedAny is deliberately NOT cleared here — #btn-finish's gate is page-load
     // scoped, not session-scoped, same reset-immunity the retired completeSent latch had.
   },
@@ -278,8 +277,8 @@ function setupWizardToggle() {
 }
 
 // ============================================================================
-// Verify step actions — "Choose another curve" returns to the picker without a full
-// reset (stepper.js's restart(), scaffolded for exactly this); "Try it as a problem"
+// Verify step actions — "Choose another construction" returns to the picker without a
+// full reset (stepper.js's restart(), scaffolded for exactly this); "Try it as a problem"
 // opens the same Problem Library as the persistent eyebrow entry, offered again here
 // since Verify is the natural end of the un-prompted flow.
 // ============================================================================

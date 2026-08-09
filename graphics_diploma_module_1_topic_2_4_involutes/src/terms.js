@@ -10,13 +10,7 @@
 // startup.
 
 export const TERMS = {
-  roulette: 'The curve traced by a point on a shape as it rolls without slipping along another line or curve — a cycloid, trochoid, epicycloid, and hypocycloid are all roulettes.',
-  cycloid: 'The path traced by a point fixed on the rim of a circle as it rolls along a straight line.',
-  trochoid: 'Like a cycloid, but the traced point sits beyond or inside the rolling circle’s rim, not on it.',
-  epicycloid: 'The path traced by a point on a circle rolling on the outside of a fixed circle.',
-  hypocycloid: 'The path traced by a point on a circle rolling on the inside of a fixed circle.',
-  'generating-circle': 'The circle that rolls to trace a roulette — its radius and the traced point’s offset from its centre are the curve’s defining measurements.',
-  'base-circle': 'The fixed circle a generating circle rolls around, for the epicycloid and hypocycloid families.',
+  involute: 'The path traced by the end of a taut string as it is unwound from a shape, kept taut the whole time.',
 };
 
 export function initTerms() {

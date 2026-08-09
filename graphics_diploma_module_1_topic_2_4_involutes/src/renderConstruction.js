@@ -18,12 +18,13 @@
 // through its motion in one jump rather than gliding, which is correct: state still
 // updates, only motion is suppressed).
 //
-// EXTRACTED from Topic 1.2 (which already added the 'circle' kind Topic 1.1 lacks) plus
-// ONE new addition this topic needs: a 'curve' kind — a sampled polyline for a traced
-// roulette (cycloid/epicycloid/trochoid/...), since no prior topic ever drew a curve that
-// isn't a compass-constructible point/line/arc/circle (this topic's own CLAUDE.md records
-// the reasoning). Drawn as a single <path> of 'L' segments through constructions.js's
-// sample points — dense enough (140-160 samples) to read as smooth without spline math.
+// EXTRACTED byte-for-byte from Topic 2.1 (Roulettes) — this topic's own CLAUDE.md/
+// DECISIONS.md ADR-080 records why: the involute-of-a-circle construction needs the SAME
+// 'curve' step kind Topic 2.1 introduced (a sampled polyline for the unwinding string's
+// traced path, since it is a genuine locus, not a compass-constructible line/arc/circle),
+// while involute-of-a-polygon needs 'point'/'line'/'arc' only (a chain of compass arcs,
+// Example 7.7's own method) — between the two constructions this topic uses every kind
+// this file defines, so nothing was trimmed.
 //
 // Layering (CLAUDE.md): leaf module. Imports only anim.js (tween/easing), never terms.js,
 // uiManager.js, or stepper.js.
@@ -165,10 +166,10 @@ function buildStepNode(step) {
   }
 
   if (step.kind === 'curve') {
-    // New this topic: a sampled polyline — the traced roulette (cycloid, epicycloid,
-    // trochoid, ...) is a genuine locus, not a compass-constructible line/arc/circle.
-    // Reuses the exact same stroke-dashoffset draw-on mechanic as a 'line' step, sized to
-    // the polyline's own cumulative length so it draws itself at the same visual rate.
+    // A sampled polyline — the traced involute-of-a-circle is a genuine locus, not a
+    // compass-constructible line/arc/circle. Reuses the exact same stroke-dashoffset
+    // draw-on mechanic as a 'line' step, sized to the polyline's own cumulative length so
+    // it draws itself at the same visual rate.
     const { points, role } = step;
     const len = Math.max(polylineLength(points), 1e-6);
     const node = el('path', {
@@ -197,8 +198,7 @@ function buildStepNode(step) {
       // legible even when the linework (or another nearby label) runs underneath it.
       // dx/dy default to the family's usual up-right nudge, but a step can override them
       // (e.g. tangentNormalSteps() pushes M and C on opposite corners so their labels
-      // don't collide when the two points land close together — a common case at the
-      // end of a full roll, where the contact point sits right next to the traced point).
+      // don't collide when the two points land close together).
       const lx = step.p.x + (step.dx ?? 4);
       const ly = step.p.y + (step.dy ?? -4);
       const lw = step.label.length * 4.2 + 3;

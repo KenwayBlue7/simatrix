@@ -1,18 +1,19 @@
 // Guided-stepper controller — the four-step shape every construction in this syllabus
 // track shares:
-//   1. Choose  — pick one of the nine curves to build.
-//   2. Given   — the curve's defining measurements, tied to live numeric values.
-//   3. Construct — the rolling circle traces the curve; scrub the Roll Angle slider or
-//      press Play, then the tangent/normal construction resolves at the end.
+//   1. Choose  — pick one of the three involute constructions to build.
+//   2. Given   — the construction's defining measurements, tied to live numeric values.
+//   3. Construct — for involute of a circle, scrub the Roll Angle slider or press Play,
+//      then the tangent/normal construction resolves at the end; for involute of a
+//      triangle/square, press Play to watch the chained compass arcs draw.
 //   4. Verify  — the result, and a route into the Problem Library.
 // Steps 2-4's title/lead are suffixed with the active construction's name once chosen.
 //
 // Layering (CLAUDE.md): leaf module. Imports nothing; main.js injects `sim`.
 
 const STEPS = [
-  { n: 1, title: 'Choose a Curve', lead: 'Pick one of the nine roulette curves to build.' },
-  { n: 2, title: 'Given', lead: 'This is what the curve starts from — adjust its measurements below.' },
-  { n: 3, title: 'Construct', lead: 'Scrub the Roll Angle slider or press Play to trace the curve, then watch the tangent/normal resolve.' },
+  { n: 1, title: 'Choose a Construction', lead: 'Pick one of the three involute constructions to build.' },
+  { n: 2, title: 'Given', lead: 'This is what the construction starts from — adjust its measurements below.' },
+  { n: 3, title: 'Construct', lead: 'Scrub the Roll Angle slider or press Play to trace the construction, then watch the tangent/normal resolve.' },
   { n: 4, title: 'Verify', lead: 'Check the result, then try it as a stated problem.' },
 ];
 const TOTAL = STEPS.length;

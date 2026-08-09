@@ -5,15 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="light only" />
   <!-- <title> MUST equal meta.json.title (ADR-026 / RULES.md §1.12). -->
-  <title>Roulettes</title>
-  <meta name="description" content="Nine curves traced by a circle rolling without slipping — cycloids, trochoids, epicycloids, hypocycloids — built and verified step by step." />
+  <title>Involutes</title>
+  <meta name="description" content="The involute of a circle and of a regular polygon — the path traced by a taut string unwinding from a shape — built and verified step by step." />
 
   <!--
-    See ../CLAUDE.md and ../DECISIONS.md ADR-095/ADR-096. This is Module 1 Topic 2.1
-    ("Roulettes"), the first topic of the Misc Curves set (ADR-096), sitting beside Topic
-    1's Geometrical Constructions inside the same module. Same 2D SVG orchestrator as
-    every topic in this track — no CDN module, no import map, nothing to pin or fetch
-    beyond this page and the bundled fonts.
+    See ../CLAUDE.md and ../DECISIONS.md ADR-095/ADR-096/ADR-080. This is Module 1 Topic
+    2.4 ("Involutes"), split out of Topic 2.1 (Roulettes) per ADR-080 — an involute is a
+    taut string/line unwinding, a structurally different generator from a circle rolling
+    without slipping. Same 2D SVG orchestrator as every topic in this track — no CDN
+    module, no import map, nothing to pin or fetch beyond this page and the bundled fonts.
   -->
 
   <!--
@@ -354,7 +354,7 @@
     .step-panel { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
     .step-panel:first-of-type { border-top: 0; padding-top: 0; margin-top: var(--space-3); }
 
-    /* Construction picker (Step 1) — 9 curves, 2 columns */
+    /* Construction picker (Step 1) — 3 constructions, 2 columns */
     .construction-picker { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); margin-top: var(--space-2); }
     .construction-picker__item {
       min-height: 56px; padding: var(--space-3) var(--space-4);
@@ -536,7 +536,7 @@
       <span class="sr-only">Toggle steps panel</span>
     </button>
 
-    <svg id="construction-svg" viewBox="0 0 240 190" preserveAspectRatio="xMidYMid meet">
+    <svg id="construction-svg" viewBox="0 0 200 140" preserveAspectRatio="xMidYMid meet">
       <g id="given-layer"></g>
       <g id="dynamic-layer"></g>
     </svg>
@@ -548,11 +548,11 @@
         <circle cx="24" cy="24" r="18" />
         <path d="M24 6 L24 12 M24 36 L24 42 M6 24 L12 24 M36 24 L42 24" />
       </svg>
-      <p>Choose a curve to begin.</p>
+      <p>Choose a construction to begin.</p>
     </div>
 
     <div id="vp-play-hint" class="vp-play-hint" hidden>
-      <span>Press Play to watch this curve trace itself.</span>
+      <span>Press Play to watch this construction trace itself.</span>
       <button type="button" id="vp-play-hint-dismiss" class="vp-play-hint__dismiss">Got it</button>
     </div>
 
@@ -612,22 +612,14 @@
         <!-- Step 1 — the picker. Orient: one decision, no wall of controls. -->
         <div class="step-panel" data-step="1">
           <p class="card__lead">
-            Every curve below is a
-            <span class="term" data-term="roulette" tabindex="0">roulette<span class="term__pop"></span></span> —
-            traced by a circle rolling without slipping along a straight line or another
-            circle. A <span class="term" data-term="cycloid" tabindex="0">cycloid<span class="term__pop"></span></span>
-            is the simplest case: a point on the rim of a circle rolling on a straight line.
+            An <span class="term" data-term="involute" tabindex="0">involute<span class="term__pop"></span></span>
+            is traced by a taut string unwinding from a shape — a circle, or a regular
+            polygon like a triangle or square, one straight side at a time.
           </p>
-          <div class="construction-picker" role="group" aria-label="Nine curves">
-            <button type="button" class="construction-picker__item" data-construction-id="cycloid" aria-pressed="false">Cycloid</button>
-            <button type="button" class="construction-picker__item" data-construction-id="superior-trochoid" aria-pressed="false">Superior Trochoid</button>
-            <button type="button" class="construction-picker__item" data-construction-id="inferior-trochoid" aria-pressed="false">Inferior Trochoid</button>
-            <button type="button" class="construction-picker__item" data-construction-id="epicycloid" aria-pressed="false">Epicycloid</button>
-            <button type="button" class="construction-picker__item" data-construction-id="superior-epitrochoid" aria-pressed="false">Superior Epitrochoid</button>
-            <button type="button" class="construction-picker__item" data-construction-id="inferior-epitrochoid" aria-pressed="false">Inferior Epitrochoid</button>
-            <button type="button" class="construction-picker__item" data-construction-id="hypocycloid" aria-pressed="false">Hypocycloid</button>
-            <button type="button" class="construction-picker__item" data-construction-id="superior-hypotrochoid" aria-pressed="false">Superior Hypotrochoid</button>
-            <button type="button" class="construction-picker__item" data-construction-id="inferior-hypotrochoid" aria-pressed="false">Inferior Hypotrochoid</button>
+          <div class="construction-picker" role="group" aria-label="Three constructions">
+            <button type="button" class="construction-picker__item" data-construction-id="involute-circle" aria-pressed="false">Involute of a Circle</button>
+            <button type="button" class="construction-picker__item" data-construction-id="involute-triangle" aria-pressed="false">Involute of a Triangle</button>
+            <button type="button" class="construction-picker__item" data-construction-id="involute-square" aria-pressed="false">Involute of a Square</button>
           </div>
         </div>
 
@@ -636,12 +628,14 @@
           <div class="dock__group" id="given-fields"></div>
         </div>
 
-        <!-- Step 3 — Construct. The Roll Angle slider (rendered here too, as just another
-             given-fields entry) scrubs the trace live; Play animates it once. -->
+        <!-- Step 3 — Construct. The Roll Angle slider (involute of a circle only, rendered
+             here too, as just another given-fields entry) scrubs the trace live; Play
+             animates it once. Involute of a triangle/square has no Roll Angle — Play draws
+             its chained compass arcs directly. -->
         <div class="step-panel" data-step="3" hidden>
           <div class="construct-actions">
             <button type="button" class="btn btn--primary btn--block" id="btn-play-construction">Play construction</button>
-            <p class="card__lead">Scrub the Roll Angle slider on the Given step to trace by hand, or press Play to watch it once.</p>
+            <p class="card__lead">For the circle, scrub the Roll Angle slider on the Given step to trace by hand, or press Play to watch it once.</p>
           </div>
         </div>
 
@@ -666,7 +660,7 @@
             </div>
 
             <div class="verify-actions">
-              <button type="button" class="btn btn--primary btn--block" id="btn-verify-restart">Choose another curve</button>
+              <button type="button" class="btn btn--primary btn--block" id="btn-verify-restart">Choose another construction</button>
               <button type="button" class="btn btn--block" id="btn-verify-problems">Try it as a problem</button>
             </div>
           </div>
