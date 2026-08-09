@@ -212,6 +212,14 @@ generator, no `meshAnalyzer.js`, no `iShape.js`, no `problems.js`.
   `OrbitControls`' `start` — it fires for the wheel too, and in this topic that swaps the projection,
   the dimension set and the frame in one notch. A drag is 3 px of movement with exactly ONE pointer
   down. `focusOn()` retargets when idle and flights `settle()` with damping off (RULES.md §5.21/§5.22).
+- **⌀ or R comes from the SWEEP THE VIEW DRAWS, through `roundDim()`.** Never type the symbol. A
+  50 mm boss on a 40 mm plate is a cylinder, and the plan draws 148 deg of it, so the plan says R25.
+  Both marks END the same way — slanting leg, horizontal shelf, value LEVEL above it — and differ at
+  the feature end. A **diameter's line crosses the CENTRE** (far side of the circle, through the
+  middle, out to the elbow, an arrowhead at each end of the diameter). A **radius starts ON the arc**
+  and never reaches the centre, because a line across the middle would say diameter. The geometry
+  states the measurement; the shelf keeps what the learner reads off the feature. Test against the
+  view's primitives, never against the authored label (RULES.md §6.31/§6.32, ADR-141).
 - **`controls.target` is EASED onto new content, never assigned.** A view change rebuilds the
   annotation layer before the flight starts, so the content box moves; setting the target in one step
   swung the camera in a single frame and was the whole of the "view switching jumps" report.

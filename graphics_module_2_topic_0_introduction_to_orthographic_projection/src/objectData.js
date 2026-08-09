@@ -244,6 +244,63 @@ export function alignedDim(d) {
 const dim = (a, b, off, text) => ({ k: 'dim', a, b, off, text });
 const note = (at, to, text) => ({ k: 'note', at, to, text });
 
+/** A circle is only a circle if all of it is there. Anything short of that is an arc. */
+const FULL_TURN = 360;
+const SWEEP_TOLERANCE = 0.5;
+const fmt = (v) => String(Math.round(v * 10) / 10);
+
+/**
+ * Ø OR R, ON A LEADER WITH A HORIZONTAL SHELF — ONE SHAPE OF MARK FOR BOTH.
+ *
+ * WHICH SYMBOL is decided from the geometry, never typed. The rule (BIS SP 46 / ISO 129-1) is not
+ * about what the feature IS, it is about what this view DRAWS: a complete circle is a diameter,
+ * anything less is an arc and takes a radius. So the sweep the view actually shows is an argument,
+ * and the symbol falls out of it — a size cannot be labelled Ø by habit while the paper shows two
+ * arcs and a pair of straight edges.
+ *
+ * The plan of the Cylindrical Block is exactly that case and was exactly that bug. The boss is a
+ * 50 mm cylinder, so it was labelled Ø50; but the plate under it is only 40 deep, so the plan trims
+ * the circle to the two arcs that stand proud of the plate's edges — 148 deg of it — and 148 deg of
+ * circle is an arc. It is R25, and its leader has to land on an arc that is actually drawn.
+ *
+ * HOW IT IS DRAWN. Both marks end the same way — a slanting leg out to clear paper, a short
+ * horizontal shelf, the value level above the shelf — and they differ at the feature end, which is
+ * where the difference belongs.
+ *
+ * A DIAMETER's line PASSES THROUGH THE CENTRE. It starts at the far side of the circle, crosses the
+ * centre, and carries on out to the elbow, with an arrowhead at each end of the diameter itself
+ * pointing outwards. That is the hybrid form: the line states the measurement (a full width, taken
+ * through the middle) while the shelf keeps the value out on clear paper, off the feature the
+ * learner is being asked to look at. The value is NOT written at the midpoint of the line, which is
+ * the centre of the hole.
+ *
+ * A RADIUS's line starts ON THE ARC and does not reach the centre — a radius is measured from the
+ * centre to the curve, and drawing it across the middle would say diameter.
+ *
+ * Both legs run along the feature's own radius, so the diameter's line passes through the centre by
+ * construction and the radius's arrow lands on its arc by construction, rather than by the author's
+ * arithmetic.
+ *
+ * @param {number[]} c      centre, in the view's own frame
+ * @param {number} r        radius, mm
+ * @param {number} sweep    how much of the circle THIS VIEW draws, in degrees
+ * @param {number} ang      the direction the leader leaves the centre, degrees CCW from +x. For a
+ *                          radius it must point along a drawn arc, so the arrow touches one.
+ * @param {number} out      how far out the elbow sits, from the centre. The author's one job: put
+ *                          the shelf and its value on clear paper, outside the object.
+ */
+const roundDim = (c, r, sweep, ang, out) => {
+  const full = Math.abs(sweep) >= FULL_TURN - SWEEP_TOLERANCE;
+  const a = (ang * Math.PI) / 180;
+  const u = [Math.cos(a), Math.sin(a)];
+  const along = (t) => [c[0] + u[0] * t, c[1] + u[1] * t];
+  // `at` is where the line STARTS and carries its first arrowhead; `to` is the elbow the shelf
+  // grows from. A diameter starts at the far side and so spans the whole width through the centre;
+  // a radius starts on the arc. `head2` is the diameter's second arrowhead, on the near side.
+  const d = note(along(full ? -r : r), along(out), full ? `Ø${fmt(2 * r)}` : `R${fmt(r)}`);
+  return full ? { ...d, k: 'dia', head2: along(r) } : d;
+};
+
 // ---------------------------------------------------------------------------
 // The registry.
 // ---------------------------------------------------------------------------
@@ -418,8 +475,13 @@ const CYLBLOCK = (() => {
       ],
       top: [
         dim([hx, -hz], [hx, hz], -LANE(1), '40'),      // overall depth
-        note([rH * 0.71, -rH * 0.71], [rB + 14, -rB - 10], 'Ø30'),
-        note([-rB * 0.71, -rB * 0.71], [-rB - 16, -rB - 10], 'Ø50'),
+        // The bore IS a complete circle in the plan, so it is a diameter through its centre.
+        roundDim([0, 0], rH, 360, -45, rB + 14),
+        // The boss is NOT. The plate is 40 deep and the boss is 50 across, so the plan can only
+        // draw the two arcs standing proud of the plate's edges — 148 deg between them. R, and the
+        // leader points DOWN, at 250 deg, because that is where one of those two arcs actually is:
+        // the old note anchored its arrow at 225 deg, on the part of the circle the plan trims off.
+        roundDim([0, 0], rB, 2 * (180 - 2 * aC), 250, rB + 12),
       ],
       side: [dim([-hz, 0], [hz, 0], -LANE(1), '40')],  // depth again, on the view it is read from
     },
@@ -527,13 +589,14 @@ const SHAFTSUP = (() => {
       ],
       top: [
         dim([hx, -hz], [hx, hz], -LANE(1), '40'),      // overall depth
-        note([-xBolt + rBolt * 0.71, rBolt * 0.71], [-xBolt - 20, hz + 12], 'Ø12'),
+        // Down and out, not up: above the plan is where the elevation's own 100 lives.
+        roundDim([-xBolt, 0], rBolt, 360, -135, 34),   // a complete circle in the plan
       ],
       side: [
         dim([-hz, 0], [hz, 0], -LANE(1), '40'),        // depth
         dim([0, 0], [0, yTop], -(R + LANE(1)), '44'),  // height to the bore centre
-        note([rHole * 0.71, yTop + rHole * 0.71], [R + 16, H + 6], 'Ø24'),
-        note([-R * 0.71, yTop + R * 0.71], [-R - 18, H + 6], 'R20'),
+        roundDim([0, yTop], rHole, 360, 45, R + 16),   // the bore, seen square-on: a full circle
+        roundDim([0, yTop], R, 180, 135, R + 12),      // the head is a semicircle, so R
       ],
     },
     viewNotes: {
@@ -654,16 +717,20 @@ const BEARING = (() => {
         dim([xL, t], [xL, 0], -LANE(1), '9'),          // base thickness
         dim([xL, 0], [xL, yLug], LANE(2), '21'),       // height to the bore centre
         dim([xR, 0], [xR, H], -LANE(1), '37'),         // overall height
-        note([xLug + rBore * 0.71, yLug + rBore * 0.71], [xJ, H + 12], 'Ø20'),
-        note([xLug - rLug * 0.71, yLug + rLug * 0.71], [xL - 14, H + 10], 'R16'),
+        roundDim([xLug, yLug], rBore, 360, 45, rLug + 16),   // the bore: a full circle here
+        roundDim([xLug, yLug], rLug, 180, 135, rLug + 12),   // the lug's head: a semicircle
       ],
       top: [
         dim([xR, -hz], [xR, hz], -LANE(1), '44'),      // overall depth
         dim([xL, hz], [lugX1, hz], LANE(1), '32'),     // lug length
         // Measured at the slot's edge, so the lane has to clear the base outline above it first.
         dim([sx0, rSlot], [sx1, rSlot], (hz - rSlot) + LANE(1), '16'), // slot, centre to centre
-        note([sx1 + rSlot * 0.71, -rSlot * 0.71], [xR + 10, -hz - 12], 'Ø18 slot'),
-        note([xJ + rEnd * 0.71, -rEnd * 0.71], [xR + 10, -hz - 24], 'R22'),
+        // A SLOT END IS NOT A HOLE. It is a semicircular cap on a straight-sided opening, so the
+        // old Ø18 was the wrong symbol for it: R9 on the cap, with the 16 above giving the two
+        // centres, is the pair that specifies the slot — and it is what the textbook prints.
+        roundDim([sx1, 0], rSlot, 180, -45, rSlot + 12),
+        // The base's rounded end, well clear of the slot's leader at a steeper angle.
+        roundDim([xJ, 0], rEnd, 180, -70, rEnd + 16),
       ],
       side: [
         dim([-hz, 0], [hz, 0], -LANE(1), '44'),        // overall depth

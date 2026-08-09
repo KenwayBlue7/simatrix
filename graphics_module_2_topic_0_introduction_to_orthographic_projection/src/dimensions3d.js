@@ -185,6 +185,9 @@ export function buildDimensions3D(data, view, sideView, box, resolution) {
   /**
    * A leader: a sloping leg off the feature, a short landing, the note above it.
    *
+   * A DIAMETER is the same mark with its leg started at the FAR side of the circle, so the leg
+   * crosses the centre on its way out, and with a second arrowhead at `head2` on the near side.
+   *
    * The note stays LEVEL, and that is not a lapse back into Method 2: a leader's note is written
    * along its horizontal landing, in both systems. Method 1 governs the value on a DIMENSION line.
    */
@@ -198,6 +201,7 @@ export function buildDimensions3D(data, view, sideView, box, resolution) {
     seg(from, to);
     seg(to, land);
     arrowHead(from, [back[0] / m, back[1] / m]);
+    if (d.head2) arrowHead(fx(d.head2), [-back[0] / m, -back[1] / m]);
     value([land[0] + dir * 2, land[1] + DIM_STYLE.textLift], d.text, 'vp-dim vp-dim--note');
   };
 

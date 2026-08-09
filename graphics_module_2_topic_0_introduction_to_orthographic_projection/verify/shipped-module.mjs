@@ -677,6 +677,12 @@ ok('the sheet captions exactly three views',
 ok('the plan is BELOW the elevation', cap.Plan.y > cap.Elevation.y,
   `plan ${cap.Plan.y.toFixed(1)} vs elev ${cap.Elevation.y.toFixed(1)}`);
 ok('the side view shares the elevation’s band', cap[sideName].y < cap.Plan.y);
+// And SHARES IT EXACTLY. The two views stand on the same line of the sheet, so their names are one
+// row of headings; left to their own clearances they drift apart by whatever the two happen to
+// carry, which put them 45 mm apart on the Cylindrical Block.
+ok('…on the same line as it, to the millimetre',
+  Math.abs(cap[sideName].y - cap.Elevation.y) < 0.6,
+  `${cap[sideName].y.toFixed(1)} vs ${cap.Elevation.y.toFixed(1)}`);
 ok('the plan is aligned under the elevation', Math.abs(cap.Plan.x - cap.Elevation.x) < 1,
   `${cap.Plan.x.toFixed(1)} vs ${cap.Elevation.x.toFixed(1)}`);
 
@@ -698,6 +704,97 @@ const revealAll = async () => {
     await wait(260);
   }
 };
+
+
+// A CAPTION IS CENTRED ON ITS OWN DRAWING, measured off the laid-out SVG.
+//
+// Each caption lives in the same <g> as the linework it names, so the group's own box is the
+// answer -- with the caption itself taken out of it, since a text node inside the group would
+// otherwise drag the box towards wherever the text already is and the test would agree with any
+// placement at all. The group holds outline and edge, which IS the drawing; centre lines and
+// dimensions sit in their own groups and are correctly ignored, because a centre line overhanging
+// one side of a part is not a reason to print its name off to that side. That was the fault:
+// the Bearing Block's bore centre line reaches 7 mm past the lug on the left with nothing to
+// balance it, and "Elevation" printed 3.5 mm left of a view symmetrical about x = 0.
+const captionCentres = async () => JSON.parse(await evaluate(`(() => {
+  const out = [];
+  for (const g of document.querySelectorAll('#proj-sheet-stage .psheet__stage--outline')) {
+    const label = g.querySelector('text.psheet__caption');
+    if (!label) continue;
+    let minX = Infinity, maxX = -Infinity;
+    for (const child of g.children) {
+      if (child.tagName === 'text') continue;
+      const b = child.getBBox();
+      if (!b.width && !b.height) continue;
+      minX = Math.min(minX, b.x);
+      maxX = Math.max(maxX, b.x + b.width);
+    }
+    const t = label.getBBox();
+    out.push({
+      name: label.textContent.trim(),
+      ink: (minX + maxX) / 2,
+      text: t.x + t.width / 2,
+      width: maxX - minX,
+    });
+  }
+  return JSON.stringify(out);
+})()`));
+
+for (const id of ['cylblock', 'shaftsupport', 'bearingblock', 'block']) {
+  await pickObject(id);
+  await revealAll();
+  await wait(400);
+  const centres = await captionCentres();
+  const off = centres.filter((c) => Math.abs(c.text - c.ink) > 0.6);
+  // How much CLEAR AIR sits between a caption and the nearest thing drawn under it. Asserted from
+  // both sides: never touching, and never adrift. The clearance is derived from where each view's
+  // marks really land, so a caption that had drifted back out would mean the derivation had gone
+  // wrong again — which is exactly how "Elevation" ended up 40 mm above a drawing it only had to
+  // clear by two. Construction lines are excluded; they are scaffolding and are faded out.
+  const air = JSON.parse(await evaluate(`(() => {
+    const svg = document.querySelector('#proj-sheet-stage svg');
+    const nodes = [...svg.querySelectorAll('path, line, circle, polyline, polygon')]
+      .filter((n) => n.closest('.psheet__stage') && !n.closest('.psheet__stage--construction'))
+      .map((n) => n.getBBox());
+    const out = [];
+    for (const c of svg.querySelectorAll('.psheet__caption')) {
+      const b = c.getBBox();
+      const under = c.textContent.trim() === 'Plan';   // the plan's caption hangs BELOW its view
+      let gap = Infinity;
+      for (const n of nodes) {
+        if (n.x + n.width < b.x - 25 || n.x > b.x + b.width + 25) continue;
+        const d = under ? b.y - (n.y + n.height) : n.y - (b.y + b.height);
+        if (d >= -0.01 && d < gap) gap = d;
+      }
+      out.push({ name: c.textContent.trim(), gap });
+    }
+    return JSON.stringify(out);
+  })()`));
+  const tight = air.filter((a) => a.gap < 1);
+  ok(`${id}: no caption touches its drawing`,
+    air.length === 3 && tight.length === 0,
+    tight.map((a) => `${a.name} ${a.gap.toFixed(2)}mm`).join(' | ') || 'all clear');
+  ok(`${id}: ...and none of them is adrift above it`,
+    Math.min(...air.map((a) => a.gap)) <= 6,
+    air.map((a) => `${a.name} ${a.gap.toFixed(1)}`).join(', '));
+
+  const rows = JSON.parse(await evaluate(`(() => {
+    const out = {};
+    for (const t of document.querySelectorAll('#proj-sheet-stage .psheet__caption')) {
+      const b = t.getBBox();
+      out[/side view/i.test(t.textContent) ? 'side' : t.textContent.trim().toLowerCase()] = b.y + b.height / 2;
+    }
+    return JSON.stringify(out);
+  })()`));
+  ok(`${id}: the elevation and the side view head one row, and the plan does not join it`,
+    Math.abs(rows.elevation - rows.side) < 0.6 && rows.plan > rows.elevation + 10,
+    `elev ${rows.elevation.toFixed(1)}, side ${rows.side.toFixed(1)}, plan ${rows.plan.toFixed(1)}`);
+  ok(`${id}: every caption is centred on its own drawing, not on the page`,
+    centres.length === 3 && off.length === 0,
+    off.length
+      ? off.map((c) => `${c.name} ${(c.text - c.ink).toFixed(2)} mm off`).join(' | ')
+      : centres.map((c) => c.name).join(', '));
+}
 
 for (const [id, expectSide, dir] of [['cylblock', 'Right side view', 'left'], ['shaftsupport', 'Left side view', 'right']]) {
   await pickObject(id);
@@ -848,16 +945,185 @@ const overlaps = async () => JSON.parse(await evaluate(`(() => {
   return JSON.stringify({ n: boxes.length, hits, caps: caps.length, capHits });
 })()`));
 
+// --- 7a2b. DIAMETER AND RADIUS: THE RIGHT SYMBOL, THE RIGHT SHAPE, AND OFF THE OBJECT ----------
+// Three separate claims, all measured against the view's own primitives rather than against the
+// registry -- "d30" matching a registry that says "d30" proves nothing about the drawing.
+//
+// WHICH SYMBOL. `circle` is the only primitive that draws a complete 360 deg circle, so a diameter
+// must have one under it at that exact centre and radius, and a radius must not. The arrowhead
+// must also LAND ON drawn outline or edge linework, because the arrow is the only thing that says
+// which curve the label belongs to -- that is what caught the Cylindrical Block's boss, labelled
+// as a diameter with its leader anchored at 225 deg, on the part of the circle the plan trims away.
+//
+// WHERE IT SITS. The elbow and the shelf must both be OUTSIDE the view's outline. A leader may
+// start on the feature -- it has to -- but nothing the learner READS may sit on the geometry they
+// are being asked to look at.
+const roundAudit = JSON.parse(await evaluate(`
+  import('./src/objectData.js').then((m) => {
+    const near = (a, b) => Math.abs(a - b) < 0.05;
+    const segDist = (p, a, b) => {
+      const dx = b[0] - a[0], dy = b[1] - a[1];
+      const l2 = dx * dx + dy * dy;
+      const t = l2 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * dx + (p[1] - a[1]) * dy) / l2)) : 0;
+      return Math.hypot(p[0] - (a[0] + t * dx), p[1] - (a[1] + t * dy));
+    };
+    // How far the point is from the nearest OUTLINE or EDGE the view actually draws. Hidden detail
+    // and centre lines are excluded: an arrow on either of those names the wrong thing.
+    const toInk = (p, prims) => {
+      let best = Infinity;
+      for (const pr of prims) {
+        if (pr.layer !== 'outline' && pr.layer !== 'edge') continue;
+        if (pr.k === 'circle') best = Math.min(best, Math.abs(Math.hypot(p[0] - pr.c[0], p[1] - pr.c[1]) - pr.r));
+        else if (pr.k === 'line') best = Math.min(best, segDist(p, pr.a, pr.b));
+        else if (pr.k === 'poly') {
+          const n = pr.pts.length;
+          for (let i = 0; i < (pr.close ? n : n - 1); i++) best = Math.min(best, segDist(p, pr.pts[i], pr.pts[(i + 1) % n]));
+        }
+      }
+      return best;
+    };
+    // Even-odd ray cast against the view's OUTLINE polygons: "is this point on the object".
+    const inside = (p, prims) => prims.some((pr) => {
+      if (pr.k !== 'poly' || pr.layer !== 'outline') return false;
+      let hit = false;
+      for (let i = 0, j = pr.pts.length - 1; i < pr.pts.length; j = i++) {
+        const xi = pr.pts[i][0], yi = pr.pts[i][1], xj = pr.pts[j][0], yj = pr.pts[j][1];
+        if ((yi > p[1]) !== (yj > p[1]) && p[0] < ((xj - xi) * (p[1] - yi)) / (yj - yi) + xi) hit = !hit;
+      }
+      return hit;
+    });
+    const bad = [], seen = { dia: 0, rad: 0 };
+    for (const o of m.OBJECTS) {
+      for (const view of ['front', 'top', 'side']) {
+        const prims = o.views[view] || [];
+        const full = (c, r) => prims.some((p) => p.k === 'circle' && near(p.c[0], c[0]) && near(p.c[1], c[1]) && near(p.r, r));
+        for (const d of o.dims[view] || []) {
+          if (d.k === 'dim') continue;
+          const where = o.id + '/' + view + ' ' + d.text + ': ';
+          const dia = d.k === 'dia';
+          const r = dia ? parseFloat(d.text.slice(1)) / 2 : parseFloat(d.text.slice(1));
+          if (dia) seen.dia++; else seen.rad++;
+          if (dia !== !/^R/.test(d.text)) bad.push(where + 'the symbol and the kind of mark disagree');
+          // Both legs run along the feature's own radius. A radius starts ON the arc, so its centre
+          // is one radius back down the leg; a diameter starts at the FAR side, so its centre is one
+          // radius FORWARD along it — which is the same as saying the line crosses the centre.
+          const len = Math.hypot(d.to[0] - d.at[0], d.to[1] - d.at[1]) || 1;
+          const u = [(d.to[0] - d.at[0]) / len, (d.to[1] - d.at[1]) / len];
+          const c = dia
+            ? [d.at[0] + u[0] * r, d.at[1] + u[1] * r]
+            : [d.at[0] - u[0] * r, d.at[1] - u[1] * r];
+          if (dia && !full(c, r)) bad.push(where + 'diameter on a shape this view does not draw as a full circle');
+          if (dia) {
+            // The line spans the whole width: the two heads are 2r apart, both on the circle, and
+            // the second is collinear with the first and the elbow.
+            if (!d.head2) bad.push(where + 'a diameter with only one arrowhead');
+            else {
+              const span = Math.hypot(d.head2[0] - d.at[0], d.head2[1] - d.at[1]);
+              const cross = (d.head2[0] - d.at[0]) * u[1] - (d.head2[1] - d.at[1]) * u[0];
+              if (Math.abs(span - 2 * r) > 0.01) bad.push(where + 'its line spans ' + span.toFixed(2) + ', not the ' + (2 * r) + ' it claims');
+              if (Math.abs(cross) > 0.01) bad.push(where + 'its second head is off the line');
+              if (Math.abs(Math.hypot(d.head2[0] - c[0], d.head2[1] - c[1]) - r) > 0.01) bad.push(where + 'its second head is off the circle');
+            }
+          } else if (d.head2) {
+            bad.push(where + 'a radius drawn across the centre');
+          }
+          if (!dia && full(c, r)) bad.push(where + 'R on a complete circle');
+          const off = toInk(d.at, prims);
+          if (!(off < 0.1)) bad.push(where + 'arrow ' + off.toFixed(2) + ' mm off any drawn line');
+          const shelf = [d.to[0] + Math.sign(d.to[0] - d.at[0] || 1) * m.DIM_STYLE.leaderLand, d.to[1]];
+          if (inside(d.to, prims)) bad.push(where + 'its elbow sits on the object');
+          if (inside(shelf, prims)) bad.push(where + 'its shelf sits on the object');
+        }
+      }
+    }
+    return JSON.stringify({ bad, seen });
+  })`));
+ok('every diameter is on a complete circle, every R is on a drawn arc, and no shelf sits on the object',
+  roundAudit.bad.length === 0, roundAudit.bad.join(' | '));
+ok('...and the drawing uses both symbols, so the rule is being exercised',
+  roundAudit.seen.dia >= 4 && roundAudit.seen.rad >= 4,
+  `${roundAudit.seen.dia} diameters, ${roundAudit.seen.rad} radii`);
+
+// The SHAPE of the mark, read back off the SVG: three points -- arrow, elbow, shelf -- with the
+// last leg horizontal, and the value standing one lift above that shelf. "Leader plus horizontal
+// shelf" is the whole of what was asked for, and a leader that had lost its shelf would still look
+// like a dimension, so it is asserted rather than assumed.
+const shelfShape = async () => JSON.parse(await evaluate(`(() => {
+  const stage = document.querySelector('#proj-sheet-stage .psheet__stage--dimension');
+  const paths = [...stage.querySelectorAll('path.psheet__ink--dimension')].map((p) => {
+    const n = p.getAttribute('d').match(/-?[0-9.]+/g).map(Number);
+    return { pts: [[n[0], n[1]], [n[2], n[3]], [n[4], n[5]]], len: n.length };
+  });
+  const texts = [...stage.querySelectorAll('text')]
+    .filter((t) => t.getAttribute('text-anchor') !== 'middle')
+    .map((t) => ({ s: t.textContent, x: t.x.baseVal[0].value, y: t.y.baseVal[0].value, rot: /rotate/.test(t.getAttribute('transform') || '') }));
+  const bad = [];
+  for (const p of paths) {
+    if (p.len !== 6) { bad.push('leader with ' + (p.len / 2) + ' points, not 3'); continue; }
+    const elbow = p.pts[1], shelf = p.pts[2];
+    if (Math.abs(shelf[1] - elbow[1]) > 0.01) bad.push('last leg is not horizontal');
+    if (Math.abs(shelf[0] - elbow[0]) < 4) bad.push('shelf only ' + Math.abs(shelf[0] - elbow[0]).toFixed(1) + ' long');
+    // The value stands ABOVE the shelf. SVG y grows downwards, so above is a SMALLER y.
+    const over = texts.filter((t) => Math.abs(t.y - (elbow[1] - 3.2)) < 0.2
+      && t.x > Math.min(elbow[0], shelf[0]) - 0.6 && t.x < Math.max(elbow[0], shelf[0]) + 0.6);
+    if (over.length !== 1) bad.push('shelf at ' + elbow[0].toFixed(1) + ' carries ' + over.length + ' values, not 1');
+  }
+  return JSON.stringify({ bad, n: paths.length, turned: texts.filter((t) => t.rot).length });
+})()`));
+for (const id of ['cylblock', 'shaftsupport', 'bearingblock']) {
+  await pickObject(id);
+  await revealAll();
+  await wait(500);
+  const shelves = await shelfShape();
+  ok(`${id}: every diameter and radius is a leader with a horizontal shelf, its value on that shelf`,
+    shelves.n > 0 && shelves.bad.length === 0, shelves.bad.join(' | ') || `${shelves.n} leaders`);
+  ok(`${id}: ...and none of those values is turned - a note on a level shelf is written level`,
+    shelves.turned === 0, `${shelves.turned} turned`);
+  // Both ends of a diameter carry a head. Counted rather than assumed, because the second one is
+  // drawn by a single guarded line and would go missing silently.
+  const heads = JSON.parse(await evaluate(`
+    import('./src/objectData.js').then((m) => {
+      const o = m.getObject('${id}');
+      const want = ['front', 'top', 'side'].reduce((n, k) => n + (o.dims[k] || [])
+        .reduce((a, d) => a + (d.k === 'dim' ? 2 : d.k === 'dia' ? 2 : 1), 0), 0);
+      const got = document.querySelectorAll('#proj-sheet-stage .psheet__stage--dimension path.psheet__arrow').length;
+      return JSON.stringify({ want, got });
+    })`));
+  ok(`${id}: ...and every arrowhead is on the paper, both ends of each diameter included`,
+    heads.got === heads.want, `${heads.got} of ${heads.want}`);
+}
+
+// The two labels that were wrong, named. A boss trimmed by the plate it stands on is an arc, and a
+// slot end is a semicircular cap, not a hole.
+const labelsFor = async (id, view) => JSON.parse(await evaluate(`
+  import('./src/objectData.js').then((m) =>
+    JSON.stringify((m.getObject('${id}').dims['${view}'] || []).map((d) => d.text)))`));
+const cylTop = await labelsFor('cylblock', 'top');
+ok('the trimmed boss in the plan is R25, not a diameter',
+  cylTop.includes('R25') && !cylTop.some((t) => /50/.test(t)), cylTop.join(' '));
+ok('...while the bore beside it, a full circle, keeps its 30 as a diameter',
+  cylTop.some((t) => /^\u00d830$/.test(t)), cylTop.join(' '));
+const bearTop = await labelsFor('bearingblock', 'top');
+ok('the slot end is R9, not a diameter',
+  bearTop.includes('R9') && !bearTop.some((t) => /18/.test(t)), bearTop.join(' '));
+
 // --- 7a3. METHOD 1 — every value lies along its own dimension line ------------------------------
 // The claim, measured rather than assumed: each value on the sheet is PARALLEL to a dimension line,
-// sits exactly one standard lift off that line's midpoint, and is turned into the half-circle that
-// reads from the bottom edge or the right-hand edge. Nothing here consults the authored data, so a
-// value that had quietly gone back to level — Method 2 — fails whatever the registry says.
+// stands exactly one standard lift PERPENDICULARLY off it, over a point of the line itself, and is
+// turned into the half-circle that reads from the bottom edge or the right-hand edge. Nothing here
+// consults the authored data, so a value that had quietly gone back to level — Method 2 — fails
+// whatever the registry says.
 //
-// Pairing is by geometry, not by DOM order: a value belongs to the parallel dimension line whose
-// midpoint is a lift away. Extension lines are perpendicular to their own dimension line and so can
-// never be mistaken for one, and a leader's note is level over a level landing, which is Method 1's
-// own rule for a note rather than an exception to it.
+// Perpendicular distance, not distance-to-the-midpoint. A linear dimension does write its value at
+// the midpoint, but a DIAMETER writes it out on the tail beyond the second arrowhead, on clear
+// paper past the geometry the line has just crossed — writing it at the midpoint would put it in
+// the middle of the very hole it measures. Both are Method 1; what they share is the perpendicular
+// lift, so that is what is measured, with the foot of the perpendicular required to land ON the
+// line rather than off either end of it.
+//
+// Pairing is by geometry, not by DOM order. Extension lines are perpendicular to their own
+// dimension line and so can never be mistaken for one, and a leader's note is level over a level
+// landing, which is Method 1's own rule for a note rather than an exception to it.
 const alignment = async () => JSON.parse(await evaluate(`(() => {
   const svg = document.querySelector('#proj-sheet-stage svg');
   const stage = svg.querySelector('.psheet__stage--dimension');
@@ -865,7 +1131,7 @@ const alignment = async () => JSON.parse(await evaluate(`(() => {
   const lines = [...stage.querySelectorAll('line.psheet__ink--dimension')].map(l => {
     const x1 = l.x1.baseVal.value, y1 = l.y1.baseVal.value;
     const x2 = l.x2.baseVal.value, y2 = l.y2.baseVal.value;
-    return { angle: fold(Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI), mx: (x1 + x2) / 2, my: (y1 + y2) / 2 };
+    return { angle: fold(Math.atan2(y2 - y1, x2 - x1) * 180 / Math.PI), x1, y1, x2, y2 };
   });
   const out = [], notes = [];
   for (const t of stage.querySelectorAll('text')) {
@@ -878,7 +1144,13 @@ const alignment = async () => JSON.parse(await evaluate(`(() => {
     let best = null;
     for (const l of lines) {
       if (Math.abs(fold(l.angle - rot)) > 0.5) continue;
-      const d = Math.hypot(x - l.mx, y - l.my);
+      const dx = l.x2 - l.x1, dy = l.y2 - l.y1;
+      const len2 = dx * dx + dy * dy;
+      if (!len2) continue;
+      // Where the foot of the perpendicular lands along the line, 0 at one end and 1 at the other.
+      const s = ((x - l.x1) * dx + (y - l.y1) * dy) / len2;
+      if (s < -0.001 || s > 1.001) continue;
+      const d = Math.abs((x - l.x1) * dy - (y - l.y1) * dx) / Math.sqrt(len2);
       if (best === null || d < best) best = d;
     }
     out.push({ t: t.textContent, rot, lift: best });

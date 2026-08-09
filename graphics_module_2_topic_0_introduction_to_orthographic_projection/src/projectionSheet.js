@@ -67,6 +67,14 @@ const EXT_OVER = DIM_STYLE.extOver;
 const TEXT_LIFT = DIM_STYLE.textLift;
 const LEADER_LAND = DIM_STYLE.leaderLand;
 
+/**
+ * A view's caption: its own height, and the clear air between the drawing and it, in sheet mm.
+ * `CAPTION_HEIGHT` must match `.psheet__caption`'s `font-size`, because the caption is anchored on
+ * its CENTRE and half of it therefore hangs back towards the view.
+ */
+const CAPTION_HEIGHT = 5;
+const CAPTION_AIR = 2.5;
+
 /** Draw-on pacing. One stage is one press, so the whole stage has to land inside a beat. */
 const DRAW_MS = 460;
 const STAGGER_MS = 55;
@@ -255,7 +263,14 @@ export function initProjectionSheet(mount, { prefersReducedMotion = false } = {}
     text(g, P(textAt), d.text, { angle });
   }
 
-  /** A leader: arrow on the feature, a sloping leg, a short horizontal landing, the note above it. */
+  /**
+   * A leader: an arrow on the feature, a sloping leg, a short horizontal landing, the note above it.
+   *
+   * A DIAMETER is the same mark with its leg started at the far side of the circle, so the leg
+   * crosses the centre on its way out, and with a second arrowhead at `head2` on the near side. The
+   * two heads then sit at the two ends of the diameter, pointing outwards, and the shelf still
+   * carries the value clear of the geometry.
+   */
   function emitNote(g, ox, oy, d) {
     const at = [ox + d.at[0], oy + d.at[1]];
     const to = [ox + d.to[0], oy + d.to[1]];
@@ -268,6 +283,7 @@ export function initProjectionSheet(mount, { prefersReducedMotion = false } = {}
       d: `M ${PX(at[0])} ${PY(at[1])} L ${PX(to[0])} ${PY(to[1])} L ${PX(land[0])} ${PY(land[1])}`,
     }));
     arrowHead(g, at, [u[0] / m, u[1] / m]);
+    if (d.head2) arrowHead(g, [ox + d.head2[0], oy + d.head2[1]], [-u[0] / m, -u[1] / m]);
     text(g, [(to[0] + land[0]) / 2, to[1] + TEXT_LIFT], d.text, {
       anchor: dir > 0 ? 'start' : 'end',
     });
@@ -298,10 +314,14 @@ export function initProjectionSheet(mount, { prefersReducedMotion = false } = {}
     };
     const flipDim = (d) => {
       if (!mirrored) return d;
-      return d.k === 'dim'
-        ? { ...d, a: flipPt(d.a), b: flipPt(d.b), off: -d.off }
-        : { ...d, at: flipPt(d.at), to: flipPt(d.to) };
+      if (d.k === 'dim') return { ...d, a: flipPt(d.a), b: flipPt(d.b), off: -d.off };
+      const f = { ...d, at: flipPt(d.at), to: flipPt(d.to) };
+      if (d.head2) f.head2 = flipPt(d.head2);
+      return f;
     };
+
+    /** The two points a dimension mark actually reaches, whatever kind it is. */
+    const dimSpan = (d) => (d.k === 'dim' ? [d.a, d.b] : [d.at, d.to]);
 
     const views = {
       front: data.views.front,
@@ -316,6 +336,57 @@ export function initProjectionSheet(mount, { prefersReducedMotion = false } = {}
       front: data.dims.front ?? [],
       top: data.dims.top ?? [],
       side: (data.dims.side ?? []).map(flipDim),
+    };
+
+    /**
+     * The box of the DRAWING ITSELF — outline and visible edges, nothing else.
+     *
+     * `boxes` below takes in every primitive, centre lines included, and that is right for LAYOUT:
+     * a centre line that overhangs the part still needs paper, and the views have to be spaced so
+     * it gets some. It is wrong for a CAPTION, because a caption is a label for the drawing and has
+     * to be centred on the drawing. The Bearing Block's elevation is the case that showed it: its
+     * bore centre line reaches 7 mm past the lug on the left and nothing balances it on the right,
+     * so the all-primitives midpoint sits 3.5 mm left of the part and "Elevation" printed visibly
+     * off-centre over a view that is itself symmetrical about x = 0.
+     *
+     * Hidden detail is left out for the same reason it is invisible to the silhouette: it lies
+     * inside the outline and can only agree with it.
+     */
+    const inkBoxes = {
+      front: bboxOf(views.front.filter((p) => p.layer === 'outline' || p.layer === 'edge')),
+      top: bboxOf(views.top.filter((p) => p.layer === 'outline' || p.layer === 'edge')),
+      side: bboxOf(views.side.filter((p) => p.layer === 'outline' || p.layer === 'edge')),
+    };
+
+    /**
+     * How far outboard a view REACHES, on the side its caption hangs from: its own linework, and
+     * then whatever its dimensions actually put beyond that.
+     *
+     * MEASURED ON THE PLACED MARK, not on its offset. The earlier version added `|off|` to the
+     * dimension's own coordinates, which is only true when the offset happens to point the way the
+     * caption hangs. A VERTICAL dimension's offset is HORIZONTAL — it moves the mark sideways and
+     * adds nothing above the view at all. The Cylindrical Block's elevation carries a boss height
+     * thrown 37 mm clear to the LEFT, and that 37 mm was being charged as headroom, pushing
+     * "Elevation" 38 mm further up the sheet than anything it had to clear.
+     *
+     * So the reach is taken from where the mark really lands: `alignedDim()`'s own dimension-line
+     * ends for a linear size, the elbow for a leader, and in both cases the value standing one lift
+     * off that with half its own height. The same functions that draw it decide it, so it cannot
+     * drift from what is on the paper.
+     */
+    const VALUE_REACH = TEXT_LIFT + DIM_STYLE.textHeight / 2;
+    const reachOf = (key, box, set) => {
+      const away = key === 'top' ? -1 : 1;
+      const outer = (a, b) => (away > 0 ? Math.max(a, b) : Math.min(a, b));
+      let reach = away > 0 ? box.maxY : box.minY;
+      for (const d of set) {
+        const ys = d.k === 'dim'
+          ? (({ A, B }) => [A[1], B[1]])(alignedDim(d))
+          : dimSpan(d).map(([, y]) => y);
+        reach = outer(reach, (away > 0 ? Math.max(...ys) : Math.min(...ys)) + away * VALUE_REACH);
+      }
+      // Clear air, then half the caption — it is anchored on its centre, not on its baseline.
+      return reach + away * (CAPTION_AIR + CAPTION_HEIGHT / 2);
     };
 
     const boxes = {
@@ -339,6 +410,31 @@ export function initProjectionSheet(mount, { prefersReducedMotion = false } = {}
       ],
     };
 
+    /**
+     * Caption heights. The ELEVATION AND THE SIDE VIEW SHARE ONE LINE.
+     *
+     * They stand on the same band of the sheet — both origins are at y = 0, and first angle puts
+     * them side by side across the top — so their names are one row of headings and have to read as
+     * one. Left to their own clearances they drift apart by whatever the two views happen to carry:
+     * the Cylindrical Block's elevation has a boss height thrown 37 mm clear of the part while its
+     * side view carries a single 12 mm lane, which put "Elevation" 45 mm above "Right side view"
+     * over two drawings standing on the same line.
+     *
+     * So the pair takes the OUTER of the two reaches. Whichever view needs more room sets the row,
+     * and the other rises to meet it — never a nudge on one of them, which would go stale the
+     * moment either view's dimensions changed.
+     *
+     * The plan is not part of that row. It hangs off the far side of its own view, below, with its
+     * own clearance, and nothing else shares that band.
+     */
+    const reaches = {
+      front: reachOf('front', boxes.front, dims.front),
+      top: reachOf('top', boxes.top, dims.top),
+      side: reachOf('side', boxes.side, dims.side),
+    };
+    const topRow = Math.max(reaches.front, reaches.side);
+    const capY = { front: topRow, top: reaches.top, side: topRow };
+
     // The 45 deg mitre line, which is how depth actually gets from the plan to the side view by
     // hand. Both views are affine in the same world z, so the mapping between them is a straight
     // 45 deg line; its slope carries the sign flip between the two frames.
@@ -361,7 +457,7 @@ export function initProjectionSheet(mount, { prefersReducedMotion = false } = {}
       // BOTH — an allowance made sideways only clips a vertical dimension's value off the edge
       // (RULES.md §3.60: one margin does not serve both axes).
       for (const d of dims[key]) {
-        const pts = d.k === 'dim' ? [d.a, d.b] : [d.at, d.to];
+        const pts = dimSpan(d);
         const pad = d.k === 'dim' ? Math.abs(d.off) + 12 : LEADER_LAND + 22;
         for (const [x, y] of pts) { swallow(ox + x - pad, oy + y - pad); swallow(ox + x + pad, oy + y + pad); }
       }
@@ -485,21 +581,9 @@ export function initProjectionSheet(mount, { prefersReducedMotion = false } = {}
       // what is actually drawn, per axis).
       const capG = stageGroups.get(`${key}:outline`);
       if (capG) {
-        const away = key === 'top' ? -1 : 1;   // which way is "away from the XY line"
-        let reach = key === 'top' ? b.minY : b.maxY;
-        for (const d of dims[key]) {
-          const pts = d.k === 'dim' ? [d.a, d.b] : [d.at, d.to];
-          // How far outboard a dimension actually REACHES: its own lane, plus the value standing
-          // one lift off that lane, plus half the value's own height. Derived rather than guessed,
-          // because a guessed clearance is one that goes stale the moment the lift changes.
-          const pad = d.k === 'dim'
-            ? Math.abs(d.off) + TEXT_LIFT + DIM_STYLE.textHeight / 2 + 3
-            : 6;
-          for (const [, y] of pts) {
-            reach = away > 0 ? Math.max(reach, y + pad) : Math.min(reach, y - pad);
-          }
-        }
-        text(capG, [ox + (b.minX + b.maxX) / 2, oy + reach + away * 6],
+        // ACROSS: the middle of the drawing. DOWN: the band this view's caption shares.
+        const ink = inkBoxes[key];
+        text(capG, [ox + (ink.minX + ink.maxX) / 2, oy + capY[key]],
           captionFor(key, sideView), { cls: 'psheet__caption' });
       }
     }

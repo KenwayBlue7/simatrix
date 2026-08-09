@@ -215,6 +215,154 @@
   exactly what Method 1 adds. Screen-space rects now, and a new pass that finds each value's own
   parallel dimension line and proves it sits one lift off its midpoint. 163 assertions green.
 
+## 2026-08-09 (i) - The gap was measured against a fiction
+
+- **Fixed** the space between a view's heading and its drawing. The clearance added `|off|` — the
+  dimension's offset — to the dimension's own coordinates, and that is only headroom when the offset
+  points the way the caption hangs. A VERTICAL dimension's offset is HORIZONTAL: it moves the mark
+  sideways and puts nothing above the view. The Cylindrical Block's elevation carries a boss height
+  thrown 37 mm clear to the LEFT, charged as headroom, so "Elevation" sat 39 mm above a drawing it
+  had to clear by two.
+- **Changed** the reach to be taken from where the mark actually LANDS: `alignedDim()`'s own
+  dimension-line ends for a linear size, the elbow for a leader, plus the value's lift and half its
+  height. The functions that draw it decide it, so it cannot drift from what is on the paper.
+- **Changed** the caption's own gap to 2.5 mm of clear air plus half the caption's height, named as
+  `CAPTION_AIR` and `CAPTION_HEIGHT` rather than buried in a 6. It is anchored on its centre, so
+  half of it hangs back towards the view and has to be paid for.
+- **Result**, measured: 1.9–5.2 mm of air where a view sets its own row, against 8–39 mm before. The
+  larger gaps that remain are the shared top row doing its job — whichever of the elevation and the
+  side view needs the room sets the line, and the other keeps it.
+- **Added** the assertion from BOTH sides: no caption touches its drawing (≥ 1 mm), and none is
+  adrift above it (the tightest on each sheet ≤ 6 mm). One bound alone would have let the fault come
+  back as soon as a dimension moved. Calibrated by restoring the offset-based clearance — all four
+  objects fail, the Cylindrical Block at 39.4 mm.
+
+## 2026-08-09 (h) - Two views on one line, one row of headings
+
+- **Fixed** "Elevation" and the side-view heading sitting at different heights. They stand side by
+  side on the same band of the sheet, so their names are one row — but each was cleared against its
+  own view's dimensions alone. The Cylindrical Block throws a boss height 37 mm clear of the
+  elevation while its side view carries a single 12 mm lane, so "Elevation" printed 45 mm above
+  "Right side view" over two drawings standing on the same line.
+- **Changed** the pair to take the OUTER of the two reaches. Whichever view needs the room sets the
+  row and the other rises to meet it. Not a nudge on either one, which would go stale the moment
+  either view's dimensions changed — the row is derived from what the two views actually reach.
+- **Left** the plan out of that row on purpose: it hangs off the far side of its own view, below,
+  with its own clearance, and shares that band with nothing.
+- **Added** the assertion for all four objects — elevation and side caption within 0.6 mm of each
+  other, plan well below. Calibrated by restoring per-view clearances: the Cylindrical Block fails
+  at 49.0 vs 11.6 and the Stepped Block at 45.0 vs 11.6.
+- **Note on the brief:** the `.top-row` flex container is not available here, for the same reason
+  as last time — the sheet is one SVG laid out in millimetres, and the three views are placed by
+  first-angle projection, not by CSS. The rule behind it (one shared baseline, derived, no margin
+  hacks, no independent positioning) is what was implemented.
+
+## 2026-08-09 (g) - A caption belongs to its drawing
+
+- **Fixed** the view captions, which were centred on each view's WHOLE bounding box — centre lines
+  and all — instead of on the drawing. The Bearing Block's elevation is where it showed: its bore
+  centre line reaches 7 mm past the lug on the left and nothing balances it on the right, so
+  "Elevation" printed 3.5 mm left of a view that is symmetrical about its own axis.
+- **Changed** the caption's two axes to take two different boxes, which is the real rule. ACROSS:
+  the outline-and-edge box, the drawing itself. DOWN: unchanged, still cleared against everything
+  the view reaches, dimensions included. The all-primitives box stays where it belongs — laying the
+  views out, because an overhanging centre line does need paper.
+- **Added** a measurement of it on the laid-out SVG for all four objects: each caption's own group
+  box with the caption EXCLUDED from it. A text node left inside the group drags the box towards
+  wherever the text already is, and the test would then agree with any placement at all. Calibrated
+  by restoring the old box — the Bearing Block fails at 3.50 mm and 1.00 mm.
+- **Note on the brief:** the wrapper it asked for (`<div class="elevation-block">` with a flex
+  column) is not available here. The sheet is ONE SVG, laid out in millimetres so that a millimetre
+  reads the same length everywhere on it (RULES.md §5.19); the three views are not HTML boxes and
+  cannot be centred by CSS. The rule behind the request — a heading is centred on its own drawing,
+  by construction, with no absolute positioning and no manual offset — is exactly what was
+  implemented.
+
+## 2026-08-09 (final) - The line states it, the shelf carries it
+
+- **Changed** the diameter to the HYBRID mark: the line starts at the FAR side of the circle,
+  crosses the centre, and carries on out past the near side to an elbow; an arrowhead sits at each
+  end of the diameter pointing outwards; the elbow turns into a short horizontal shelf; the value
+  stands level above the shelf, on clear paper.
+- **Kept** what each of the day's two earlier forms was right about, which is why this one is worth
+  the third pass. The bare through-centre line stated the measurement honestly — a diameter IS a
+  full width taken through the middle — but wrote its value turned, along its own slant, over a
+  hatch of linework. The plain edge leader fixed the value and threw away the statement: an arrow
+  touching a circle's edge with a letter beside it is the same mark a radius uses, in a topic that
+  is teaching exactly that distinction. The hybrid keeps the statement in the geometry and the
+  reading on the shelf.
+- **Corrected** the earlier entry's reasoning, not just its outcome. "One shape of mark for both
+  symbols means the learner compares the WORDS" treated the mark as decoration. The mark is the
+  statement; a diameter should not look like a radius.
+- **Left** the radius alone on purpose: it starts ON the arc and does not reach the centre, because
+  a line drawn across the middle would say diameter.
+- **Implemented** it as one `note`-shaped object with two extra fields — `k: 'dia'` and `head2` —
+  so both renderers' existing leader functions draw it with a single guarded line each. No separate
+  diameter path in either medium, and no `diameterDim()`.
+- **Added** assertions for every part of that claim: the two heads are 2r apart, both on the circle
+  and collinear with the elbow (which is what "passes through the centre" means when measured); a
+  radius carries no second head; the symbol and the kind of mark agree; and the arrowheads on the
+  paper are COUNTED against the authored set, because a head drawn by one guarded line goes missing
+  silently.
+
+## 2026-08-09 (last) - One shape of mark, two words
+
+- **Changed** ⌀ and R to be drawn the SAME way: an arrow on the feature, a slanting leg out to clear
+  paper, a short horizontal shelf, and the value level above the shelf. The symbol is now the only
+  difference between the two marks.
+- **Withdrew** the through-centre diameter added earlier the same day. It is a correct BIS/ISO
+  construction and it worked — but it lays a dimension line and two arrowheads ACROSS the hole being
+  measured, and this topic's entire subject is reading a drawing. The learner is being asked to look
+  at that feature; nothing they read may sit on it. The diameter mark was the only mark on the sheet
+  with ink inside the geometry.
+- **Kept** what that work was actually for. The leg still runs along the feature's own radius, so a
+  diameter's leader points at the centre when produced and a radius's arrow lands on its arc by
+  construction rather than by the author's arithmetic. And ⌀ versus R is still decided from the
+  sweep the view draws, never typed.
+- **Noted** that one shape of mark for both symbols is better teaching here, not just tidier: the
+  distinction being drawn IS ⌀ versus R, and two marks that differ only in the word make the learner
+  read the word.
+- **Removed** the `dia` primitive, `diameterDim()`, `DIM_STYLE.diaTextRun` and both renderers'
+  diameter paths. Nothing replaced them — `emitNote()` and `leader()` already drew this shape.
+- **Added** assertions on the mark's SHAPE, read off the SVG: three points per leader, a horizontal
+  last leg of at least 4 mm, exactly one value one lift above each shelf, none of them turned. Plus
+  an even-odd ray cast against each view's outline polygons proving that no elbow and no shelf lands
+  on the object — which is the "nothing inside the geometry" rule, measured.
+
+## 2026-08-09 (later still) - ⌀ or R is a fact about the view
+
+- **Fixed** two labels that named the feature instead of the drawing. The boss on the Cylindrical
+  Block is a 50 mm cylinder and was labelled ⌀50; the plate it stands on is 40 deep, so the plan can
+  only draw the two arcs standing proud of the plate's edges — 147.5 deg of circle between them,
+  well under the half circle above which a diameter would still be allowed. **R25.** Its leader was
+  also anchored at 225 deg, which is inside the plate: the arrow pointed at a stretch of circle that
+  is not on the paper. It now points down at 250 deg, onto an arc that is.
+- **Fixed** the Bearing Block's slot, which was ⌀18. A slot end is not a hole, it is a semicircular
+  cap: **R9**, which with the 16 centre-to-centre already on the plan is the pair that specifies the
+  slot, and is what the textbook prints.
+- **Changed** every circular size to go through `roundDim(centre, r, sweep, ang, out)`. The sweep the
+  view draws is an ARGUMENT, and the symbol falls out of it — 360 deg gives a diameter, anything
+  less gives a radius. The symbol can no longer be typed from memory. Four diameters, five radii.
+- **Added** the `dia` primitive and `diameterDim()`, which sits beside `alignedDim()` and is shared
+  by the sheet and the solid for the same reason. A diameter is a line THROUGH THE CENTRE with an
+  arrowhead at each end on the circle pointing outwards, running on past the second head to clear
+  paper, with the value written over that tail. Not at the midpoint — the midpoint of a diameter is
+  the middle of the hole it measures.
+- **Changed** the radius leader's arrowhead to be computed as `centre + r·û`, so it touches its arc
+  by construction rather than by the author's arithmetic.
+- **Changed** the Method 1 oracle to measure each value's PERPENDICULAR distance from its dimension
+  line, with the foot of the perpendicular required to land on the line. The old test measured the
+  distance to the line's MIDPOINT, which is the same thing only for a linear dimension.
+- **Added** six assertions that read the view's own primitives instead of the authored label: a ⌀
+  must have a `circle` at that exact centre and radius, an R must not, an R's arrow must sit within
+  0.1 mm of drawn outline or edge linework, and a diameter's line must pass through its centre.
+  Calibrated by declaring the boss a full circle — it fails with "Ø on a shape this view does not
+  draw as a full circle".
+- **Noted** without acting: the plan omits the boss's circle where it CROSSES the plate, and that
+  omission is what makes the boss an arc there. From above on the solid, the boss's top edge is a
+  complete circle visible along its whole length, so the plan arguably ought to draw it — and if it
+  did, the same rule would then say ⌀50. That is a question about the linework, not the dimensioning.
+
 ## 2026-08-09 (later) - A re-frame is a move
 
 - **Fixed** the jump on the FIRST FRAME of every view change. The flight was never the problem: it

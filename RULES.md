@@ -636,6 +636,31 @@ Every rule is formatted:
 > because height binds the scale first and leaves width to spare; making the pane tall and narrow
 > made width binding and clipped "Axis" at the edge on the first frame. The analytic bbox measures
 > LINEWORK, so the caption allowance has to be added per axis, by the code that sizes the pane.
+>
+> *Extended 2026-08-09:* the two AXES of a caption's placement take two different boxes, and mixing
+> them is what puts a heading visibly off its view. ACROSS, centre it on the DRAWING — outline and
+> visible edges only. DOWN, clear it against everything the view reaches, dimensions included.
+> A layout box that takes in centre lines is right for spacing the views (an overhanging centre line
+> needs paper) and wrong for a caption: the Bearing Block's bore centre line reaches 7 mm past the
+> lug on the left with nothing to balance it, so an all-primitives midpoint printed "Elevation"
+> 3.5 mm left of a view that is symmetrical about its own axis. Never correct this with a manual
+> nudge — take the box the label is a label FOR.
+>
+> And views that stand on the SAME BAND share ONE caption line: the elevation and the side view sit
+> side by side across the top of a first-angle sheet, so their names are one row of headings and
+> must read as one. Left to their own clearances they drift apart by whatever the two views happen
+> to carry — the Cylindrical Block's elevation throws a boss height 37 mm clear of the part while
+> its side view carries a single 12 mm lane, which put "Elevation" 45 mm above "Right side view".
+> The pair takes the OUTER of the two reaches, so whichever view needs the room sets the row and the
+> other rises to meet it. The plan is not in that row; it hangs off its own side, alone.
+>
+> Measure the reach on the PLACED MARK, never on its offset. `|off|` is only headroom when the
+> offset points the way the caption hangs, and a VERTICAL dimension's offset is HORIZONTAL — it
+> moves the mark sideways and adds nothing above the view at all. The Cylindrical Block's elevation
+> carries a boss height thrown 37 mm clear to the LEFT, charged as headroom, which parked
+> "Elevation" 39 mm above a drawing it had to clear by two. Ask the placement function where the
+> mark landed; then add the value's own lift and half its height, the clear air, and half the
+> caption, since a caption anchored on its centre hangs half of itself back towards the view.
 
 > **§3.57 ✅ DO** open a step-by-step procedure on its GIVEN DATA, and name that opening state per
 > procedure rather than assuming it is the first stage.
@@ -1133,6 +1158,33 @@ Every rule is formatted:
 > What a construction is ASKED to produce is not optional and does not leave — Example 6.8's focus
 > and directrix moved onto the envelope stage rather than off the sheet.
 
+> **§6.31 ✅ DO** choose ⌀ or R from the SWEEP THE VIEW DRAWS, and pass that sweep to the helper
+> that writes the label. **❌ NEVER** type the symbol by hand from what the feature is. *(ADR-141)*
+> Reason: the rule (BIS SP 46 / ISO 129-1) is about the paper, not the part. A 50 mm boss on a
+> 40 mm-deep plate is a cylinder, and the plan can only draw the 148 deg of it that stands proud of
+> the plate's edges — so the plan's label is R25, not ⌀50, however cylindrical the thing is. Because
+> the wrong symbol is still a perfectly plausible-looking label, this cannot be left to the author's
+> memory: the sweep is an argument and the symbol falls out of it.
+> BOTH marks END the same way — a slanting leg out to clear paper, a short horizontal shelf, the
+> value LEVEL above the shelf — and they differ at the feature end, which is where the difference
+> belongs. A DIAMETER's line starts at the far side of the circle, crosses the CENTRE, and carries
+> on out to the elbow, with an arrowhead at each end of the diameter pointing outwards. A RADIUS's
+> line starts ON THE ARC and never reaches the centre, because a line across the middle would say
+> diameter. Both legs run along the feature's own radius, so each of those properties holds by
+> construction rather than by the author's arithmetic.
+> Nothing the learner READS may sit on the geometry: the line may cross the feature — for a diameter
+> it must — but the elbow, the shelf and the value must all be outside the outline. Writing the
+> value along the slant instead was tried and is worse: turned text over a hatch of linework, in a
+> topic whose subject is reading a drawing.
+
+> **§6.32 ✅ DO** test a label against the view's own primitives. **❌ NEVER** assert it against the
+> authored label. *(ADR-141)*
+> Reason: `⌀30` where the registry says `⌀30` proves nothing about the drawing. A complete circle is
+> the one thing a `circle` primitive draws, so a ⌀ must have one under it at that exact centre and
+> radius and an R must not; and an R's arrowhead must sit within a tenth of a millimetre of drawn
+> outline or edge linework — which is how the Cylindrical Block's boss was caught pointing its
+> leader at 225 deg, into the part of the circle the plan trims away.
+
 > **§6.30 ✅ DO** trace a revealed curve in the direction a hand would draw it, and check the
 > direction as a signed sweep about the figure's own centroid. *(ADR-134, ADR-114)*
 > Reason: the sheet is y-DOWN, so a sampler that runs y upward traces anticlockwise on screen. Two
@@ -1318,6 +1370,7 @@ Every rule is formatted:
 - ❌ Convert units inside a pure engine leaf, or leave a state bag's unit unstated. *(§6.23)*
 - ❌ Give one construction its own drawing path, or ship a construction no oracle has proved. *(§6.24, §6.25)*
 - ❌ Let a construction stage double as the reveal for a toggle, or trace a curve backwards. *(§6.29, §6.30)*
+- ❌ Type ⌀ or R by hand, or check a label against the registry instead of against the linework. *(§6.31, §6.32)*
 - ❌ Delete problems to narrow a library's scope, when a filter axis would say the same thing. *(§6.31)*
 - ❌ Measure a staged drawing's frame from the stage on screen, when a later stage reaches further. *(§6.32)*
 

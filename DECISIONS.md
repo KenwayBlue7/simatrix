@@ -5770,3 +5770,112 @@ point AT the target is unaffected, and the target is precisely what moved.
 assertions cover it, calibrated by restoring the instant assignment: five of the seven "no frame
 that teleports" checks fail, at up to 245×. The two that pass under the old code are the switches
 whose dimension set does not change — which is exactly the population that never had the bug.
+
+---
+
+## ADR-141: ⌀ or R is a fact about the VIEW, not about the part
+
+**Date:** 2026-08-09 (amended 2026-08-09)
+**Status:** Active, with decision 2 REPLACED — see the amendment at the end. Applies to
+`graphics_module_2_topic_0_introduction_to_orthographic_projection`; binding platform-wide as
+RULES §6.31/§6.32.
+
+**Context.** The topic's circular sizes were hand-typed strings in the registry — `'Ø30'`, `'Ø50'`,
+`'Ø18 slot'` — and two of them were wrong. Both were wrong in the same way: the author wrote down
+what the FEATURE is, and BIS SP 46 / ISO 129-1 asks what the VIEW DRAWS.
+
+The Cylindrical Block's boss is a 50 mm cylinder, so it was labelled ⌀50. But the plate it stands on
+is only 40 deep, so the plan can draw just the two arcs that stand proud of the plate's edges —
+147.5 deg of circle between them, well under the half circle above which a diameter would still be
+allowed. It is R25. Worse, its leader was anchored at 225 deg, which is inside the plate: the arrow
+pointed at a stretch of circle that is not on the paper at all. The Bearing Block's slot was ⌀18,
+and a slot end is not a hole — it is a semicircular cap, R9, which with the 16 centre-to-centre
+already on the plan is the pair that specifies the slot.
+
+**Decision.**
+
+1. **The sweep is an argument.** `roundDim(centre, r, sweep, ang, out)` in `objectData.js` takes how
+   much of the circle THIS VIEW draws and returns the right primitive: a diameter at 360 deg, a
+   radius leader below it. The symbol is computed, never typed. Every circular size in all four
+   objects goes through it.
+2. **A diameter is a line through the centre.** New `dia` primitive, placed by `diameterDim()` next
+   to `alignedDim()` and shared by both renderers: arrowheads at the two ends of the diameter, ON
+   the circle, pointing outwards; the line running on past the second head to `out`; the value
+   written over that tail, outside the geometry the line has just crossed. Method 1 governs the
+   value exactly as it governs a linear one — parallel to its line, above it as read, folded into
+   (-90, 90].
+3. **A radius is a leader that touches its arc.** The arrowhead is computed as `centre + r·û`, so it
+   is on the arc by construction rather than by the author's arithmetic.
+4. **The oracle reads the linework, not the registry.** A ⌀ must have a `circle` primitive at that
+   exact centre and radius; an R must not; an R's arrow must land within 0.1 mm of drawn outline or
+   edge. Calibrated by declaring the boss a full circle: it fails with "Ø on a shape this view does
+   not draw as a full circle".
+
+**Rejected.**
+
+- *Keep the leader for diameters and only fix the letters.* A leader with ⌀ is legitimate for a
+  small hole, and is what the topic had. But the brief asked for the line through the centre, it is
+  equally standard, and it makes the two symbols visually distinct — which is the thing being
+  taught here.
+- *Write the diameter's value at the midpoint of its line, as a linear dimension does.* The midpoint
+  of a diameter is the centre of the hole.
+- *A threshold below which a hole is "too small" for a through-centre diameter.* Not needed: with
+  the value out on the tail, the circle only has to hold two 3.2 mm arrowheads, and the smallest
+  hole in the topic is 12 mm.
+
+**Consequences:** four diameters and five radii, every one of them derived. Six assertions cover the
+rule, plus the Method 1 test, which was generalised to measure the value's PERPENDICULAR distance
+from its line with the foot required to land on the line — the old test measured distance from the
+midpoint, which is only the same thing for a linear dimension.
+
+**Noted, not acted on.** The Cylindrical Block's plan omits the boss's circle WHERE IT CROSSES the
+plate, and that is what makes the boss an arc there. Seen from above on the solid, the boss's top
+edge is a complete circle and is visible along its whole length, so the plan arguably ought to draw
+it — and if it did, the same rule would then make the label ⌀50. That is a question about the
+linework, not about the dimensioning, and the label follows whichever the drawing shows.
+
+**Amended 2026-08-09 — decision 2 replaced twice, landing on the HYBRID form.**
+
+Decision 2 originally drew a diameter as a bare line through the centre with the value written
+along it. That was withdrawn for a good reason and replaced by a plain leader off the circle's edge,
+which was then withdrawn in turn for a different good reason. Both intermediate forms are recorded
+here because each was correct about something and wrong about something, and the form that shipped
+is the one that keeps both halves.
+
+*The bare through-centre line* stated the measurement honestly — a diameter IS a full width taken
+through the middle, and a line that crosses the centre says so — but it wrote its value out along
+its own slant on the far side of the circle. Turned text sitting on a hatch of geometry is hard to
+read, and this topic's whole subject is reading a drawing.
+
+*The plain edge leader* fixed the value: level, on a horizontal shelf, out on clear paper. But it
+threw away the statement. An arrow touching the edge of a circle with `Ø30` beside it is the same
+mark a radius uses, distinguished only by the letter, and the topic is teaching exactly that
+distinction — so the two marks should not be identical apart from the word after all. The earlier
+amendment argued the opposite; the argument was wrong, and the reason it was wrong is that it
+treated the mark as decoration rather than as the statement it is.
+
+**The hybrid.** The line starts at the FAR side of the circle, crosses the centre, and carries on
+out past the near side to an elbow; an arrowhead sits at each end of the diameter itself, pointing
+outwards; the elbow turns into a short horizontal shelf; the value stands level above the shelf, on
+clear paper. The geometry states the measurement, the shelf keeps what the learner reads off the
+feature they are being asked to look at, and a diameter no longer looks like a radius.
+
+A RADIUS is unchanged and must stay unchanged: it starts ON the arc and does not reach the centre,
+because a radius is measured from the centre to the curve and a line drawn across the middle would
+say diameter.
+
+Both legs still run along the feature's own radius, so the diameter's line passes through the
+centre by construction and the radius's arrow lands on its arc by construction — which is what
+decision 3 was for, kept through all three forms.
+
+In code this is one `note`-shaped object with two extra fields: `k: 'dia'`, and `head2` for the
+second arrowhead. Both renderers' existing leader functions draw it, each with one guarded line for
+the extra head; there is no separate diameter path in either medium, and no `diameterDim()`.
+
+Consequence for §6.32's oracle, all measured rather than assumed: the two heads are 2r apart, both
+on the circle and collinear with the elbow (that IS "passes through the centre"); a radius carries
+no `head2`; the symbol and the kind of mark must agree; every leader is three points with a
+horizontal last leg; exactly one value sits one lift above each shelf and none is turned; an
+even-odd ray cast proves no elbow and no shelf lands on the object; and the arrowheads on the paper
+are COUNTED against the authored set, because a second head drawn by one guarded line would go
+missing silently. Twelve assertions across three objects, on top of the symbol audit.
