@@ -452,13 +452,17 @@
     /* Step Through (Construct step, N-Gon construction only) — click-gated slide navigator,
        default/primary alongside the unchanged "Play All" secondary button. Layout only:
        reuses .btn/.btn--primary/.btn--block verbatim, no new button variant, no new colours
-       (RULES §4.1) — every token below is already declared for the rest of this page. */
+       (RULES §4.1) — every token below is already declared for the rest of this page.
+       Caption sits on its own row above; Back/Next pair adjacent below, matching this repo's
+       other Back/Next precedents (Module2's .method-bar, Topic 6's .con-nav, this topic's own
+       .card__nav-next footer) instead of splitting Back off with the caption. */
     .step-through { display: flex; flex-direction: column; width: 100%; gap: var(--space-3); }
     .step-through[hidden] { display: none; }
-    .step-through__row { display: flex; align-items: center; gap: var(--space-3); width: 100%; }
-    .step-through__back { flex: 0 0 auto; min-height: 40px; padding: 0 var(--space-3); font-size: var(--text-sm); }
+    .step-through__row { display: flex; align-items: center; gap: var(--space-2); width: 100%; }
+    .step-through__back { flex: 0 0 auto; padding: 0 var(--space-3); }
+    .step-through__next { flex: 1 1 auto; min-width: 0; }
     .step-through__caption {
-      flex: 1 1 auto; margin: 0; padding: var(--space-2) var(--space-3);
+      flex: 0 0 auto; margin: 0; padding: var(--space-2) var(--space-3);
       font-size: var(--text-sm); line-height: 1.5; color: var(--color-ink-secondary);
       background: var(--color-paper); border: 1px solid var(--color-border); border-radius: var(--radius-sm);
       min-height: 40px; display: flex; align-items: center;
@@ -709,11 +713,11 @@
             <button type="button" class="btn btn--primary btn--block" id="btn-play-construction">Play construction</button>
 
             <div class="step-through" id="step-through" hidden>
+              <p class="step-through__caption" id="step-through-caption" aria-live="polite"></p>
               <div class="step-through__row">
                 <button type="button" class="btn step-through__back" id="btn-step-back" disabled>Back</button>
-                <p class="step-through__caption" id="step-through-caption" aria-live="polite"></p>
+                <button type="button" class="btn btn--primary step-through__next" id="btn-step-next">Step Through</button>
               </div>
-              <button type="button" class="btn btn--primary btn--block" id="btn-step-next">Step Through</button>
               <button type="button" class="btn btn--block" id="btn-play-all">Play All</button>
             </div>
 
