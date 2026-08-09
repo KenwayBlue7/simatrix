@@ -3,6 +3,14 @@
 Per-module changelog, per this repo's own rule (root `CHANGELOG.md` header, `RULES.md` §8.2).
 Root `CHANGELOG.md` covers repo-wide entries; this file covers only this module.
 
+## 2026-08-10
+
+- Changed: Step Through's Back button now sits directly beside Next in the Construct step
+  (N-Gon only), instead of sharing a row with the slide caption while Next sat full-width below —
+  the two halves of one control now read as a pair. Caption moved to its own row above. Also
+  dropped `.step-through__back`'s 40px height override, which was under RULES §4.12's 44px
+  interactive-target floor; it now matches Next at 44px.
+
 ## 2026-08-09
 
 - Fixed: label/angle-arc/angle-text chrome (font-size, stroke-width, angledim arc radius) read

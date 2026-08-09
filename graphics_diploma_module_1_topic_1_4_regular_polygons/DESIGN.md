@@ -60,17 +60,24 @@ method, then presses Play to watch THAT method's derivation animate, exactly mir
 
 `#step-through` sits where `#btn-play-construction` sits for pentagon/hexagon — same Construct-
 step slot, toggled by `hidden` on whichever the active construction needs (`uiManager.js`'s
-`sim.hasSlides()` branch), never both at once. Layout only, no new colour tokens: reuses
-`.btn`/`.btn--primary`/`.btn--block` verbatim (RULES §4.1). `.step-through__caption` is a plain
-bordered text block at `--text-sm` — same `--color-paper`/`--color-border`/`--radius-sm` treatment
-`#result-text` already uses, so a slide's caption reads as "a value the sim is reporting", not a
-button or a label.
+`sim.hasSlides()` branch), never both at once. Layout only, no new colour tokens: reuses `.btn`/
+`.btn--primary` verbatim (RULES §4.1); `.btn--block` stays only on Play All now, since Back/Next
+share a row instead of stacking full-width. `.step-through__caption` is a plain bordered text
+block at `--text-sm` — same `--color-paper`/`--color-border`/`--radius-sm` treatment `#result-text`
+already uses, so a slide's caption reads as "a value the sim is reporting", not a button or a
+label.
 
 The primary button relabels by state instead of a separate "start" trigger — "Step Through" at
-rest (nothing revealed yet), "Next" once a slide is showing, disabled at the final slide. Back
-sits to its own left in a row with the caption, matching this topic's other paired-button layouts
-(`#btn-reset`/`#reset-confirm`) rather than introducing a new row pattern. No new focus-ring,
-press, or disabled treatment — `.btn`'s existing states cover all of it.
+rest (nothing revealed yet), "Next" once a slide is showing, disabled at the final slide. The
+caption sits on its own full-width row above the controls; **Back sits immediately to Next's
+left in the row below**, matching every other Back/Next pair in this repo (Module2's
+`.method-bar`, Topic 6's `.con-nav`, and this topic's own footer `.card__nav-next`) rather than
+the earlier layout, which split Back onto the caption's row by analogy to `#btn-reset`/
+`#reset-confirm` — a confirm prompt, not a navigation pair, and a weaker precedent than the three
+above. `.step-through__back` no longer overrides `.btn`'s `min-height: 44px` (it previously sat
+at 40px, under RULES §4.12's interactive-target floor); Next gets `flex: 1 1 auto` so it fills
+the row while Back stays content-width. No new focus-ring, press, or disabled treatment — `.btn`'s
+existing states cover all of it.
 
 ## 5. Post-construction de-emphasis + label layering (new, ADR-145)
 

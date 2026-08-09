@@ -3,6 +3,12 @@
 All notable changes at the Simatrix project root (spanning Module1, Module2, and the
 topic deploy copies). Per-module changelogs live inside each module folder.
 
+## 2026-08-10
+- Changed: `graphics_diploma_module_1_topic_1_4_regular_polygons`'s Step Through Back/Next pair
+  is now laid out adjacently (Back beside Next, caption on its own row above), matching the
+  Back/Next layout already used by Module2's method walkthrough and Topic 6's construction nav;
+  also fixed Back sitting under the 44px interactive-target floor. See module CHANGELOG.md.
+
 ## 2026-08-09
 - Fixed: `graphics_module_3_topic_2_2_conic_sections`'s Step 6 stacked three loud `btn--primary`
   buttons — `#btn-deal-cut`, `#btn-complete-next`, `#btn-finish` — a regression in the 2026-08-07
