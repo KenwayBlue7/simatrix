@@ -926,12 +926,39 @@ await shot('given-data-on-arrival');
     await evaluate('document.getElementById("btn-proof-next").textContent'));
   ok('…still exactly one loud action', (await loudCount()) === 1, `${await loudCount()} primary buttons`);
 
-  // Step 6 stacked two full-width primaries: the exercise and a third route to the library.
+  // Step 6 stacked THREE full-width primaries after the Finish-button rollout: f8771ab dropped
+  // ADR-121's own class toggle and added #btn-finish on top. The accent belongs to the payoff —
+  // Finish lesson in free play, "Try another problem" once a problem is loaded (2026-08-09
+  // addendum to ADR-121).
   await goStep(6);
   ok('Step 6 has exactly one loud action in free play', (await loudCount()) === 1,
     `${await loudCount()} primary buttons`);
-  ok('…and it is the exercise, not the library link', (await primary('btn-deal-cut')) === true
+  ok('…and it is Finish lesson, not the exercise or the library link',
+    (await primary('btn-finish')) === true
+    && (await primary('btn-deal-cut')) === false
     && (await primary('btn-complete-next')) === false);
+
+  // Load a problem: the payoff moves, and the count still holds.
+  await evaluate('document.getElementById("open-problem-library").click()');
+  await wait(600);
+  await evaluate('document.querySelector(".problem-card").click()');
+  await wait(400);
+  await evaluate(`(() => { const c = document.getElementById('problem-confirm-load');
+    if (c && !document.getElementById('problem-library-confirm').hidden) c.click(); })()`);
+  await wait(2000);            // loadProblem() routes through sim.reset() → Step 1
+  await goStep(6);
+  ok('Step 6 still has exactly one loud action mid-problem', (await loudCount()) === 1,
+    `${await loudCount()} primary buttons`);
+  ok('…and mid-problem the accent is "Try another problem"',
+    (await primary('btn-complete-next')) === true && (await primary('btn-finish')) === false);
+
+  // Exiting the problem (no reset — "your drawing is kept") must not leave a stale accent:
+  // exitProblem() doesn't route through sim.reset(), so it has to call sim.syncNav() itself.
+  await evaluate('document.getElementById("exit-problem").click()');
+  await wait(400);
+  ok('exiting the problem hands the accent back to Finish lesson',
+    (await primary('btn-finish')) === true && (await primary('btn-complete-next')) === false);
+  ok('…still exactly one loud action', (await loudCount()) === 1, `${await loudCount()} primary buttons`);
 
   // A message is anchored to the step that raised it. Both slots hold for 4.5s, which outlives
   // a learner pressing Next twice in three seconds — and Step 2's note names a control Step 3

@@ -2810,15 +2810,17 @@
         <section class="step-panel" data-step="6" hidden>
           <div class="dock__group" data-ctrl="predict">
             <h3 class="dock__group-title">Name the cut</h3>
-            <button id="btn-deal-cut" class="btn btn--primary btn--block" type="button">Set up a cut</button>
+            <button id="btn-deal-cut" class="btn btn--block" type="button">Set up a cut</button>
             <div class="tour-chips" id="predict-chips" role="group" aria-label="Name this cut"></div>
             <p class="match-status" id="predict-status"></p>
             <p class="dock__note">When you can call every cut on sight, take on the chapter's own exercises with <strong>Practice problems</strong> at the top of this card.</p>
             <!-- "Try another problem" (Finish-button rollout — renamed off "Complete..."
                  wording since #btn-finish now owns lesson completion): the repeatable
                  practice-loop button, shown by stepper.js on the last step;
-                 click → sim.completeAndNext(). -->
-            <button id="btn-complete-next" class="btn btn--primary btn--block" type="button" hidden>Try another problem</button>
+                 click → sim.completeAndNext(). ONE loud action per step (ADR-121 + its
+                 2026-08-09 addendum): no btn--primary here in markup — stepper.js's
+                 renderNav() is the single assigner, toggling it on while a problem is loaded. -->
+            <button id="btn-complete-next" class="btn btn--block" type="button" hidden>Try another problem</button>
           </div>
         </section>
       </div>
@@ -2847,8 +2849,10 @@
              #btn-next. Ungated (confirmed against the KTU sibling
              graphics_module_3_topic_2_development_of_surfaces, which also carries a
              Problem Library and is likewise ungated — Diploma's hasSolvedProblem() gate
-             does not transfer to this track). -->
-        <button id="btn-finish" class="btn btn--primary btn--nav" type="button" hidden>Finish lesson</button>
+             does not transfer to this track). No btn--primary in markup (ADR-121 addendum,
+             2026-08-09): stepper.js's renderNav() assigns the accent, off while a problem
+             is loaded so "Try another problem" carries it instead. -->
+        <button id="btn-finish" class="btn btn--nav" type="button" hidden>Finish lesson</button>
       </footer>
     </section>
     </div>

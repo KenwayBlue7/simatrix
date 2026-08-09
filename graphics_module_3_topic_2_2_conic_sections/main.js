@@ -3371,6 +3371,10 @@ const simController = {
   /** Whether a textbook problem is loaded — drives the terminal-step CTA (stepper.js). */
   isProblemActive() { return problemLibrary?.isActive() ?? false; },
 
+  /** Re-render the wizard nav; the terminal-step accent follows problem state (ADR-121
+   *  addendum, 2026-08-09) and loadProblem()'s own sim.reset() doesn't cover exitProblem(). */
+  syncNav() { stepper?.sync(); },
+
   /**
    * Terminal-step "Complete & next problem": close out the finished construction and
    * send the learner back to the library for the next one. Celebrate (calm toast), clear

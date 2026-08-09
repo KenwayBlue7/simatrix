@@ -239,6 +239,10 @@ export function initProblemLibrary(sim) {
     resetHints(); // clears revealed steps + hides the button (no active problem now)
     headerEl.hidden = true;
     sim.announce('Exited the problem. Your drawing is kept.');
+    // No sim.reset() here (deliberately — "your drawing is kept"), so the Step-6 accent
+    // (ADR-121 addendum) would otherwise go stale on "Try another problem" until the next
+    // step change. Re-render explicitly.
+    sim.syncNav?.();
   }
 
   function setCollapsed(collapsed) {

@@ -3,6 +3,18 @@
 All notable changes at the Simatrix project root (spanning Module1, Module2, and the
 topic deploy copies). Per-module changelogs live inside each module folder.
 
+## 2026-08-09
+- Fixed: `graphics_module_3_topic_2_2_conic_sections`'s Step 6 stacked three loud `btn--primary`
+  buttons — `#btn-deal-cut`, `#btn-complete-next`, `#btn-finish` — a regression in the 2026-08-07
+  "Finish button rollout" (`f8771ab`), which added `#btn-finish` while silently deleting the
+  ADR-121 fix (`renderNav()`'s `classList.toggle('btn--primary', solving)`) and leaving
+  `btn--primary` hardcoded on `#btn-complete-next` in markup. Re-decided the Step-6 accent across
+  all three controls (Finish in free play, Try-another-problem while a problem is loaded) rather
+  than a straight revert, since `#btn-finish` didn't exist when ADR-121 was written. Also fixed a
+  related staleness gap: `exitProblem()` doesn't route through `sim.reset()`, so it now calls a new
+  `sim.syncNav()` to re-render the accent on exit. Full root-cause account and the accent decision
+  table are in the topic's own `CHANGELOG.md` (2026-08-09 entry) and `DECISIONS.md` ADR-142.
+
 ## 2026-08-08
 - Fixed: `graphics_module_1_topic_1_foundations`'s vertical (H) dimension value ("46") rendered
   to the right of/below its vertical dimension line in Aligned mode, against BIS/ISO convention

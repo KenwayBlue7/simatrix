@@ -96,14 +96,29 @@ export function initStepper(sim) {
     // graphics_module_3_topic_2_development_of_surfaces, which carries a Problem Library
     // too and is likewise ungated (the Diploma family's hasSolvedProblem() gate does not
     // transfer to this KTU track).
-    if (btnFinish) btnFinish.hidden = currentStep < TOTAL;
+    //
+    // ONE loud action per step (DESIGN.md §5.1, ADR-121 + its 2026-08-09
+    // addendum). Three controls now share the terminal step, so the accent is assigned
+    // HERE, in one place, and none of the three carries btn--primary in the markup.
+    // "Set up a cut" is never the loud one at Step 6; the accent sits on the learner's
+    // real payoff — finishing the lesson in free play, or completing the problem they are
+    // part-way through. f8771ab (the Finish-button rollout) deleted this file's own
+    // ADR-121 toggle without replacing what it did — restored and extended here.
+    const solving = !!sim.isProblemActive?.();
+    if (btnFinish) {
+      btnFinish.hidden = currentStep < TOTAL;
+      btnFinish.classList.toggle('btn--primary', !solving);
+    }
     // "Try another problem" (Finish-button rollout — renamed off "Complete & next
     // problem"/"Pick a problem" wording since #btn-finish now owns the completion signal):
     // stays the repeatable practice-loop action only, same label in both problem and
-    // free-play modes (still opens the library to choose a challenge either way).
+    // free-play modes (still opens the library to choose a challenge either way). Loud
+    // only while a problem is loaded — mid-problem or already solved, it is the payoff
+    // and takes the accent back from Finish (ADR-121's own reasoning).
     if (btnCompleteNext) {
       btnCompleteNext.hidden = currentStep !== TOTAL;
       btnCompleteNext.textContent = 'Try another problem';
+      btnCompleteNext.classList.toggle('btn--primary', solving);
     }
   }
 
