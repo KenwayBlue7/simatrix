@@ -1,6 +1,6 @@
 {
-  "title": "Orthographic Projection of Solids",
-  "description": "Visualize how 3D solids project onto the Horizontal (HP) and Vertical (VP) planes, with adjustable inclination, orientation, and rotation.",
+  "title": "Solids Inclined to Both Planes",
+  "description": "Tilt a solid until it leans toward both the Horizontal (HP) and Vertical (VP) planes at once, then draw and flatten the top, front, and side views that follow from that double inclination.",
   "difficulty": "intermediate",
-  "tags": ["engineering-graphics", "orthographic-projection", "solids", "hp-vp", "3d"]
+  "tags": ["engineering-graphics", "orthographic-projection", "solids", "hp-vp", "inclined-solids", "both-planes", "3d"]
 }
