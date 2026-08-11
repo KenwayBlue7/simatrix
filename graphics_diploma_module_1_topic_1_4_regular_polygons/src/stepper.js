@@ -28,6 +28,8 @@ const TOTAL = STEPS.length;
  *   onEnterConstructStep: () => void,
  *   hasSolvedProblem: () => boolean,
  *   markComplete: () => void,
+ *   getActiveConstruction: () => Object | null,
+ *   getParams: () => Record<string, number|string>,
  * }} sim
  * @returns {{ sync: () => void, reset: () => void, restart: () => void, dispose: () => void }}
  */
@@ -44,10 +46,31 @@ export function initStepper(sim) {
   const elTotal = $('step-total');
   const elTitle = $('step-title');
   const elLead = $('step-lead');
+  const elNote = $('step-note');
+  const elNoteBody = $('step-note-body');
   const btnBack = $('btn-back');
   const btnNext = $('btn-next');
   const btnFinish = $('btn-finish');
   const pickerButtons = [...document.querySelectorAll('.construction-picker__item')];
+
+  // Given/Construct phases only — see this topic's DESIGN.md §6. `notes.given`/`.construct`
+  // are optional per construction, so a missing key (or a phase this map doesn't list) just
+  // hides the block rather than needing a branch at every call site.
+  const NOTE_KEY_BY_STEP = { 2: 'given', 3: 'construct' };
+
+  function renderNote() {
+    if (!elNote || !elNoteBody) return;
+    const key = NOTE_KEY_BY_STEP[currentStep];
+    const con = sim.getActiveConstruction?.();
+    const fn = key && con?.notes?.[key];
+    if (!fn) {
+      elNote.hidden = true;
+      return;
+    }
+    const method = sim.getParams?.()?.method;
+    elNoteBody.textContent = fn(method);
+    elNote.hidden = false;
+  }
 
   if (elTotal) elTotal.textContent = String(TOTAL);
 
@@ -105,6 +128,7 @@ export function initStepper(sim) {
     const suffix = currentStep > 1 && label ? ` — ${label}` : '';
     if (elTitle) elTitle.textContent = meta.title + suffix;
     if (elLead) elLead.textContent = meta.lead;
+    renderNote();
 
     for (const panel of panels) {
       const show = Number(panel.dataset.step) === currentStep;
@@ -147,7 +171,7 @@ export function initStepper(sim) {
     }, listen);
   }
 
-  function sync() { renderRail(); renderNav(); }
+  function sync() { renderRail(); renderNav(); renderNote(); }
 
   function reset() {
     maxReached = 1;

@@ -808,6 +808,10 @@ function buildSemicircleDivision(A, B, s, dirAB, nn, divAngle) {
  * @property {string} shortLabel
  * @property {MethodSpec[]} methods
  * @property {(method:string) => string} principle
+ * @property {{given?:(method:string)=>string, construct?:(method:string)=>string}} [notes] Short
+ *   plain-language blurbs for the Given/Construct wizard phases (RULES §6.31 — phenomenon in
+ *   plain words BEFORE the formal statement `principle()` gives in Verify). Optional per key;
+ *   Choose and Verify intentionally have none — see this topic's DESIGN.md §6.
  * @property {ParamSpec[]} given
  * @property {(params:Record<string,number|string>) => {steps:Array, resultText:string, invalid?:string}} build
  */
@@ -942,6 +946,19 @@ export const CONSTRUCTIONS = [
       }
       return "A pentagon's circumcentre O is exactly where two 54° rays from A and B meet — 54° is half the pentagon's 108° interior angle, since triangle OAB is isosceles with apex angle 72° (360° ÷ 5).";
     },
+    notes: {
+      given: () =>
+        "A side length is the whole problem statement — the book's own worked example asks only for “a regular pentagon having side length equal to 40 mm”. All five sides equal AB and all five interior angles are 108° whatever you set, so the side alone fixes ONE pentagon. (K.C. John Ch. 5)",
+      construct: (method) => {
+        if (method === 'circles') {
+          return "Two full circles, each as wide as AB, cross above the line at a point the same distance from A as from B. Every candidate centre lies on the straight-up line through AB's midpoint — the last arc steps along it to the one that works for FIVE sides. (K.C. John Ch. 5)";
+        }
+        if (method === 'arcs') {
+          return 'Same idea, less ink — two short arcs instead of two whole circles reach the same crossing above AB, then one more arc steps up to the same centre. Compare it against Two Circles: identical pentagon, fewer compass sweeps. (K.C. John Ch. 5)';
+        }
+        return "Watch two straight rays leave A and B at the same shallow tilt and cross at one point above the line. That crossing is the centre of the circle every corner sits on — set the compass to AB and it steps round that circle five times. (K.C. John Ch. 5)";
+      },
+    },
     given: [{ key: 'side', label: 'Side length', unit: 'mm', min: 30, max: 50, step: 1, default: 45 }],
     build(params) {
       const { steps, resultText } = pentagonRaw(params);
@@ -965,6 +982,16 @@ export const CONSTRUCTIONS = [
       }
       return "A hexagon's circumcentre O is exactly where two 60° rays from A and B meet — triangle OAB is EQUILATERAL (apex angle 360° ÷ 6 = 60°), which is why a regular hexagon's circumradius always equals its own side length.";
     },
+    notes: {
+      given: () =>
+        "Only the side is given, as in the book's “regular hexagon having length of a side equal to 30 mm”. A hexagon is the special case where the circumradius equals the side itself — so the number you set here is also the compass width that finds every corner. (K.C. John Ch. 5)",
+      construct: (method) => {
+        if (method === 'compass') {
+          return 'No protractor this time, just two arcs both set to the width of AB. They cross at the centre — join A and B to it and that SAME compass width then walks round to every corner too, the one polygon where the compass never needs resetting. (K.C. John Ch. 5)';
+        }
+        return "The rays leave A and B at a steeper tilt than the pentagon's. Watch where they meet — the triangle they close with AB has all three sides EQUAL, which is why a hexagon's centre sits exactly one side-length from every corner. (K.C. John Ch. 5)";
+      },
+    },
     given: [{ key: 'side', label: 'Side length', unit: 'mm', min: 25, max: 45, step: 1, default: 35 }],
     build(params) {
       const { steps, resultText } = hexagonRaw(params);
@@ -987,6 +1014,16 @@ export const CONSTRUCTIONS = [
         return "The perpendicular bisector of AB holds every possible centre for a polygon on side AB — real compass arcs pin points 4 and 6 exactly, their midpoint gives 5, and the same ladder keeps climbing to the point for the chosen n, whose circle threads every vertex. The same bisector–ladder–circle shape pentagon and hexagon use, generalized to any n from 3 to 12.";
       }
       return "Dividing a semicircle into n equal parts sidesteps a real limit: most polygons' angles (128.57° for a 7-gon, for instance) simply aren't reachable with a compass alone — a protractor-style division works for ANY n, which is exactly why this, not a compass trick, is the general method. A ray from A through each division point lands exactly on the next vertex — the angle it makes at A is always one division step, the same inscribed angle that vertex subtends — so a fixed-radius compass arc, centred on the vertex just found, can cut that ray to derive every remaining vertex in turn.";
+    },
+    notes: {
+      given: () =>
+        "Two numbers now, matching the book's general statement — “a polygon having n sides and length of side equal to s”. The interior angle follows from n alone: (n−2)×180°÷n, which is 128.57° at n = 7 and climbs toward 180° as n grows. (K.C. John Ch. 5)",
+      construct: (method) => {
+        if (method === 'bisector') {
+          return "The line rising from AB's midpoint holds every possible centre — one rung per polygon. Watch the numbered ladder climb: 4 for a square, 5 for a pentagon, 6 for a hexagon, and so on. Pick the rung for your n, draw its circle, then step the compass round it. (K.C. John Ch. 5)";
+        }
+        return 'The semicircle above A is split into as many equal slices as the polygon has sides. Each ray through a division mark points straight at the next corner, and an arc of width AB planted on the corner just found cuts it there — repeat until the shape closes. Works for ANY n, including the ones a compass alone cannot reach. (K.C. John Ch. 5)';
+      },
     },
     given: [
       { key: 'side', label: 'Side length', unit: 'mm', min: 25, max: 42, step: 1, default: 32 },
