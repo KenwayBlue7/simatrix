@@ -11,7 +11,7 @@
 //   3. Contextual spotlight hints — the same chip treatment, reused to point out the
 //      Top View, Front View, and connector lines the FIRST time each is revealed.
 //      A shared queue plays them ONE AT A TIME (DESIGN.md "Quiet Chrome" / don't
-//      spam): when Step 4 reveals the top and front views together, the two hints
+//      spam): when Step 5 reveals the top and front views together, the two hints
 //      play in sequence rather than stacking. Each is first-seen-once (persisted),
 //      auto-dismisses, and also dismisses on click or first orbit.
 //

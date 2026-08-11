@@ -12,8 +12,9 @@
 // loop on open/resume on close, matching that same contract). Two consequences for this file:
 //   1. The DOM is now STATIC markup (index.html), not built here — this module queries it, same
 //      as problemLibrary.js queries #problem-library rather than creating it.
-//   2. The takeover is fully independent of Compare: no split ever opens, so Step 1/2's drivers
-//      never leave the (now-covered) wizard panels. The rail-edit abort listener ADR-084 needed
+//   2. The takeover is fully independent of Compare: no split ever opens, so the WORKBENCH_CONTROLS
+//      drivers (Step 1/2/3's — ADR-161 added Step 3's inclination pair to that set) never leave
+//      the (now-covered) wizard panels. The rail-edit abort listener ADR-084 needed
 //      here (because the split re-parented those drivers into a rail that stayed live) is
 //      GENUINELY DEAD under ADR-085 and has been deleted — stepper.js's own abort-on-edit
 //      (reflowFrom) is kept as a no-op invariant guard, but this module's half of it is gone.
@@ -168,7 +169,7 @@ export function initMethodController(sim) {
 
   // --- Focus trap + Escape (scoped to the takeover; harmless while it is hidden) — mirrors
   // problemLibrary.js's own overlay trap exactly. This is the ONLY thing keeping Tab out of the
-  // covered Step 1/2 sliders under ADR-085 (no split ever opens, so there is no rail to bind a
+  // covered Step 1/2/3 sliders under ADR-085 (no split ever opens, so there is no rail to bind a
   // second abort listener to) — load-bearing, not decoration. ---
   function focusables() {
     return [...viewEl.querySelectorAll('button')].filter(

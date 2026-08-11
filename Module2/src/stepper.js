@@ -3,9 +3,9 @@
 // It sequences six steps, revealing one step's controls at a time (progressive
 // disclosure) and gating each behind the previous one's completion.
 //
-//   1. Add & rest the solid       4. Draw top & front views (HP + VP)
-//   2. Position & incline         5. Add side view (reveal PP)
-//   3. Label vertices             6. Flatten to 2D
+//   1. Add & rest the solid       4. Label vertices
+//   2. Position                   5. Draw the views (HP + VP, then PP)
+//   3. Inclinations               6. Flatten to 2D
 //
 // Layering (CLAUDE.md): leaf module. Like uiManager.js it imports NO other layer;
 // main.js injects the same `sim` controller. uiManager owns the low-level
@@ -16,6 +16,12 @@
 /**
  * Per-step copy (warm tutor voice — PRODUCT.md brand personality). Titles/leads
  * are set into the card; the rail labels live in the HTML.
+ *
+ * ADR-161: Inclination split out of "Position" into its own step (RULES.md §6.30 —
+ * a control belongs in the ONE guided step whose question it answers; "where does it
+ * sit" and "how is it tilted" are two questions), and the two view reveals (top+front,
+ * side) merged into one step with two sub-toggles (they are one idea — cast onto the
+ * three reference planes — not two lessons). Net step count stays 6.
  */
 const STEPS = [
   {
@@ -25,23 +31,23 @@ const STEPS = [
   },
   {
     n: 2,
-    title: 'Position & incline',
-    lead: 'Tilt or turn the solid. Incline a face onto a plane, orient it to a corner or edge, or spin it freely. The views you draw next depend on how it sits.',
+    title: 'Position',
+    lead: 'Set how far the solid sits from each plane, then turn it about its own axis — spin it freely, or snap a corner or edge toward the VP.',
   },
   {
     n: 3,
+    title: 'Inclinations',
+    lead: 'Tilt the solid toward a plane. Incline a face onto the HP or VP, or use the angle sliders for a standard-axis tilt. The views you draw next depend on how it leans.',
+  },
+  {
+    n: 4,
     title: 'Label the vertices',
     lead: 'Name each corner so you can follow the very same point from the solid into every view. We letter the base A, B, C… and an apex O, and draw the central axis as a chain line from O down to P at the base centre. Curved solids number their rim 1, 2, 3… with dashed generators running up the surface.',
   },
   {
-    n: 4,
-    title: 'Draw top & front views',
-    lead: 'Cast the solid onto the planes: a top view onto the HP (teal) and a front view onto the VP (amber). Edges the body hides are drawn dashed.',
-  },
-  {
     n: 5,
-    title: 'Add the side view',
-    lead: 'Bring in the profile plane (PP, violet) standing at the solid’s side, and cast the third view onto it. Top, front, and side together fix the solid completely.',
+    title: 'Draw the views',
+    lead: 'Cast the solid onto the planes: a top view onto the HP (teal) and a front view onto the VP (amber), with edges the body hides drawn dashed. Then bring in the profile plane (PP, violet) at the solid’s side to add the side view — top, front, and side together fix the solid completely.',
   },
   {
     n: 6,
@@ -105,17 +111,20 @@ export function initStepper(sim) {
   if (elTotal) elTotal.textContent = String(TOTAL);
 
   // --- Wizard state. Layer flags mirror what the engine is currently showing. ---
+  // state.sideView (ADR-161): no longer gates step 5 — Top & front alone completes it — but
+  // still tracks whether the PP/side view is currently shown, driving the Show/Hide toggle
+  // label and its done-badge (mirrors state.dimensions' toggle-not-gate role at step 6).
   let currentStep = 1;
-  const state = { visited2: false, labels: false, projections: false, sideView: false, flattened: false, dimensions: false };
+  const state = { visited2: false, visited3: false, labels: false, projections: false, sideView: false, flattened: false, dimensions: false };
 
   /** Whether step i counts as complete (drives rail checks + Next gating). */
   function isComplete(i) {
     switch (i) {
       case 1: return sim.hasSolid();
       case 2: return state.visited2;
-      case 3: return state.labels;
-      case 4: return state.projections;
-      case 5: return state.sideView;
+      case 3: return state.visited3;
+      case 4: return state.labels;
+      case 5: return state.projections; // side view (sub-toggle) doesn't gate — see state comment above
       case 6: return state.flattened;
       default: return false;
     }
@@ -123,8 +132,9 @@ export function initStepper(sim) {
 
   /** Whether the learner may advance from the current step. */
   function canAdvance(step) {
-    if (step >= TOTAL) return false; // step 6 is terminal
-    if (step === 2) return true;     // exploratory — always satisfiable
+    if (step >= TOTAL) return false;        // step 6 is terminal
+    if (step === 2 || step === 3) return true; // exploratory — always satisfiable (a solid with
+                                                // zero inclination is a legitimate simple-position answer)
     return isComplete(step);
   }
 
@@ -167,7 +177,14 @@ export function initStepper(sim) {
     doneLabel?.classList.toggle('is-on', state.labels);
     if (btnProject) btnProject.hidden = state.projections;
     doneProject?.classList.toggle('is-on', state.projections);
-    if (btnSideView) btnSideView.hidden = state.sideView;
+    // Side view (ADR-161, merged into step 5 alongside Top & front): a TRUE on/off toggle,
+    // same idiom as Dimensions below — the button stays visible and swaps its label +
+    // aria-pressed between "Add side view" and "Hide side view"; the done badge lights
+    // while it's on. It gates nothing (step 5 completes on Top & front alone).
+    if (btnSideView) {
+      btnSideView.textContent = state.sideView ? 'Hide side view' : 'Add side view';
+      btnSideView.setAttribute('aria-pressed', String(state.sideView));
+    }
     doneSideView?.classList.toggle('is-on', state.sideView);
     if (btnFlatten) btnFlatten.hidden = state.flattened;
     if (btnUnfold) btnUnfold.hidden = !state.flattened;
@@ -211,6 +228,7 @@ export function initStepper(sim) {
   function goToStep(n, { announce = true } = {}) {
     currentStep = Math.min(Math.max(n, 1), TOTAL);
     if (currentStep === 2) state.visited2 = true;
+    if (currentStep === 3) state.visited3 = true;
 
     const meta = STEPS[currentStep - 1];
     if (elTitle) elTitle.textContent = meta.title;
@@ -234,8 +252,8 @@ export function initStepper(sim) {
   }
 
   // ----------------------------------------------------------------------------
-  // Reflow on edit — editing an early step is NON-DESTRUCTIVE. Labels (Step 3),
-  // projections (Step 4), and the side view (Step 5) reflow automatically on the
+  // Reflow on edit — editing an early step is NON-DESTRUCTIVE. Labels (Step 4),
+  // projections (Step 5), and the side view (Step 5) reflow automatically on the
   // next rebuild because their flags stay on, so a slider nudge updates them live
   // instead of discarding them (no confirm dialog, no lost work). Only the flatten
   // (Step 6) reverses: editing geometry while the solid is folded flat and hidden is
@@ -267,12 +285,15 @@ export function initStepper(sim) {
   // Wiring
   // ----------------------------------------------------------------------------
 
-  // Editing on Step 1 or Step 2 reflows later steps' output live (see reflowFrom).
+  // Editing on Step 1, 2, or 3 reflows later steps' output live (see reflowFrom).
+  // Step 3 (ADR-161: Inclinations, split out of the old Step 2) is a geometry driver
+  // just like the first two — its sliders must reach this same guard or a flattened
+  // sheet would silently stay folded stale after an inclination nudge.
   // The commit itself is handled by uiManager (its listeners fire first); these
   // only reverse a flatten so the edit is visible in 3D. Buttons are excluded.
   for (const panel of panels) {
     const step = Number(panel.dataset.step);
-    if (step > 2) continue;
+    if (step > 3) continue;
     const onEdit = (e) => {
       if (e.target.matches('input, select')) reflowFrom(step);
     };
@@ -289,7 +310,7 @@ export function initStepper(sim) {
     renderNav();
   }, listen);
 
-  // Step 3 — labels.
+  // Step 4 — labels.
   btnLabel?.addEventListener('click', () => {
     sim.setLabels(true);
     state.labels = true;
@@ -297,7 +318,7 @@ export function initStepper(sim) {
     renderRail(); renderActions(); renderNav();
   }, listen);
 
-  // Step 4 — top & front views (HP + VP projections).
+  // Step 5 — top & front views (HP + VP projections). One-shot, like Label (gates the step).
   btnProject?.addEventListener('click', () => {
     sim.setProjections(true);
     state.projections = true;
@@ -305,11 +326,15 @@ export function initStepper(sim) {
     renderRail(); renderActions(); renderNav();
   }, listen);
 
-  // Step 5 — side view (reveal the profile plane + its projection).
+  // Step 5 — side view (ADR-161: merged alongside Top & front). A TRUE on/off toggle —
+  // same idiom as the Dimensions handler below — since it no longer gates the step.
   btnSideView?.addEventListener('click', () => {
-    sim.setSideView(true);
-    state.sideView = true;
-    sim.announce('Profile plane revealed and side view drawn onto the PP.');
+    const next = !state.sideView;
+    sim.setSideView(next);
+    state.sideView = next;
+    sim.announce(next
+      ? 'Profile plane revealed and side view drawn onto the PP.'
+      : 'Side view hidden.');
     renderRail(); renderActions(); renderNav();
   }, listen);
 
@@ -391,6 +416,7 @@ export function initStepper(sim) {
    *  resets the wizard's own state and chrome, never the engine (no second path). */
   function reset() {
     state.visited2 = false;
+    state.visited3 = false;
     state.labels = false;
     state.projections = false;
     state.sideView = false;

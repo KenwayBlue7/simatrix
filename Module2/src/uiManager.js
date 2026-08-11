@@ -84,6 +84,7 @@ export function initUIManager(sim) {
   const orient = $('tgl-orient');
   const lblOrient = $('lbl-orient');
   const disthpHint = $('disthp-hint');
+  const inclLockHint = $('incl-lock-hint'); // ADR-161: cross-step padlock cause (Step 3 note about Step 2's orient preset)
   const btnReset = $('btn-reset');
   const resetConfirm = $('reset-confirm');
   const btnResetYes = $('btn-reset-yes');
@@ -345,6 +346,7 @@ export function initUIManager(sim) {
       // Empty start — no solid; keep every mode toggle off and disabled.
       fihp.checked = fivp.checked = orient.checked = false;
       fihp.disabled = fivp.disabled = orient.disabled = true;
+      if (inclLockHint) inclLockHint.hidden = true;
       return;
     }
     const { shape } = s;
@@ -362,6 +364,13 @@ export function initUIManager(sim) {
     fihp.disabled = !pyramid || m.faceInclinationVP || m.orientToCorner;
     fivp.disabled = !pyramid || m.faceInclinationHP || m.orientToCorner;
     orient.disabled = faceActive;
+
+    // ADR-161: Step 3 (Inclinations) is a different panel from Step 2's "Orient to
+    // corner" toggle that can padlock it — the padlock icon alone doesn't say WHY when
+    // the cause is on a step the learner isn't currently looking at. Only surface this
+    // for the cross-step cause (orient preset), not the same-panel non-pyramid case,
+    // which the shape dropdown already explains.
+    if (inclLockHint) inclLockHint.hidden = !(pyramid && m.orientToCorner);
 
     lblOrient.textContent = orientationLabelFor(shape);
   }

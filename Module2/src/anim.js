@@ -2,7 +2,7 @@
 // CLAUDE.md forbids npm dependencies), just a requestAnimationFrame interpolator.
 //
 // Used by the Guided Stepper for the animations that teach cause-and-effect:
-//   • the projection-line draw-on (top + front views, Step 4; side view, Step 5), and
+//   • the projection-line draw-on (top + front views and side view, both Step 5), and
 //   • the VP-fold "flatten to 2D" (Step 6).
 //
 // Layering: leaf module, imports nothing. main.js owns the rAF loop and STEPS the

@@ -175,7 +175,7 @@ let faSymbolEl;
  *  the profile plane (see applyProfilePlaneVisibility) or the pill leaks through Steps 1–4. */
 let ppPlaneLabel;
 
-/** CSS2DRenderer overlay for vertex labels (Step 3). Rendered each frame on top
+/** CSS2DRenderer overlay for vertex labels (Step 4). Rendered each frame on top
  *  of the WebGL canvas; sized in lockstep with the renderer on resize. */
 let labelRenderer;
 
@@ -239,7 +239,7 @@ let ppGrid;
 let ppHingeGroup;
 
 /**
- * Pivot at the world origin for the "flatten to 2D" fold (Step 5). Holds the VP
+ * Pivot at the world origin for the "flatten to 2D" fold (Step 6). Holds the VP
  * grid and — once projections are drawn — the VP projection subgroup, so rotating
  * this group about Z swings the whole vertical plane (grid + front view) down onto
  * the horizontal plane, hinged on the ground line (the Z axis, where HP meets VP).
@@ -282,9 +282,9 @@ let vpAxisInset = 0;
 
 // --- Stepper-driven view state. The wizard flips these; rebuild() honours them so
 //     editing the solid keeps labels/projections/fold consistent. ---
-let showLabelsFlag = false;      // Step 3 on
-let showProjectionsFlag = false; // Step 4 on — top (HP) + front (VP) views
-let showSideViewFlag = false;    // Step 5 on — profile plane (PP) revealed + side view drawn
+let showLabelsFlag = false;      // Step 4 on
+let showProjectionsFlag = false; // Step 5 on — top (HP) + front (VP) views
+let showSideViewFlag = false;    // Step 5 on — profile plane (PP) revealed + side view drawn (toggle, doesn't gate)
 let showDimensionsFlag = false;  // Step 6 (optional) on — BIS Type-B dimension layer revealed (ADR-041)
 /** De-clutter toggle (default on): hides BOTH connector sets — the upright 3D→2D
  *  connectors and the flattened projectors — when the learner wants a cleaner drawing.
@@ -1018,9 +1018,9 @@ function applyDimensionVisibility(on) {
 /**
  * Draw or clear the orthographic projections to match showProjectionsFlag + the
  * current mesh. All three views (HP/VP/PP) are computed in one edge pass, but the PP
- * side view only BECOMES VISIBLE once the side-view step is reached: the PP subgroup
- * lives under ppHingeGroup, whose `.visible` mirrors showSideViewFlag (false through
- * Step 4, true from Step 5). So Step 4 shows the top + front views; Step 5 reveals the
+ * side view only BECOMES VISIBLE once the Side view toggle (Step 5) is switched on: the
+ * PP subgroup lives under ppHingeGroup, whose `.visible` mirrors showSideViewFlag. So
+ * Top & front draws the top + front views on its own; Side view then reveals the
  * profile plane and its side view by un-hiding the hinge group — no separate redraw.
  *
  * The VP subgroup is reparented into vpFoldGroup so the flatten step can fold it with
@@ -1054,7 +1054,7 @@ function refreshProjections() {
   ppHingeGroup.add(activeProjection.ppGroup);
 
   // Re-assert the profile plane's reveal state after a rebuild re-parents the PP
-  // subgroup: it stays hidden through Step 4 (top + front only) and shows from Step 5.
+  // subgroup: it stays hidden until the Side view toggle (Step 5) is switched on.
   applyProfilePlaneVisibility(showSideViewFlag);
 
   // 2D projectors live at the FOLDED layout positions (static world space), so they
@@ -1126,8 +1126,9 @@ function applyFoldVisual(p) {
     const connectorFactor = showConnectorsFlag ? 1 : 0;
     setObjectOpacity(activeProjection.connectorGroup, solidOpacity * connectorFactor);
     // The 3D side-view connectors belong to the upright view too, but to the PP — which is
-    // only revealed at Step 5. Gate them additionally on showSideViewFlag so they never
-    // appear at Step 4 alongside the HP/VP connectors, then fade with the solid like those.
+    // only revealed once the Step 5 Side view toggle is on. Gate them additionally on
+    // showSideViewFlag so they never appear alongside the HP/VP connectors before that
+    // toggle is switched on, then fade with the solid like those.
     const ppConnectorFactor = connectorFactor * (showSideViewFlag ? 1 : 0);
     setObjectOpacity(activeProjection.ppConnectorGroup, solidOpacity * ppConnectorFactor);
     setObjectOpacity(activeProjection.flatConnectorGroup,
@@ -1166,9 +1167,9 @@ function setObjectOpacity(root, opacity) {
 }
 
 // ============================================================================
-// Step actions — labels (Step 3), top + front views (Step 4), side view (Step 5),
-// flatten (Step 6). Exposed to the wizard through simController; each is idempotent
-// and routes any geometry side-effects through the refresh helpers above.
+// Step actions — labels (Step 4), top + front views + side view (Step 5, ADR-161
+// merge), flatten (Step 6). Exposed to the wizard through simController; each is
+// idempotent and routes any geometry side-effects through the refresh helpers above.
 // ============================================================================
 
 function setLabelsVisible(on) {
@@ -1179,10 +1180,10 @@ function setLabelsVisible(on) {
 function setProjectionsVisible(on) {
   showProjectionsFlag = on;
   refreshProjections();
-  // The Compare chip's 2D gate (Step 4's top+front) and any open sheet both track this flag.
+  // The Compare chip's 2D gate (Step 5's top+front) and any open sheet both track this flag.
   syncCompareChipVisibility();
   if (compareOpen) drawCompare();
-  // Sync the freshly built projection to the current fold state — at Step 4 the
+  // Sync the freshly built projection to the current fold state — at Step 5 the
   // fold is 0, so this hides the 2D projectors until the learner flattens (without
   // it the new flatConnectorGroup would render at full opacity over the 3D view).
   applyFoldVisual(foldProgress);
@@ -2052,7 +2053,7 @@ function buildScene(container) {
   vpGrid.rotation.z = Math.PI / 2;
 
   // Fold pivot at the origin: rotating it about Z swings the VP (grid + front-view
-  // projection, added later) down onto the HP, hinged on the ground line (Step 5).
+  // projection, added later) down onto the HP, hinged on the ground line (Step 6).
   vpFoldGroup = new THREE.Group();
   vpFoldGroup.add(vpGrid);
   scene.add(vpFoldGroup);
@@ -2173,7 +2174,7 @@ function buildScene(container) {
   shapeGroup = new THREE.Group();
   scene.add(shapeGroup);
 
-  // CSS2D overlay for vertex labels (Step 3). A transparent DOM layer sized to the
+  // CSS2D overlay for vertex labels (Step 4). A transparent DOM layer sized to the
   // canvas; pointer-events disabled so drag-to-orbit passes through. Appended to
   // the same container as the canvas so it tracks the viewport's box exactly.
   labelRenderer = new CSS2DRenderer();
@@ -2885,7 +2886,8 @@ let workbenchRail = null;
 /** @type {Map<string, {parent: Element, next: Node|null}>} Each driver wrapper's original
  *  {parent, nextSibling}, captured the first time it is re-parented so exitWorkbench can
  *  restore it to its EXACT home slot — unlike the Points reference's single `#controls`
- *  dock, these 7 wrappers come home to TWO different Step panels (Step 1 and Step 2). */
+ *  dock, these 7 wrappers come home to THREE different Step panels (Step 1, Step 2, and
+ *  Step 3 — ADR-161 moved the inclination pair `anglehp`/`anglevp` out of Step 2). */
 const driverHomes = new Map();
 
 /** The docked rail, created once and kept for the session. */
@@ -2985,7 +2987,7 @@ function updateCompareChip() {
   compareChip?.setAttribute('aria-pressed', String(compareOpen));
 }
 
-/** Hide the chip until the lesson's 2D gate passes (Step 4's top + front views), preserving
+/** Hide the chip until the lesson's 2D gate passes (Step 5's top + front views), preserving
  *  the pedagogy that the 2D drawing is meaningless before any view is projected. A closed
  *  gate also force-closes an open card (e.g. a reset mid-Compare). */
 function syncCompareChipVisibility() {
@@ -5131,7 +5133,7 @@ const simController = {
   commit(partial) { rebuild({ ...(currentShapeData ?? defaultShapeData()), ...partial }); },
   setMode(mode, enabled) { applyMode(mode, enabled); },
 
-  /** Step 3–6 layer toggles (idempotent). */
+  /** Step 4–6 layer toggles (idempotent). */
   setLabels(on) { setLabelsVisible(on); },
   setProjections(on) { setProjectionsVisible(on); },
   setSideView(on) { setSideViewVisible(on); },

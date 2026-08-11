@@ -242,7 +242,7 @@
       user-select: none;
     }
 
-    /* Vertex labels (Step 3) — CSS2DObject DOM pills positioned at 3D points by
+    /* Vertex labels (Step 4) — CSS2DObject DOM pills positioned at 3D points by
        main.js. Themed from tokens; never intercept pointer events (orbit through). */
     .vlabel {
       font-family: var(--font-mono);
@@ -462,7 +462,7 @@
     /* ---- Compare chip (ADR-012 family): the third member of the top-left pill family —
        same shell as the connector toggle, but a real button whose aria-pressed mirrors the
        Compare card's open state (filled accent while open). Hidden until the 2D gate passes
-       (main.js syncCompareChipVisibility: showProjectionsFlag, i.e. Step 4's top+front —
+       (main.js syncCompareChipVisibility: showProjectionsFlag, i.e. Step 5's top+front —
        the 2D drawing is meaningless before any view is projected). Ported from the Points
        topic (graphics_module_1_topic_3_points), which is the finished ADR-037 reference. */
     .compare-chip {
@@ -2273,9 +2273,9 @@
     <ol id="step-rail" aria-label="Progress">
       <li class="rail__item" data-step="1"><button type="button" class="rail__btn"><span class="rail__marker">1</span><span class="rail__label">Add &amp; rest</span></button></li>
       <li class="rail__item" data-step="2"><button type="button" class="rail__btn"><span class="rail__marker">2</span><span class="rail__label">Position</span></button></li>
-      <li class="rail__item" data-step="3"><button type="button" class="rail__btn"><span class="rail__marker">3</span><span class="rail__label">Label</span></button></li>
-      <li class="rail__item" data-step="4"><button type="button" class="rail__btn"><span class="rail__marker">4</span><span class="rail__label">Top &amp; front</span></button></li>
-      <li class="rail__item" data-step="5"><button type="button" class="rail__btn"><span class="rail__marker">5</span><span class="rail__label">Side view</span></button></li>
+      <li class="rail__item" data-step="3"><button type="button" class="rail__btn"><span class="rail__marker">3</span><span class="rail__label">Inclinations</span></button></li>
+      <li class="rail__item" data-step="4"><button type="button" class="rail__btn"><span class="rail__marker">4</span><span class="rail__label">Label</span></button></li>
+      <li class="rail__item" data-step="5"><button type="button" class="rail__btn"><span class="rail__marker">5</span><span class="rail__label">Draw views</span></button></li>
       <li class="rail__item" data-step="6"><button type="button" class="rail__btn"><span class="rail__marker">6</span><span class="rail__label">Flatten</span></button></li>
     </ol>
 
@@ -2365,7 +2365,7 @@
             <h3 class="dock__group-title">Resting plane</h3>
             <p class="dock__note">The base sits flat on one reference plane, and the axis stays <strong>perpendicular to it</strong>. On the
               <button type="button" class="term" aria-describedby="def-hp">HP<span class="term__pop" role="tooltip" id="def-hp">The <strong>Horizontal Plane</strong>: the flat floor the solid rests above. Looking straight down onto it gives the top view.</span></button> the axis stands upright; on the
-              <button type="button" class="term" aria-describedby="def-vp">VP<span class="term__pop" role="tooltip" id="def-vp">The <strong>Vertical Plane</strong>: the upright wall behind the solid. Looking at it from the front gives the front view.</span></button> the solid lies down with its axis horizontal. Inclination (Step&nbsp;2) then tilts it from there.</p>
+              <button type="button" class="term" aria-describedby="def-vp">VP<span class="term__pop" role="tooltip" id="def-vp">The <strong>Vertical Plane</strong>: the upright wall behind the solid. Looking at it from the front gives the front view.</span></button> the solid lies down with its axis horizontal. Inclination (Step&nbsp;3) then tilts it from there.</p>
             <!-- data-ctrl="resting": see the "size" wrapper's comment above. -->
             <div data-ctrl="resting">
               <div class="field">
@@ -2379,7 +2379,7 @@
           </div>
         </section>
 
-        <!-- STEP 2 — Position & turn (distance from each plane, base orientation, then inclination) -->
+        <!-- STEP 2 — Position (distance from each plane, then base orientation) -->
         <section class="step-panel" data-step="2" hidden>
           <div class="dock__group">
             <h3 class="dock__group-title">Placement</h3>
@@ -2437,7 +2437,11 @@
               <svg class="toggle__lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
             </label>
           </div>
+        </section>
 
+        <!-- STEP 3 — Inclinations (ADR-161: split out of the old Step 2's third group,
+             RULES.md §6.30 — "where does it sit" and "how is it tilted" are two questions). -->
+        <section class="step-panel" data-step="3" hidden>
           <div class="dock__group">
             <h3 class="dock__group-title">Inclination</h3>
             <p class="dock__note">Tilt the solid toward a plane. Use the angle sliders for a standard-axis tilt, or
@@ -2475,11 +2479,14 @@
               <span class="toggle__text">Face inclination &rarr; VP</span>
               <svg class="toggle__lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
             </label>
+            <!-- Cross-step lock note (plan risk 1): the padlock alone doesn't say WHY these two
+                 are disabled when Step 2's "Orient to corner" preset is on — name the cause. -->
+            <p class="dock__note" id="incl-lock-hint" hidden>Face inclination is unavailable while <strong>Orient to corner/edge</strong> (Step&nbsp;2) is on — turn that off first.</p>
           </div>
         </section>
 
-        <!-- STEP 3 — Label vertices -->
-        <section class="step-panel" data-step="3" hidden>
+        <!-- STEP 4 — Label vertices -->
+        <section class="step-panel" data-step="4" hidden>
           <p class="hint">
             <svg class="hint__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             <span>Each label stays pinned to its corner as you rotate the view, so you never lose track of which point is which across the projections.</span>
@@ -2491,8 +2498,11 @@
           </p>
         </section>
 
-        <!-- STEP 4 — Draw top & front views (HP + VP only) -->
-        <section class="step-panel" data-step="4" hidden>
+        <!-- STEP 5 — Draw the views (ADR-161: merged from the former Step 4 top+front and
+             Step 5 side-view panels — one idea, cast onto the three reference planes, not two
+             lessons). Top & front stays a one-shot primary action (gates the step); Side view
+             is a true Show/Hide toggle (mirrors #btn-dimensions on Step 6) that does not gate. -->
+        <section class="step-panel" data-step="5" hidden>
           <p class="hint">
             <svg class="hint__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             <span>This is
@@ -2504,20 +2514,16 @@
             <svg class="done-badge__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             Top &amp; front views drawn
           </p>
-        </section>
-
-        <!-- STEP 5 — Add the side view (reveal the profile plane) -->
-        <section class="step-panel" data-step="5" hidden>
           <p class="hint">
             <svg class="hint__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             <span>The
               <button type="button" class="term" aria-describedby="def-pp">profile plane<span class="term__pop" role="tooltip" id="def-pp">The <strong>Profile Plane</strong>: an upright wall standing at the solid's side. Looking at it from the side gives the side view — the third of the three views that fix the solid completely.</span></button>
-              (PP, violet) stands at the solid's side. We bring it in and cast the side view onto it, completing the set of three views.</span>
+              (PP, violet) stands at the solid's side. Bring it in to cast the side view onto it, completing the set of three views.</span>
           </p>
-          <button id="btn-sideview" class="btn btn--primary btn--block" type="button">Add side view</button>
+          <button id="btn-sideview" class="btn btn--block" type="button" aria-pressed="false">Add side view</button>
           <p class="done-badge" id="done-sideview">
             <svg class="done-badge__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Side view added
+            Side view shown
           </p>
         </section>
 
@@ -2625,7 +2631,7 @@
       <!-- Compare chip (ADR-012 family): the on-demand 2D-drawing view. Ported from
            Module1/src/chrome.js #compare-chip via the Points topic's reference build.
            Hidden until the lesson's 2D gate passes (main.js syncCompareChipVisibility:
-           showProjectionsFlag — Step 4's top+front views must exist first), preserving
+           showProjectionsFlag — Step 5's top+front views must exist first), preserving
            the pedagogy that the 2D drawing is meaningless before any view is projected.
            main.js wires it to compare.toggle() — the chip is Compare's only open/close
            control (ADR-080). -->
@@ -2685,7 +2691,7 @@
     </div>
 
     <!-- Contextual spotlight hint: a queued, first-seen chip pointing out the top view,
-         front view (Step 4), and connector lines (Step 6 flatten) the first time each is
+         front view (Step 5), and connector lines (Step 6 flatten) the first time each is
          revealed. Shares the bottom-centre slot with the orbit hint; onboarding.js shows
          one at a time. The leading dot's colour ties to the linework (teal HP / amber VP /
          ink), so it carries colour AND label (Two-Cue Rule). Dismisses on click/orbit/timeout. -->
