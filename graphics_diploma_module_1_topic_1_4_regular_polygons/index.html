@@ -308,6 +308,14 @@
     .card__eyebrow { margin: 0 0 var(--space-1); font-family: var(--font-mono); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-ink-secondary); }
     .card__title { margin: 0 0 var(--space-2); font-size: var(--text-title); line-height: 1.2; font-weight: 700; letter-spacing: -0.01em; }
     .card__lead { margin: 0; max-width: 60ch; font-size: var(--text-sm); line-height: 1.55; color: var(--color-ink-secondary); }
+    /* #step-lead is the step's instruction line ("what to do"), rendered once per phase change
+       directly above #step-note's "why it works" blurb (both .card__lead-recipe grey — same
+       size, same colour — with nothing between them but a small mono eyebrow, Phase A U8).
+       Outranking it to body size/ink here, rather than touching .card__lead itself (still used
+       unchanged for Step 1's own body prose and the Construct-step replay hint) or demoting
+       #step-note-body (already deliberately quiet — DESIGN.md §6), gives the two stacked lines
+       a real type hierarchy: instruction first, context second. ADR-160. */
+    #step-lead { font-size: var(--text-base); color: var(--color-ink); }
 
     /* Practice-problems entry (persistent, beside the eyebrow — platform family pattern). */
     .library-entry {
@@ -415,8 +423,15 @@
     .field__num:focus { outline: none; border-color: var(--color-accent); box-shadow: var(--ring-focus); }
     .field__unit { flex: 0 0 auto; width: 2.4ch; font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-ink-secondary); }
 
-    /* Construct step */
-    .construct-actions { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); }
+    /* Construct step. Three-tier spacing rhythm (ADR-160, no new tokens — RULES §4.1):
+       space-2 (tightest) same-control pairs, e.g. Back/Next; space-3 (medium) an alternate
+       action within one widget, e.g. Play All under Back/Next; space-4 (loosest) between
+       distinct widgets, e.g. method switcher vs. the reveal control vs. the replay hint.
+       `align-items` deliberately omitted (default stretch) — `center` used to be the ONLY
+       rule touching #construct-replay-hint (every other child is already width:100% by its
+       own rule), and it wrongly centred the one line that should read as left-aligned card
+       prose, making its .card__lead max-width:60ch a dead rule. Stretch fixes both. */
+    .construct-actions { display: flex; flex-direction: column; gap: var(--space-4); }
 
     /* Verify step */
     .result-panel { display: flex; flex-direction: column; gap: var(--space-4); }
@@ -463,10 +478,13 @@
        (RULES §4.1) — every token below is already declared for the rest of this page.
        Caption sits on its own row above; Back/Next pair adjacent below, matching this repo's
        other Back/Next precedents (Module2's .method-bar, Topic 6's .con-nav, this topic's own
-       .card__nav-next footer) instead of splitting Back off with the caption. */
-    .step-through { display: flex; flex-direction: column; width: 100%; gap: var(--space-3); }
+       .card__nav-next footer) instead of splitting Back off with the caption.
+       Vertical rhythm (ADR-160): no flat `gap` — caption/row/Play All are margin-spaced
+       individually (below) so the row reads as tightly bound to its caption while Play All
+       reads as a demoted alternate action, not a third step in the sequence (Phase A U10/U11). */
+    .step-through { display: flex; flex-direction: column; width: 100%; }
     .step-through[hidden] { display: none; }
-    .step-through__row { display: flex; align-items: center; gap: var(--space-2); width: 100%; }
+    .step-through__row { display: flex; align-items: center; gap: var(--space-2); width: 100%; margin-top: var(--space-2); }
     .step-through__back { flex: 0 0 auto; padding: 0 var(--space-3); }
     .step-through__next { flex: 1 1 auto; min-width: 0; }
     .step-through__caption {
@@ -480,8 +498,8 @@
     }
     /* Idle state (no slide revealed yet) — the accent-soft wash is earned by having a real
        slide caption to show; at rest the box would otherwise just restate "Step Through"
-       (the button 40px below) at promoted visual weight. Toggled by uiManager.js's
-       renderStepThrough() (ADR-159). */
+       (the button 40px below) at promoted visual weight (Phase A U12, ADR-160). Toggled by
+       uiManager.js's renderStepThrough(). */
     .step-through__caption.is-idle {
       background: transparent; color: var(--color-ink-secondary);
       border-color: var(--color-border);
@@ -492,6 +510,9 @@
     }
     .step-through__count[hidden] { display: none; }
     .step-through__text { min-width: 0; }
+    /* space-3, not space-2 — one tier looser than the Back/Next row's own internal gap, so
+       Play All reads as this widget's alternate action rather than its next control (ADR-160). */
+    #btn-play-all { margin-top: var(--space-3); }
 
     /* --- Buttons --- */
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-height: 44px; padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-paper); color: var(--color-ink); font-size: var(--text-base); font-weight: 400; cursor: pointer; transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard); }
