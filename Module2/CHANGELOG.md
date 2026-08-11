@@ -1,6 +1,11 @@
 # Changelog
 
-All notable changes to Module 2 (Orthographic Projection of Solids).
+All notable changes to Module 2 (Solids Inclined to Both Planes).
+
+## 2026-08-11
+- Changed: `meta.json` title renamed from "Orthographic Projection of Solids" to "Solids Inclined to Both Planes" (description + tags rewritten to match), since Module 2 is the only build that teaches the both-planes tier and the old name overlapped its own Simple Positions clone. `index.html`'s `<title>` updated in lockstep per RULES.md §1.12. See `../DECISIONS.md` ADR-161.
+- Changed: the wizard's "Position & incline" step split into a dedicated Step 3 "Inclinations" (angle sliders + face-inclination toggles), and the old top+front / side-view steps merged into one Step 5 "Draw the views" (side view is now a Show/Hide toggle that no longer gates the step). Net step count unchanged at 6. See `../DECISIONS.md` ADR-161.
+- Note: the merged-views step (change 2 above) was **not** backported to `graphics_module_2_topic_2_simple_positions` this session — pending. That clone has no inclination controls, so only the view-merge applies there.
 
 ## 2026-08-04
 - Fixed: the Side view folded down beside the Top view instead of the Front view, violating standard first-angle convention (Side must share Front's height band via shared horizontal projectors, not Top's). The Profile Plane's fold hinge (`ppHingeGroup`) was a world-space sibling of the VP fold pivot (`vpFoldGroup`), folding `−90°` about local X onto the HP; it's now nested inside `vpFoldGroup` and folds `+90°` about local Y into the VP plane about the VP∩PP line, riding the VP's own fold down with the front view. Updated `positionRefLabels()`, `answerSheetBox()`, `drawCompare()`'s `sheetPP` formula and its X1-Y1 reference line (now the VP∩PP hinge, spanning Front+Side), and `projectionDrawer.js`'s flat side-view connector (now ties to the folded Front point). The Step-6 tutorial caption already read correctly ("beside the front") and needed no change — only the code disagreed with its own copy. See `../DECISIONS.md` ADR-106.

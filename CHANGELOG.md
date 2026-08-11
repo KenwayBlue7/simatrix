@@ -4,6 +4,10 @@ All notable changes at the Simatrix project root (spanning Module1, Module2, and
 topic deploy copies). Per-module changelogs live inside each module folder.
 
 ## 2026-08-11
+- Changed: `Module2` (the master) renamed from "Orthographic Projection of Solids" to "Solids
+  Inclined to Both Planes" (`meta.json` + `index.html` `<title>`), and its wizard restructured —
+  inclination moved into its own Step 3, and the top+front/side-view steps merged into one Step 5.
+  See `Module2/CHANGELOG.md`, ADR-161.
 - Fixed: `graphics_diploma_module_1_topic_1_4_regular_polygons`'s two most-clicked wizard
   controls (`.construction-picker__item`, `.method-switcher__btn`) had no hover state and a
   focused Play All button advanced a slide on Space instead of playing. See module CHANGELOG.md.

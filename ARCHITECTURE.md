@@ -59,7 +59,8 @@ C:\xampp\htdocs\Simatrix\
 │                                              stylesheet (src/shell.css).
 │
 ├── Module2\                                   >>> THE MASTER CODEBASE <<<
-│                                              "Orthographic Projection of Solids".
+│                                              "Solids Inclined to Both Planes" (ADR-161;
+│                                              formerly "Orthographic Projection of Solids").
 │                                              A single-page sim: index.html + main.js
 │                                              orchestrator + a folder of small,
 │                                              single-purpose modules in src/.
@@ -418,10 +419,10 @@ into the orchestrator directly.
   + the injected controller). **Provides:** `initUIManager(sim)` → `{ sync, dispose }`.
 
 - **`stepper.js`** — The Guided Stepper controller: sequences the six steps
-  (1 Add & rest → 2 Position & incline → 3 Label vertices → 4 Top & front views →
-  5 Side view → 6 Flatten to 2D), gates each step behind the previous, and drives the
-  step card + numbered rail. **Imports:** none (injected controller). **Provides:**
-  `initStepper(sim)` → `{ sync, reset, dispose }`.
+  (1 Add & rest → 2 Position → 3 Inclinations → 4 Label vertices → 5 Draw the views
+  [top+front, then side] → 6 Flatten to 2D; ADR-161), gates each step behind the
+  previous, and drives the step card + numbered rail. **Imports:** none (injected
+  controller). **Provides:** `initStepper(sim)` → `{ sync, reset, dispose }`.
 
 - **`problemLibrary.js`** — The textbook Problem Library: a focus-trapped modal of
   problem cards, hints revealed one at a time, and a tolerant self-check that compares

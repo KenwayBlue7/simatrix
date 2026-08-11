@@ -7724,6 +7724,58 @@ Construct, not touched here).
 
 ---
 
+## ADR-161: Module 2 renamed to "Solids Inclined to Both Planes"; Inclinations split into its own step; the two view-drawing steps merged
+
+**Date:** 2026-08-11
+**Decision:** Three related changes to Module 2 (the master Engineering Graphics sim), landed as
+one decision because each is a consequence of naming the topic honestly:
+
+1. **`meta.json` renamed.** `title` was "Orthographic Projection of Solids" — generic enough to
+   overlap its own clone, `graphics_module_2_topic_2_simple_positions` ("Simple Positions"), even
+   though Module 2 is the only build that enables the `both-planes` problem tier (`problems.js`
+   `ENABLED_TIERS`). Retitled to **"Solids Inclined to Both Planes"**, description and tags
+   rewritten to match. `index.html`'s `<title>` updated in the same commit — RULES.md §1.12 /
+   ADR-026 forbid a sim shipping with `<title>` disagreeing with `meta.json.title` (this exact
+   defect was already on record once, in the clone, fixed 2026-06-28).
+2. **Inclination split out of the old Step 2 ("Position & incline") into a new Step 3
+   ("Inclinations").** The old step bundled three unrelated questions — where does it sit
+   (distance from HP/VP), how is it turned (base orientation), how is it tilted (the angle
+   sliders and face-inclination toggles) — under one panel. RULES.md §6.30: a control belongs in
+   the ONE guided step whose question it answers. For a topic now named after inclination, "how
+   is it tilted" earns its own step.
+3. **The old Step 4 (top + front views) and Step 5 (side view) merged into one Step 5 ("Draw the
+   views").** Casting the solid onto HP, VP, and PP is one idea — the three views that together
+   fix the solid — not two lessons. Top & front keeps its one-shot primary-button behaviour and
+   still gates the step (RULES §6.30 still applies: this step's one question is "draw the views");
+   Side view becomes a true Show/Hide toggle (the `#btn-dimensions` idiom, Step 6) that no longer
+   gates advancement — a learner who has drawn top+front may proceed without ever revealing the
+   side view, since the pedagogy of *drawing* it doesn't require leaving it visible.
+
+Net step count is unchanged at 6 (`Add & rest → Position → Inclinations → Label → Draw the views →
+Flatten`). `stepper.js`'s `STEPS`/`isComplete`/`canAdvance` were updated accordingly, with a new
+`state.visited3` exploratory gate mirroring `visited2` (a solid with zero inclination is a
+legitimate simple-position answer — Step 3 must never trap a learner who wants to leave it at
+0°). The `reflowFrom` edit-listener guard (`if (step > 2) continue`) was widened to `step > 3` —
+the inclination sliders are now a geometry driver living past that boundary, and without the
+widen, nudging an inclination angle while the sheet is flattened would silently leave the drawing
+stale instead of unfolding it back to 3D.
+
+**Consequences:** A cross-step UX cost, mitigated but not eliminated: `#tgl-orient` (Step 2) can
+padlock `#tgl-fihp`/`#tgl-fivp` (now Step 3) via the existing rotation-priority hierarchy
+(CLAUDE.md), and a learner landing on Inclinations may see both toggles locked with the cause on a
+step they've already left. Mitigated with a conditional `.dock__note` (`uiManager.js`
+`syncToggles()`, `#incl-lock-hint`) that names Step 2's orient-to-corner preset as the cause,
+shown only when that is genuinely why the toggles are disabled (not the same-panel non-pyramid
+case, which the shape dropdown already explains). Not addressed: the padlock note is text-only,
+one more thing a future edit to the rotation hierarchy must remember to keep in sync with. The
+clone (`graphics_module_2_topic_2_simple_positions`) was **not** backported this session — it has
+no inclination controls at all (its own CLAUDE.md: "no tilt … `angleHP`/`angleVP` are removed"),
+so only the Step 4/5 view-merge would apply there, and that backport is deliberately deferred
+(flagged in its own CHANGELOG).
+**Status:** Active.
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*

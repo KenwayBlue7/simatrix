@@ -620,7 +620,9 @@ module appendix conflicts on a token or named rule, this file wins.**
 
 A module adds its own domain encodings and viewport behaviour **here**, never by re-defining a shared token.
 
-### 7.1 Module 2 — Orthographic Projection of Solids (the master / reference implementation)
+### 7.1 Module 2 — Solids Inclined to Both Planes (the master / reference implementation)
+
+*(Renamed from "Orthographic Projection of Solids" — ADR-161, 2026-08-11.)*
 
 - **Adds PP Violet** (`--color-pp-line #7a5ea6`) as a fully-used third projection plane (side view).
 - Defines only the two z-index rungs it uses (`--z-notice`, `--z-overlay`).
