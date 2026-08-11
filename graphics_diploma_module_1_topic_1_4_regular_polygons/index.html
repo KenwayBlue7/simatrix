@@ -214,7 +214,6 @@
                   color var(--dur-fast) var(--ease-standard),
                   transform var(--dur-fast) var(--ease-standard);
     }
-    .wizard-toggle:hover { color: var(--color-ink); border-color: var(--color-ink-secondary); }
     .wizard-toggle:active { transform: scale(0.97); }
     .wizard-toggle__icon { width: 20px; height: 20px; transition: transform var(--dur-base) var(--ease-standard); }
     body.wizard-collapsed #wizard { display: none; }
@@ -519,7 +518,6 @@
     .btn:active:not(:disabled) { transform: scale(0.97); }
     .btn:disabled { opacity: 0.55; cursor: default; }
     .btn--primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-panel); }
-    .btn--primary:hover:not(:disabled) { background: var(--color-accent-strong); border-color: var(--color-accent-strong); }
     .btn--ghost { min-height: 36px; padding: 0 var(--space-3); font-size: var(--text-sm); font-weight: 400; color: var(--color-ink-secondary); background: transparent; border-color: transparent; }
     .btn--block { width: 100%; }
     :where(button, [tabindex]):focus-visible { outline: none; box-shadow: var(--ring-focus); }
@@ -598,6 +596,25 @@
     .sim-fallback__icon { width: 48px; height: 48px; color: var(--color-bench-grey); margin-bottom: var(--space-4); }
     .sim-fallback__title { font-size: var(--text-title); margin: 0 0 var(--space-3); }
     .sim-fallback__body { color: var(--color-ink-secondary); line-height: 1.5; margin: 0 0 var(--space-5); }
+
+    /* Decorative hover only fires for a real pointing device (hover: hover + pointer: fine).
+       On touch a faked hover latches a "stuck" highlight after a tap; gating keeps tap clean
+       while preserving full hover feedback on desktop (root DESIGN.md §5.10). Rules are in
+       original source order so the cascade is unchanged; `:active` and `:focus-visible` stay
+       outside the gate.
+       Selected (`aria-pressed="true"`) pickers are excluded on purpose: the switcher's click
+       handler early-returns on the active method (uiManager.js), so a hover cue there would
+       promise an action that never happens — and the exclusion also keeps this rule from
+       out-specifying the `[aria-pressed="true"]` fill it sits after.
+       The switcher shifts fill, not border: `:not(:first-child)` zeroes `border-left`, so the
+       seam between two buttons belongs to the left neighbour and a border-colour hover would
+       darken three sides only. */
+    @media (hover: hover) and (pointer: fine) {
+      .wizard-toggle:hover { color: var(--color-ink); border-color: var(--color-ink-secondary); }
+      .construction-picker__item:not([aria-pressed="true"]):hover { background: var(--color-panel); border-color: var(--color-bench-grey); }
+      .method-switcher__btn:not([aria-pressed="true"]):not(:disabled):hover { background: var(--color-panel); color: var(--color-ink); }
+      .btn--primary:hover:not(:disabled) { background: var(--color-accent-strong); border-color: var(--color-accent-strong); }
+    }
 
     /* ============================================================
        Reduced motion (§4.13)
