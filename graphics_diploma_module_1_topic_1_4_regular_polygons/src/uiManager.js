@@ -24,7 +24,7 @@ const parseNumeric = (str) => parseFloat(String(str).trim().replace(',', '.'));
  * @property {() => import('./constructions.js').ConstructionDef | null} getActiveConstruction
  * @property {() => Record<string, number>} getParams
  * @property {(partial: Record<string, number>) => void} commit
- * @property {() => void} play
+ * @property {(opts?: {onComplete?: () => void}) => void} play
  * @property {() => void} reset
  * @property {(msg: string) => void} announce
  * @property {(msg: string) => void} flowNote
@@ -35,6 +35,8 @@ const parseNumeric = (str) => parseFloat(String(str).trim().replace(',', '.'));
  * @property {() => Array<{caption: string, startIdx: number, endIdx: number}>} getSlides
  * @property {(range: {startIdx: number, endIdx: number}, opts?: {onComplete?: () => void}) => void} revealSlide
  * @property {(endIdx: number) => void} showStepsUpTo
+ * @property {() => void} skipToEnd Jump straight to the finished construction — what an
+ *   in-flight Play/Play All relabels to (ADR-159).
  */
 
 /** @param {SimController} sim */
@@ -62,10 +64,20 @@ export function initUIManager(sim) {
   const btnStepBack = $('btn-step-back');
   const btnStepNext = $('btn-step-next');
   const btnPlayAll = $('btn-play-all');
-  const stepCaption = $('step-through-caption');
+  const stepCaptionEl = $('step-through-caption');
+  const stepCaptionText = $('step-through-text');
+  const stepCount = $('step-through-count');
 
   let fieldEls = []; // [{ cfg, range, num }] for the currently-active construction
   let stepIdx = -1; // Step Through progress: -1 = nothing revealed yet
+
+  // ADR-159 (Phase A audit E5/E15): neither button ever changed state while a Play/Play All
+  // animation was in flight — no signal anything was running, no way to stop it, and Play
+  // All additionally lied about progress (stepIdx jumped to "done" the instant it was
+  // CLICKED, not when the drawing actually finished). These two flags are the in-flight
+  // signal; both are cleared by resetStepThrough() on every sync(), same as stepIdx already is.
+  let playInFlight = false; // #btn-play-construction (Pentagon/Hexagon — Play is their ONLY path)
+  let playAllInFlight = false; // #btn-play-all (N-Gon)
 
   /** (Re)build the given-value sliders for the active construction. Called whenever the
    *  construction changes — the param SET itself differs per construction, so fields are
@@ -156,7 +168,26 @@ export function initUIManager(sim) {
     }
   }
 
-  btnPlay?.addEventListener('click', () => sim.play(), listen);
+  // ADR-159: Play construction relabels to "Skip to end" while its animation is in flight —
+  // the in-flight signal Phase A audit's E5 found missing, plus an actual escape hatch.
+  // Pentagon/Hexagon have no Step Through, so Play is their ONLY reveal path; skipping just
+  // jumps straight to sim.skipToEnd() (main.js's showStepsUpTo() driven to completion).
+  function endPlay() {
+    playInFlight = false;
+    if (btnPlay) btnPlay.textContent = 'Play construction';
+  }
+  btnPlay?.addEventListener('click', () => {
+    if (playInFlight) {
+      sim.skipToEnd();
+      endPlay();
+      sim.announce('Skipped to the finished construction.');
+      return;
+    }
+    playInFlight = true;
+    if (btnPlay) btnPlay.textContent = 'Skip to end';
+    sim.play({ onComplete: endPlay });
+    sim.announce('Playing the construction. Press Skip to end to jump to the finished drawing.');
+  }, listen);
 
   // --- Step Through (N-Gon only) — click-gated slide navigator, default/primary alongside
   // "Play All" (sim.play(), unchanged). Cherry-picked from Module2/src/methodController.js:
@@ -171,23 +202,52 @@ export function initUIManager(sim) {
 
   function renderStepThrough() {
     if (!stepThroughEl || stepThroughEl.hidden) return;
+    // ADR-159: Play All previously set stepIdx = slideCount() - 1 the instant it was
+    // CLICKED, so this render made the caption/counter/Back-Next state claim "fully drawn"
+    // while slide one of a multi-second (up to ~75s pre-budget) animation was still on
+    // screen (Phase A audit E15). stepIdx is now only written once playback actually
+    // completes (endPlayAll() below); while it's running this branch shows the true state
+    // instead, and disables Back/Next rather than leaving Back readable as available.
+    if (playAllInFlight) {
+      if (btnStepBack) btnStepBack.disabled = true;
+      if (btnStepNext) btnStepNext.disabled = true;
+      if (stepCaptionText) stepCaptionText.textContent = 'Playing all steps…';
+      if (stepCaptionEl) stepCaptionEl.classList.remove('is-idle');
+      if (stepCount) stepCount.hidden = true;
+      return;
+    }
     const slides = sim.getSlides();
     const count = slides.length;
     if (btnStepBack) btnStepBack.disabled = stepIdx < 0;
     if (stepIdx < 0) {
       if (btnStepNext) { btnStepNext.textContent = 'Step Through'; btnStepNext.disabled = count === 0; }
-      if (stepCaption) stepCaption.textContent = 'Press Step Through to begin.';
+      if (stepCaptionText) stepCaptionText.textContent = 'Press Step Through to begin.';
+      // Idle: no slide revealed yet, so the caption has nothing of its own to say (it would
+      // otherwise just restate the button below at promoted accent-soft weight — Phase A
+      // U12). Demote to quiet chrome; the accent-soft wash is earned once a real slide
+      // caption lands below, in the branch below (ADR-160).
+      if (stepCaptionEl) stepCaptionEl.classList.add('is-idle');
+      if (stepCount) stepCount.hidden = true;
     } else {
       if (btnStepNext) {
         btnStepNext.textContent = 'Next';
         btnStepNext.disabled = stepIdx >= count - 1;
       }
-      if (stepCaption) stepCaption.textContent = `Slide ${stepIdx + 1} of ${count} — ${slides[stepIdx].caption}`;
+      if (stepCaptionText) stepCaptionText.textContent = slides[stepIdx].caption;
+      if (stepCaptionEl) stepCaptionEl.classList.remove('is-idle');
+      if (stepCount) { stepCount.hidden = false; stepCount.textContent = `${stepIdx + 1} / ${count}`; }
     }
   }
 
+  // Called on every sync() (main.js's rebuild() already cancelled any in-flight activePlay
+  // by then) — so a construction/param/method/reset change always lands back on the idle
+  // "Play construction" / "Play All" labels, not just Step Through's own stepIdx (ADR-159).
   function resetStepThrough() {
     stepIdx = -1;
+    playAllInFlight = false;
+    if (btnPlayAll) btnPlayAll.textContent = 'Play All';
+    playInFlight = false;
+    if (btnPlay) btnPlay.textContent = 'Play construction';
     renderStepThrough();
   }
 
@@ -214,21 +274,37 @@ export function initUIManager(sim) {
 
   btnStepNext?.addEventListener('click', goStepNext, listen);
   btnStepBack?.addEventListener('click', goStepBack, listen);
-  btnPlayAll?.addEventListener('click', () => {
-    sim.play();
-    // Keep Step Through's own caption/counter/button state truthful about what's actually on
-    // screen — Play All just drew everything, so Step Through's progress catches up to
-    // "fully revealed" instead of going stale (the two consumers share one drawing; this is
-    // the concrete shape of keeping them in sync after either one runs).
+
+  // ADR-159: stepIdx is now written HERE, at actual completion, not synchronously on click —
+  // see renderStepThrough()'s playAllInFlight branch above for what covers the gap in between.
+  function endPlayAll() {
+    playAllInFlight = false;
+    if (btnPlayAll) btnPlayAll.textContent = 'Play All';
     stepIdx = slideCount() - 1;
     renderStepThrough();
+  }
+  btnPlayAll?.addEventListener('click', () => {
+    if (playAllInFlight) {
+      sim.skipToEnd();
+      endPlayAll();
+      sim.announce('Skipped to the finished construction.');
+      return;
+    }
+    playAllInFlight = true;
+    if (btnPlayAll) btnPlayAll.textContent = 'Skip to end';
+    sim.play({ onComplete: endPlayAll });
+    renderStepThrough();
+    sim.announce('Playing the construction. Press Skip to end to jump to the finished drawing.');
   }, listen);
 
-  // Space advances like Next, unless focus is already on Back (which keeps its own native
-  // Space activation) — bound to the container, not document, so it's inert everywhere else.
+  // Space advances like Next, unless focus is already on Back or Play All (each keeps its own
+  // native Space activation) — bound to the container, not document, so it's inert everywhere else.
+  // Also inert during Play All (ADR-159): Next is disabled on screen at that point (see
+  // renderStepThrough()'s playAllInFlight branch), Space must not bypass that.
   stepThroughEl?.addEventListener('keydown', (e) => {
     if (e.code !== 'Space' && e.key !== ' ') return;
-    if (document.activeElement === btnStepBack) return;
+    if (playAllInFlight) return;
+    if (document.activeElement === btnStepBack || document.activeElement === btnPlayAll) return;
     if (e.repeat) { e.preventDefault(); return; }
     e.preventDefault();
     goStepNext();

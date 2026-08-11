@@ -471,10 +471,27 @@
     .step-through__next { flex: 1 1 auto; min-width: 0; }
     .step-through__caption {
       flex: 0 0 auto; margin: 0; padding: var(--space-2) var(--space-3);
-      font-size: var(--text-sm); line-height: 1.5; color: var(--color-ink-secondary);
-      background: var(--color-paper); border: 1px solid var(--color-border); border-radius: var(--radius-sm);
-      min-height: 40px; display: flex; align-items: center;
+      font-size: var(--text-sm); line-height: 1.5; color: var(--color-ink);
+      background: var(--color-accent-soft);
+      border: 1px solid color-mix(in srgb, var(--color-accent) 25%, var(--color-border));
+      border-radius: var(--radius-sm);
+      min-height: 40px; display: flex; align-items: center; gap: var(--space-2);
+      transition: background var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard);
     }
+    /* Idle state (no slide revealed yet) — the accent-soft wash is earned by having a real
+       slide caption to show; at rest the box would otherwise just restate "Step Through"
+       (the button 40px below) at promoted visual weight. Toggled by uiManager.js's
+       renderStepThrough() (ADR-159). */
+    .step-through__caption.is-idle {
+      background: transparent; color: var(--color-ink-secondary);
+      border-color: var(--color-border);
+    }
+    .step-through__count {
+      flex: 0 0 auto; font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+      font-size: var(--text-xs); color: var(--color-ink-secondary);
+    }
+    .step-through__count[hidden] { display: none; }
+    .step-through__text { min-width: 0; }
 
     /* --- Buttons --- */
     .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-height: 44px; padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-paper); color: var(--color-ink); font-size: var(--text-base); font-weight: 400; cursor: pointer; transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard); }
@@ -731,7 +748,10 @@
             <button type="button" class="btn btn--primary btn--block" id="btn-play-construction">Play construction</button>
 
             <div class="step-through" id="step-through" hidden>
-              <p class="step-through__caption" id="step-through-caption" aria-live="polite"></p>
+              <p class="step-through__caption" id="step-through-caption" aria-live="polite">
+                <span class="step-through__count" id="step-through-count" aria-hidden="true" hidden></span>
+                <span class="step-through__text" id="step-through-text"></span>
+              </p>
               <div class="step-through__row">
                 <button type="button" class="btn step-through__back" id="btn-step-back" disabled>Back</button>
                 <button type="button" class="btn btn--primary step-through__next" id="btn-step-next">Step Through</button>

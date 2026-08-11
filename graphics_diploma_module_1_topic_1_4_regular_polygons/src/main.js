@@ -221,7 +221,11 @@ const simController = {
     rebuild();
     uiManager.sync({ rebuildFields: false });
   },
-  play() {
+  // ADR-159: onComplete mirrors revealSlide()'s own shape below — uiManager.js uses it to
+  // know when a Play/Play All run has actually finished (not just been triggered), the
+  // in-flight signal Phase A audit's E5/E15 found missing. playSteps()'s cancel() does not
+  // fire onComplete, so a skipToEnd()-cancelled run correctly never calls back here.
+  play({ onComplete } = {}) {
     if (!lastRecipe || !dynamicLayer) return;
     activePlay?.cancel();
     clear(dynamicLayer);
@@ -231,7 +235,7 @@ const simController = {
     // but only if it isn't already visible (a comfortable manual zoom is left alone).
     viewTransform.ensureVisible(computeBounds(lastRecipe.steps));
     activePlay = playSteps(dynamicLayer, lastRecipe.resolvedMoveResult, {
-      onComplete: () => { activePlay = null; setComplete(true); },
+      onComplete: () => { activePlay = null; setComplete(true); onComplete?.(); },
       chromeScale: lastRecipe.chromeScale,
     });
   },
@@ -282,13 +286,20 @@ const simController = {
     }
     setComplete(!!lastRecipe?.resolvedMoveResult && endIdx >= lastRecipe.resolvedMoveResult.length);
   },
+  // ADR-159: the "Skip to end" control an in-flight Play/Play All relabels to — just the
+  // existing showStepsUpTo() driven all the way through, so it reuses the cancel + instant
+  // renderStatic() path above rather than adding a second "jump to finished" code path.
+  skipToEnd() {
+    if (!lastRecipe?.resolvedMoveResult) return;
+    this.showStepsUpTo(lastRecipe.resolvedMoveResult.length);
+  },
   reset() {
     state = { constructionId: null, params: {} };
     cancelTweens();
     rebuild();
     stepper.reset();
     uiManager.sync({ rebuildFields: true });
-    viewTransform.resetView();
+    resetFit(); // ADR-155
     announce('Reset. Choose a construction to begin.');
     // solvedAny is deliberately NOT cleared here — #btn-finish's gate is page-load
     // scoped, not session-scoped, same reset-immunity the retired completeSent latch had.

@@ -71,10 +71,36 @@ function arcPathD(center, radius, startAngle, endAngle) {
 }
 
 /** How long a step's draw-on takes — a sweeping arc or a drawn line needs enough time to
- *  actually watch the tool move; a point/label snapping into place doesn't. */
+ *  actually watch the tool move; a point/label snapping into place doesn't. These are the
+ *  PER-KIND base durations; the actual contract playSteps() honours is PLAY_BUDGET_MS below
+ *  (a whole-call time budget), not these constants directly — see playSteps(). */
 function durationFor(step) {
   return step.kind === 'arc' || step.kind === 'line' || step.kind === 'circle' ? 1800 : 600;
 }
+
+// Phase A audit (E5): durationFor()'s flat per-step constants have no ceiling on a whole
+// playSteps() call — N-Gon/Semicircle Division at n=12 summed to ~75.6s of unskippable
+// animation (measured: 11 division points + 21 rays/sides/semicircle + 10 arc-cuts). Every
+// OTHER construction's own default already ran 22-37s, not just the n=12 extreme.
+// PLAY_BUDGET_MS caps one playSteps() CALL, not one step — durationFor()'s per-kind values
+// stay meaningful (Step Through still shows a proper compass sweep), but a call whose steps
+// sum past the budget gets every step's duration scaled down by the same factor, so relative
+// pacing (arc vs point) is preserved. Applied UNIFORMLY to every call, Play All's whole-recipe
+// call and Step Through's one-slide call alike — no special-casing by caller. In practice this
+// means Play All (which hands the whole recipe) is the one that visibly compresses; almost
+// every individual Step Through slide is already well under budget so it renders at
+// durationFor()'s stated pace unchanged. Two slides are the exception, both only at the N-Gon
+// slider's n=12 ceiling: Semicircle Division's final "Join every side" slide (11 lines, 20.4s
+// raw) and Perpendicular Bisector's "cut every vertex" slide (12 arcs, 24s raw) — both exceed
+// PLAY_BUDGET_MS on their own and get the same mild, budget-respecting compression Play All
+// gets. That is a feature, not a gap: it means NO single reveal, slide or full recipe, ever
+// runs unbounded — which is the actual outcome this fix is for. Verified numerically for every
+// (method, n) combination, not just the n=12 case — see the topic's DESIGN.md §8.
+// Rejected: lowering durationFor()'s constants instead — a flat cut from 1800->1100ms only
+// takes n=12 to ~46s, it doesn't solve the actual "no ceiling" problem, and it slows down
+// every short construction that never needed it.
+const PLAY_BUDGET_MS = 20000;
+const MIN_STEP_MS = 200; // floor so a future, larger recipe can't compress a step to a flicker
 
 /** Build (but do not reveal) the SVG element for one recipe step. Returns { node, reveal,
  *  finalize } where reveal(t) sets the 0..1 draw-on progress and finalize() removes any
@@ -765,6 +791,13 @@ export function playSteps(group, steps, { onComplete, chromeScale = 1 } = {}) {
   let cancelled = false;
   let activeTween = null;
 
+  // PLAY_BUDGET_MS caps THIS CALL's total draw-on time, not any single step (see the const's
+  // own comment above). A one-slide Step Through slice is always far under budget, so
+  // timeScale lands at 1 there and per-slide pacing is untouched; a full-recipe Play All call
+  // scales down uniformly so relative pacing (arc vs point) survives the compression.
+  const totalMs = resolvedSteps.reduce((sum, s) => sum + durationFor(s), 0);
+  const timeScale = totalMs > PLAY_BUDGET_MS ? PLAY_BUDGET_MS / totalMs : 1;
+
   function playAt(i) {
     if (cancelled) return;
     if (i >= resolvedSteps.length) { onComplete?.(); return; }
@@ -773,7 +806,7 @@ export function playSteps(group, steps, { onComplete, chromeScale = 1 } = {}) {
     if (node) ink.appendChild(node);
     if (labelNode) labels.appendChild(labelNode);
     activeTween = tween({
-      from: 0, to: 1, duration: durationFor(step), ease: easeDraw,
+      from: 0, to: 1, duration: Math.max(MIN_STEP_MS, durationFor(step) * timeScale), ease: easeDraw,
       onUpdate: reveal,
       onComplete: () => { finalize(); playAt(i + 1); },
     });
