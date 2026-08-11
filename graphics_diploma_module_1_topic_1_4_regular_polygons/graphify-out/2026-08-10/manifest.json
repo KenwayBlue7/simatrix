@@ -10,13 +10,13 @@
     "semantic_hash": ""
   },
   "src/constructions.js": {
-    "mtime": 1786386968.5620239,
-    "ast_hash": "473df0799fac4ca98bca8455bea5a1f7",
+    "mtime": 1786383224.05059,
+    "ast_hash": "261a6a36d98fa866f66a77a98fd1e0af",
     "semantic_hash": ""
   },
   "src/main.js": {
-    "mtime": 1786389969.1098216,
-    "ast_hash": "ef289a29d1bceec6eacdb86f1d27eae2",
+    "mtime": 1786353821.9191813,
+    "ast_hash": "afc960a9b622c65eed7f909a537a8354",
     "semantic_hash": ""
   },
   "src/onboarding.js": {
@@ -30,13 +30,13 @@
     "semantic_hash": ""
   },
   "src/problems.js": {
-    "mtime": 1786385121.4358516,
-    "ast_hash": "9b03a8186eed3dea7d4e5a9c4578abe2",
+    "mtime": 1785488362.552361,
+    "ast_hash": "a4636bbd73444be9888162933e613170",
     "semantic_hash": ""
   },
   "src/renderConstruction.js": {
-    "mtime": 1786390180.0552733,
-    "ast_hash": "8554c16165b56a3abadc672f093c89f6",
+    "mtime": 1786353656.3642063,
+    "ast_hash": "c531c085db8ca115601534d8ee58c58e",
     "semantic_hash": ""
   },
   "src/stepper.js": {
@@ -50,8 +50,8 @@
     "semantic_hash": ""
   },
   "src/uiManager.js": {
-    "mtime": 1786390057.39547,
-    "ast_hash": "e2fb34a606496f13860b347406a89a70",
+    "mtime": 1786353656.3642063,
+    "ast_hash": "1d63fbc83dcd6f667931e666da0e88a5",
     "semantic_hash": ""
   },
   "src/viewTransform.js": {
@@ -60,23 +60,23 @@
     "semantic_hash": ""
   },
   "CLAUDE.md": {
-    "mtime": 1786390270.705512,
-    "ast_hash": "57555195097d112dcb5e76d440f5bf1e",
+    "mtime": 1786354157.7550313,
+    "ast_hash": "0a6607fd1a18db588b2c059bb2e46d11",
     "semantic_hash": ""
   },
   "DESIGN.md": {
-    "mtime": 1786390231.4857192,
-    "ast_hash": "8c3ac1950931bef2c11d9120dddf18b6",
+    "mtime": 1786354185.7778404,
+    "ast_hash": "f9fef705142e85258ebeab04747b69df",
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1786388153.7612576,
-    "ast_hash": "48b404aa4b90aa4624aa98980a122aff",
+    "mtime": 1786353656.3642063,
+    "ast_hash": "da7f92b2af9e6c4049cf74c083aa3281",
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1786390313.0479298,
-    "ast_hash": "8a6dc8de7143e21d80c3a657ad22c056",
+    "mtime": 1786383256.0391738,
+    "ast_hash": "23babafe7143510915bcc80f0a00e17b",
     "semantic_hash": ""
   }
 }

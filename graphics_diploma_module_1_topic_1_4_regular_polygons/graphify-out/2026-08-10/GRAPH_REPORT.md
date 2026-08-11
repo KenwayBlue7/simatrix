@@ -1,11 +1,11 @@
-# Graph Report - graphics_diploma_module_1_topic_1_4_regular_polygons  (2026-08-11)
+# Graph Report - graphics_diploma_module_1_topic_1_4_regular_polygons  (2026-08-10)
 
 ## Corpus Check
-- 15 files · ~42,605 words
+- 15 files · ~39,759 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 179 nodes · 325 edges · 14 communities (12 shown, 2 thin omitted)
+- 175 nodes · 320 edges · 17 communities (15 shown, 2 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 4 edges (avg confidence: 0.57)
 - Token cost: 0 input · 0 output
 
@@ -29,6 +29,9 @@
 - terms.js
 - anim.js
 - Changelog — Regular Polygons (graphics_diploma_module_1_topic_1_4_regular_polygons)
+- hexagonRaw
+- pentagonRaw
+- separateCoincidentLabels
 
 ## God Nodes (most connected - your core abstractions)
 1. `pentagonRaw()` - 18 edges
@@ -39,8 +42,8 @@
 6. `ngonRaw()` - 11 edges
 7. `dist()` - 10 edges
 8. `regularPolygonVertices()` - 10 edges
-9. `DESIGN.md — Diploma Engineering Graphics, Module 1 Topic 1.4: Regular Polygons (topic appendix)` - 9 edges
-10. `P()` - 8 edges
+9. `P()` - 8 edges
+10. `arcMark()` - 8 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `rebuild()` --calls--> `assignLabelPositions()`  [EXTRACTED]
@@ -57,19 +60,19 @@
 ## Import Cycles
 - None detected.
 
-## Communities (14 total, 2 thin omitted)
+## Communities (17 total, 2 thin omitted)
 
 ### Community 0 - "constructions.js"
-Cohesion: 0.13
-Nodes (42): ADR-0053, ADR-0143, ADR-0146, ADR-0147, ADR-0148, ADR-0157, angleDim(), angleOf() (+34 more)
+Cohesion: 0.15
+Nodes (15): ADR-0053, ADR-0143, ADR-0146, ADR-0147, ADR-0148, ADR-0157, applyTransform(), calibratedScale() (+7 more)
 
 ### Community 1 - "main.js"
 Cohesion: 0.08
-Nodes (20): ADR-0002, ADR-0004, dynamicLayer, givenLayer, ADR-0078, ADR-0095, ADR-0145, ADR-0155 (+12 more)
+Nodes (19): ADR-0002, ADR-0004, dynamicLayer, givenLayer, ADR-0078, ADR-0095, ADR-0145, ADR-0155 (+11 more)
 
 ### Community 2 - "renderConstruction.js"
 Cohesion: 0.14
-Nodes (27): angledimCandidates(), angledimLabelCenter(), annoLabelBox(), arcObstacles(), arcPathD(), assignLabelPositions(), boxesOverlap(), buildStepNode() (+19 more)
+Nodes (26): angledimCandidates(), angledimLabelCenter(), annoLabelBox(), arcObstacles(), arcPathD(), assignLabelPositions(), boxesOverlap(), buildStepNode() (+18 more)
 
 ### Community 3 - "CLAUDE.md — Simatrix · Diploma Engineering Graphics, Module 1 Topic 1.4: Regular Polygons"
 Cohesion: 0.15
@@ -84,8 +87,8 @@ Cohesion: 0.29
 Nodes (7): tick(), announce(), frame(), init(), setupVerifyActions(), setupVerifyGate(), setupWizardToggle()
 
 ### Community 6 - "DESIGN.md — Diploma Engineering Graphics, Module 1 Topic 1.4: Regular Polygons (topic appendix)"
-Cohesion: 0.20
-Nodes (9): 1. Subject, 2. Construction-line token map (reused from Topic 1.1/1.2/1.3, unchanged), 3. The method switcher (new to this topic), 4. Step Through (new, N-Gon construction only), 5. Post-construction de-emphasis + label layering (new, ADR-145), 6. Step note — concept blurb for Given/Construct (new, ADR-154), 7. Default view — content-fitted, capped (new, ADR-155), 8. Playback pacing and the skip control (new, ADR-159) (+1 more)
+Cohesion: 0.22
+Nodes (8): 1. Subject, 2. Construction-line token map (reused from Topic 1.1/1.2/1.3, unchanged), 3. The method switcher (new to this topic), 4. Step Through (new, N-Gon construction only), 5. Post-construction de-emphasis + label layering (new, ADR-145), 6. Step note — concept blurb for Given/Construct (new, ADR-154), 7. Default view — content-fitted, capped (new, ADR-155), DESIGN.md — Diploma Engineering Graphics, Module 1 Topic 1.4: Regular Polygons (topic appendix)
 
 ### Community 7 - "rebuild"
 Cohesion: 0.25
@@ -104,11 +107,23 @@ Cohesion: 0.29
 Nodes (5): active, cancelAll(), easeDraw, easeStandard, tween()
 
 ### Community 13 - "Changelog — Regular Polygons (graphics_diploma_module_1_topic_1_4_regular_polygons)"
-Cohesion: 0.33
-Nodes (5): 2026-08-08, 2026-08-09, 2026-08-10, 2026-08-11, Changelog — Regular Polygons (graphics_diploma_module_1_topic_1_4_regular_polygons)
+Cohesion: 0.40
+Nodes (4): 2026-08-08, 2026-08-09, 2026-08-10, Changelog — Regular Polygons (graphics_diploma_module_1_topic_1_4_regular_polygons)
+
+### Community 14 - "hexagonRaw"
+Cohesion: 0.27
+Nodes (14): angleDim(), angleOf(), applyOutwardHints(), arcMark(), awayFrom(), buildSemicircleDivision(), deg2rad(), dim() (+6 more)
+
+### Community 15 - "pentagonRaw"
+Cohesion: 0.47
+Nodes (10): buildPerpendicularBisector(), circleIntersect(), circleStep(), dist(), drawCircumcircle(), L(), P(), pentagonRaw() (+2 more)
+
+### Community 16 - "separateCoincidentLabels"
+Cohesion: 0.67
+Nodes (3): coincidentBoxesOverlap(), coincidentLabelBox(), separateCoincidentLabels()
 
 ## Knowledge Gaps
-- **66 isolated node(s):** `active`, `easeStandard`, `scaleCache`, `ADR-0143`, `ADR-0095` (+61 more)
+- **62 isolated node(s):** `active`, `easeStandard`, `scaleCache`, `ADR-0143`, `ADR-0095` (+57 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
@@ -116,16 +131,12 @@ Nodes (5): 2026-08-08, 2026-08-09, 2026-08-10, 2026-08-11, Changelog — Regular
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `assignLabelPositions()` connect `renderConstruction.js` to `main.js`, `rebuild`?**
-  _High betweenness centrality (0.043) - this node is a cross-community bridge._
+  _High betweenness centrality (0.044) - this node is a cross-community bridge._
 - **Why does `renderStatic()` connect `renderConstruction.js` to `main.js`, `rebuild`?**
-  _High betweenness centrality (0.006) - this node is a cross-community bridge._
-- **Why does `playSteps()` connect `renderConstruction.js` to `main.js`?**
-  _High betweenness centrality (0.006) - this node is a cross-community bridge._
+  _High betweenness centrality (0.007) - this node is a cross-community bridge._
 - **What connects `active`, `easeStandard`, `scaleCache` to the rest of the system?**
-  _66 weakly-connected nodes found - possible documentation gaps or missing edges._
-- **Should `constructions.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.1331923890063425 - nodes in this community are weakly interconnected._
+  _62 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `main.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.08 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.08333333333333333 - nodes in this community are weakly interconnected._
 - **Should `renderConstruction.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.14285714285714285 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.1402116402116402 - nodes in this community are weakly interconnected._
