@@ -260,7 +260,19 @@ function applyTransform(steps, scale, tx, ty) {
   const tp = (p) => ({ x: p.x * scale + tx, y: p.y * scale + ty });
   const tm = (v) => v * scale; // a magnitude (radius/offset) — scales, never translates
   return steps.map((step) => {
-    if (step.kind === 'point' || step.kind === 'label') return { ...step, p: tp(step.p) };
+    // dx/dy is a point's label-offset HINT (awayFrom()/applyOutwardHints(), raw pre-scale
+    // units) — must scale in lockstep with p or it ends up interpreted as final-space px
+    // against an already-scaled point, the same magnitude-scaling `tm()` already gives
+    // 'dim'/'circle'/'arc' below. Unscaled, a fixed raw hint reads oversized on any tightly-
+    // packed raw-space point cluster (e.g. the bisector ladder points, ADR-153) even though
+    // it looks fine on widely-spaced points (e.g. polygon vertices) at the exact same magnitude.
+    if (step.kind === 'point' || step.kind === 'label') {
+      return {
+        ...step, p: tp(step.p),
+        dx: step.dx != null ? tm(step.dx) : step.dx,
+        dy: step.dy != null ? tm(step.dy) : step.dy,
+      };
+    }
     if (step.kind === 'line') return { ...step, a: tp(step.a), b: tp(step.b) };
     if (step.kind === 'circle' || step.kind === 'arc') {
       return { ...step, center: tp(step.center), radius: tm(step.radius) };
@@ -394,6 +406,22 @@ function coincidentBoxesOverlap(a, b, pad = 1) {
   return a.x0 - pad < b.x1 && a.x1 + pad > b.x0 && a.y0 - pad < b.y1 && a.y1 + pad > b.y0;
 }
 
+// Phase A verify (2026-08-11): this function proves clearance in RAW pre-scale space using
+// labelBox()'s magic constants unscaled, while the render judges the SAME box scaled by
+// chromeScale (renderConstruction.js's labelBox()) after dx/dy has already been multiplied by
+// calibratedScale (applyTransform()). The two scales aren't the same factor, so the true error
+// is chromeScale/calibratedScale, not the 1/calibratedScale a naive read suggests. Measured for
+// N-Gon (the only construction that ever emits a coincident group — pentagon/hexagon emit none):
+// calibratedScale = 0.900, chromeScale ranges 0.5 (CHROME_SCALE_FLOOR) to 1 (worst-case params),
+// so the render is up to 11% tighter than this search proves at large side/n and up to 80%
+// LOOSER at small side/n. Exhaustively swept (both methods × n 3-12 × every integer side in
+// range): zero overlaps at either the hint stage or after assignLabelPositions()'s real search,
+// minimum clearance 1.22 units. The margin comes from this function's own `radius += 2` quantum
+// and from coincidentBoxesOverlap()'s `pad = 1`, which is NOT scaled by chromeScale either — pad
+// alone is worth ~1.11 raw units at the worst case, almost exactly covering the shortfall. A
+// future change to `pad`, `CHROME_SCALE_FLOOR`, or the `radius += 2` step should re-run that
+// sweep (constructions.js's own exports make it a small node script) rather than assume the
+// margin still holds.
 function separateCoincidentLabels(steps, O, eps = 1e-6) {
   const groups = [];
   for (const step of steps) {
@@ -502,6 +530,12 @@ function walkVerticesByCompass(vertices, n) {
  *  has no triangle example), so a single point at the true apothem(3) stands in for the whole
  *  ladder rather than showing point 4's unrelated radius.
  *
+ *  "O" denotes the circumcentre topic-wide (drawCircumcircle() is its only other emitter) —
+ *  this method's AB-midpoint is drawn but deliberately left UNLABELLED rather than reusing that
+ *  symbol for a point that is the circumcentre only at n=∞ (ADR-157). The real circumcentre this
+ *  method reaches is the numbered ladder rung itself (point 4/5/6…nn), never separately labelled
+ *  "O" — the ladder number IS its name here.
+ *
  *  Slide grouping (Step Through, ADR-095 addendum): Fig 5.24 is a STATIC book page (a
  *  9-instruction numbered list for its own n=8 octagon example), not a slide deck — unlike
  *  buildSemicircleDivision()'s polygon.pdf source, there is no literal per-slide PDF to match
@@ -523,6 +557,23 @@ function buildPerpendicularBisector(A, B, s, nn) {
   const upDir = { x: 0, y: -1 }; // matches regularPolygonVertices' perpDir for a horizontal
   const along = (h) => ({ x: M.x + upDir.x * h, y: M.y + upDir.y * h }); // AB, A left of B
   const apothem = (k) => s / (2 * Math.tan(Math.PI / k));
+  // Every ladder point (3/4/5/6/7…nn) sits, by construction, ON the bisector line itself —
+  // applyOutwardHints()'s default "away from O" hint is RADIAL, which for a point collinear
+  // with O points straight at the ladder's own neighbouring point (e.g. point 5's hint aims
+  // dead at point 4 or 6), guaranteeing a first-ring collision and forcing
+  // candidateOffsets()'s widening-ring search to escalate outward. A Phase C audit (this
+  // session, ADR-153 addendum) tested fixing the DIRECTION alone (tangential instead of
+  // radial) first — measured no real improvement (91-110/141 ladder labels still escalated
+  // across every hint angle tried, n=3..12 × 3 side values): the true driver is
+  // assignLabelPositions()'s sequential greedy placement, 3+ labels genuinely competing for
+  // the same ~10-15 unit vertical corridor, not the hint's own angle. What the same sweep DID
+  // show working: a smaller base MAGNITUDE — halving it (6 → 3) roughly halved both how often
+  // escalation triggers (89→58/141) and its worst case (13.2→6.6, since candidateOffsets()'s
+  // ring multipliers are relative) — the ×2.2 worst ring is only ever as far as this base
+  // makes it. Sideways (perpendicular to the vertical bisector) still beats radial outright
+  // for the same reason as ADR-148's tangential coincident-point split: it can never point AT
+  // another ladder point, only ever past one's side.
+  const ladderHint = { dx: -3, dy: 0 };
 
   const r = Math.max(s * 0.62, s / 2 + 1);
   const cands = sortByY(circleIntersect(A, r, B, r));
@@ -535,13 +586,35 @@ function buildPerpendicularBisector(A, B, s, nn) {
     invalid = 'Could not construct the perpendicular bisector for this side length.';
   } else {
     const [upper, lower] = cands;
-    mark('Construct the perpendicular bisector of AB at O.', () => {
+    // The line drawn here has to carry the WHOLE ladder below, not just the two compass-arc
+    // crossings — `[upper, lower]` alone reaches only ~0.366*s off M (Phase A audit), while the
+    // ladder's own topmost rung sits well past that for every nn>=4 (0.5*s at point 4, up to
+    // 1.866*s at point 12), leaving points 4/5/6/… floating off the end of a too-short segment
+    // with nothing under them. `topK` is the highest-numbered rung actually PLOTTED below (not
+    // always `nn`: nn===5 still plots point 6 as an intermediate rung before taking pt5's
+    // midpoint), so `apothem(topK)` is always >= every plotted rung's own height. `upper`/
+    // `lower` stay as their own point markers (the book shows both crossings) — only the LINE's
+    // far endpoint moves.
+    const topK = nn === 3 ? 3 : nn === 4 ? 4 : Math.max(nn, 6);
+    const ladderTop = along(apothem(topK) + s * 0.08);
+    mark('Construct the perpendicular bisector of AB.', () => {
+      // unobtrusive (Phase D audit, ADR-153 addendum): these 4 arcs exist to FIND the bisector,
+      // not to mark any one labelled point — upper/lower are unlabelled, so no point "owns"
+      // them the way point 4 owns its own arc below. But their wide 55°-half-span sweep passes
+      // right through the ladder's own neighbourhood, and unlike an owned arc (excluded by
+      // onOwnArc() geometrically, since a ladder point sits ON its own arc) these are only ever
+      // NEAR a ladder point, never on it — geometric self-exclusion can't reach them. Opting
+      // them out of the obstacle set entirely is what actually gets point 4 off ring 3 (verified
+      // via sweep: without this, point 4 stays at ring 3/mag 5.94 even with every other
+      // exemption applied — see ADR-153 addendum for the full trace).
       methodSteps.push(
-        arcMark(A, r, upper, 55), arcMark(A, r, lower, 55),
-        arcMark(B, r, upper, 55), arcMark(B, r, lower, 55),
-        L(upper, lower, 'move'),
+        { ...arcMark(A, r, upper, 55), unobtrusive: true },
+        { ...arcMark(A, r, lower, 55), unobtrusive: true },
+        { ...arcMark(B, r, upper, 55), unobtrusive: true },
+        { ...arcMark(B, r, lower, 55), unobtrusive: true },
+        L(lower, ladderTop, 'move'),
         P(upper, 'move'), P(lower, 'move'),
-        P(M, 'move', 'O'),
+        P(M, 'move'),
       );
     });
   }
@@ -551,14 +624,14 @@ function buildPerpendicularBisector(A, B, s, nn) {
     // The book's ladder starts at 4 (Fig 5.24 has no n=3 case) — for a triangle there is
     // nothing to build up to, so place the one point directly rather than showing point 4's
     // (wrong) radius and correcting it away.
-    mark('With centre O and the true apothem radius, mark point 3 (no ladder needed for a triangle).', () => {
+    mark("With AB's midpoint as centre, mark point 3 (no ladder needed for a triangle).", () => {
       ptFinal = along(apothem(3));
-      methodSteps.push(arcMark(M, dist(M, A), ptFinal, 40), P(ptFinal, 'move', '3'));
+      methodSteps.push(arcMark(M, dist(M, A), ptFinal, 40), P(ptFinal, 'move', '3', ladderHint));
     });
   } else {
-    mark('With centre O and radius OA, draw an arc to point 4.', () => {
+    mark("With AB's midpoint as centre and radius to A, draw an arc to point 4.", () => {
       const pt4 = along(apothem(4));
-      methodSteps.push(arcMark(M, dist(M, A), pt4, 40), P(pt4, 'move', '4'));
+      methodSteps.push(arcMark(M, dist(M, A), pt4, 40), P(pt4, 'move', '4', ladderHint));
       ptFinal = pt4;
     });
 
@@ -567,19 +640,19 @@ function buildPerpendicularBisector(A, B, s, nn) {
       let pt6;
       mark('With centre B and radius AB, draw a second arc to point 6.', () => {
         pt6 = along(apothem(6));
-        methodSteps.push(arcMark(B, s, pt6, 40), P(pt6, 'move', '6'));
+        methodSteps.push(arcMark(B, s, pt6, 40), P(pt6, 'move', '6', ladderHint));
         ptFinal = pt6;
       });
       mark('Find the midpoint of 4 to 6 — point 5.', () => {
         const pt5 = midpoint(pt4, pt6); // book's method: literal midpoint, not apothem(5)
-        methodSteps.push(P(pt5, 'move', '5'));
+        methodSteps.push(P(pt5, 'move', '5', ladderHint));
         ptFinal = nn === 5 ? pt5 : pt6;
       });
       if (nn >= 7) {
         mark(`Mark centre points 7, 8, … ${nn} at equal intervals up the bisector.`, () => {
           for (let k = 7; k <= nn; k++) {
             const ptK = along(apothem(k));
-            methodSteps.push(P(ptK, 'move', String(k)));
+            methodSteps.push(P(ptK, 'move', String(k), ladderHint));
             ptFinal = ptK;
           }
         });
@@ -662,7 +735,6 @@ function buildSemicircleDivision(A, B, s, dirAB, nn, divAngle) {
       const div = divisionPoint(i);
       methodSteps.push(P(div, 'move', String(i), awayFrom(A, div)));
     }
-    methodSteps.push(angleDim(A, B, divisionPoint(1), `${(180 / nn).toFixed(1)}°`, 'move', 7));
   });
 
   // One ray per division (1..n-1), extended a FIXED amount past whichever it needs to reach —
@@ -677,6 +749,16 @@ function buildSemicircleDivision(A, B, s, dirAB, nn, divAngle) {
 
   mark('Draw a line connecting A and the first division.', () => {
     methodSteps.push(L(A, rayTo(1), 'move'));
+    // radius 10, not the platform's usual 7-ish "small mark" default — this angle's own span
+    // (180°/n, as low as ~15° at n=12) makes for a short chord even at a normal radius; a
+    // smaller radius shrinks the chord further, to the point the arc reads as a stray dot next
+    // to its own label rather than a visible sweep between the two rays (Phase A follow-up:
+    // the render-side fix — renderConstruction.js's geometryObstacles() now including
+    // dim/angledim ink — keeps the label from sitting ON TOP of the arc, but a too-small arc
+    // is still hard to read even once uncovered). Staged in THIS slide, not the division slide
+    // above — an angledim mark needs both its legs already drawn (AB from the opening slide,
+    // A's own ray just above) or it floats with nothing to measure between (Phase A audit).
+    methodSteps.push(angleDim(A, B, divisionPoint(1), `${(180 / nn).toFixed(1)}°`, 'move', 10));
   });
 
   mark(`With radius AB and centre B, draw an arc to cut the line at ${letterFor(2)}.`, () => {
@@ -757,6 +839,7 @@ function pentagonRaw({ side, method }) {
       steps.push(arcMark(A, s, apex, 50), arcMark(B, s, apex, 50));
     }
     steps.push(P(apex, 'move', 'P'));
+    steps.push(L(A, apex, 'move'), L(B, apex, 'move')); // the legs each 60° mark below measures
     steps.push(angleDim(A, B, apex, '60°', 'move', 9), angleDim(B, A, apex, '60°', 'move', 9));
     steps.push(arcMark(M, dist(M, O), O, 40));
   }
@@ -785,6 +868,7 @@ function hexagonRaw({ side, method }) {
 
   if (method === 'compass') {
     steps.push(arcMark(A, s, O, 50), arcMark(B, s, O, 50));
+    steps.push(L(A, O, 'move'), L(B, O, 'move')); // the legs the 60° mark below measures
   } else {
     const rayA = pointAt(A, s * 1.2, angleOf(A, O));
     const rayB = pointAt(B, s * 1.2, angleOf(B, O));

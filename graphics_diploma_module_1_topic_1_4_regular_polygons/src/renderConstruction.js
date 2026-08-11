@@ -239,6 +239,7 @@ function buildStepNode(step, chromeScale = 1) {
         x: step.p.x + (step.dx ?? 4), y: step.p.y + (step.dy ?? -4),
         fill: roleColor(step.role), 'font-family': 'var(--font-sans)',
         'font-size': VERTEX_FONT * chromeScale, 'font-weight': 700,
+        'data-role': step.role,
       });
       labelNode.textContent = step.label;
     }
@@ -283,6 +284,7 @@ function buildStepNode(step, chromeScale = 1) {
       x: mid.x.toFixed(2), y: mid.y.toFixed(2),
       fill: color, 'font-family': 'var(--font-mono)', 'font-size': ANNO_FONT * chromeScale,
       'text-anchor': 'middle', 'dominant-baseline': 'middle',
+      'data-role': role,
     });
     label.textContent = text;
     // Label kept OUT of `group` (ink only) — returned as labelNode so the caller can route
@@ -324,6 +326,7 @@ function buildStepNode(step, chromeScale = 1) {
       y: (center.y + labelR * Math.sin(midAngle)).toFixed(2),
       fill: color, 'font-family': 'var(--font-mono)', 'font-size': ANNO_FONT * chromeScale,
       'text-anchor': 'middle', 'dominant-baseline': 'middle',
+      'data-role': role,
     });
     label.textContent = text;
     // Label kept OUT of `group` (ink only) — see the 'point' branch's comment, above.
@@ -373,6 +376,36 @@ function annoLabelBox(cx, cy, charCount, fontSize = 5.5) {
 
 function boxesOverlap(a, b, pad = 1) {
   return a.x0 - pad < b.x1 && a.x1 + pad > b.x0 && a.y0 - pad < b.y1 && a.y1 + pad > b.y0;
+}
+
+/** Whether `p` lies (within a small tolerance) ON the arc traced by center/radius/span — "this
+ *  point's own construction ink," the same not-a-collision idea a point's own dot already gets
+ *  (geometryObstacles()'s `owner: step` exclusion, below), extended to the compass arc that was
+ *  drawn TO REACH it. A point built by `arcMark(center, radius, aimPoint, …)` sits exactly on
+ *  that arc's curve by construction — e.g. the Perpendicular Bisector ladder's point 4/6 (Phase
+ *  D audit, ADR-153 addendum): without this, the label-collision search could never get closer
+ *  than ~2 units to its own dot before grazing the very arc that placed it. Purely geometric
+ *  (no step-identity threading needed) so it generalizes to every arc-then-point call site at
+ *  once — vertex letters, semicircle-division numbers, pentagon's apex — not just the ladder. */
+function onOwnArc(p, center, radius, startAngle, endAngle, tol = 0.3) {
+  const d = Math.hypot(p.x - center.x, p.y - center.y);
+  if (Math.abs(d - radius) > tol) return false;
+  let a = Math.atan2(p.y - center.y, p.x - center.x);
+  const s = startAngle, e = endAngle;
+  while (a < s - 0.01) a += 2 * Math.PI;
+  while (a > e + 0.01) a -= 2 * Math.PI;
+  return a >= s - 0.01 && a <= e + 0.01;
+}
+
+/** Same idea as onOwnArc(), for a straight line — whether `p` lies on segment a-b. Covers a
+ *  point built to sit ON a drawn line (e.g. every rung of the ladder sits on the bisector line
+ *  connecting them all). */
+function onOwnSegment(p, a, b, tol = 0.3) {
+  const len2 = (b.x - a.x) ** 2 + (b.y - a.y) ** 2 || 1;
+  const t = ((p.x - a.x) * (b.x - a.x) + (p.y - a.y) * (b.y - a.y)) / len2;
+  if (t < -0.05 || t > 1.05) return false;
+  const px = a.x + t * (b.x - a.x), py = a.y + t * (b.y - a.y);
+  return Math.hypot(p.x - px, p.y - py) < tol;
 }
 
 /** A handful of small boxes sampled along a line segment — a cheap stand-in for "this ink is
@@ -504,26 +537,68 @@ function angledimCandidates(step) {
   return out;
 }
 
-/** Every obstacle the drawn INK itself presents to a label — points, lines, arcs, circles —
- *  built once from `steps` before any label is placed (the geometry doesn't move during this
- *  pass). Richer than "marker dots only": a label sitting ON a ray, an arc, or a circle read
- *  just as broken as one sitting on another label (Phase A audit, ADR-145). Each box carries
- *  an `owner` (the step it came from, or null for non-point ink) so a point's OWN candidate
- *  search can exclude its OWN dot: a label sitting close to the point it names is expected,
- *  not a collision, and the small vertical/horizontal component a real outward hint can have
- *  (unlike the old fixed +4/-4 default, which always happened to clear its own dot by
- *  construction) can otherwise self-reject and fall through to an oddly-rotated fallback. */
-function geometryObstacles(steps) {
+/** Every obstacle the drawn INK itself presents to a label — points, lines, arcs, circles,
+ *  and (unlike the rest) a dim/angledim mark's OWN ink — built once from `steps` before any
+ *  label is placed (the geometry doesn't move during this pass). Richer than "marker dots
+ *  only": a label sitting ON a ray, an arc, or a circle read just as broken as one sitting on
+ *  another label (Phase A audit, ADR-145). Each box carries an `owner` (the step it came from,
+ *  or null for ownerless ink) so a point's OWN candidate search can exclude its OWN dot: a
+ *  label sitting close to the point it names is expected, not a collision, and the small
+ *  vertical/horizontal component a real outward hint can have (unlike the old fixed +4/-4
+ *  default, which always happened to clear its own dot by construction) can otherwise
+ *  self-reject and fall through to an oddly-rotated fallback.
+ *
+ *  A dim/angledim mark's own ink is the OPPOSITE case from a point's dot — its label is
+ *  supposed to sit clear of the very arc/line it annotates, not hug it — so those boxes stay
+ *  tagged with their owning step but assignLabelPositions() does NOT filter them out of that
+ *  step's own search the way it does for 'point'. Before this, dim/angledim ink was entirely
+ *  absent from `occupied`, so a label's search never detected its own mark underneath it and
+ *  kept the very first (smallest-push) candidate — invisible on a normal-sized arc, but a
+ *  small-radius angledim (e.g. this topic's 30°/120° N-Gon marks, ADR-14x Phase A follow-up)
+ *  could have a chord shorter than its own label text, so the label fully occluded the arc it
+ *  was meant to be labelling, reading as "the arc is missing"/"wrong position" even though the
+ *  underlying rayA/rayB sweep was correct. `chromeScale` mirrors buildStepNode()'s own
+ *  'angledim' radius exactly (see angledimLabelCenter()'s comment) — without it this obstacle
+ *  would be sized for the PRE-chrome-shrink arc, larger than what's actually drawn. */
+function geometryObstacles(steps, chromeScale = 1) {
   const occupied = [];
   for (const step of steps) {
     if (step.kind === 'point') {
       occupied.push({ ...pointBox(step.p, (step.role === 'result' ? 1.7 : 1.1) + 1), owner: step });
     } else if (step.kind === 'line') {
-      for (const b of segmentObstacles(step.a, step.b)) occupied.push({ ...b, owner: null });
+      // `unobtrusive` (Phase D, ADR-153 addendum): scaffolding ink drawn to FIND a construction
+      // (e.g. the Perpendicular Bisector's own compass arcs, below) rather than ink that IS a
+      // labelled point's answer — opts out of the obstacle set entirely, for every label, not
+      // just the one point it happens to sit nearest. Distinct from onOwnSegment/onOwnArc below,
+      // which excise ink a SPECIFIC point sits exactly on; this is for ink no point sits on but
+      // that still crowds a busy neighbourhood (verified via sweep, ADR-153 addendum: without
+      // it the ladder's own point 4 stays stuck three rings out even after its own arc/line are
+      // excluded, blocked purely by nearby scaffold arcs it never touches).
+      if (step.unobtrusive) continue;
+      for (const b of segmentObstacles(step.a, step.b)) occupied.push({ ...b, owner: null, lineA: step.a, lineB: step.b });
     } else if (step.kind === 'arc') {
-      for (const b of arcObstacles(step.center, step.radius, step.startAngle, step.endAngle)) occupied.push({ ...b, owner: null });
+      if (step.unobtrusive) continue;
+      for (const b of arcObstacles(step.center, step.radius, step.startAngle, step.endAngle)) {
+        occupied.push({ ...b, owner: null, arcCenter: step.center, arcRadius: step.radius, arcStart: step.startAngle, arcEnd: step.endAngle });
+      }
     } else if (step.kind === 'circle') {
       for (const b of arcObstacles(step.center, step.radius, -Math.PI, Math.PI)) occupied.push({ ...b, owner: null });
+    } else if (step.kind === 'dim') {
+      // The offset dimension line, not the raw a-b segment — matches dimLabelCenter()'s oa/ob.
+      const len = Math.hypot(step.b.x - step.a.x, step.b.y - step.a.y) || 1;
+      const px = -(step.b.y - step.a.y) / len;
+      const py = (step.b.x - step.a.x) / len;
+      const off = step.offset ?? 10;
+      const oa = { x: step.a.x + px * off, y: step.a.y + py * off };
+      const ob = { x: step.b.x + px * off, y: step.b.y + py * off };
+      for (const b of segmentObstacles(oa, ob)) occupied.push({ ...b, owner: step });
+    } else if (step.kind === 'angledim') {
+      const a0 = Math.atan2(step.rayA.y - step.center.y, step.rayA.x - step.center.x);
+      let diff = Math.atan2(step.rayB.y - step.center.y, step.rayB.x - step.center.x) - a0;
+      while (diff > Math.PI) diff -= 2 * Math.PI;
+      while (diff < -Math.PI) diff += 2 * Math.PI;
+      const radius = (step.radius ?? ANGLEDIM_ARC_RADIUS) * chromeScale;
+      for (const b of arcObstacles(step.center, radius, a0, a0 + diff)) occupied.push({ ...b, owner: step });
     }
   }
   return occupied;
@@ -548,13 +623,23 @@ function geometryObstacles(steps) {
  *  candidateOffsets() and pushCandidates() try the step's OWN already-resolved dx/dy/labelPush
  *  first, so the second pass just re-confirms it. */
 export function assignLabelPositions(steps, chromeScale = 1) {
-  const occupied = geometryObstacles(steps);
+  const occupied = geometryObstacles(steps, chromeScale);
   const annoFont = ANNO_FONT * chromeScale; // must match buildStepNode()'s dim/angledim font exactly
   const resolved = [];
   for (const step of steps) {
     if (step.kind === 'point' && step.label) {
       const candidates = candidateOffsets(step.dx, step.dy);
-      const relevant = occupied.filter((o) => o.owner !== step); // exclude this point's OWN dot
+      const relevant = occupied.filter((o) => {
+        if (o.owner === step) return false; // exclude this point's OWN dot
+        // Exclude the arc/line ink that PLACED this point too, same reasoning (Phase D audit,
+        // ADR-153 addendum) — a compass-constructed point sits exactly on the ink that found
+        // it, so grazing that ink isn't a real collision. Geometric, not identity-based, so it
+        // covers every arc-then-point call site (ladder, vertex letters, division numbers,
+        // pentagon's apex) without threading an owner reference through each one.
+        if (o.arcCenter && onOwnArc(step.p, o.arcCenter, o.arcRadius, o.arcStart, o.arcEnd)) return false;
+        if (o.lineA && onOwnSegment(step.p, o.lineA, o.lineB)) return false;
+        return true;
+      });
       let chosen = candidates[0];
       for (const c of candidates) {
         if (!relevant.some((b) => boxesOverlap(labelBox(step, c.dx, c.dy, chromeScale), b))) { chosen = c; break; }
