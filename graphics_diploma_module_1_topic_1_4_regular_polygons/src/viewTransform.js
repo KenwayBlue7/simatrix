@@ -14,12 +14,22 @@ const BASE_H = 200;
 const MIN_ZOOM = 0.4; // zoom OUT to 2.5x the default view area, to see past wide overshoot/pan
 const MAX_ZOOM = 5;
 
-/** @param {SVGSVGElement} svg  @param {HTMLElement} viewportEl  drag/wheel listener target */
-export function initViewTransform(svg, viewportEl) {
+/** @param {SVGSVGElement} svg  @param {HTMLElement} viewportEl  drag/wheel listener target
+ *  @param {() => void} [onResetRequest]  ADR-155: dblclick/`0` call this instead of the raw
+ *  resetView() when given, so a caller that opens on a content-fitted default (main.js's
+ *  defaultFit()) can route "reset" back to that fit instead of the bare 200x200 box. Falls
+ *  back to resetView() itself when omitted (or when there's no construction to fit). */
+export function initViewTransform(svg, viewportEl, onResetRequest) {
   const ac = new AbortController();
   const listen = { signal: ac.signal, passive: false };
 
   let vx = 0, vy = 0, vw = BASE_W, vh = BASE_H;
+  // ADR-155: true once the user has manually wheel-zoomed, dragged, pinched, or arrow-key
+  // panned/zoomed — main.js's rebuild() checks this before re-applying its content-fit default,
+  // the same "leave a comfortable manual view alone" rule ensureVisible() already applies at
+  // Play time. Only clearRequest() (via clearUserAdjusted()) turns it back off; fitToBounds()
+  // deliberately does NOT clear it — a caller decides explicitly when a fit counts as "fresh".
+  let userAdjusted = false;
 
   function apply() {
     svg.setAttribute('viewBox', `${vx.toFixed(2)} ${vy.toFixed(2)} ${vw.toFixed(2)} ${vh.toFixed(2)}`);
@@ -37,6 +47,8 @@ export function initViewTransform(svg, viewportEl) {
     const zoomNow = BASE_W / vw;
     const zoomNext = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, zoomNow * factor));
     if (zoomNext === zoomNow) return;
+    userAdjusted = true; // ADR-155: wheel/pinch/keyboard zoom — every caller of zoomAt() is a
+                          // deliberate user gesture, so main.js's content-fit default backs off.
     const { x: userX, y: userY, relX, relY } = toUser(clientX, clientY);
     const newW = BASE_W / zoomNext;
     const newH = BASE_H / zoomNext;
@@ -65,29 +77,40 @@ export function initViewTransform(svg, viewportEl) {
     apply();
   }
 
-  /** If `bounds` (a {minX,maxX,minY,maxY} box in drawing units, from renderConstruction.js's
-   *  computeBounds()) isn't fully inside the CURRENT view, zoom/pan out just enough to bring
-   *  it into frame — otherwise leaves the view untouched. main.js calls this right before
-   *  Play, so a construction the student zoomed/panned away from doesn't animate partly (or
-   *  fully) out of sight. Never zooms IN past the box's own fit, only out. */
-  function ensureVisible(bounds, margin = 10) {
-    // The "already visible" check uses the RAW bounds, not margin-padded — otherwise a
-    // construction whose bounds exactly match the default view would still "not fit" (the
-    // margin pushes past it) and re-fit on every single Play, even at 1x/no pan. Margin
-    // only widens the frame once a re-fit is actually needed, for a comfortable border.
-    const fits = bounds.minX >= vx && bounds.maxX <= vx + vw && bounds.minY >= vy && bounds.maxY <= vy + vh;
-    if (fits) return;
+  /** ADR-155: the unconditional framing core — zooms IN or OUT to fit `bounds` (a
+   *  {minX,maxX,minY,maxY} box in drawing units) at its own centre, clamped to
+   *  [MIN_ZOOM, maxZoom]. `maxZoom` defaults to MAX_ZOOM (uncapped) so a direct caller gets
+   *  the same ceiling every other zoom path respects; main.js's content-fit default passes a
+   *  tighter cap so small constructions don't zoom in enough to erase the "drawing grows with
+   *  side/n" size cue calibratedScale() (constructions.js) deliberately encodes. Does NOT
+   *  touch/clear userAdjusted — a caller decides explicitly when a fit counts as "fresh". */
+  function fitToBounds(bounds, { margin = 10, maxZoom = MAX_ZOOM } = {}) {
     const bx0 = bounds.minX - margin, bx1 = bounds.maxX + margin;
     const by0 = bounds.minY - margin, by1 = bounds.maxY + margin;
     const bw = Math.max(bx1 - bx0, 1e-6);
     const bh = Math.max(by1 - by0, 1e-6);
-    const zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.min(BASE_W / bw, BASE_H / bh)));
+    const zoom = Math.max(MIN_ZOOM, Math.min(maxZoom, Math.min(BASE_W / bw, BASE_H / bh)));
     vw = BASE_W / zoom;
     vh = BASE_H / zoom;
     vx = (bx0 + bx1) / 2 - vw / 2;
     vy = (by0 + by1) / 2 - vh / 2;
     clampPan();
     apply();
+  }
+
+  /** If `bounds` isn't fully inside the CURRENT view, zoom/pan out just enough to bring it
+   *  into frame via fitToBounds() — otherwise leaves the view untouched. main.js calls this
+   *  right before Play, so a construction the student zoomed/panned away from doesn't animate
+   *  partly (or fully) out of sight. Uncapped (MAX_ZOOM) — unlike main.js's own default-fit
+   *  call, this only ever zooms OUT to catch up to bounds already picked by something else. */
+  function ensureVisible(bounds, margin = 10) {
+    // The "already visible" check uses the RAW bounds, not margin-padded — otherwise a
+    // construction whose bounds exactly match the current view would still "not fit" (the
+    // margin pushes past it) and re-fit on every single Play, even at 1x/no pan. Margin
+    // only widens the frame once a re-fit is actually needed, for a comfortable border.
+    const fits = bounds.minX >= vx && bounds.maxX <= vx + vw && bounds.minY >= vy && bounds.maxY <= vy + vh;
+    if (fits) return;
+    fitToBounds(bounds, { margin, maxZoom: MAX_ZOOM });
   }
 
   viewportEl.addEventListener('wheel', (e) => {
@@ -138,6 +161,7 @@ export function initViewTransform(svg, viewportEl) {
       return;
     }
     if (!dragging || !lastClient) return;
+    userAdjusted = true; // ADR-155: a manual drag-pan, same rule as zoomAt()
     const rect = viewportEl.getBoundingClientRect();
     const dxUser = ((e.clientX - lastClient.x) / rect.width) * vw;
     const dyUser = ((e.clientY - lastClient.y) / rect.height) * vh;
@@ -163,7 +187,10 @@ export function initViewTransform(svg, viewportEl) {
   };
   viewportEl.addEventListener('pointerup', endDrag, listen);
   viewportEl.addEventListener('pointercancel', endDrag, listen);
-  viewportEl.addEventListener('dblclick', resetView, listen);
+  // ADR-155: dblclick/`0` mean "reset the view" — route that through onResetRequest when a
+  // caller supplied one (main.js's resetFit(), which re-fits to content AND clears
+  // userAdjusted) rather than always snapping back to the raw 200x200 box.
+  viewportEl.addEventListener('dblclick', () => (onResetRequest ? onResetRequest() : resetView()), listen);
 
   // Keyboard equivalents of drag-to-pan/scroll-to-zoom/double-click-reset (RULES §4.12 — an
   // interactive target needs a keyboard path, not just pointer/touch). Phase A audit found
@@ -176,10 +203,10 @@ export function initViewTransform(svg, viewportEl) {
   viewportEl.addEventListener('keydown', (e) => {
     const PAN_FRACTION = 0.08;
     switch (e.key) {
-      case 'ArrowLeft': vx -= vw * PAN_FRACTION; clampPan(); apply(); break;
-      case 'ArrowRight': vx += vw * PAN_FRACTION; clampPan(); apply(); break;
-      case 'ArrowUp': vy -= vh * PAN_FRACTION; clampPan(); apply(); break;
-      case 'ArrowDown': vy += vh * PAN_FRACTION; clampPan(); apply(); break;
+      case 'ArrowLeft': userAdjusted = true; vx -= vw * PAN_FRACTION; clampPan(); apply(); break;
+      case 'ArrowRight': userAdjusted = true; vx += vw * PAN_FRACTION; clampPan(); apply(); break;
+      case 'ArrowUp': userAdjusted = true; vy -= vh * PAN_FRACTION; clampPan(); apply(); break;
+      case 'ArrowDown': userAdjusted = true; vy += vh * PAN_FRACTION; clampPan(); apply(); break;
       case '+': case '=': {
         const rect = viewportEl.getBoundingClientRect();
         zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, 1.2);
@@ -190,12 +217,19 @@ export function initViewTransform(svg, viewportEl) {
         zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, 1 / 1.2);
         break;
       }
-      case '0': resetView(); break;
+      case '0': onResetRequest ? onResetRequest() : resetView(); break;
       default: return; // let every other key (Tab, Space on a focused ancestor, …) through
     }
     e.preventDefault();
   }, listen);
 
   apply();
-  return { resetView, ensureVisible, dispose: () => ac.abort() };
+  return {
+    resetView,
+    ensureVisible,
+    fitToBounds,
+    hasUserAdjusted: () => userAdjusted,
+    clearUserAdjusted: () => { userAdjusted = false; },
+    dispose: () => ac.abort(),
+  };
 }

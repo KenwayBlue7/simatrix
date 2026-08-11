@@ -65,7 +65,9 @@ const givenLayer = document.getElementById('given-layer');
 const dynamicLayer = document.getElementById('dynamic-layer');
 const statusEl = document.getElementById('sim-status');
 const svgEl = document.getElementById('construction-svg');
-const viewTransform = initViewTransform(svgEl, svgEl);
+// ADR-155: dblclick/`0` route through resetFit() (defined below, content-fit aware) instead
+// of viewTransform's own raw resetView() — see resetFit()'s own comment for why.
+const viewTransform = initViewTransform(svgEl, svgEl, () => resetFit());
 
 function announce(msg) { if (statusEl) statusEl.textContent = msg; }
 
@@ -106,6 +108,44 @@ function defaultsFor(construction) {
   };
 }
 
+// ADR-155: the fixed 200x200 viewBox default (viewTransform.js's own resetView()) under-fills
+// at every param combo below calibratedScale()'s (constructions.js) worst-case calibration —
+// Phase A audit measured Pentagon/Hexagon defaults filling ~65-75% of the frame and the N-Gon
+// default (s32/n6) only ~45%, worst at small side/small n. DEFAULT_FIT_MAX_ZOOM is capped
+// (not the uncapped fit module 2's development-of-surfaces topic uses) so a small construction
+// doesn't zoom in far enough to read the same on-screen size as the worst-case one — that would
+// erase calibratedScale()'s whole "the drawing grows with side/n" point (ADR-145). 1.6 was
+// picked by measuring: it lifts the N-Gon default to ~76% fill while the smallest N-Gon config
+// (s25/n3) still reads visibly smaller (~63%) than the largest (~92%) — screen size stays
+// monotonic in both side and n at this cap, verified across every construction x method.
+// Phase A verify (2026-08-11): these percentages are fill of the square 200x200 viewBox, not
+// of the rendered #sim-viewport — preserveAspectRatio="xMidYMid meet" letterboxes the square
+// into whatever aspect the wizard layout leaves (measured 0.75-1.5, never a ~2:1 desktop
+// assumption), so true on-screen fill is lower on whichever axis gutters (e.g. ~57% vertically
+// at the default with the wizard panel open). The cap's monotonicity argument is unaffected —
+// meet scales both axes by the same factor — so this is a labelling note, not a defect.
+const DEFAULT_FIT_MARGIN = 8;
+const DEFAULT_FIT_MAX_ZOOM = 1.6;
+
+/** Frames the active construction's full drawn bounds at load/select/reset time — the
+ *  content-aware replacement for a bare viewTransform.resetView() (ADR-155). No construction
+ *  picked yet -> falls back to resetView() itself (there's nothing to fit). */
+function defaultFit() {
+  if (!lastRecipe) { viewTransform.resetView(); return; }
+  viewTransform.fitToBounds(computeBounds(lastRecipe.steps), {
+    margin: DEFAULT_FIT_MARGIN,
+    maxZoom: DEFAULT_FIT_MAX_ZOOM,
+  });
+}
+
+/** What dblclick/`0` and the explicit "reset view" actions should do: clear any manual
+ *  zoom/pan the student made, THEN re-fit to content — resetView()'s raw 200x200 box would
+ *  otherwise be what a double-click snaps back to, undoing this whole fix. */
+function resetFit() {
+  viewTransform.clearUserAdjusted();
+  defaultFit();
+}
+
 function rebuild() {
   clear(givenLayer);
   clear(dynamicLayer);
@@ -142,6 +182,12 @@ function rebuild() {
       : 'Construction drawing area. Choose a construction to begin.',
   );
 
+  // ADR-155: re-fit on every rebuild (a side/n slider move included) so a growing construction
+  // can never outgrow a frame fitted for its previous, smaller size — but only while the
+  // student hasn't manually zoomed/panned; a deliberate manual view is left alone here exactly
+  // as ensureVisible() already leaves one alone at Play time (viewTransform.js).
+  if (!viewTransform.hasUserAdjusted()) defaultFit();
+
   stepper?.sync();
   problemLibrary?.sync();
 }
@@ -161,7 +207,8 @@ const simController = {
     state = { constructionId: construction.id, params: defaultsFor(construction) };
     rebuild();
     uiManager.sync({ rebuildFields: true });
-    viewTransform.resetView();
+    resetFit(); // ADR-155: a fresh construction always opens framed on it, any stale manual
+                // zoom/pan from the PREVIOUS construction cleared first
     announce(`${construction.label} selected. Adjust the given value, then continue.`);
   },
   onEnterConstructStep() { onboarding?.playHint(); },
@@ -258,7 +305,7 @@ const simController = {
     state = { constructionId: construction.id, params: defaultsFor(construction) };
     rebuild();
     uiManager.sync({ rebuildFields: true });
-    viewTransform.resetView();
+    resetFit(); // ADR-155
     stepper.goToGivenStep();
     announce(`${construction.label} selected for this problem. Adjust the given value to match, then continue.`);
   },
