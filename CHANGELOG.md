@@ -3,11 +3,36 @@
 All notable changes at the Simatrix project root (spanning Module1, Module2, and the
 topic deploy copies). Per-module changelogs live inside each module folder.
 
+## 2026-08-11
+- Fixed: `graphics_diploma_module_1_topic_1_4_regular_polygons`'s two most-clicked wizard
+  controls (`.construction-picker__item`, `.method-switcher__btn`) had no hover state and a
+  focused Play All button advanced a slide on Space instead of playing. See module CHANGELOG.md.
+- Fixed: `graphics_diploma_module_1_topic_1_4_regular_polygons`'s Play/Play All animation ran
+  unbounded (up to 75.6s at N-Gon n=12) with no in-flight signal or way to stop it; capped at a
+  20s per-call budget and both Play buttons now relabel to "Skip to end" while playing (ADR-159).
+  See module CHANGELOG.md.
+
 ## 2026-08-10
+- Fixed: `graphics_diploma_module_1_topic_1_4_regular_polygons`'s Problem Library — 6 of 8
+  problems targeted the same value as the construction's own default, so the self-check passed
+  before the student touched anything; targets restored to the source textbook's own numbers
+  (pentagon 40, hexagon 30, n-gon 25), all now genuinely requiring a slider move (ADR-158). See
+  module CHANGELOG.md.
 - Changed: `graphics_diploma_module_1_topic_1_4_regular_polygons`'s Step Through Back/Next pair
   is now laid out adjacently (Back beside Next, caption on its own row above), matching the
   Back/Next layout already used by Module2's method walkthrough and Topic 6's construction nav;
   also fixed Back sitting under the 44px interactive-target floor. See module CHANGELOG.md.
+- Fixed: `graphics_diploma_module_1_topic_1_4_regular_polygons`'s Construct view opened too far
+  zoomed out (fixed 200×200 default under-filled every config, worst on the N-Gon at ~45%);
+  default view now fits the construction's own content, capped at 1.6× so the drawing still
+  visibly grows with side/n (ADR-155). See module CHANGELOG.md.
+- Fixed: `graphics_diploma_module_1_topic_1_4_regular_polygons`'s Pentagon "Three Arcs"/"Two
+  Circles + Arc" and Hexagon "Compass + Circle" methods showed 60° angle marks with no ray drawn
+  between them — the marks now have their own visible legs, like every other method already had
+  (ADR-156). See module CHANGELOG.md.
+- Fixed: `graphics_diploma_module_1_topic_1_4_regular_polygons`'s Perpendicular Bisector method
+  mislabelled the AB midpoint "O", the symbol reserved topic-wide for the circumcentre; midpoint
+  now unlabelled, three slide captions reworded (ADR-157). See module CHANGELOG.md.
 
 ## 2026-08-09
 - Fixed: `graphics_module_3_topic_2_2_conic_sections`'s Step 6 stacked three loud `btn--primary`

@@ -3,13 +3,128 @@
 Per-module changelog, per this repo's own rule (root `CHANGELOG.md` header, `RULES.md` §8.2).
 Root `CHANGELOG.md` covers repo-wide entries; this file covers only this module.
 
+## 2026-08-11
+
+- Fixed: `.construction-picker__item` (Step 1) and `.method-switcher__btn` (Construct step) had
+  no `:hover` rule despite both declaring a `transition` for it — the two most-clicked controls
+  in the wizard were inert until clicked; added gated hover (root DESIGN.md §5.10), mirroring
+  the existing `.wizard-toggle:hover` pattern, skipping the already-selected button on each.
+- Fixed: focusing `#btn-play-all` and pressing Space advanced a Step Through slide instead of
+  playing the full animation (`#step-through`'s keydown handler excluded only `#btn-step-back`);
+  Play All now excluded too, matching its Enter-key behaviour.
+- Changed: Corrected ADR-155's default-view fill percentages in `src/main.js`, this folder's
+  `DESIGN.md` §7, and root `DECISIONS.md` — they describe fill of the square 200×200 viewBox, not
+  of the rendered viewport, which `xMidYMid meet` letterboxes to a 0.75–1.5 aspect (never the
+  ~2:1 a first read implied); largest-config figure corrected 95%→92%. No behaviour change.
+- Changed: Documented `separateCoincidentLabels()`'s raw-vs-scaled coordinate-space gap
+  (`chromeScale`/`calibratedScale` mismatch) in its header comment, with the measured worst-case
+  margin (11% tighter at large side/n) and why it doesn't currently cause an overlap. No
+  behaviour change.
+- Fixed: Play/Play All animation had no time ceiling (every construction's default ran 22–37s,
+  N-Gon/Semicircle Division at n=12 ran 75.6s) and no in-flight signal — the button stayed
+  "Play construction"/"Play All" throughout, and a second click silently cancelled and restarted.
+  `playSteps()` now caps any one call at a 20s budget (Step Through's own per-slide pacing is
+  practically unaffected — only two slides at n≥11 also exceed the budget on their own and get
+  the same mild compression); both Play buttons relabel to "Skip to end" while playing and jump
+  straight to the finished drawing on click. See ADR-159.
+- Fixed: Play All set Step Through's slide counter/caption to "fully drawn" the instant it was
+  clicked, not when the drawing actually finished, so Next disabled and Back enabled while slide
+  one of the animation was still on screen. Step Through now shows "Playing all steps…" with
+  Back/Next both disabled until Play All's animation genuinely completes.
+- Fixed: the Construct step's five recent additions (method switcher, step note, Step Through,
+  Play All, replay hint) all sat at the same flat 12px gap and the same grey text register, so
+  they read as one undifferentiated stack — one layout pass (Phase A U8–U12): a three-tier
+  spacing rhythm (8px same-control / 12px alternate-action / 16px between-widgets, no new
+  tokens), `#step-lead` promoted to body ink so it outranks the concept blurb below it,
+  `.construct-actions`' wrongly-centring `align-items` deleted so the replay hint reads as
+  left-aligned card prose, and Step Through's caption drops its accent-soft wash at rest
+  (previously just restated the button under it) and regains it once a real slide is showing.
+  See ADR-160.
+
 ## 2026-08-10
+
+- Fixed: Problem Library — 6 of 8 problems targeted the exact value already sitting in the
+  construction's default params (`defaultsFor()`), so `loadProblem()`'s reset-to-defaults made
+  the self-check pass on load, before any slider was touched (RULES §6.2's letter held, its
+  intent didn't). Targets restored to the source textbook's own numbers (`Regular Polygons.pdf`
+  §5.6): pentagon 45→40 mm, hexagon 35→30 mm, the shared-side problem 35→40 mm, n-gon 30→25 mm —
+  every one now differs from its construction's default by more than the ±1 tolerance and
+  requires a real slider move to green. Problem ids renamed to match (`pentagon-40-angle` etc.).
+  See root `DECISIONS.md` ADR-158; same collision found (not fixed here) in Topics 1.3/1.6/2.4.
+- Fixed: the Construct view opened too far zoomed out — the fixed 200×200 default viewBox
+  under-filled every config below `calibratedScale()`'s worst-case calibration (Pentagon/Hexagon
+  ~65-75%, N-Gon default only ~45%, worst at small side/small n). Default view now fits the
+  active construction's own drawn bounds (capped at 1.6× so the drawing still visibly grows with
+  side/n, per ADR-145) and re-fits as sliders move, unless the student has manually zoomed/panned
+  (ADR-155).
+- Added: short K.C. John-cited concept blurb on the Given and Construct wizard phases (all three
+  constructions, method-aware in Construct), so a learner sees the idea before the mechanics
+  instead of only in Verify's existing "Why it works" (ADR-154).
+- Changed: Step Through slide caption drops its "Slide X of Y —" prefix (instruction only now)
+  and moves to an accent-soft hint-callout treatment so it reads as primary content, not a quiet
+  status line; slide position moved into a small `aria-hidden` mono counter chip on the same row
+  since screen readers already get it in prose via `#sim-status`.
+- Fixed: N-Gon's Perpendicular Bisector method labelled the AB midpoint "O", the symbol every
+  other method reserves for the true circumcentre — the midpoint now stays unlabelled and its
+  three slide captions name the centre in words instead (ADR-157).
+- Fixed: N-Gon Perpendicular Bisector's point `4` still rendered visibly separated from its dot
+  even after the sideways-hint fix below — unlike its now-tight siblings `5`/`6`. Root cause:
+  `renderConstruction.js`'s label-collision search treats a compass-constructed point's OWN arc/
+  line (the very ink that placed it) as a foreign obstacle, same class of gap as a point's own dot
+  needing an explicit exclusion. Two fixes: (1) `assignLabelPositions()` now geometrically excludes
+  any arc/line a point's own coordinates lie on (`onOwnArc()`/`onOwnSegment()`, `renderConstruction.js`)
+  — generic, no per-call-site changes, fixes point `6` outright and helps vertex letters/division
+  numbers/pentagon's apex wherever the same pattern occurs; (2) the four wide compass arcs that
+  locate the bisector itself (`buildPerpendicularBisector()`, `constructions.js`) are tagged
+  `unobtrusive: true` and opt out of the obstacle set entirely — they're scaffolding no point sits
+  ON, only near, so exclusion (1) can't reach them, and they were point `4`'s actual remaining
+  blocker. n=6/side=32: point `4` 5.94→4.05, point `6` 4.05→2.70. See `../DECISIONS.md` ADR-153's
+  second addendum for the full trace (an arc-only fix was tried first and measured no effect on
+  point `4` at all — needed both pieces).
+- Fixed: N-Gon Perpendicular Bisector's ladder numbers (`4`, `5`, `6`, … up to `n`) still read as
+  floating well past their marker dot after the scale fix below — `buildPerpendicularBisector()`
+  now gives each ladder point an explicit small sideways hint (`{dx:-3,dy:0}`) instead of falling
+  through to `applyOutwardHints()`'s radial-from-circumcentre default, which pointed every ladder
+  point straight at its own neighbour (they're all collinear on the bisector line) and forced the
+  label-collision search to escalate outward. Worst-case offset measured 13.2 units pre-fix, 5.94
+  post-fix (n=3-12 × 5 side values, 235 checks) — comparable to a vertex letter's own normal
+  spacing. See `../DECISIONS.md` ADR-153 addendum for the audit trail (a naive direction-only fix
+  was tried first and measured no real improvement; the actual fix needed a smaller base distance).
+- Fixed: `src/constructions.js`'s `applyTransform()` scaled every point/line/circle/dim/angledim
+  coordinate and magnitude to the construction's frozen on-screen scale except a `'point'` step's
+  label-offset hint (`dx`/`dy`, set by `awayFrom()`/`applyOutwardHints()` in raw pre-scale units)
+  — left untouched, so it was applied post-scale as if it were already final-space px. Inconsistent
+  with `'dim'`'s own `offset`, scaled via the same `tm()` helper three lines down. Follow-up to
+  ADR-152 below; see `../DECISIONS.md` ADR-153.
+- Fixed: N-Gon Perpendicular Bisector's ladder numbers (`4`, `5`, `6`, … up to `n`) read as
+  free-floating text with nothing under them — two independent causes, see `../DECISIONS.md`
+  ADR-152 for the full root-cause trace and sweep numbers.
+  - `src/constructions.js`: `buildPerpendicularBisector()`'s drawn bisector line previously ran
+    only between the two compass-arc crossings (`≈0.366·s` off the midpoint), well short of the
+    ladder's own points (`0.5·s` at point 4, up to `1.866·s` at point 12, for every n≥4) — now
+    extended to `apothem(topK) + s*0.08` past the midpoint, covering every plotted rung.
+  - `src/renderConstruction.js`: `buildStepNode()` now stamps `data-role` on label `<text>` nodes
+    (`'point'`/`'dim'`/`'angledim'`), not just their ink — the post-construction fade
+    (`index.html`'s `.is-complete [data-role="move"]`) previously faded a ladder's dots and line
+    while its numbers stayed at full opacity, detaching them visually. Fixes the same detachment
+    for Semicircle Division's division numbers and both constructions' other move-role labels too.
+  - Verified via a 336-check headless sweep (n=3-12 × 3 side values × both n-gon methods, every
+    labelled ladder/division point on its drawn ink), a re-run of ADR-148's coincident-label sweep
+    (0 regressions), and live in Chrome (n=6/n=12, both methods, `getComputedStyle()` confirming
+    move-role labels now match their ink's 0.32 opacity post-completion).
 
 - Changed: Step Through's Back button now sits directly beside Next in the Construct step
   (N-Gon only), instead of sharing a row with the slide caption while Next sat full-width below —
   the two halves of one control now read as a pair. Caption moved to its own row above. Also
   dropped `.step-through__back`'s 40px height override, which was under RULES §4.12's 44px
   interactive-target floor; it now matches Next at 44px.
+- Fixed: Pentagon "Two Circles + Arc"/"Three Arcs" and Hexagon "Compass + Circle" drew their 60°
+  angle marks with no ray connecting A/B to the apex/centre — the arc floated with nothing visibly
+  between it and the label. Root cause: `angleDim()` only ever draws the small arc + text, never
+  the legs; these three "no protractor" methods never emitted them. Now emit `L(A,…)`/`L(B,…)`
+  before the mark, matching the two "angle" methods that already did (ADR-156). Also reworded
+  Hexagon Compass's Construct blurb, which had claimed "no rays at all". Separately fixed N-Gon
+  Semicircle Division's own angle mark appearing one Step-Through slide before its ray existed.
 
 ## 2026-08-09
 

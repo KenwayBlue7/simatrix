@@ -7081,6 +7081,649 @@ unmodified by this merge; the other 8 modified Diploma topics and both new topic
 
 ---
 
+## ADR-152: Regular Polygons' Perpendicular Bisector method extends its drawn bisector line to actually carry its own ladder, and label fade now applies to text as well as ink
+
+**Date:** 2026-08-10
+**Decision:** In `graphics_diploma_module_1_topic_1_4_regular_polygons`, the N-Gon construction's
+Perpendicular Bisector method (`buildPerpendicularBisector()`, `src/constructions.js`) drew its
+division-number labels (`4`, `5`, `6`, … up to `n`) floating in blank space, disconnected from any
+visible line or dot. A Phase A audit (read-only) found **two independent, compounding causes**,
+neither of which is a label-collision case (so ADR-148's `separateCoincidentLabels()` machinery
+doesn't apply here):
+
+**Cause 1 (geometric):** the bisector was drawn only between the two compass-arc crossings —
+`L(upper, lower, 'move')`, spanning `sqrt(r² − (s/2)²) ≈ 0.366·s` off the AB midpoint. The ladder's
+own points sit at `apothem(k) = s / (2·tan(π/k))`: point 4 at `0.5·s`, point 5 (book's midpoint of
+4/6) at `0.683·s`, point 6 at `0.866·s`, up to point 12 at `1.866·s` — every one of them, at every
+`n ≥ 4`, past the end of the drawn segment (proved algebraically: every ratio is linear in `s`, so
+this holds at any side length; verified numerically for `n=3..12`). Only the `n===3` special case
+(a single point at `0.289·s`) happened to land on it. The coordinates were always correct; the line
+meant to carry them was too short. Fig 5.24 (the method's book source) draws one long centre line
+through the whole ladder — this build never extended it past the arc crossings.
+
+**Cause 2 (render-side):** `index.html`'s post-construction de-emphasis
+(`#dynamic-layer.is-complete [data-role="move"]{opacity:0.32}`, added by ADR-145, explicitly
+naming "ladder/division points" in its own comment) only ever reached ink — `buildStepNode()`
+(`src/renderConstruction.js`) stamped `data-role` on marker dots, `dim` groups, and `angledim`
+groups, but never on the `<text>` label nodes themselves, which live in a separate always-on-top
+`[data-layer="labels"]` sublayer untouched by that selector. Once a construction finished, its
+move-role dots and lines faded to 32% while their numbers stayed at 100% — visually detaching the
+label from its (now nearly invisible) point. This is a bug against the CSS comment's own stated
+intent and affects every construction, not just this method: Semicircle Division's division numbers
+(genuinely on their drawn arc — cause 1 doesn't apply there) and Pentagon/Hexagon's own move-role
+labels all had the same detachment once complete.
+
+**Fix:**
+- `src/constructions.js`: `buildPerpendicularBisector()` now draws
+  `L(lower, along(apothem(topK) + s*0.08), 'move')` instead of `L(upper, lower, 'move')`, where
+  `topK` is the highest-numbered rung actually plotted below (`nn===3` → 3, `nn===4` → 4, else
+  `max(nn, 6)` — `nn===5` still plots point 6 as an intermediate rung before taking point 5's
+  midpoint, so 6 can exceed `nn` itself). `upper`/`lower` keep their own point markers (the book
+  shows both crossings); only the line's far endpoint moves. Margin (`s*0.08`) is proportional to
+  side length, matching every other length in this file — never a raw literal.
+- `src/renderConstruction.js`: `buildStepNode()` now stamps `'data-role': step.role` on the label
+  `<text>` node in the `'point'`, `'dim'`, and `'angledim'` branches (the standalone `'label'` kind
+  — used elsewhere in this repo, e.g. `graphics_diploma_module_2_topic_1_1_development_of_surfaces`
+  — carries no `role` field at all in this topic's own step schema, so left unstamped rather than
+  writing a meaningless `data-role="undefined"`).
+
+**Why:** proved with the same headless-sweep method ADR-145/148 established (`constructions.js`
+imports nothing, runs directly under Node). Swept `n=3..12` × `{min, default, max}` side × both
+n-gon methods (336 labelled-point checks): every numeric ladder/division label now lies exactly on
+its drawn ink (`onLine && within` its line's own span, or exactly radius-`s` from the semicircle's
+centre) — 0 failures, down from the pre-fix state where every `n≥4` bisector config failed. Re-ran
+ADR-148's own coincident-label sweep (30 coincident-point groups across the same domain): 0
+unresolved — no regression. Checked the framing side-effect explicitly rather than assuming it:
+`unitsPerMm` at the worst-case config (max side, max n) measured identical before/after (0.9003,
+matching the ADR-147 changelog baseline) — the ladder's topmost point was already inside
+`calibratedScale()`'s bounds from other geometry, so the added margin didn't move the shared
+n-gon scale at all.
+
+Live-verified in Chrome (hard-reload; the automated tab's rAF is suspended — same
+`project_chrome_automation_raf_stall` gotcha ADR-148 hit — worked around by forcing a static render
+via a direct `renderConstruction.js`/`constructions.js` dynamic `import()` in-page rather than
+waiting out the animation): n=6 and n=12, Perpendicular Bisector — dodecagon's ladder now runs
+labelled `4` through `12` continuously up the extended line; `getComputedStyle()` on every numeric
+move-role label confirms `opacity: 0.32`, exactly matching its dot, post-completion, while
+`given`/`result` labels stay at `opacity: 1`. Cross-checked Semicircle Division at n=6/n=12 the same
+way — its division numbers now fade with their arc too, previously stuck at full opacity.
+
+**Consequences:** Easier: every Perpendicular Bisector ladder point (any n, any side) now reads as
+what it is — a mark on a real centre line — instead of a stray number; every construction's
+move-role labels now genuinely de-emphasize with their ink post-completion, closing a gap ADR-145
+itself only half-closed. Harder / open: none identified — this fix is additive (a longer line, a
+DOM attribute) with no removed capability. Pentagon/Hexagon were not independently live-clicked
+through the wizard this session, but they call the exact same `buildStepNode()`/CSS mechanism the
+live n-gon checks exercised, so no separate verification path exists for them to diverge on.
+**Status:** Active.
+
+---
+
+## ADR-153: Regular Polygons' point-label offset hints now scale with the construction's frozen viewBox scale, closing a scale-space mismatch `applyTransform()` left open
+
+**Date:** 2026-08-10
+**Decision:** Follow-up to ADR-152. With ADR-152's fix landed, the N-Gon Perpendicular Bisector
+method's ladder numbers (`4`, `5`, `6`, …) sat on their correct ink but still rendered visibly
+farther from their marker dot than other point labels (e.g. vertex letters `A`-`F`), per
+user-marked reference screenshots. A Phase A audit (read-only) traced both label kinds through the
+SAME code path — `awayFrom()`/`applyOutwardHints()` (`src/constructions.js`) sets a `'point'`
+step's `dx`/`dy` label-offset hint, `candidateOffsets()`/`assignLabelPositions()`
+(`src/renderConstruction.js`) resolves it against collision obstacles — not two paths, and not a
+larger constant on the ladder's side.
+
+The actual defect: `applyTransform()` (`src/constructions.js`), which converts every step from raw
+unscaled geometry to the construction's frozen on-screen scale, scales `p`, line endpoints, circle/
+arc radii, and `dim`'s own `offset` (via its `tm()` magnitude helper) — but spread a `'point'`
+step's `dx`/`dy` through untouched:
+```js
+if (step.kind === 'point' || step.kind === 'label') return { ...step, p: tp(step.p) };
+```
+`renderConstruction.js` then uses `step.p.x + step.dx` directly as a final-space SVG offset
+(`buildStepNode()`'s `'point'` branch) — but `p` had just been scaled and `dx` hadn't, a
+scale-space mismatch between two halves of the same coordinate.
+
+**Why the letters looked fine and the ladder didn't**, at the same nominal hint magnitude (6 raw
+units, `awayFrom()`'s default): `n`-gon's frozen scale (`calibratedScale()`, cached per
+construction id) measured **0.9003** — close to 1, so the raw-vs-scaled gap is only ~10% by itself
+here, not the dominant effect. The bigger factor is a second, structural property of
+`awayFrom(O, p, dist)`: it points from the true circumcentre `O` through the labelled point `p`.
+Every ladder point lies, by construction, on the SAME line through `O` (the perpendicular bisector
+itself) — so `awayFrom()`'s "away from O" direction for an interior ladder point (e.g. point `5`,
+sitting between `4` and `6`) points straight at its own neighbour, guaranteeing a first-ring
+collision and forcing `candidateOffsets()`'s widening-ring search (ring 2 = ×1.5, ring 3 = ×2.2) to
+escalate. Confirmed by direct measurement: post-fix, point `5`'s resolved offset lands at ring 3
+(magnitude 11.88) at every `n` checked (6, 8, 10), while vertex letters mostly resolve at ring 1
+(5.40). Vertex letters don't hit this because they're spread circumferentially around `O`, so
+"away from `O`" is close to perpendicular to their neighbour spacing, not parallel to it.
+
+**Fix (this ADR):** `applyTransform()`'s `'point'`/`'label'` branch now scales `dx`/`dy` the same
+way `tm()` already scales `dim`'s `offset`:
+```js
+if (step.kind === 'point' || step.kind === 'label') {
+  return {
+    ...step, p: tp(step.p),
+    dx: step.dx != null ? tm(step.dx) : step.dx,
+    dy: step.dy != null ? tm(step.dy) : step.dy,
+  };
+}
+```
+Single choke point — covers every `'point'` step's hint regardless of source (`applyOutwardHints()`
+fill-in, `separateCoincidentLabels()`'s override, or an explicit `away` passed to `P()` at
+construction time), no change needed in `renderConstruction.js`: `candidateOffsets()`'s ring
+multipliers automatically scale correctly once their input is already final-space.
+
+**Why:** a Node smoke test (module has no browser dependency) built every construction × every
+method × `n=3..12` (where applicable) post-fix — 0 crashes, 0 non-finite offsets. Directly measured
+`applyTransform()`'s frozen scale for `ngon` (0.9003, matching ADR-152's own recorded baseline —
+confirms this fix touches offset scaling only, not the shared geometry scale ADR-152 already
+verified unchanged) and compared resolved `dx`/`dy` magnitudes before/after: every value shrank by
+exactly that scale factor (e.g. ring-1 6→5.40, ring-2 9→8.10, ring-3 13.2→11.88), matching the fix
+exactly rather than an approximation.
+
+**Consequences:** Easier: point-label offset hints are now dimensionally consistent with every
+other magnitude `applyTransform()` handles (matches `dim`'s `offset` treatment); the ~10% inflation
+this bug added on top of the ladder's escalation is gone, platform-wide (every construction using
+`'point'` labels benefits, not just this one). **Open, not fixed by this ADR:** the ladder's ring-3
+escalation itself is structural, not this bug — `awayFrom(O, p, dist)`'s radial-from-`O` hint is
+the wrong FIRST candidate for any point collinear with `O` (it points at its own neighbour by
+construction), the same class of problem ADR-148's `separateCoincidentLabels()` already solved for
+same-point label pairs by switching to a tangential hint instead of a radial one. Point `5`
+(prototypically) still resolves at ring 3 post-fix. Flagged for the user; a targeted fix (an
+explicit lateral `away` hint for ladder points in `buildPerpendicularBisector()`, bypassing
+`applyOutwardHints()`'s self-colliding default for this one call site) was scoped but not applied —
+awaiting go-ahead, kept as a separate change from this ADR's scale-consistency fix.
+**Status:** Active.
+
+**Addendum (2026-08-10, same day): the open item above, resolved — and the obvious fix was
+wrong.** A Phase C audit tested the scoped idea (swap `awayFrom()`'s radial hint for a tangential
+one, direction only) empirically before implementing it: built a probe against the REAL
+`assignLabelPositions()` (no source edit), swept n=3-12 × 3 side values (141 ladder-label checks),
+radial vs. fixed-right vs. fixed-left vs. alternating-by-parity vs. a vertical control. Result:
+**direction alone barely moved the needle** — 89-110 of 141 still escalated across every scheme
+tried, fixed-left (91) only marginally better than the current radial default (110). Traced the
+real cause one level deeper: `assignLabelPositions()` (`renderConstruction.js`) resolves labels
+*sequentially* in step-push order, adding each resolved label's own box to the shared `occupied`
+set before the next point's search runs. The ladder's push order is `4, 6, 5, [7..nn]` — by the
+time point `5` resolves, `4` and `6` have already claimed nearby real estate in a genuinely tight
+~10-15-unit vertical corridor. Three-plus labels competing for one corridor is not something a
+hint's ANGLE can fix, only where in the ring-search it happens to succeed.
+
+What the same sweep showed DID work: the hint's base MAGNITUDE. Halving it (6 → 3) roughly halved
+both how often escalation triggers (89→58/141) and, more importantly, its worst case (13.2→6.6 —
+`candidateOffsets()`'s ring multipliers are relative, so shrinking the base shrinks every ring).
+Checked for side-effects before implementing: vertex-letter escalation measured identically
+(78/255) whether the ladder's base was 6, 3.0, or 2.5 — confirmed against the unmodified,
+zero-override production path first, then re-confirmed post-fix at a wider sweep (129/425, same
+~30% rate) — the two label groups don't interact enough for one's magnitude to move the other's
+outcome.
+
+**Fix implemented:** `buildPerpendicularBisector()` now defines one `ladderHint = { dx: -3, dy: 0 }`
+(sideways — tangential to the vertical bisector, so it can never point AT another ladder point,
+same reasoning as ADR-148's tangential coincident-point split — AND a smaller base magnitude, the
+part that actually mattered) and passes it as `P()`'s 4th arg on every ladder point: `3`/`4`/`6`/
+`5`/each `7..nn` rung. This also incidentally fixes a related staleness: point `6` coincides
+exactly with the true circumcentre `O` whenever `nn===6` (proved in this file's own header
+comment), which previously made `applyOutwardHints()` skip it entirely (its "skip if hint already
+present" guard didn't apply, but its "skip if colocated with O" guard did) and fall back to
+`renderConstruction.js`'s bare +4/-4 default — point `6` now gets the same intentional hint as
+every other rung instead of that incidental fallback.
+
+**Verified:** full smoke test (every construction × every method × n=3-12 × 3 side values) — 0
+crashes. Targeted sweep (n=3-12 × 5 side values, 235 ladder-label checks, run against the real
+`assignLabelPositions()`): worst-case final offset **13.20 → 5.94** — tighter than the very
+scenario this whole audit started from (`n=6, side=32`: point `5` went 11.88→2.70, point `4`
+8.10→5.94, point `6` 5.66 [stale fallback]→4.05). Letter-label escalation unchanged (baseline
+78/255, confirmed identical pre/post). Live-verified in Chrome (hard-reload past the stale-module
+cache gotcha; rAF patched to `setTimeout` to defeat the hidden-tab suspension gotcha, both per
+established session workarounds) at `n=6, side=32`, Perpendicular Bisector, Play All: `4`/`5`/`6`
+render visibly tight against their dots, matching the fix's own numbers.
+**Status:** Active.
+
+**Second addendum (2026-08-10, same day): point `4` was still visibly separated from its dot next
+to now-tight `5`/`6` — a real, different defect, not yet covered above.** Probed the exact
+scenario (n=6, side=32) with the real `assignLabelPositions()`: point `5` ring1 (2.70), point `6`
+ring2 (4.05), point `4` ring3 (5.94) — a gradient, not equal siblings. Traced point 4's blocked
+ring1/ring2 candidates (24 of 24, exhaustively): every one blocked by `arc` or `line` ink, never by
+a label or another point. Root cause: `arcMark(M, dist(M,A), pt4, 40)` — the compass arc drawn TO
+CONSTRUCT point 4 — sits with point 4 dead-centre on its own curve (that's the whole purpose of
+the arc), and `geometryObstacles()` samples that curve into obstacle boxes with no exemption for
+"this is the ink that placed me," unlike a point's own DOT, which already gets that exemption
+(`owner: step`). Point 5 has no such collision because it has no own-arc (built via plain
+`midpoint()`); point 6 has one too (`arcMark(B, s, pt6, 40)`) but at the full side length `s`
+instead of point 4's `s/2` — a flatter curve, more give, hence only ring2 instead of ring3.
+
+**Revised the originally-scoped fix — simpler than planned.** The prior plan (thread an `owner`
+reference from `arcMark()`'s return value into the `P()` call it feeds, mirroring dot-exclusion)
+turned out to need no `constructions.js` call-site changes at all: a purely GEOMETRIC test — does
+this point's own coordinate lie on this arc's curve / this line's segment — gets the identical
+result from a single `renderConstruction.js` change, and generalizes to every `arcMark()`→`P()`
+site at once (`walkVerticesByCompass()`'s vertex letters, `buildSemicircleDivision()`'s division
+numbers, `pentagonRaw()`'s apex) without enumerating them individually.
+
+**But geometric self-exclusion alone did NOT move point 4 — verified before implementing, not
+after:** simulated excluding point 4's own arc (its own line too) and re-ran the resolver — point
+4 stayed at ring3, mag 5.94, completely unchanged. Its actual remaining blockers (traced via the
+same exhaustive per-candidate method) were the FOUR wide compass arcs
+(`arcMark(A/B, r, upper/lower, 55)`) that locate the bisector line itself — unowned (`upper`/
+`lower` carry no label), 55° sweep, radius ~17.9 in this scaled scenario, geometrically passing
+near point 4's whole neighbourhood without point 4 ever sitting ON them — so the geometric "am I
+on this ink" test correctly does NOT exempt them (it shouldn't; they're real, if incidental,
+scaffolding ink). Confirmed by exempting them too (simulation only, at this stage): point 4 dropped
+to ring2 (mag 4.05) — its floor, capped there by genuinely nearby DOTS (point 5, `upper`, `lower`),
+which no ink exemption can or should remove.
+
+**Fix implemented, two pieces:**
+1. `renderConstruction.js`: new `onOwnArc()`/`onOwnSegment()` geometric tests; `geometryObstacles()`
+   now tags each arc/line obstacle box with its source geometry (`arcCenter`/`arcRadius`/`arcStart`/
+   `arcEnd` or `lineA`/`lineB`); `assignLabelPositions()`'s point-label branch excludes any obstacle
+   the point's own coordinates lie on, alongside the pre-existing own-dot exclusion.
+2. `constructions.js`: the four `arcMark(A/B, r, upper/lower, 55)` calls in
+   `buildPerpendicularBisector()` now spread `unobtrusive: true` onto their returned step;
+   `geometryObstacles()` skips any `unobtrusive`-flagged arc/line entirely, for every label, not
+   just a specific point's search — these are pure scaffolding, not any one point's ink.
+
+**Verified:** full smoke test (every construction × method × n=3-12 × 3 side values) — 0 crashes.
+Direct re-check of the target scenario against the real (now-patched) `assignLabelPositions()`:
+point `4` 5.94→**4.05**, point `6` 4.05→**2.70**, point `5` 2.70→4.05 (a real but small knock-on —
+resolving 6 into 5's old ring-1 slot first nudges 5 out one ring; all three now sit within a tight
+2.70-4.05 band instead of one visibly standing out). `O`'s own label improved too, 8.10→5.40
+(unplanned but welcome — it sits near the same neighbourhood). Regression-swept generically
+(`onOwnArc`/`onOwnSegment` apply platform-wide, not ladder-only) across ngon (both methods) +
+pentagon (all 3 methods) + hexagon (both methods), n=3-12 × 5 side values, 1512 labels: 378
+improved, 1095 unchanged, 39 marginally worse (same greedy-sequential knock-on mechanism, not a
+new failure mode — worst-case magnitude across the whole sweep unchanged at 15.85 both before and
+after, so nothing newly blows up). That 15.85 outlier traced separately (Semicircle Division,
+n=12/side=28, division number `10`) and confirmed PRE-EXISTING and unrelated to this fix — checked
+against a clean `git stash` baseline: 17.60 pre-fix, 15.85 post-fix, i.e. this change improves it
+slightly as a side effect rather than causing it; the underlying Semicircle Division high-n
+crowding is a separate, out-of-scope defect, not touched here. Live-verified in Chrome (same
+hard-reload + rAF-patch workaround as the first addendum): n=6/side=32, Perpendicular Bisector,
+Play All — `4`/`5`/`6` all sit tight against their dots, no longer one visible outlier; Semicircle
+Division spot-checked too (division numbers 1-5), no regression.
+**Status:** Active.
+
+---
+
+## ADR-154: Regular Polygons gets a short concept blurb per wizard phase (Given/Construct only), method-aware, chapter-level citation only
+
+**Date:** 2026-08-10
+**Decision:** Added `notes: { given, construct }` to each of the three `ConstructionDef`s in
+`src/constructions.js` — one-to-three-sentence plain-language blurbs rendered into a new
+`#step-note` block (`index.html`, between `#step-lead` and the step panels), wired by a
+`renderNote()` in `src/stepper.js` called from `goToStep()` and `sync()`. Scope was narrowed
+during a read-only audit (this session) from the initial ask ("a blurb per step,
+Choose/Given/Construct/Verify") to **Given and Construct only**:
+- **Choose** already has concept copy — the Step-1 static prose with its three `.term` popovers
+  (`index.html`) — and `goToStep(1)` runs before any construction is picked, so a
+  per-construction blurb has nothing to key off yet.
+- **Verify** already has concept copy in the exact same register — `principle(method)` under the
+  "Why it works" eyebrow. A second block there would duplicate it, not add to it.
+
+`notes.construct` is **method-aware** (`(method) => string`, same shape as the shipped
+`principle(method)`), because the Construct phase's method switcher changes which derivation is
+on screen; `notes.given` is not, since the given value is the same regardless of method.
+`renderNote()` reads `sim.getActiveConstruction()`/`sim.getParams()` — both already existed on
+`simController` (added for `uiManager.js`'s own use) — so this required no new `simController`
+surface and no leaf-to-leaf import (RULES §3.6).
+
+**Placement, not a new accent-wash box:** `.step-through__caption` was *just* promoted
+(same day, this topic's own DESIGN.md §4) to a `--color-accent-soft` hint-callout so it would read
+as the Construct panel's primary content. Giving the new blurb the same treatment would have
+undone that by stacking two accent-washed boxes in the same panel. Instead `#step-note` reuses
+Verify's own `.result-block__eyebrow` + `.result-principle` recipe verbatim (quiet
+`--color-ink-secondary` grey, `--text-sm`) — zero new tokens (RULES §4.1/§4.16), and it visually
+subordinates to the accent-washed caption below it rather than competing with it.
+
+**Textbook grounding and citation form — the load-bearing finding of this ADR.** The two source
+PDFs at the repo root are *K.C. John, Engineering Graphics for Diploma*, Ch. 5 §5.6 "Construction
+of Regular Polygons" (`Regular Polygons.pdf`, pp. 48-51 — Ex. 5.9 Pentagon, Ex. 5.10 Hexagon,
+Ex. 5.11 general n-gon) and a 43-slide Pandalam Polytechnic deck (`polygon.pdf`, semicircle
+division only, already the documented source for `buildSemicircleDivision()`'s captions). There is
+**no N.D. Bhatt polygon PDF in this repo** — Bhatt cannot be cited for this topic.
+
+Reading every `*Raw()` builder against K.C. John's own numbered methods (not trusting the sim's
+method labels) found **the sim's Pentagon "Two Circles + Arc" and "Three Arcs" methods do not
+match John's Method-II/Method-III constructions** — the sim reaches the same equilateral apex both
+times via a different route than the book's D→C→E→K/L or perpendicular-at-B/Q sequence. Hexagon's
+two methods are simplified/adapted from John's Fig 5.21/5.22, not literal ports. Only Pentagon's
+"54° Angle + Circle" and N-Gon's two methods (already documented in this topic's CLAUDE.md as
+literal-match / designed-analogue respectively) are faithful ports. **Consequence: no blurb cites a
+figure or "Method-N" number** — four of seven would be false, and RULES §2.19a (caption text on
+assumed correctness) plus the ADR-116 precedent (a shipped wrong citation, corrected) make that a
+real defect class, not a style nitpick. Every blurb instead carries a **chapter-level citation
+only** — `(K.C. John Ch. 5)` — true for all seven methods and matching the shipped precedent in
+`development_of_surfaces/src/terms.js` (`"…(K.C. John Ch.15)"`).
+
+**Consequences:** Easier: a learner sees the idea before the mechanics on the two phases that
+previously had only imperative instruction text, closing the gap `RULES.md` §6.31 (ADR-141,
+"plain words BEFORE naming it") describes; `principle()` in Verify keeps its existing "why the
+result is correct" role instead of being asked to also carry "what am I about to watch". Harder /
+accepted cost: `notes` is a second per-construction, per-method copy surface alongside
+`principle()` — a future added method must supply both or `notes.construct` silently falls back to
+hiding the block for that method (the `if (!fn)` guard degrades gracefully, it does not warn).
+Screen-reader note: `#step-note-body` carries its own `aria-live="polite"`, independent of
+`goToStep()`'s existing phase-change announcement, so a method switch announces the new blurb
+without the phase announcement doubling it — same pattern `.step-through__caption` already uses
+for the identical problem (this topic's DESIGN.md §4).
+**Status:** Active.
+
+---
+
+## ADR-155: Regular Polygons' default view fits the construction's content, capped, instead of a fixed 200×200 viewBox
+
+**Date:** 2026-08-10
+**Decision:** `graphics_diploma_module_1_topic_1_4_regular_polygons` opens (and re-frames on every
+`side`/`n` slider change, unless the student has manually zoomed/panned) on a view fitted to the
+active construction's own drawn bounds, capped at **1.6×**, instead of the fixed `200×200`
+`BASE_W×BASE_H` viewBox at zoom 1.0 every other SVG topic in this track (1.1, 1.2, 1.3, 1.5, 1.6,
+2.1, 2.2, 2.3, 2.4) still opens on.
+
+**Root cause (Phase A audit).** The fixed default interacts badly with `calibratedScale()`
+(`src/constructions.js`, ADR-145), which freezes ONE scale per construction from the *worst-case*
+param combo across every method — deliberate, so the drawing visibly grows with `side`/`n`. Every
+config below that worst case then under-fills a 200×200 frame that never compensates. Measured:
+Pentagon/Hexagon defaults filled 61-75% of the frame; the N-Gon default (side 32, n 6) filled only
+43-48%, worst at small `side`/small `n` (down to ~30% at side 25, n 3) — compounded there because
+`chromeScaleFor()`'s `CHROME_SCALE_FLOOR = 0.5` was also pinned, drawing half-size labels over an
+already-undersized construction.
+
+**Precedent reused, with two required divergences.**
+`graphics_diploma_module_2_topic_1_1_development_of_surfaces` already solved this same complaint
+for its own (Canvas2D, not SVG) topic — `viewTransform.js`'s `fitToBounds(bounds, margin)` plus a
+`defaultFit()`/`resetFit()` pair in `main.js`, called on select/reset/problem-load, with
+`ensureVisible()` demoted to a "does it already fit?" guard that delegates to it. Ported that
+shape into this topic's `src/viewTransform.js`/`src/main.js` verbatim in spirit, but:
+1. **Capped the fit at 1.6×**, not uncapped. Module 2's `fitToBounds()` has no ceiling; applied
+   uncapped here, n=3 and n=12 would render at near-identical on-screen size and erase ADR-145's
+   whole point. 1.6 was picked by measuring monotonicity: at that cap the N-Gon default fills
+   ~76% of the 200×200 viewBox, and the smallest N-Gon config (side 25, n 3) still reads visibly
+   smaller (~63%) than the largest (~92%) — screen size stays monotonic in both `side` and `n`,
+   verified across every construction × method, at every cap tested from 1.3 to 1.8. **Phase A
+   verify (2026-08-11):** these figures are fill of the square viewBox, not of the rendered
+   `#sim-viewport` — `preserveAspectRatio="xMidYMid meet"` letterboxes that square into whatever
+   aspect the wizard layout leaves (measured 0.75–1.5, never the ~2:1 "wide desktop" a first read
+   of this ADR suggests), so true on-screen fill is lower on whichever axis gutters (e.g. ~57%
+   vertically at the N-Gon default with the wizard panel open). `fitToBounds()`/`clampPan()`/
+   `ensureVisible()` all reason in viewBox space and `meet` scales both axes equally, so this
+   changes what the percentages measure, not the cap's monotonicity argument itself.
+2. **Fits the FULL step bounds** (`computeBounds(lastRecipe.steps)`, every role), not
+   `given`-only. Module 2 fits given-only because its given block *is* the modelled object; here
+   `given` is just the A–B baseline, far smaller than the finished polygon — fitting to it alone
+   would over-zoom drastically.
+
+**Mechanics.** `viewTransform.js` gained `fitToBounds(bounds, {margin, maxZoom})` (the
+unconditional zoom-in-or-out core, lifted out of what was `ensureVisible()`'s tail — that function
+now just delegates to it, unchanged behaviourally, always at the uncapped `MAX_ZOOM`), a
+`userAdjusted` flag (set by any manual wheel/pinch/drag/arrow-key action, read-only via
+`hasUserAdjusted()`, cleared only via `clearUserAdjusted()`), and an `onResetRequest` constructor
+param so dblclick/`0` route through the caller's own content-aware reset instead of snapping back
+to the raw box. `main.js` added `defaultFit()`/`resetFit()` (mirroring module 2's own names) and
+calls `defaultFit()` at the tail of `rebuild()` whenever `!hasUserAdjusted()` — this is what keeps
+a growing `n`/`side` from ever outgrowing a frame fitted for a smaller prior value, while a
+deliberate manual zoom is left alone, the same rule `ensureVisible()` already applies at Play time.
+
+**Consequences.** Easier: the Construct-step drawing reads at a comfortable size on load across
+all three constructions, no scroll-to-zoom required, closing the reported defect. Harder /
+accepted cost: this topic's `viewTransform.js` is now further diverged from Topic 1.2's original
+byte-copy (already noted as a prior divergence point, ADR-145's arrow-key/`+`/`-`/`0` addition) —
+a future audit comparing the two files must expect `fitToBounds`/`userAdjusted`/`onResetRequest`
+as topic-1.4-only. Not ported to the other 8 SVG diploma topics still on a fixed default — each
+would need its own fill-percentage measurement first (this topic's numbers do not generalize;
+Ogee curves, roulettes, etc. have different worst-case-vs-typical spreads).
+**Status:** Active.
+
+---
+
+## ADR-156: Regular Polygons' angle-dimension marks require their own legs to already be drawn ink, not just implied geometry
+
+**Date:** 2026-08-10
+**Decision:** `angleDim()` (`constructions.js`) is a pure annotation — its renderer
+(`renderConstruction.js`'s `'angledim'` branch) draws only the small arc between two rays plus the
+degree text, never the rays themselves. It has always silently assumed the emitting branch already
+pushed a `line` step along each leg. A read-only audit (reported: Pentagon "Three Arcs" showing two
+60° arcs with nothing visibly between them) found this held for every method **except** the three
+"compass-only" branches, which by design skip drawing rays: Pentagon `circles` and `arcs` (60° at A
+and B, missing leg `A→apex`/`B→apex`) and Hexagon `compass` (60° at A and B, missing leg `A→O`/
+`B→O`). Confirmed pre-existing since the topic's first commit, not a fade/opacity regression (not
+ADR-152) and not caused by the session's other in-flight WIP.
+
+**Fix:** each of the three branches now pushes `L(A, target, 'move')`/`L(B, target, 'move')`
+immediately before its `angleDim(...)` calls — mirroring the already-correct Pentagon `angle` and
+Hexagon `angle` branches' own `L(...)`-then-`angleDim(...)` order. Hexagon `compass`'s
+`notes.construct` blurb ("No rays at all this time...") was reworded to stop claiming rays never
+appear, keeping its `(K.C. John Ch. 5)` chapter-level citation (ADR-154) intact. Separately, N-Gon
+Semicircle Division's `180/n°` mark was moved from the "Divide the semicircle" slide into the
+following "Draw a line connecting A and the first division" slide — Play All was unaffected, but
+Step Through briefly showed the mark one slide before its own ray existed.
+
+**Verified with a node oracle** (kept in the session scratchpad, not committed — repo has no test
+harness for this topic): for every construction × method, every `angledim` step must have, among
+the `line` steps at or before its own index in the same array, one collinear with `center→rayA` and
+one with `center→rayB`. Confirmed the oracle fails on exactly the three predicted branches (plus
+the N-Gon ordering case) against the pre-fix code, and passes all 7 methods post-fix. Live-verified
+in-browser (`php -S localhost:8123`) for Pentagon Three Arcs, Hexagon Compass + Circle, and N-Gon
+Semicircle Division's Step Through slide 3.
+
+---
+
+## ADR-157: "O" is reserved topic-wide for the circumcentre — Perpendicular Bisector's AB midpoint stays unlabelled
+
+**Date:** 2026-08-10
+**Decision:** `buildPerpendicularBisector()` (`constructions.js`, N-Gon's second method) labelled
+the midpoint of AB **"O"** (`P(M, 'move', 'O')`), while every other emitter of an `'O'` label in
+this topic — `drawCircumcircle()`, called by Pentagon, Hexagon, and N-Gon's Semicircle Division —
+uses it exclusively for the true circumcentre. Step 1's own copy ("every method finds the same
+circumcentre O by a different route"), `terms.js`'s circumcentre glossary entry, and both other
+n-gon-adjacent `principle()` strings all assume that identity. One of seven methods silently broke
+it: AB's midpoint is the circumcentre for no value of n, so a student comparing methods saw two
+different points both called O. Found by a read-only design audit (`E1`), not a bug report.
+
+**Fix:** `P(M, 'move', 'O')` → `P(M, 'move')` — the midpoint keeps its dot (still a real obstacle
+for the label-placement pass, still visible ink) but loses the label rather than being renamed.
+Considered and rejected: relabelling it "M" — no other point in the topic carries that symbol,
+`terms.js` has no midpoint entry to back it, and n=12 already has a genuine "M"/"10" coincident
+label pair (`separateCoincidentLabels()`'s own header comment) the system was tuned against;
+introducing a second "M" meaning would confuse audits of that pair later. The real circumcentre
+this method reaches (the ladder rung at `ptFinal`, numbered "4"/"6"/"8"/…) stays labelled only by
+its rung number, not additionally "O" — that number IS the pedagogical point of the ladder, and a
+second coincident label there would trigger `separateCoincidentLabels()`'s tangential split on the
+single busiest point in the drawing for no benefit.
+
+Three slide captions referencing "O" as this method's centre were reworded to name it in words
+instead: "Construct the perpendicular bisector of AB[ at O]." → "…of AB."; "With centre O and the
+true apothem radius, mark point 3…" → "With AB's midpoint as centre, mark point 3…"; "With centre
+O and radius OA, draw an arc to point 4." → "With AB's midpoint as centre and radius to A, draw an
+arc to point 4." `principle('bisector')` and `notes.construct('bisector')` already said "AB's
+midpoint" / carried no "O" — not touched.
+
+**Verified no knock-on** to the label-placement pipeline: `applyOutwardHints()` and
+`separateCoincidentLabels()` both guard on `!step.label` and skip an unlabelled point outright, so
+dropping the label removes M from their input entirely rather than changing what they compute.
+`geometryObstacles()` pushes a point's box regardless of label, so M's dot remains an obstacle
+unchanged. The only real effect is in `assignLabelPositions()`: M's label box (previously ~6 units
+below M, per its `awayFrom(O, M, 6)` hint) no longer enters the shared `occupied` set — removing an
+obstacle can only relax the greedy ladder-label search ADR-153 tuned, never tighten it, so that
+sweep's magnitude findings still hold. Live-verified in-browser (`php -S localhost:8123`) for N-Gon
+Perpendicular Bisector at n=3, 6, 8, 12 (covering all three branch splits) and cross-checked
+Pentagon/Hexagon/Semicircle Division still draw and label the real "O".
+
+**Not fixed here (separate, out of scope):** an unrelated n=3-only defect found during the same
+audit — `arcMark(M, dist(M, A), ptFinal, 40)` draws the point-3 arc at radius `0.5·s`, but
+`ptFinal` (`along(apothem(3))`) sits at `0.2887·s`, so the arc drawn does not pass through the
+point it is aiming at, despite the (now-reworded) caption's "true apothem radius" claim. Flagged
+for its own pass — it changes drawn geometry, not just a label, and needs its own visual check.
+**Status:** Active.
+
+**Consequences:** Easier: every angle mark in this topic is now anchored by visible ink the moment
+it appears — the equilateral triangle Pentagon's `circles`/`arcs` `principle()` text already
+describes in words is now also drawn. Harder / accepted cost: `calibratedScale()` was re-checked,
+not just assumed safe — both new line pairs terminate at points already inside each construction's
+existing raw bounds (`apex` and `O` already had their own `P()` steps), so the frozen per-construction
+scale and ADR-155's 1.6× default-fit cap do not need re-measuring. A future new method that emits an
+`angleDim()` must remember to draw its own legs first — the renderer still does not enforce or warn
+if a leg is missing; this ADR is the one place that rule is written down.
+**Status:** Active.
+
+---
+
+## ADR-158: A Problem Library target must differ from its construction's defaults by more than the tolerance
+
+**Date:** 2026-08-10
+**Decision:** `graphics_diploma_module_1_topic_1_4_regular_polygons/src/problems.js`'s 8 problems
+are re-authored to the source textbook's own numbers (`Regular Polygons.pdf` §5.6: pentagon side
+40, hexagon side 30, n-gon side 25) instead of the previously shipped 45/35/30 — which, for 6 of
+the 8 problems, exactly matched `defaultsFor()`'s slider defaults. `loadProblem()` resets params
+to defaults before the student touches anything (RULES §6.2); when a target equals the default,
+`matches()` passes on load, `onProblemSolved()` fires immediately, and the practice tier teaches
+nothing. Restoring textbook fidelity (RULES §6.7) fixed the collision as a side effect — it was
+not a code bug, it was six problems whose authored numbers had drifted onto the defaults.
+**Why:** Rejected fixing this by moving the construction's own defaults instead: ADR-155's
+default-fit zoom cap (1.6×) is calibrated and documented in prose against these exact default
+values (`main.js`, DESIGN.md §7); changing them to dodge one topic's problem set would invalidate
+a separately-verified measurement to patch a data-authoring bug, and would not stop the next
+problem from being authored onto whatever the new defaults are. Also rejected an explicit
+"submit" action decoupled from live parameter matching — every topic in this family shares one
+self-check pattern (§6.3, ADR-015); a second interaction model for one topic's Problem Library
+was the larger, less-targeted change for a data problem.
+**Consequences:** Easier: authoring stays a plain data file, no engine/UI change, matches every
+sibling topic's problem-authoring shape (ADR-083 §6.24). Harder / accepted cost: this doesn't fix
+the Problem Library's separate inability to distinguish which METHOD a problem asks for (three
+pentagon and two hexagon cards still target the same side length across methods) — `matches()`
+only compares numbers, tracked as its own finding, not addressed here. Also: the same
+target-equals-default collision was found in three sibling Diploma topics
+(`topic_1_3_tangent_lines`, `topic_1_6_ogee_curves`, `topic_2_4_involutes`) during this audit —
+not fixed here, flagged as a follow-up sweep. No RULES.md rule currently requires a target to
+differ from its construction's defaults; this ADR records the reasoning so a future rule addition
+(and the audit script that would enforce it) has a citation.
+**Status:** Active.
+
+---
+
+## ADR-159: Regular Polygons' Play/Play All animation gets a whole-call time budget and a "Skip to end" control
+
+**Date:** 2026-08-11
+**Decision:** `graphics_diploma_module_1_topic_1_4_regular_polygons/src/renderConstruction.js`'s
+`playSteps()` sums `durationFor()` across whatever step list it was handed and, if the total
+exceeds `PLAY_BUDGET_MS` (20000ms), scales every step's duration down by the same factor (floored
+at `MIN_STEP_MS = 200`). Measured against the real geometry, every construction's own default
+already ran 22–37s of unskippable animation before this change, and N-Gon/Semicircle Division at
+`n=12` ran 75.6s (Phase A audit finding E5). The budget is applied identically to every
+`playSteps()` call — `main.js`'s `play()` (Play/Play All, the whole recipe) and `revealSlide()`
+(Step Through, one slide) are not special-cased against each other.
+
+`main.js`'s `play()` now accepts `{ onComplete }`, mirroring `revealSlide()`'s existing shape, and
+`simController` gains `skipToEnd()` — a one-line wrapper over the already-existing
+`showStepsUpTo(fullLength)` (no new render path). `uiManager.js`'s `#btn-play-construction` and
+`#btn-play-all` relabel to "Skip to end" while their animation is in flight and call `skipToEnd()`
+instead of silently cancel-and-restarting, which is what a second click did before this change
+with no signal on screen that anything had happened.
+
+Separately fixes Phase A finding E15's Play-All half: `uiManager.js` previously set
+`stepIdx = slideCount() - 1` synchronously in Play All's click handler, so Step Through's own
+caption/counter/Back-Next state claimed "fully drawn" while the animation was still running. That
+write now happens only in `sim.play()`'s `onComplete`; `renderStepThrough()` gained a
+`playAllInFlight` branch to render the true in-between state (caption "Playing all steps…",
+Back and Next both disabled) instead of leaving the previous slide's stale state on screen.
+
+**Why:** Rejected lowering `durationFor()`'s flat per-kind constants instead (e.g. 1800→1100ms) —
+a flat cut only takes the `n=12` worst case to ~46s, it does not solve the actual "no ceiling on a
+whole call" problem, and it slows down every short construction (pentagon, hexagon, N-Gon at low
+`n`) that never had a complaint against it. A whole-call budget scales exactly the calls that need
+it and leaves the rest at `durationFor()`'s literal, already-tuned pace.
+
+Rejected exempting Step Through's `revealSlide()` calls from the budget entirely (i.e., applying
+it only when `play()`'s full-recipe call is the caller). Verifying every `(method, n)` combination
+the N-Gon slider allows (3–12), not just eyeballing `n=12`, found two individual slides — Semicircle
+Division's final "Join every side" slide at `n=12` (11 lines, 20.4s raw) and Perpendicular
+Bisector's "cut every vertex" slide at `n≥11` (up to 12 arcs grouped into one `mark()` call, 24s
+raw) — that exceed the 20s budget entirely on their own, independent of Play All. A caller-based
+exemption would have let those two slides keep running unbounded, which is the exact defect this
+ADR exists to close. Applying the budget uniformly means the two slides get the same mild
+compression (7–17%, not perceptible as a stopwatch difference) Play All gets; every other slide —
+the large majority — is already under budget and renders unaffected, so "Step Through's pacing is
+effectively untouched" still holds as a practical claim, just not as an absolute one caller-based
+exemption would have made true by construction. See DESIGN.md §8 for the full numeric verification.
+
+Rejected a dedicated `#btn-skip` element alongside the existing Play buttons — the audit's own
+U10/U11 findings already flag the Construct step as five undifferentiated stacked blocks at one
+spacing rhythm; a relabel-in-place needed no new markup, no new CSS rule, and no new colour token,
+where a second button would have added a sixth block to a stack already flagged as too flat.
+
+**Consequences:** Easier: a student who has seen enough of a construction (or who accidentally
+re-clicked Play) has an actual way out, on every construction, not just the two with Step Through.
+No construction's Play animation now exceeds ~21s. Harder / accepted cost: `durationFor()` itself
+is still purely kind-based, not proportional to an arc's actual sweep angle or a line's actual
+length — two constructions with the same step COUNT but very different visual complexity still
+play at the same nominal pace before budget-scaling; that is a separate, larger question this ADR
+does not address. Also: Perpendicular Bisector's "cut every vertex" slide grouping every large-`n`
+vertex-cut into one slide (rather than one-per-vertex, the way Semicircle Division does it) is what
+produces its 24s worst-case single-slide duration — a slide-granularity question, not a pacing one,
+flagged here but not changed.
+**Status:** Active.
+
+---
+
+## ADR-160: Regular Polygons' Construct step gets a three-tier spacing rhythm, replacing one flat 12px gap used for everything
+
+**Date:** 2026-08-11
+**Decision:** A standalone design audit (Phase A, source-only, no live page inspected at review
+time) flagged the Construct step's recent additions — the method switcher, step note (ADR-154),
+Step Through/Play All (ADR-159 and earlier this session), replay hint — as individually well-documented
+but collectively flat: `.construct-actions` and `.step-through` both used `gap: var(--space-3)`
+(12px) for every relationship, whether it was Back/Next's own row, Play All under that row, or
+unrelated widgets like the method switcher and Step Through. Fixed as one pass across
+`index.html`'s CSS and `uiManager.js`'s `renderStepThrough()`, not five separate patches:
+
+- **Three spacing tiers, zero new tokens** (RULES §4.1/§4.16 — reused `--space-2`/`-3`/`-4`):
+  `--space-2` for same-control pairs (Back/Next, and now the Step Through caption to its row),
+  `--space-3` for an alternate action inside one widget (Play All under Back/Next — demotes it
+  from reading as a third navigation step to reading as a second reveal mode), `--space-4`
+  between genuinely distinct widgets (`.construct-actions`' own gap). Net height change: +4px on
+  the whole Construct-step stack.
+- **`#step-lead` promoted** to `--text-base`/`--color-ink` (an id-level override, `.card__lead`
+  itself untouched) so it outranks `#step-note-body` immediately below it — both were
+  `--text-sm`/ink-secondary with nothing but a small mono eyebrow between them, reading as one
+  grey wall.
+- **`.construct-actions { align-items: center }` deleted.** Every child is already `width: 100%`
+  by its own rule except `#construct-replay-hint`, so `center` had exactly one effect: wrongly
+  centring the one line of the group that should read as left-aligned card prose (and making its
+  own `max-width: 60ch` a dead rule in the process). Default `stretch` fixes both.
+- **`.step-through__caption` gains an `.is-idle` state**, toggled in `renderStepThrough()`. At
+  rest its accent-soft "primary content" treatment (ADR from the caption's own promotion, §4 of
+  this topic's `DESIGN.md`) was being spent on copy that just restated the button 40px below it
+  ("Press Step Through to begin." / "Step Through"). Idle drops to the same quiet chrome as the
+  rest of the panel; the wash returns once a real slide caption (or "Playing all steps…") is
+  actually there to promote. Copy unchanged — a visual-weight fix, not a rewrite.
+
+**Why:** Rejected fixing each of the five findings as independent one-line patches (e.g. just
+deleting `align-items: center`, just bumping `#step-lead`'s color). The audit's own framing was
+that the flatness was the defect — five locally-correct additions that never agreed on a shared
+rhythm — so patching them independently would have left the same "everything is `--space-3`"
+baseline underneath four unrelated exceptions, no more coherent than before. A single three-tier
+scheme, chosen once and applied everywhere in the Construct step, is what makes tight/medium/loose
+*mean* something (same control / same widget / different widgets) rather than being incidental.
+
+Rejected new copy for the idle caption (e.g. previewing the slide count) as the fix for U12 —
+considered, but it turns a layout pass into a content/pedagogy decision (what's actually useful to
+tell a student before they've clicked anything), which this audit wasn't scoped to make. Demoting
+the box's visual weight at rest is a mechanical, reversible fix that resolves the actual complaint
+(a promoted box with nothing to say) without answering a question nobody asked yet.
+
+**Consequences:** Easier: the Construct step now has a real, inspectable hierarchy — a student's
+eye can tell "these two buttons are one thing, that one is different, this is a separate control"
+from spacing alone, which RULES' 44px/token discipline never addressed on its own. Harder /
+accepted cost: three spacing tiers is one more rule for future additions to this step to follow
+correctly (the exact failure mode that produced U10 in the first place — reused `--space-3`
+because it was already there, not because it was the right relationship); no enforcement beyond
+this ADR and the inline comments at each rule. Not addressed by this pass, flagged as open:
+U13 (Step Through's caption is byte-identical to `#result-warning`'s recipe — a platform-level
+gap, root DESIGN.md only defines one accent-wash callout) and Step 1's own two-consecutive-
+`.card__lead` stack (a different pairing than `#step-lead`/`#step-note-body`, doesn't reproduce on
+Construct, not touched here).
+**Status:** Active.
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*
