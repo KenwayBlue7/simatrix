@@ -1,16 +1,16 @@
-# Graph Report - Module2  (2026-08-11)
+# Graph Report - Module2  (2026-08-04)
 
 ## Corpus Check
-- 29 files · ~107,368 words
+- 29 files · ~106,637 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 448 nodes · 819 edges · 26 communities (22 shown, 4 thin omitted)
+- 443 nodes · 814 edges · 27 communities (22 shown, 5 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 12 edges (avg confidence: 0.53)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `313f070f`
+- Built from commit: `bda9c420`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -36,8 +36,9 @@
 - 2026-06-03T13-12-43Z__index-html.md
 - Changelog
 - reset
-- teardownShowMethod
 - projectSet
+- beginShowMethod
+- methodArcEligible
 - methodBeatLabel
 - refreshLabels
 - initTerms
@@ -46,7 +47,7 @@
 1. `drawProjections()` - 27 edges
 2. `init()` - 18 edges
 3. `rebuild()` - 17 edges
-4. `Changelog` - 16 edges
+4. `Changelog` - 15 edges
 5. `applyShapeTransform()` - 14 edges
 6. `buildScene()` - 13 edges
 7. `projectSet()` - 13 edges
@@ -63,17 +64,17 @@
   main.js → src/meshAnalyzer.js
 - `refreshProjections()` --calls--> `drawProjections()`  [EXTRACTED]
   main.js → src/projectionDrawer.js
-- `applyFoldVisual()` --calls--> `easeDissolve`  [EXTRACTED]
+- `applyFoldVisual()` --calls--> `easeDraw`  [EXTRACTED]
   main.js → src/anim.js
 
 ## Import Cycles
 - None detected.
 
-## Communities (26 total, 4 thin omitted)
+## Communities (27 total, 5 thin omitted)
 
 ### Community 0 - "genericPrism.js"
 Cohesion: 0.10
-Nodes (34): computeSeating(), createSolidMesh(), projectSequentialBothPlanesPose(), projectSetPose(), buildConeGeometry(), createCone(), cssColor(), rootStyle (+26 more)
+Nodes (31): createSolidMesh(), buildConeGeometry(), createCone(), cssColor(), rootStyle, createCube(), cssColor(), rootStyle (+23 more)
 
 ### Community 1 - "5. Components"
 Cohesion: 0.07
@@ -81,7 +82,7 @@ Nodes (29): 1. Overview, 2. Colors, 3. Typography, 4. Elevation, 5. Components, 
 
 ### Community 2 - "main.js"
 Cohesion: 0.03
-Nodes (53): ADR-0034, ADR-0037, ADR-0038, ADR-0052, ADR-0053, ADR-0054, ADR-0055, ADR-0056 (+45 more)
+Nodes (52): ADR-0034, ADR-0037, ADR-0038, ADR-0052, ADR-0053, ADR-0054, ADR-0055, ADR-0056 (+44 more)
 
 ### Community 3 - "projectionDrawer.js"
 Cohesion: 0.10
@@ -92,8 +93,8 @@ Cohesion: 0.23
 Nodes (20): announce(), answerSheetBox(), clearProjectionMorph(), contentBox(), engageOrtho(), fitOrthoZoom(), fitPerspectiveDistance(), flattenedViewBox() (+12 more)
 
 ### Community 5 - "init"
-Cohesion: 0.06
-Nodes (30): init(), markBooted(), setupConnectorToggle(), setupMobileNotice(), syncCompareChipVisibility(), initMethodController(), ADR-0084, ADR-0085 (+22 more)
+Cohesion: 0.07
+Nodes (26): init(), markBooted(), setupConnectorToggle(), setupMobileNotice(), initMethodController(), ADR-0084, ADR-0085, ADR-0087 (+18 more)
 
 ### Community 6 - "Critique — Orthographic Projection Guided Stepper (`index.html`)"
 Cohesion: 0.13
@@ -104,8 +105,8 @@ Cohesion: 0.50
 Nodes (4): ensureWorkbenchRail(), enterWorkbench(), exitWorkbench(), syncRailToggleState()
 
 ### Community 8 - "rebuild"
-Cohesion: 0.20
-Nodes (12): applyMode(), beginShowMethod(), computeEffectiveAngles(), inclinationStageCount(), isPyramidType(), methodCanRun(), orientationAngle(), planMethodStages() (+4 more)
+Cohesion: 0.24
+Nodes (10): applyMode(), computeEffectiveAngles(), computeSeating(), isPyramidType(), orientationAngle(), projectSequentialBothPlanesPose(), projectSetPose(), PYRAMID_TYPES (+2 more)
 
 ### Community 9 - "CLAUDE.md — Simatrix Engineering Graphics Viewer"
 Cohesion: 0.17
@@ -116,16 +117,16 @@ Cohesion: 0.22
 Nodes (11): initProblemLibrary(), ENABLED_TIERS, enabledProblems(), FIELD_LABELS, groupByTier(), ADR-0083, ADR-0084, PROBLEMS (+3 more)
 
 ### Community 12 - "buildScene"
-Cohesion: 0.20
-Nodes (10): buildScene(), createEdgeOverlay(), cssColor(), cueOrthoLock(), makePlaneLabel(), makeViewLabel(), pause(), showContextLostNotice() (+2 more)
+Cohesion: 0.17
+Nodes (12): animate(), applyProjectionMorph(), buildScene(), createEdgeOverlay(), cssColor(), cueOrthoLock(), makePlaneLabel(), makeViewLabel() (+4 more)
 
 ### Community 13 - "vertexLabeler.js"
 Cohesion: 0.23
 Nodes (11): harvestAnnotations(), CHAIN, chainPositions(), GENERATOR_DASH, ADR-0084, letterFor(), numberFor(), orderRing() (+3 more)
 
 ### Community 14 - "refreshProjections"
-Cohesion: 0.11
-Nodes (27): animateFold(), applyDimensionVisibility(), applyFoldVisual(), applyProfilePlaneVisibility(), disposeActiveProjection(), drawCompare(), notifyStateChange(), positionRefLabels() (+19 more)
+Cohesion: 0.10
+Nodes (30): animateFold(), applyDimensionVisibility(), applyFoldVisual(), applyProfilePlaneVisibility(), disposeActiveProjection(), drawCompare(), handleResize(), notifyStateChange() (+22 more)
 
 ### Community 15 - "meshAnalyzer.js"
 Cohesion: 0.27
@@ -145,24 +146,24 @@ Nodes (8): Anti-Patterns Verdict, Design Health Score, Minor Observations, Overa
 
 ### Community 19 - "Changelog"
 Cohesion: 0.12
-Nodes (16): 2026-06-16, 2026-07-02, 2026-07-09, 2026-07-15, 2026-07-16, 2026-07-20, 2026-07-25, 2026-07-27 (+8 more)
+Nodes (15): 2026-06-16, 2026-07-02, 2026-07-09, 2026-07-15, 2026-07-16, 2026-07-20, 2026-07-25, 2026-07-27 (+7 more)
 
 ### Community 20 - "reset"
 Cohesion: 0.08
-Nodes (36): cssVar(), drawMethodGhost(), drawMethodLabels(), drawMethodSheet(), drawMethodView(), fillMethodTris(), handleResize(), lineArrayUnitCount() (+28 more)
-
-### Community 21 - "teardownShowMethod"
-Cohesion: 0.25
-Nodes (8): abortShowMethod(), animate(), applyProjectionMorph(), endShowMethod(), resume(), startLoop(), teardownShowMethod(), tick()
+Nodes (36): abortShowMethod(), cssVar(), drawMethodGhost(), drawMethodLabels(), drawMethodSheet(), drawMethodView(), endShowMethod(), fillMethodTris() (+28 more)
 
 ### Community 22 - "projectSet"
 Cohesion: 0.20
 Nodes (11): axisInclinations(), formatSetLabel(), harvestLabelGroup(), harvestLineGroup(), harvestTriGroup(), methodContentBeats(), methodFlattenHP(), methodFlattenVP() (+3 more)
 
+### Community 23 - "beginShowMethod"
+Cohesion: 0.33
+Nodes (7): beginShowMethod(), inclinationStageCount(), methodCanRun(), pause(), planMethodStages(), stopLoop(), trueShapeForPlane()
+
 ## Knowledge Gaps
-- **181 isolated node(s):** `rootStyle`, `DEFAULT_CAMERA_POSITION`, `DEFAULT_CAMERA_TARGET`, `DEFAULT_VIEW_DIR`, `QUICK_VIEWS` (+176 more)
+- **176 isolated node(s):** `rootStyle`, `DEFAULT_CAMERA_POSITION`, `DEFAULT_CAMERA_TARGET`, `DEFAULT_VIEW_DIR`, `QUICK_VIEWS` (+171 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **4 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -170,14 +171,14 @@ _Questions this graph is uniquely positioned to answer:_
 - **Why does `drawProjections()` connect `projectionDrawer.js` to `main.js`, `projectSet`, `refreshProjections`?**
   _High betweenness centrality (0.038) - this node is a cross-community bridge._
 - **Why does `planAnnotations()` connect `vertexLabeler.js` to `main.js`?**
-  _High betweenness centrality (0.008) - this node is a cross-community bridge._
+  _High betweenness centrality (0.009) - this node is a cross-community bridge._
 - **Why does `initUIManager()` connect `init` to `main.js`?**
   _High betweenness centrality (0.005) - this node is a cross-community bridge._
 - **What connects `rootStyle`, `DEFAULT_CAMERA_POSITION`, `DEFAULT_CAMERA_TARGET` to the rest of the system?**
-  _182 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _177 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `genericPrism.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.0951219512195122 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.10384068278805121 - nodes in this community are weakly interconnected._
 - **Should `5. Components` be split into smaller, more focused modules?**
   _Cohesion score 0.06666666666666667 - nodes in this community are weakly interconnected._
 - **Should `main.js` be split into smaller, more focused modules?**
-  _Cohesion score 0.03389830508474576 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.034482758620689655 - nodes in this community are weakly interconnected._
