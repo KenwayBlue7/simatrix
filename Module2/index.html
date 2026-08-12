@@ -836,13 +836,92 @@
       line-height: 1;
     }
     /* Collapsed: drop the rail out of the grid (its row + gap reclaimed) and flip the
-       chevron to point back down toward where the rail will reappear. */
+       chevron to point back down toward where the rail will reappear. Scoped to #rail-toggle
+       (not every .rail-toggle) so #method-pose-reset's own icon — the same base class, a
+       different glyph with no "flip" meaning — can never inherit this transform even though
+       the two modes' classes are not expected to co-occur (exitWorkbench() already clears
+       rail-collapsed before method-split can be entered). */
     body.rail-collapsed #workbench-rail { display: none !important; }
-    body.rail-collapsed .rail-toggle__icon { transform: rotate(180deg); }
+    body.rail-collapsed #rail-toggle .rail-toggle__icon { transform: rotate(180deg); }
     body.compare-split.rail-collapsed {
       grid-template-rows: minmax(0, 1fr);
       grid-template-areas: "view compare";
     }
+
+    /* ============================================================
+       Show Method — 3D pose-visualizer mode (ADR-085 amendment; RULES.md §5.16c). A SECOND,
+       independent docked split — NOT the Compare workbench above (mutually exclusive; entering
+       this mode closes Compare first, main.js enterMethodPose). §5.16a's "Compare has exactly
+       one shape" is Compare's own rule; this is a different feature with its own ratio (§5.16c),
+       still a docked grid, never a floating/compact card.
+         ┌───────────┬───────────────────────┐
+         │  3D pane  │   #method-view (sheet) │   ← one row, 3fr/7fr columns
+         │  (30%)    │   (70%)                │
+         └───────────┴───────────────────────┘
+       #sim-viewport and #method-view are BOTH already direct <body> children (unlike Compare's
+       #compare-card, which enterWorkbench re-parents out of #sim-viewport first) — so this is
+       grid-area assignment only, no re-parenting, no JS sizing change (handleResize measures
+       #sim-viewport exactly as it already does outside this mode). #method-view drops its own
+       position:fixed/inset:0 (the plain-takeover shape) for a normal grid cell while this class
+       is on; ADR-085's original takeover markup/CSS is otherwise untouched — this class is the
+       only thing toggling between the two container shapes. */
+    body.method-split {
+      display: grid;
+      grid-template-columns: 3fr 7fr;
+      grid-template-rows: minmax(0, 1fr);
+      grid-template-areas: "view method";
+      background: var(--color-panel);
+      gap: var(--space-4);
+      padding: var(--space-4);
+    }
+    body.method-split #sim-viewport {
+      grid-area: view;
+      min-width: 0;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      overflow: hidden; /* clip the WebGL canvas to the rounded corners, matches compare-split */
+    }
+    body.method-split #method-view {
+      position: relative; /* was fixed; inset:0 — see the block comment above */
+      inset: auto;
+      grid-area: method;
+      z-index: auto;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: none;  /* docked grid cell, not a transient overlay — the .method-view base
+                            rule's --shadow-md is the takeover shape's Flat-Ink exception
+                            (DESIGN.md §4.2) and does not carry over here. */
+      overflow: hidden;  /* clip .method-view__stage + #method-canvas to the rounded corners,
+                            same as #sim-viewport above and .compare-card's own base rule. */
+    }
+    /* The wizard is collapsed BY this mode too (same reasoning as compare-split: the reserved
+       panel cramps both panes) — #method-exit is this mode's own way back, mirroring how the
+       still-visible Compare chip is that split's only exit. */
+    body.method-split #wizard,
+    body.method-split #wizard-toggle { display: none; }
+    /* #method-pose-reset (index.html, beside #rail-toggle) — hidden by default via the shared
+       .rail-toggle base rule; floats at the 3D pane's bottom-left, exactly like #rail-toggle
+       does for the Compare split's own viewport pane. */
+    body.method-split #method-pose-reset {
+      display: inline-flex;
+      grid-area: view;
+      align-self: end;
+      justify-self: start;
+      margin: var(--space-4);
+    }
+    /* Pose mode is the first container that ever EXPOSES #sim-viewport (the plain ADR-085
+       takeover just covers it) — so two of .vp-cluster's controls, dead here, surface for the
+       first time (ADR-163 follow-up, RULES.md §5.16c). Hidden, not padlocked (DESIGN.md §5.4's
+       padlock is for a control HIERARCHY within one panel; this is a container swap, the repo's
+       settled idiom for that is display:none — body.compare-split #wizard, .rail-toggle itself).
+       Compare chip: enterMethodPose() already calls compare.hide() up front because the two
+       docked grids can't coexist, and opening it would run enterWorkbench()'s unconditional
+       unflatten() — destroying methodCanRun()'s own foldProgress===1 precondition. Connector
+       lines: provably inert here — setMethodPoseVisible(true) has already hidden every group
+       the toggle can reach (main.js). The quick-view chips (Top/Front/Side) stay: they are a
+       legitimate way to inspect the pose, and resetMethodPoseCamera un-latches them itself. */
+    body.method-split #compare-chip,
+    body.method-split .connector-toggle { display: none; }
 
     /* ---- 44px hit-area floor (DESIGN.md). These viewport-corner controls stay visually
        compact so the chrome stays quiet, but a transparent, centred ::before guarantees a
@@ -2077,6 +2156,15 @@
         grid-template-areas: "view" "compare";
       }
 
+      /* Show Method's pose-visualizer split (RULES.md §5.16c mirrors ADR-080's restack rule for
+         Compare): 3D on top, the sheet given the larger share underneath — the drawing is the
+         deliverable at this width, the 3D pane is the explanation. */
+      body.method-split {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) minmax(0, 2fr);
+        grid-template-areas: "view" "method";
+      }
+
       /* The panel now stacks BELOW the viewport, so the chevron points along that
          axis instead of sideways: down = push the panel closed, up = pull it back
          open (drawer-from-bottom). +90° offset over the desktop right/left states. */
@@ -2241,6 +2329,12 @@
                the Set 2 -> Set 3 turn even when it skips into Set 3 — Skip exists to cut click
                cost, playing a 1.65s animation there fights that. -->
           <button type="button" class="btn btn--small" id="method-skip-set">Skip to next Set</button>
+          <!-- ADR-085 amendment (3D pose-visualizer mode): the SECOND Show Method container —
+               body.method-split, a live 30/70 3D+sheet split — toggled live, mid-walkthrough,
+               without losing curSet/curBeat/focusSet. aria-pressed mirrors the mode; label swaps
+               (the #btn-dimensions/#btn-flatten idiom). methodController.js wires this; main.js
+               drives simController.method.setPoseMode via enterMethodPose/exitMethodPose. -->
+          <button type="button" class="btn btn--small" id="method-3d" aria-pressed="false">3D view</button>
           <button type="button" class="btn btn--small" id="method-exit">Exit method</button>
         </div>
       </div>
@@ -2737,6 +2831,32 @@
       <path d="M6 9l6 6 6-6" />
     </svg>
     <span class="rail-toggle__text">Hide</span>
+  </button>
+
+  <!-- Show Method's 3D pose-visualizer reset-camera affordance (ADR-085 amendment; renamed +
+       re-iconed in the ADR-163 follow-up). Same precedent as #rail-toggle above: a direct
+       <body> child (not nested inside #method-view, which owns the sheet pane, not the 3D one —
+       #sim-viewport is a SIBLING body child, see the container note on ADR-085's original
+       decision), claiming grid-area:view so it floats at the 3D pane's bottom-left. Only visible
+       while body.method-split is active (see CSS below). Deliberately OUTSIDE #method-view's own
+       focus trap (methodController.js focusables() only queries inside #method-view) — correct,
+       not an oversight: entering this mode sets #method-view's aria-modal to "false" precisely
+       because a live, orbitable pane now sits beside it and the rest of the document is no
+       longer inert, so this button is reached the same way the quick-view chips and #rail-toggle
+       already are. Wired in methodController.js (poseResetBtn) to
+       simController.method.resetPoseView() — recentres/refits the CURRENT camera direction on
+       the posed solid rather than snapping to an unrelated default angle (resetMethodPoseCamera's
+       own header). Icon: the platform's existing four-corner frame/fit glyph (same one used for
+       "Expand compare view" in the Sections-of-Solids and Understanding-Orthographic-Views
+       topics), not the platform's circular-arrow undo glyph — this button only re-centres/
+       re-fits, it never discards anything, and the module already has a genuinely destructive
+       #btn-reset behind a two-state confirm; the old circular-arrow (plus a headless "arrow" that
+       was really just a bracket) read as "wipe my work". Label follows: "Reset camera". -->
+  <button id="method-pose-reset" class="rail-toggle" type="button" aria-label="Reset camera" title="Reset camera">
+    <svg class="rail-toggle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M9 3H5a2 2 0 0 0-2 2v4M15 3h4a2 2 0 0 1 2 2v4M9 21H5a2 2 0 0 1-2-2v-4M15 21h4a2 2 0 0 0 2-2v-4" />
+    </svg>
+    <span class="rail-toggle__text">Reset camera</span>
   </button>
 
   <!-- Live region: main.js + stepper.js narrate step + mode changes for screen readers. -->

@@ -57,7 +57,14 @@ export function initMethodController(sim) {
   const skipBtn = document.getElementById('method-skip-set'); // ADR-087 Decision 2
   const exitBtn = document.getElementById('method-exit');
   const replayBtn = document.getElementById('method-replay-turn'); // ADR-105: turn replay control
-  if (!viewEl || !chipRow || !captionEl || !nextBtn || !backBtn || !skipBtn || !exitBtn || !replayBtn) {
+  // ADR-085 amendment (3D pose-visualizer mode): the SECOND takeover container (body.method-split
+  // 30/70 3D+sheet), toggled live via sim.method.{poseMode,setPoseMode}. poseResetBtn is a QoL
+  // affordance (index.html #method-pose-reset, a direct <body> sibling of #method-view — see its
+  // own markup comment for why) — optional-chained rather than required below, since its absence
+  // would only cost the reset-view shortcut, not the mode toggle itself.
+  const pose3dBtn = document.getElementById('method-3d');
+  const poseResetBtn = document.getElementById('method-pose-reset');
+  if (!viewEl || !chipRow || !captionEl || !nextBtn || !backBtn || !skipBtn || !exitBtn || !replayBtn || !pose3dBtn) {
     // Takeover markup missing (shouldn't happen — index.html ships it) — degrade to a no-op
     // rather than throw, matching problemLibrary.js's own ac.abort()-guarded degrade shape.
     return { sync: () => {}, dispose: () => {} };
@@ -216,6 +223,17 @@ export function initMethodController(sim) {
     }
   }
 
+  /** ADR-085 amendment — mirror the pose-mode toggle's aria-pressed + label against the engine's
+   *  own `sim.method.poseMode()` flag, the single source of truth (this controller never tracks
+   *  the mode itself, same "engine owns it, controller reflects it" shape as renderProgress's own
+   *  reads). Called on start() (always false there — beginShowMethod never enables pose mode) and
+   *  right after the toggle's own click. */
+  function syncPoseButton() {
+    const on = sim.method.poseMode();
+    pose3dBtn.setAttribute('aria-pressed', String(on));
+    pose3dBtn.textContent = on ? 'Sheet only' : '3D view';
+  }
+
   function start() {
     if (running) return;
     const ok = sim.method.begin();
@@ -231,6 +249,7 @@ export function initMethodController(sim) {
     if (btnShowMethod) btnShowMethod.hidden = true;
     renderChips();
     renderProgress();
+    syncPoseButton(); // ADR-085 amendment — always starts in sheet-only mode
     captionEl.textContent = sim.method.beatLabel(curSet, curBeat); // ADR-094
     nextBtn.focus();
     sim.announce(`Show Method started. Set 1 of ${setCount} — ${sets[0]?.label ?? ''}.`);
@@ -356,6 +375,15 @@ export function initMethodController(sim) {
   // (startMethodTilt cancels a live tilt before starting a new one, the same ADR-091
   // cancel-and-snap contract Next already relies on).
   replayBtn.addEventListener('click', () => sim.method.playTilt(), listen);
+  // ADR-085 amendment — live mid-walkthrough toggle, curSet/curBeat/focusSet untouched either
+  // direction (enterMethodPose/exitMethodPose, main.js). Both directions are no-ops outside
+  // their own valid transition (already-in/already-out), so this reads the CURRENT state fresh
+  // on every click rather than tracking a local mirror that could drift from the engine's own.
+  pose3dBtn.addEventListener('click', () => {
+    sim.method.setPoseMode(!sim.method.poseMode());
+    syncPoseButton();
+  }, listen);
+  poseResetBtn?.addEventListener('click', () => sim.method.resetPoseView(), listen);
   viewEl.addEventListener('keydown', onViewKeydown, listen);
 
   /** Re-evaluate the Step-6 trigger's visible/enabled state AND reconcile against an EXTERNAL

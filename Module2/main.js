@@ -87,6 +87,14 @@ const FIT_PADDING = 1.1;
  *  never touches the viewport edge. */
 const FRAME_PADDING = 1.1;
 
+/** Padding for the Show Method 3D pose-visualizer's own fit (resetMethodPoseCamera) — wider
+ *  than FRAME_PADDING's 10%. That margin is tuned for the full-width viewport; in pose mode's
+ *  narrow 30% pane the same 10% crops the HP/VP reference planes right at the solid's
+ *  silhouette, which defeats the mode's own point (inclination read AGAINST the planes).
+ *  1.6 matches the platform's existing "not too tight" capped content-fit precedent (ADR-155,
+ *  Regular Polygons' default zoom) rather than inventing a new ratio. */
+const METHOD_POSE_FRAME_PADDING = 1.6;
+
 /** Auto-zoom dolly duration. Snappier than the quick-view move (CAMERA_MOVE_MS) so it keeps
  *  up with a height-slider drag — each rebuild restarts the dolly toward the new distance. */
 const AUTO_ZOOM_MS = 500;
@@ -1544,16 +1552,18 @@ function fitPerspectiveDistance(box, pivot, dir, up, padding = FRAME_PADDING) {
 }
 
 /**
- * Point the perspective camera at the live solid and dolly to a FRAME_PADDING fill along `dir`
+ * Point the perspective camera at the live solid and dolly to a `padding` fill along `dir`
  * (unit, target→camera), recentring controls.target on the solid centre. Does NOT call
  * controls.update(): instant callers (first solid) update after; the unfold glide reads the new
  * camera.position / controls.target as its destination and animates there.
  * @param {THREE.Vector3} dir  unit view direction (target→camera)
+ * @param {number} [padding=FRAME_PADDING]  overridden by resetMethodPoseCamera
+ *   (METHOD_POSE_FRAME_PADDING) — every other caller keeps the default full-viewport fit.
  */
-function frameToSolid(dir) {
+function frameToSolid(dir, padding = FRAME_PADDING) {
   const box = contentBox();
   const center = box.getCenter(new THREE.Vector3());
-  const D = fitPerspectiveDistance(box, center, dir, camera.up);
+  const D = fitPerspectiveDistance(box, center, dir, camera.up, padding);
   controls.target.copy(center);
   camera.position.copy(center).addScaledVector(dir, D);
 }
@@ -2585,6 +2595,14 @@ let methodActive = false;          // walkthrough is running (the takeover is op
 let methodSets = [];                // built ONCE per method.begin(): [{ label, z0, data, eff }]
 let methodSet = 0;                  // 0-based index of the Set currently being drawn
 let methodBeat = 0;                 // 0-based beat index within methodSet (see BEAT ORDER, drawMethodSheet)
+/** ADR-085 amendment (3D pose-visualizer mode) — the takeover's SECOND container: a live
+ *  `body.method-split` 30/70 grid (3D pane left, sheet right) instead of the plain full-viewport
+ *  sheet. Gates the pose-mode-only behaviour scattered through this section: the private rAF pump
+ *  (startMethodBeatAnim/startMethodFocusAnim/startMethodTilt) must NOT start while this is true —
+ *  see enterMethodPose's own header for why — and setMethodProgress/setMethodFocus only drive
+ *  applyMethodPose while it is. See enterMethodPose/exitMethodPose below (defined beside
+ *  startMethodTilt) for the full contract. */
+let methodPoseMode = false;
 /** Set-N focus (main.js CLAUDE.md naming note, ADR-084/085): purely visual — which Set's block
  *  the camera lens (methodPanX/Y, methodZoom) is currently framed on. Independent of methodSet/
  *  methodBeat (what is DRAWN); null = the whole row. "Set" not "Stage" — .compare-card__stage
@@ -2656,7 +2674,13 @@ function startMethodFocusAnim(toPanX, toPanY, toZoom) {
   methodFocusTarget = { panX: toPanX, panY: toPanY, zoom: toZoom };
   stopMethodFocusAnim(false); // cancel a prior focus tween IN PLACE — don't snap it to ITS old target first
   methodFocusActive = true;
-  if (methodAnimRafId === null) {
+  // ADR-085 amendment (pose-visualizer mode): this private pump only exists because ADR-085's
+  // sim-loop pause means animate()'s own tickTweens never runs while the takeover is open. Pose
+  // mode does NOT pause (enterMethodPose keeps window.simAPI.resume()d), so animate() is already
+  // ticking anim.js's shared `active` Set — starting this pump too would tick every live tween
+  // TWICE per frame (2x speed). Guarded out here rather than at each of this function's 3 call
+  // sites so the guard can never drift from the one thing it protects.
+  if (!methodPoseMode && methodAnimRafId === null) {
     methodAnimLastT = 0;
     methodAnimRafId = requestAnimationFrame(methodAnimFrame);
   }
@@ -2906,7 +2930,13 @@ function startMethodBeatAnim(set, beatIndex) {
   methodAnimBeat = beatIndex;
   methodAnimIndex = 0;
   methodAnimUnitT = 0;
-  if (methodAnimRafId === null) {
+  // ADR-085 amendment (pose-visualizer mode): this private pump only exists because ADR-085's
+  // sim-loop pause means animate()'s own tickTweens never runs while the takeover is open. Pose
+  // mode does NOT pause (enterMethodPose keeps window.simAPI.resume()d), so animate() is already
+  // ticking anim.js's shared `active` Set — starting this pump too would tick every live tween
+  // TWICE per frame (2x speed). Guarded out here rather than at each of this function's 3 call
+  // sites so the guard can never drift from the one thing it protects.
+  if (!methodPoseMode && methodAnimRafId === null) {
     methodAnimLastT = 0;
     methodAnimRafId = requestAnimationFrame(methodAnimFrame);
   }
@@ -2973,7 +3003,13 @@ function startMethodTilt() {
   methodTiltMotionT = 0;
   methodTiltAlpha = 1;
   methodTiltActive = true;
-  if (methodAnimRafId === null) {
+  // ADR-085 amendment (pose-visualizer mode): this private pump only exists because ADR-085's
+  // sim-loop pause means animate()'s own tickTweens never runs while the takeover is open. Pose
+  // mode does NOT pause (enterMethodPose keeps window.simAPI.resume()d), so animate() is already
+  // ticking anim.js's shared `active` Set — starting this pump too would tick every live tween
+  // TWICE per frame (2x speed). Guarded out here rather than at each of this function's 3 call
+  // sites so the guard can never drift from the one thing it protects.
+  if (!methodPoseMode && methodAnimRafId === null) {
     methodAnimLastT = 0;
     methodAnimRafId = requestAnimationFrame(methodAnimFrame);
   }
@@ -3023,6 +3059,244 @@ function queueMethodRedraw() {
     methodRedrawQueued = false;
     if (methodViewOpen) drawMethodView();
   });
+}
+
+// ============================================================================
+// Show Method — 3D pose-visualizer mode (ADR-085 amendment). A SECOND container for the same
+// takeover: `body.method-split` splits the viewport 30/70 (live 3D pane left, the same n-Set
+// sheet right) instead of the plain full-viewport takeover. Toggled live, mid-walkthrough, by
+// methodController.js's #method-3d button — curSet/curBeat/focusSet are untouched by either
+// direction. Deliberately NOT `enterWorkbench()`: that call force-unflattens (breaks
+// methodCanRun's own foldProgress===1 precondition) and re-parents WORKBENCH_CONTROLS into a
+// live #workbench-rail beside a walkthrough one slider nudge invalidates — the exact two
+// grievances ADR-085 itself removed Show Method FROM Compare to fix. #method-view and
+// #sim-viewport are both already direct <body> children, so the split is CSS grid-area only —
+// no re-parenting, unlike compare-split's own #compare-card move.
+// ============================================================================
+
+/** Slow — the rotation IS the pedagogy this mode exists to show, not a transition to rush past.
+ *  Matches the platform's other deliberately-slow moves (QUICK_VIEW_MS=1500, METHOD_TILT
+ *  ~1650ms) in register, chosen longer since a full re-pose covers more visual distance than a
+ *  quick-view snap. */
+const METHOD_POSE_MS = 2000;
+
+let methodPoseHandle = null;  // the live pose tween handle, so a new pose can cancel it in place
+let methodPoseSavedFold = 0;  // foldProgress at enterMethodPose() — restored verbatim on exit
+let methodPoseSavedMesh = null; // currentMesh identity at enter — guards the exit restore (below)
+let methodPoseSavedPose = null; // { q, p } cloned from the live mesh at enter
+
+/** Show or hide everything that belongs to the LIVE pose while the pose-visualizer's own Set
+ *  pose occupies currentMesh/currentEdgeOverlay. HP/VP grids + pills are NOT touched here — they
+ *  are reference planes, correct at every pose, exactly what inclination is measured against.
+ *  Also drops the PP/side view unconditionally while posing (ADR-088 already excludes it from
+ *  the replay, same call here — restored to `showSideViewFlag` on exit).
+ *
+ *  `activeProjection.group` (hpGroup + connectorGroup, projectionDrawer.js:946 — vpGroup is
+ *  re-parented OUT of it into vpFoldGroup by refreshProjections, so `group` alone never covers
+ *  the front view), `vpGroup`, and `ppConnectorGroup` need a direct `.visible` toggle — nothing
+ *  else already gates them at foldProgress 0 (`flatConnectorGroup` is already fully transparent
+ *  there via applyFoldVisual's own `clamp(p*3-2, 0, 1)`, and `ppGroup`'s parent `ppHingeGroup` is
+ *  covered by the `applyProfilePlaneVisibility` call below). The dimension groups carry live
+ *  CSS2D labels the r160 CSS2DRenderer renders regardless of ancestor `.visible` (the same gotcha
+ *  the PP pill has) — routed through the existing `applyDimensionVisibility` helper instead of a
+ *  second, incomplete traversal here. Idempotent both directions. */
+function setMethodPoseVisible(on) {
+  if (activeProjection) {
+    if (activeProjection.group) activeProjection.group.visible = !on;
+    if (activeProjection.vpGroup) activeProjection.vpGroup.visible = !on;
+    if (activeProjection.ppConnectorGroup) activeProjection.ppConnectorGroup.visible = !on;
+  }
+  applyDimensionVisibility(on ? false : showDimensionsFlag);
+  applyProfilePlaneVisibility(on ? false : showSideViewFlag);
+  labeler?.setOpacity(on ? 0 : (foldProgress < 1 ? 1 : 0));
+}
+
+/** Write Set `setIndex`'s stored pose (q/seat — see projectSet's own header for why these are
+ *  provably the exact pose, including the ADR-093 sequential yaw for a both-planes Set 3) onto
+ *  BOTH currentMesh and currentEdgeOverlay — the overlay is a SIBLING that copies the mesh's
+ *  transform at rebuild() time (main.js:942-945), not a child, so it never follows the mesh
+ *  automatically. `animate`: false snaps instantly (mode entry, so the learner doesn't watch an
+ *  unexplained tween before Next is even clicked); true tweens over METHOD_POSE_MS via a
+ *  quaternion SLERP (never Euler-lerp — Set 3's pose is a composed quaternion, `yaw · q1`, not an
+ *  Euler at all; see projectSequentialBothPlanesPose) + a linear lerp on seat.x/seat.y. Rides
+ *  animate()'s own tickTweens — pose mode keeps the sim loop running (see enterMethodPose), so
+ *  this deliberately does NOT start the private methodAnimFrame pump (that guard lives in
+ *  startMethodBeatAnim/startMethodFocusAnim/startMethodTilt themselves). */
+function applyMethodPose(setIndex, animate) {
+  if (!methodPoseMode || !currentMesh) return;
+  const set = methodSets[setIndex];
+  if (!set?.q || !set?.seat) return;
+  methodPoseHandle?.cancel(); // cancel-and-snap (ADR-091 idiom) — a new pose always wins outright
+  const mesh = currentMesh;
+  const overlay = currentEdgeOverlay;
+  const write = (q, x, y) => {
+    mesh.quaternion.copy(q);
+    mesh.position.x = x;
+    mesh.position.y = y;
+    if (overlay) {
+      overlay.quaternion.copy(q);
+      overlay.position.x = x;
+      overlay.position.y = y;
+    }
+  };
+  if (!animate) {
+    write(set.q, set.seat.x, set.seat.y);
+    return;
+  }
+  const fromQ = mesh.quaternion.clone();
+  const fromX = mesh.position.x;
+  const fromY = mesh.position.y;
+  const liveQ = new THREE.Quaternion();
+  methodPoseHandle = tween({
+    from: 0,
+    to: 1,
+    duration: METHOD_POSE_MS,
+    ease: easeFold, // the platform's "physical hinge" curve — same as the fold + the Set-to-Set ghost
+    onUpdate: (t) => {
+      liveQ.slerpQuaternions(fromQ, set.q, t);
+      write(liveQ, THREE.MathUtils.lerp(fromX, set.seat.x, t), THREE.MathUtils.lerp(fromY, set.seat.y, t));
+    },
+    onComplete: () => { methodPoseHandle = null; },
+  });
+}
+
+/** Fit affordance (spec: "small reset view affordance", camera is otherwise preserved across
+ *  Set changes by design — see #method-pose-reset's own markup comment for the "Reset camera"
+ *  naming). Reuses simController.unflatten's own orbit-angle-preserving idiom
+ *  (main.js:5305-ish) rather than a hard snap to DEFAULT_CAMERA_POSITION: re-centres the pivot
+ *  and re-fits the distance to the CURRENT solid+pose along whichever direction the learner is
+ *  already looking from, so "fit" recovers a lost/clipped framing without yanking the view back
+ *  to an unrelated default angle. Uses METHOD_POSE_FRAME_PADDING (wider than the platform's
+ *  usual FRAME_PADDING) — this pane is a narrow 30% split, and the mode's whole point is
+ *  reading the solid against the HP/VP reference planes, which the tighter default crops right
+ *  at the silhouette (ADR-163 follow-up).
+ *
+ *  Also the SAME fit `enterMethodPose` runs on entry (via remeasureAfterReflow) — kept as one
+ *  function so entry framing and this button can never disagree.
+ *
+ *  Un-latches a quick view first: Top/Front/Side (setView → engageOrtho) swap the LIVE camera
+ *  to orthoCamera and can arm the ortho→perspective morph, so fitting against `camera`/
+ *  `controls` while one is active would silently do nothing (the button read as dead) or read
+ *  a mid-morph pose. restorePerspective() with no args is the plain instant hand-off (its own
+ *  header) — quick views never move `camera` itself, so its retained pose is exactly what
+ *  "un-latching" should restore. */
+function resetMethodPoseCamera() {
+  if (!methodPoseMode) return;
+  if (activeCamera !== camera) restorePerspective();
+  const dir = camera.position.clone().sub(controls.target);
+  if (dir.lengthSq() > 1e-6) frameToSolid(dir.normalize(), METHOD_POSE_FRAME_PADDING);
+  controls.update();
+}
+
+/** Enter the 3D pose-visualizer mode (methodController.js's #method-3d toggle). No-op unless
+ *  Show Method is actually running. Mutually exclusive with Compare (closes it first) and with
+ *  an in-flight fold (§5.10: the fold owns the camera). Unlike beginShowMethod(), this does NOT
+ *  pause the sim loop — a live 3D pane needs animate()'s render + tickTweens running, which is
+ *  also why the private methodAnimFrame pump must stay OFF here (see its own guard comment,
+ *  main.js's startMethodBeatAnim et al) — ticking `active` from both animate() and a private
+ *  pump would double-advance every Show Method tween. */
+function enterMethodPose() {
+  if (!methodActive || methodPoseMode || foldTween) return;
+  stopMethodBeatAnim(); // settle any in-flight beat/ghost/focus tween before the mode switch
+  if (compareOpen) compare.hide(); // mutually exclusive grid — both claim body-level layout areas
+
+  methodPoseSavedFold = foldProgress;
+  methodPoseSavedMesh = currentMesh;
+  methodPoseSavedPose = currentMesh
+    ? { q: currentMesh.quaternion.clone(), p: currentMesh.position.clone() }
+    : null;
+
+  window.simAPI?.resume(); // ADR-085 amendment: this mode needs the render loop live, see header
+  methodPoseMode = true;
+
+  applyFoldVisual(0);       // stand the VP/PP back up, fade the solid back in (display-only —
+                             // writes module `foldProgress`, restored verbatim on exit)
+  restorePerspective();     // leave the answer-sheet ortho pose for the free perspective orbit —
+                             // called with no args, so this is the INSTANT hand-off branch (its
+                             // own header), not the animated §5.18 morph: no tween is created,
+                             // clearProjectionMorph() has already zeroed projectionMorphK, and
+                             // the only path that ever arms the morph inside this mode is a
+                             // learner-latched quick view (setView → engageOrtho — see
+                             // resetMethodPoseCamera's own un-latch guard).
+  setMethodPoseVisible(true);
+  applyMethodPose(methodSet, false); // land on the CURRENT Set's pose instantly — no unexplained tween
+
+  document.body.classList.add('method-split');
+  if (methodViewEl) methodViewEl.setAttribute('aria-modal', 'false'); // §5.16c: a live pane sits
+                                                                        // beside it now — the rest
+                                                                        // of the document is no
+                                                                        // longer inert
+  // double-rAF: resizes the renderer AND re-fits the 2D sheet into 70%, THEN re-frames the
+  // camera against the new 30%-wide aspect (resetMethodPoseCamera reuses the SAME frameToSolid
+  // helper #method-pose-reset ("Reset camera") calls, so entry framing and the button can never
+  // disagree by construction). ADR-163 follow-up, corrected: the aspect itself was already
+  // correct here even before this fix (measured via a temp debug hook) — the actual over-zoom
+  // was fitPerspectiveDistance's default FRAME_PADDING (10% margin, tuned for the full-width
+  // viewport) framing the solid ALONE, cropping the HP/VP reference planes right at its
+  // silhouette in this pane's narrow 30% width. Fixed via METHOD_POSE_FRAME_PADDING (60%
+  // margin), passed through frameToSolid's new optional padding param — see
+  // resetMethodPoseCamera's own header for the full account.
+  remeasureAfterReflow(resetMethodPoseCamera);
+}
+
+/** Leave the 3D pose-visualizer mode — back to the plain full-viewport sheet takeover. Mirrors
+ *  enterMethodPose in reverse. The pose restore is IDENTITY-GUARDED: an edit mid-pose-mode
+ *  (stepper.js reflowFrom → sim.method.abort() → teardownShowMethod, which calls this FIRST) may
+ *  have already run rebuild() and replaced currentMesh before this fires — writing the
+ *  snapshotted quaternion onto a brand-new mesh would clobber ITS correct fresh pose, so the
+ *  restore only applies when the mesh is still the one this mode posed. */
+function exitMethodPose() {
+  if (!methodPoseMode) return;
+  methodPoseHandle?.cancel();
+  methodPoseHandle = null;
+  methodPoseMode = false;
+
+  if (currentMesh && methodPoseSavedMesh === currentMesh && methodPoseSavedPose) {
+    currentMesh.quaternion.copy(methodPoseSavedPose.q);
+    currentMesh.position.x = methodPoseSavedPose.p.x;
+    currentMesh.position.y = methodPoseSavedPose.p.y;
+    if (currentEdgeOverlay) {
+      currentEdgeOverlay.quaternion.copy(methodPoseSavedPose.q);
+      currentEdgeOverlay.position.x = methodPoseSavedPose.p.x;
+      currentEdgeOverlay.position.y = methodPoseSavedPose.p.y;
+    }
+  }
+  methodPoseSavedMesh = null;
+  methodPoseSavedPose = null;
+
+  // setMethodPoseVisible(false) restores the dimension/PP layers to the live showDimensionsFlag/
+  // showSideViewFlag state on its own — no separate call needed. Its own labeler-opacity write
+  // reads foldProgress before the fold restore below lands, so applyFoldVisual's own labeler
+  // write (from the RESTORED foldProgress) is intentionally the one that has the final say.
+  setMethodPoseVisible(false);
+  applyFoldVisual(methodPoseSavedFold); // back to the flat sheet — stepper's flatten latch was
+                                         // never touched, so #btn-unfold still reads correctly
+
+  // enterMethodPose's own restorePerspective() left the LIVE viewport on the free-orbit
+  // perspective camera (needed for pose mode's own orbit) — without this, the wizard's Step 6
+  // panel would reappear on that free camera instead of the clean top-down answer-sheet ortho
+  // view flatten()/swoopToAnswerSheet() had originally established, reading as "flatten broke"
+  // even though foldProgress/state is correct underneath. Re-swoop back to it — methodCanRun()
+  // required foldProgress===1 to ever enter this mode, so it is always exactly 1 here. Must run
+  // BEFORE window.simAPI?.pause() below: the swoop is a real anim.js tween (animate()'s own
+  // tickTweens must be running to advance it) — if a mid-walkthrough "Sheet only" toggle (not a
+  // full exit) freezes it right after by pausing the loop, it simply resumes and completes once
+  // teardownShowMethod's own unconditional window.simAPI?.resume() (main.js, right after this
+  // function returns on that path) restarts the loop — never a stuck half-transitioned camera.
+  // Restore the full-width layout BEFORE the swoop fits to it — swap the class first, then
+  // force the reflow with a synchronous clientWidth read (handleResize's own), so
+  // swoopToAnswerSheet's fitOrthoZoom sees the real viewport instead of the still-30% pane it
+  // would otherwise measure. Must still land ahead of simAPI.pause() below (unchanged from
+  // before — the swoop is a real anim.js tween needing animate()'s tickTweens live).
+  document.body.classList.remove('method-split');
+  if (methodViewEl) methodViewEl.setAttribute('aria-modal', 'true');
+  handleResize(viewport);
+
+  if (methodPoseSavedFold === 1) swoopToAnswerSheet();
+
+  window.simAPI?.pause(); // ADR-085's original pause contract resumes — the sheet-only takeover
+                           // still fully covers the 3D scene once this mode is off
+  remeasureAfterReflow();
 }
 
 let workbenchRail = null;
@@ -3116,11 +3390,15 @@ function exitWorkbench() {
 
 /** Re-measure the viewport AFTER a layout-changing reflow has actually been laid out
  *  (entering/leaving the split flips the body between a flex row and a CSS grid — a
- *  heavy reflow not committed by the first requestAnimationFrame). */
-function remeasureAfterReflow() {
+ *  heavy reflow not committed by the first requestAnimationFrame). `after`, if given, runs
+ *  once the resize has landed — e.g. re-framing the camera against the NEW pane size (a plain
+ *  callback rather than a Promise/event: the only two callers so far are single, synchronous
+ *  follow-ups, and this keeps the double-rAF ordering explicit at each call site). */
+function remeasureAfterReflow(after) {
   requestAnimationFrame(() => requestAnimationFrame(() => {
     handleResize(viewport);
     if (compareOpen) drawCompare();
+    after?.();
   }));
 }
 
@@ -3458,7 +3736,11 @@ function formatSetLabel(spec, incl) {
  *  Figs 12.21/12.23/12.24/12.25): size dimensions are printed once, in the simple-position Set,
  *  never repeated on the inclined Sets (which instead carry the beat-12 angle arc). */
 function projectSet(plan, setIndex) {
-  const { eff, m } = projectSetPose(plan.overrides, plan.modes, plan.sequential);
+  // q/seat retained (previously discarded here) — the 3D pose-visualizer mode (ADR-085 amendment)
+  // tweens the live mesh straight to these: q is the exact quaternion projectSetPose already
+  // composed for this Set (including the ADR-093 sequential yaw for the both-planes Set 3), and
+  // seat.x/seat.y is the matching seatOnPlanes-equivalent placement — no re-derivation needed.
+  const { eff, m, q, seat } = projectSetPose(plan.overrides, plan.modes, plan.sequential);
   const box = new THREE.Box3().setFromBufferAttribute(currentMesh.geometry.getAttribute('position'));
   box.applyMatrix4(m); // mirrors rebuild()'s own `new THREE.Box3().setFromObject(mesh)` (main.js)
   const z0 = box.min.z - PP_MARGIN; // per-Set standoff — NEVER read the live ppHingeGroup (ADR-084)
@@ -3519,6 +3801,7 @@ function projectSet(plan, setIndex) {
   const label = formatSetLabel(plan.labelSpec, incl);
   const set = {
     label, trueShape: plan.trueShape, eff, z0, data, ann, axisDir: axis, incl,
+    q, seat, // pose-visualizer mode (ADR-085 amendment) — the world quaternion + seat placement
     labelSpec: plan.labelSpec,
     // ADR-099: the exact TURN this Set applies (projectSequentialBothPlanesPose's own yaw
     // magnitude, not a re-measurement) — for the both-planes Set 3 only. Distinct from `incl`:
@@ -3756,6 +4039,10 @@ function beginShowMethod() {
  *  Method no longer touches Compare's state or the fold at all post-ADR-085. */
 function teardownShowMethod() {
   if (!methodActive) return;
+  // ADR-085 amendment: leave the 3D pose-visualizer mode FIRST — exitMethodPose's identity guard
+  // (methodPoseSavedMesh === currentMesh) needs to run before anything below it changes state,
+  // and every exit path (end/abort/Exit-button/Escape/reset) funnels through this one function.
+  exitMethodPose();
   stopMethodBeatAnim();
   methodActive = false;
   methodSets = [];
@@ -3781,6 +4068,7 @@ function abortShowMethod() { teardownShowMethod(); }
 function setMethodProgress(set, beat) {
   if (!methodActive || methodSets.length === 0) return;
   const prevFlat = methodSet * METHOD_BEAT_COUNT + methodBeat;
+  const prevSet = methodSet; // ADR-085 amendment — Set-crossing detection for the pose tween below
   // ADR-091: whatever beat was mid-reveal snaps to fully-drawn before the new position takes
   // effect — this is the "Next mid-animation" half of the contract, and it is a harmless no-op
   // when nothing was animating (Back, a skip, or a fresh Next after the prior beat finished).
@@ -3791,6 +4079,13 @@ function setMethodProgress(set, beat) {
   // Only a genuine forward step (Next) animates in — Back/skip/focus jumps land on the fully-drawn
   // state instantly, matching how those already behaved before this change.
   if (newFlat > prevFlat) startMethodBeatAnim(methodSets[methodSet], methodBeat);
+  // ADR-085 amendment (3D pose-visualizer mode) — SPEC: "Pose changes at Set boundaries only, not
+  // per-beat." Engine-side (not methodController.js) so Next/Back/Skip all trigger it uniformly
+  // with no controller edit — see enterMethodPose's own header for why this hooks here rather
+  // than mirroring goNext's ADR-105 ghost trigger. Unlike the ghost (a one-way forward flourish),
+  // a stale pose is a genuine state inconsistency, so Back re-poses too — animate on every
+  // crossing, forward or back.
+  if (methodPoseMode && methodSet !== prevSet) applyMethodPose(methodSet, true);
   queueMethodRedraw();
 }
 
@@ -3842,6 +4137,13 @@ function methodSheetLayout(w, h) {
 function setMethodFocus(i) {
   if (!methodActive) return;
   focusSet = (i === null || i === undefined) ? null : Math.min(Math.max(i, 0), methodSets.length - 1);
+  // ADR-085 amendment (3D pose-visualizer mode) — SPEC: pose changes also fire "on Set focus chip
+  // click". Only on a genuine focus, not the re-click-to-defocus zoom-out (chip.js's own
+  // `alreadyActive` branch): there is no single "whole row" pose to revert to on defocus, so the
+  // 3D pane simply stays at whichever Set a real focus or a walkthrough Set-boundary crossing
+  // last left it at. Independent of the 2D sheet's own w/h early-return below — a zero-size
+  // canvas rect must not also block the 3D pane's pose.
+  if (methodPoseMode && focusSet !== null) applyMethodPose(focusSet, true);
 
   const stage = methodCanvas?.parentElement;
   const w = stage?.clientWidth || 0;
@@ -5396,6 +5698,16 @@ const simController = {
     /** Play the tilt from the previous Set's pose into the current one (startMethodTilt's own
      *  header has the full contract). Same boolean-return, no-op-on-false shape as begin(). */
     playTilt: () => startMethodTilt(),
+
+    /** ADR-085 amendment (3D pose-visualizer mode) — the takeover's SECOND container
+     *  (`body.method-split`, 30/70 3D+sheet), toggled live by methodController.js's #method-3d
+     *  button. `poseMode()` mirrors `isActive()`'s read-only-flag shape; `setPoseMode(on)` is the
+     *  only entry point into `enterMethodPose`/`exitMethodPose` (both no-op outside their own
+     *  valid transition, so this is safe to call unconditionally from a toggle handler).
+     *  `resetPoseView()` is the reset-view affordance's own entry point (no-op outside pose mode). */
+    poseMode: () => methodPoseMode,
+    setPoseMode: (on) => { on ? enterMethodPose() : exitMethodPose(); },
+    resetPoseView: () => resetMethodPoseCamera(),
   },
 
   announce,
