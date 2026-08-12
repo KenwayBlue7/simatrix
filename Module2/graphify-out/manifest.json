@@ -5,18 +5,18 @@
     "semantic_hash": ""
   },
   "main.js": {
-    "mtime": 1785852720.0263782,
-    "ast_hash": "09aec099cfb89caa5d29b4afd200e7d2",
+    "mtime": 1786514080.8870952,
+    "ast_hash": "89708e4fae03c0783ad1fd0e9d8a5824",
     "semantic_hash": ""
   },
   "meta.json": {
-    "mtime": 1783004542.9520597,
-    "ast_hash": "21cdac333acc1860822b2d2338de0939",
+    "mtime": 1786438870.4892468,
+    "ast_hash": "b79789b8f2b12dde7f8f152327478663",
     "semantic_hash": ""
   },
   "src/anim.js": {
-    "mtime": 1781108181.4405499,
-    "ast_hash": "9794e5759735a99293db84e8fd6daf96",
+    "mtime": 1786446884.0083609,
+    "ast_hash": "31d2b4dfb3e062f7fdbc700ff799d176",
     "semantic_hash": ""
   },
   "src/cone.js": {
@@ -60,8 +60,8 @@
     "semantic_hash": ""
   },
   "src/onboarding.js": {
-    "mtime": 1781211069.5460565,
-    "ast_hash": "61c9b5b2d7ada8bbcac528a5bd072668",
+    "mtime": 1786446793.520402,
+    "ast_hash": "c5bd9ef4ad05035cfbc2f3faf1c817ba",
     "semantic_hash": ""
   },
   "src/problemLibrary.js": {
@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "src/projectionDrawer.js": {
-    "mtime": 1785827348.8332524,
-    "ast_hash": "21b96a948f0e6e1cb328faada7f51574",
+    "mtime": 1786446874.7896545,
+    "ast_hash": "dc28d6606d440b8bccf6accd38bc287b",
     "semantic_hash": ""
   },
   "src/shapeData.js": {
@@ -85,8 +85,8 @@
     "semantic_hash": ""
   },
   "src/stepper.js": {
-    "mtime": 1785488386.8909826,
-    "ast_hash": "6977684b75cf5d3b8c7e8a8e4d990095",
+    "mtime": 1786446658.1214166,
+    "ast_hash": "9f1dd78f9e1b94ab4596c08269f27e64",
     "semantic_hash": ""
   },
   "src/terms.js": {
@@ -95,12 +95,12 @@
     "semantic_hash": ""
   },
   "src/uiManager.js": {
-    "mtime": 1781207103.5444279,
-    "ast_hash": "22978310ca0f212c604a1dc1d5bc3769",
+    "mtime": 1786439111.3528488,
+    "ast_hash": "ef3d70de395ac0ca30ccf68fd537ae3b",
     "semantic_hash": ""
   },
   "src/vertexLabeler.js": {
-    "mtime": 1785603548.9199266,
+    "mtime": 1786292925.5036154,
     "ast_hash": "2f2a09e8fc4d6367846a29e53994b146",
     "semantic_hash": ""
   },
@@ -125,8 +125,8 @@
     "semantic_hash": ""
   },
   "CHANGELOG.md": {
-    "mtime": 1785851599.4105942,
-    "ast_hash": "dbd31ce1444b28d143f69b3f646d9f6c",
+    "mtime": 1786514116.7218032,
+    "ast_hash": "f809124bbc7727bfab31171b925bee83",
     "semantic_hash": ""
   },
   "CLAUDE.md": {
@@ -140,13 +140,13 @@
     "semantic_hash": ""
   },
   "index.html": {
-    "mtime": 1785851526.481122,
-    "ast_hash": "1f19eac17e10d8e6726a913bb6d7e03d",
+    "mtime": 1786516127.3897865,
+    "ast_hash": "11695f22f8f5e5ae094d7d6d0c313d0f",
     "semantic_hash": ""
   },
   "src/methodController.js": {
-    "mtime": 1785851494.7788863,
-    "ast_hash": "aa8bfae452177c23931bdf0542defdb4",
+    "mtime": 1786467088.7100227,
+    "ast_hash": "d22e16f905a9984b58295536ccca9059",
     "semantic_hash": ""
   }
 }

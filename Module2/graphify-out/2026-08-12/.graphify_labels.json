@@ -22,8 +22,5 @@
   "20": "reset",
   "21": "startLoop",
   "22": "projectSet",
-  "23": "projectSet",
-  "24": "lineArrayUnitCount",
-  "25": "methodBeatLabel",
-  "26": "refreshLabels"
+  "25": "methodBeatLabel"
 }

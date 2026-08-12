@@ -21,9 +21,6 @@
   "19": "Changelog",
   "20": "reset",
   "22": "projectSet",
-  "23": "beginShowMethod",
-  "24": "methodArcEligible",
-  "25": "methodBeatLabel",
-  "26": "refreshLabels",
-  "27": "initTerms"
+  "23": "methodCanRun",
+  "25": "methodBeatLabel"
 }
