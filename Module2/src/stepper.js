@@ -4,7 +4,7 @@
 // disclosure) and gating each behind the previous one's completion.
 //
 //   1. Add & rest the solid       4. Label vertices
-//   2. Position                   5. Draw the views (HP + VP, then PP)
+//   2. Position                   5. Draw the views (Front, then Top, then Side — one action)
 //   3. Inclinations               6. Flatten to 2D
 //
 // Layering (CLAUDE.md): leaf module. Like uiManager.js it imports NO other layer;
@@ -20,8 +20,11 @@
  * ADR-161: Inclination split out of "Position" into its own step (RULES.md §6.30 —
  * a control belongs in the ONE guided step whose question it answers; "where does it
  * sit" and "how is it tilted" are two questions), and the two view reveals (top+front,
- * side) merged into one step with two sub-toggles (they are one idea — cast onto the
- * three reference planes — not two lessons). Net step count stays 6.
+ * side) merged into one step — they are one idea, cast onto the three reference planes,
+ * not two lessons. ADR-162 finishes that merge: the step's two buttons (one-shot
+ * top+front, toggle side) collapse into ONE "Draw the three views" action that plays a
+ * single Front→Top→Side reveal and gates on all three — a learner can no longer advance
+ * having drawn only two of the three views that fix the solid. Net step count stays 6.
  */
 const STEPS = [
   {
@@ -47,7 +50,7 @@ const STEPS = [
   {
     n: 5,
     title: 'Draw the views',
-    lead: 'Cast the solid onto the planes: a top view onto the HP (teal) and a front view onto the VP (amber), with edges the body hides drawn dashed. Then bring in the profile plane (PP, violet) at the solid’s side to add the side view — top, front, and side together fix the solid completely.',
+    lead: 'Cast the solid onto all three reference planes at once: a front view onto the VP (amber), a top view onto the HP (teal), and a side view onto the profile plane (PP, violet) at the solid’s side — with edges the body hides drawn dashed. Together the three fix the solid completely.',
   },
   {
     n: 6,
@@ -63,8 +66,7 @@ const TOTAL = STEPS.length;
  *   hasSolid: () => boolean,
  *   addSolid: (shape?: string) => void,
  *   setLabels: (on: boolean) => void,
- *   setProjections: (on: boolean) => void,
- *   setSideView: (on: boolean) => void,
+ *   drawViews: (hooks: { onViewDrawn?: (name: 'front'|'top'|'side') => void, onDone?: () => void }) => void,
  *   setDimensions: (on: boolean) => void,
  *   flatten: () => void,
  *   unflatten: () => void,
@@ -97,25 +99,27 @@ export function initStepper(sim) {
 
   const btnAdd = $('btn-add');
   const btnLabel = $('btn-label');
-  const btnProject = $('btn-project');
-  const btnSideView = $('btn-sideview');
+  const btnDrawViews = $('btn-draw-views');
   const btnFlatten = $('btn-flatten');
   const btnDimensions = $('btn-dimensions');
   const btnUnfold = $('btn-unfold');
   const btnCompleteNext = $('btn-complete-next');
   const doneLabel = $('done-label');
-  const doneProject = $('done-project');
-  const doneSideView = $('done-sideview');
+  const doneFront = $('done-front');
+  const doneTop = $('done-top');
+  const doneSide = $('done-side');
   const shapeSelect = $('ctl-shape');
 
   if (elTotal) elTotal.textContent = String(TOTAL);
 
   // --- Wizard state. Layer flags mirror what the engine is currently showing. ---
-  // state.sideView (ADR-161): no longer gates step 5 — Top & front alone completes it — but
-  // still tracks whether the PP/side view is currently shown, driving the Show/Hide toggle
-  // label and its done-badge (mirrors state.dimensions' toggle-not-gate role at step 6).
+  // state.viewsDrawn (ADR-162, supersedes ADR-161's projections/sideView split): a 0–3 counter
+  // of how many of the three views (front, top, side) the current reveal has landed — mirrors
+  // main.js's own fractional-index tween idiom (revealViewsSequence) rather than three separate
+  // booleans. state.viewsDrawing guards against a second click while one is in flight (the
+  // button already hides itself, but a keyboard/programmatic activation could still re-fire).
   let currentStep = 1;
-  const state = { visited2: false, visited3: false, labels: false, projections: false, sideView: false, flattened: false, dimensions: false };
+  const state = { visited2: false, visited3: false, labels: false, viewsDrawn: 0, viewsDrawing: false, flattened: false, dimensions: false };
 
   /** Whether step i counts as complete (drives rail checks + Next gating). */
   function isComplete(i) {
@@ -124,7 +128,7 @@ export function initStepper(sim) {
       case 2: return state.visited2;
       case 3: return state.visited3;
       case 4: return state.labels;
-      case 5: return state.projections; // side view (sub-toggle) doesn't gate — see state comment above
+      case 5: return state.viewsDrawn === 3; // ADR-162: all three views mandatory, not just top+front
       case 6: return state.flattened;
       default: return false;
     }
@@ -175,17 +179,15 @@ export function initStepper(sim) {
     if (btnAdd) btnAdd.hidden = sim.hasSolid();
     if (btnLabel) btnLabel.hidden = state.labels;
     doneLabel?.classList.toggle('is-on', state.labels);
-    if (btnProject) btnProject.hidden = state.projections;
-    doneProject?.classList.toggle('is-on', state.projections);
-    // Side view (ADR-161, merged into step 5 alongside Top & front): a TRUE on/off toggle,
-    // same idiom as Dimensions below — the button stays visible and swaps its label +
-    // aria-pressed between "Add side view" and "Hide side view"; the done badge lights
-    // while it's on. It gates nothing (step 5 completes on Top & front alone).
-    if (btnSideView) {
-      btnSideView.textContent = state.sideView ? 'Hide side view' : 'Add side view';
-      btnSideView.setAttribute('aria-pressed', String(state.sideView));
-    }
-    doneSideView?.classList.toggle('is-on', state.sideView);
+    // Draw the views (ADR-162, supersedes ADR-161's split idiom): ONE-SHOT, same as Label
+    // above — hides once the reveal has started (blocks re-entry) and stays hidden once all
+    // three views have landed, since there is nothing left to draw and the reveal isn't a
+    // toggle. Each of the three badges lights independently as its own view lands, giving a
+    // legible progress readout across the ~3s reveal instead of one badge lighting at the end.
+    if (btnDrawViews) btnDrawViews.hidden = state.viewsDrawing || state.viewsDrawn === 3;
+    doneFront?.classList.toggle('is-on', state.viewsDrawn >= 1);
+    doneTop?.classList.toggle('is-on', state.viewsDrawn >= 2);
+    doneSide?.classList.toggle('is-on', state.viewsDrawn >= 3);
     if (btnFlatten) btnFlatten.hidden = state.flattened;
     if (btnUnfold) btnUnfold.hidden = !state.flattened;
     // Dimensions (Step 6, optional): a TRUE on/off toggle — the button stays visible and
@@ -252,13 +254,14 @@ export function initStepper(sim) {
   }
 
   // ----------------------------------------------------------------------------
-  // Reflow on edit — editing an early step is NON-DESTRUCTIVE. Labels (Step 4),
-  // projections (Step 5), and the side view (Step 5) reflow automatically on the
-  // next rebuild because their flags stay on, so a slider nudge updates them live
-  // instead of discarding them (no confirm dialog, no lost work). Only the flatten
-  // (Step 6) reverses: editing geometry while the solid is folded flat and hidden is
-  // confusing, so unfold back to 3D so the learner sees their change, then they can
-  // re-flatten when ready.
+  // Reflow on edit — editing an early step is NON-DESTRUCTIVE. Labels (Step 4) and
+  // the three views (Step 5) reflow automatically on the next rebuild because their
+  // flags stay on, so a slider nudge updates them live instead of discarding them (no
+  // confirm dialog, no lost work). A slider edit mid-reveal also cancels-and-snaps the
+  // in-flight tween (main.js stopViewReveal, ADR-162) rather than leaving it stranded.
+  // Only the flatten (Step 6) reverses: editing geometry while the solid is folded flat
+  // and hidden is confusing, so unfold back to 3D so the learner sees their change, then
+  // they can re-flatten when ready.
   // ----------------------------------------------------------------------------
 
   function reflowFrom(step) {
@@ -318,24 +321,27 @@ export function initStepper(sim) {
     renderRail(); renderActions(); renderNav();
   }, listen);
 
-  // Step 5 — top & front views (HP + VP projections). One-shot, like Label (gates the step).
-  btnProject?.addEventListener('click', () => {
-    sim.setProjections(true);
-    state.projections = true;
-    sim.announce('Top and front views drawn onto the HP and VP.');
+  // Step 5 — draw the three views (ADR-162: one action, Front → Top → Side, all mandatory;
+  // supersedes ADR-161's separate one-shot top+front / toggle side-view buttons). One-shot,
+  // like Label — state.viewsDrawing hides the button immediately so the reveal can't be
+  // re-triggered mid-flight, even via a keyboard/programmatic activation the `hidden` attribute
+  // alone wouldn't stop. sim.drawViews (main.js revealViewsSequence) drives the sheet; this
+  // handler only mirrors its progress into the wizard's own badges/gate.
+  btnDrawViews?.addEventListener('click', () => {
+    state.viewsDrawing = true;
+    sim.announce('Drawing the front, top and side views.');
     renderRail(); renderActions(); renderNav();
-  }, listen);
-
-  // Step 5 — side view (ADR-161: merged alongside Top & front). A TRUE on/off toggle —
-  // same idiom as the Dimensions handler below — since it no longer gates the step.
-  btnSideView?.addEventListener('click', () => {
-    const next = !state.sideView;
-    sim.setSideView(next);
-    state.sideView = next;
-    sim.announce(next
-      ? 'Profile plane revealed and side view drawn onto the PP.'
-      : 'Side view hidden.');
-    renderRail(); renderActions(); renderNav();
+    sim.drawViews({
+      onViewDrawn: () => {
+        state.viewsDrawn += 1;
+        renderActions(); // badge-only update; rail/nav don't change until all three land
+      },
+      onDone: () => {
+        state.viewsDrawing = false;
+        sim.announce('Front, top and side views drawn.');
+        renderRail(); renderActions(); renderNav();
+      },
+    });
   }, listen);
 
   // Step 6 — flatten / unfold (terminal; reversible).
@@ -418,8 +424,8 @@ export function initStepper(sim) {
     state.visited2 = false;
     state.visited3 = false;
     state.labels = false;
-    state.projections = false;
-    state.sideView = false;
+    state.viewsDrawn = 0;
+    state.viewsDrawing = false;
     state.flattened = false;
     state.dimensions = false;
     goToStep(1, { announce: false });

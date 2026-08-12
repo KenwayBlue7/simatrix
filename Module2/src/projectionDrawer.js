@@ -549,7 +549,10 @@ function buildArrowMesh(positions, color) {
  * @property {THREE.Group} connectorGroup Dotted 3D→2D connector lines to HP + VP (upright view).
  * @property {THREE.Group} ppConnectorGroup Dotted 3D→PP connector lines (upright view) — the
  *   side-view counterpart of connectorGroup. Kept SEPARATE so the consumer can reveal it only
- *   once the Side view toggle (Step 5) is switched on, rather than with the top + front views.
+ *   once showSideViewFlag is on, rather than with the top + front views. (ADR-162: Step 5's
+ *   single reveal action sets showSideViewFlag alongside showProjectionsFlag on the same click,
+ *   but this group still animates on its own beat within that one reveal — see main.js
+ *   revealViewsSequence.)
  * @property {THREE.Group} flatConnectorGroup Dashed 2D projectors linking the top
  *   view to the FOLDED front view across the ground line — the connector lines of
  *   the flattened drawing. Positioned at the folded layout; the consumer fades them

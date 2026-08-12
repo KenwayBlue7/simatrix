@@ -299,6 +299,17 @@ let foldTween = null;
  *  than the reverse of the disappear curve. Set by animateFold. */
 let solidAppearing = false;
 
+/** Live handle + bookkeeping for the Step 5 Front→Top→Side sequential reveal (ADR-162), or
+ *  null/0 when no reveal is in flight. Held so a mid-reveal dispose/reset can cancel-and-snap
+ *  (mirrors methodAnimHandle's role for Show Method's own beat reveal) — and so that
+ *  cancel-and-snap can still fire the stepper's onViewDrawn/onDone hooks for whatever the
+ *  in-flight tween hadn't yet announced, instead of leaving the wizard's button/badges/Next-gate
+ *  stuck waiting on a callback that a cancelled tween will never call. */
+let viewRevealHandle = null;
+let viewRevealHooks = null;
+let viewRevealUnits = null;
+let viewRevealAnnounced = 0;
+
 /** VP fold angle at foldProgress = 1: +90° about Z swings the VP's top edge
  *  BACKWARD (away from the +X observer) down into the horizontal plane, landing
  *  the front view on the opposite side of the ground line from the top view —
@@ -861,6 +872,10 @@ function computeSeating(geometry, quaternion, data) {
  * reparents vpGroup out into vpFoldGroup (projectionDrawer.dispose).
  */
 function disposeActiveProjection() {
+  // ADR-162: a Step 5 reveal captures activeProjection into a closure var (proj) and keeps
+  // writing opacity into it every tick; cancel-and-snap FIRST so an in-flight reveal can't
+  // write into the groups this is about to dispose (stopViewReveal is a no-op once nulled).
+  stopViewReveal();
   if (activeProjection) {
     activeProjection.dispose();
     activeProjection = null;
@@ -1018,10 +1033,12 @@ function applyDimensionVisibility(on) {
 /**
  * Draw or clear the orthographic projections to match showProjectionsFlag + the
  * current mesh. All three views (HP/VP/PP) are computed in one edge pass, but the PP
- * side view only BECOMES VISIBLE once the Side view toggle (Step 5) is switched on: the
- * PP subgroup lives under ppHingeGroup, whose `.visible` mirrors showSideViewFlag. So
- * Top & front draws the top + front views on its own; Side view then reveals the
- * profile plane and its side view by un-hiding the hinge group — no separate redraw.
+ * side view only BECOMES VISIBLE once showSideViewFlag is on: the PP subgroup lives
+ * under ppHingeGroup, whose `.visible` mirrors that flag. ADR-162: Step 5's single
+ * "Draw the three views" action flips both showProjectionsFlag and showSideViewFlag
+ * together (revealViewsSequence, main.js) before animating anything, so this function
+ * itself no longer distinguishes a top+front-only call from a with-side-view call —
+ * un-hiding the hinge group here just re-asserts whichever flags are already set.
  *
  * The VP subgroup is reparented into vpFoldGroup so the flatten step can fold it with
  * the VP grid; HP + connectors stay in world space under shapeGroup.
@@ -1054,7 +1071,8 @@ function refreshProjections() {
   ppHingeGroup.add(activeProjection.ppGroup);
 
   // Re-assert the profile plane's reveal state after a rebuild re-parents the PP
-  // subgroup: it stays hidden until the Side view toggle (Step 5) is switched on.
+  // subgroup: it stays hidden until showSideViewFlag is on (Step 5's single reveal
+  // action sets this alongside showProjectionsFlag — see the header above, ADR-162).
   applyProfilePlaneVisibility(showSideViewFlag);
 
   // 2D projectors live at the FOLDED layout positions (static world space), so they
@@ -1167,9 +1185,12 @@ function setObjectOpacity(root, opacity) {
 }
 
 // ============================================================================
-// Step actions — labels (Step 4), top + front views + side view (Step 5, ADR-161
-// merge), flatten (Step 6). Exposed to the wizard through simController; each is
-// idempotent and routes any geometry side-effects through the refresh helpers above.
+// Step actions — labels (Step 4), the three views (Step 5: setProjectionsVisible +
+// setSideViewVisible are the per-flag primitives, revealViewsSequence is the wizard's
+// single "draw all three" action that drives them together — ADR-162, supersedes
+// ADR-161's two-button merge), flatten (Step 6). Exposed to the wizard through
+// simController; each is idempotent and routes any geometry side-effects through the
+// refresh helpers above.
 // ============================================================================
 
 function setLabelsVisible(on) {
@@ -1177,10 +1198,21 @@ function setLabelsVisible(on) {
   refreshLabels();
 }
 
-function setProjectionsVisible(on) {
+/**
+ * @param {boolean} on
+ * @param {{ sequenced?: boolean }} [opts]  ADR-162: when `sequenced` is true, this call is one
+ *   step inside `revealViewsSequence`'s own Front→Top→Side tween — skip this function's SOLO
+ *   draw-on tween and its spotlight/Compare side-effects, which the sequence drives itself once
+ *   all three views have landed. The flag + geometry build still happen unconditionally so the
+ *   sequence has `activeProjection` to animate.
+ */
+function setProjectionsVisible(on, { sequenced = false } = {}) {
   showProjectionsFlag = on;
   refreshProjections();
-  // The Compare chip's 2D gate (Step 5's top+front) and any open sheet both track this flag.
+  if (sequenced) return;
+  // The Compare chip's 2D gate and any open sheet both track showProjectionsFlag. Only reached
+  // when called directly (sequenced=false) — Step 5's own reveal (ADR-162) defers this to its
+  // own onComplete instead, so the chip waits for all three views, not just this one.
   syncCompareChipVisibility();
   if (compareOpen) drawCompare();
   // Sync the freshly built projection to the current fold state — at Step 5 the
@@ -1220,14 +1252,18 @@ function setProjectionsVisible(on) {
  * but kept hidden under ppHingeGroup; this un-hides the hinge group — bringing in the
  * PP grid and label — and fades the PP linework on, so the third view arrives as its
  * own beat after the top + front views. Idempotent: re-running re-asserts the reveal.
+ * @param {boolean} on
+ * @param {{ sequenced?: boolean }} [opts]  ADR-162: see setProjectionsVisible's matching param —
+ *   skip this function's own draw-on tween and Compare redraw when the sequence is driving it.
  */
-function setSideViewVisible(on) {
+function setSideViewVisible(on, { sequenced = false } = {}) {
   showSideViewFlag = on;
   applyProfilePlaneVisibility(on);
   // Sync the 3D side-view connectors to the new flag through the same path rebuild uses
   // (they live in world space, gated on showSideViewFlag inside applyFoldVisual). This is
   // what hides them again when the step is turned off.
   applyFoldVisual(foldProgress);
+  if (sequenced) return;
   // The Compare sheet's side (PP, violet) line follows the same flag (drawCompare gates
   // ppGroup on showSideViewFlag).
   if (compareOpen) drawCompare();
@@ -1250,6 +1286,113 @@ function setSideViewVisible(on) {
       },
     });
   }
+}
+
+/**
+ * Cancel-and-snap chokepoint for the Step 5 view reveal (ADR-162), mirroring
+ * stopMethodBeatAnim's contract: cancelling never freezes a half-drawn view — it snaps every
+ * group straight to full opacity so a reveal interrupted by an edit or a reset still completes
+ * visually. No-op when nothing is in flight.
+ *
+ * This is an EXTERNAL cancellation (a rebuild from a slider edit, or window.simAPI.reset), never
+ * the tween's own natural finish — tween()'s cancel() contract explicitly does NOT fire
+ * onComplete (src/anim.js) — so any onViewDrawn/onDone the in-flight reveal hadn't yet announced
+ * are fired here instead. Without this, editing a slider mid-reveal would strand the wizard:
+ * the button stays hidden (state.viewsDrawing never clears) and Next stays disabled forever,
+ * even though every view is now visibly, fully drawn.
+ */
+function stopViewReveal() {
+  if (!viewRevealHandle) return;
+  viewRevealHandle.cancel();
+  viewRevealHandle = null;
+  const units = viewRevealUnits;
+  const hooks = viewRevealHooks;
+  const from = viewRevealAnnounced;
+  viewRevealUnits = null;
+  viewRevealHooks = null;
+  viewRevealAnnounced = 0;
+  if (units) {
+    for (const u of units) for (const g of u.groups) setObjectOpacity(g, 1);
+  }
+  if (hooks && units) {
+    for (let i = from; i < units.length; i++) hooks.onViewDrawn?.(units[i].name);
+    hooks.onDone?.();
+  }
+}
+
+/**
+ * Step 5 (ADR-162, supersedes ADR-161 decision 3): draw all three views — front, then top,
+ * then side — from a single click, all three mandatory. Reuses Show Method's own idiom
+ * (startMethodBeatAnim, ~main.js:2760): one tween whose value is a fractional item index —
+ * `floor(v)` counts how many units are fully done, `v - floor(v)` (re-eased by easeDraw) is the
+ * CURRENT unit's own 0..1 draw-on — rather than three separate tweens or a setTimeout chain.
+ *
+ * Reduced motion needs no special-casing: tween() (src/anim.js) calls onUpdate ONCE, synchronously,
+ * with `v` already at `to` — the `while` loop below still walks every unit in that single call, so
+ * all three onViewDrawn fire (and onComplete right after), just with zero visible motion.
+ *
+ * Front is revealed first (not Top, unlike the old combined HP+VP tween this replaces) because
+ * the front view is what the learner has been building toward since Step 3's inclinations —
+ * see ADR-162. Compare-chip sync and the spotlight queue are deferred to onComplete so neither
+ * pops mid-sequence (syncCompareChipVisibility fires the instant showProjectionsFlag flips,
+ * which used to happen on Front's own solo tween in setProjectionsVisible).
+ *
+ * @param {{ onViewDrawn?: (name: 'front'|'top'|'side') => void, onDone?: () => void }} [hooks]
+ */
+function revealViewsSequence(hooks = {}) {
+  stopViewReveal(); // defensive: force-complete any stale in-flight reveal before starting a new one
+  // Build the geometry + flip both flags before animating anything — refreshProjections()
+  // (called by setProjectionsVisible) early-returns on !showProjectionsFlag, so the side view
+  // MUST run second or activeProjection would still be null for it to reveal.
+  setProjectionsVisible(true, { sequenced: true });
+  setSideViewVisible(true, { sequenced: true });
+  if (!activeProjection) { hooks.onDone?.(); return; } // no mesh — nothing to reveal
+  const proj = activeProjection; // capture: a later toggle/rebuild may null the module ref
+
+  const UNITS = [
+    { name: 'front', groups: [proj.vpGroup, ...(showConnectorsFlag ? [proj.connectorGroup] : [])] },
+    { name: 'top', groups: [proj.hpGroup] },
+    { name: 'side', groups: [proj.ppGroup, ...(showConnectorsFlag ? [proj.ppConnectorGroup] : [])] },
+  ];
+  for (const u of UNITS) for (const g of u.groups) setObjectOpacity(g, 0);
+
+  viewRevealUnits = UNITS;
+  viewRevealHooks = hooks;
+  viewRevealAnnounced = 0;
+
+  viewRevealHandle = tween({
+    from: 0,
+    to: UNITS.length,
+    duration: UNITS.length * DRAW_DURATION_MS,
+    ease: (x) => x, // linear across units — easeDraw (below) shapes each unit's own reveal instead
+    onUpdate: (v) => {
+      const doneCount = Math.min(Math.floor(v), UNITS.length);
+      const unitT = doneCount < UNITS.length ? easeDraw(THREE.MathUtils.clamp(v - doneCount, 0, 1)) : 1;
+      for (let i = 0; i < UNITS.length; i++) {
+        const o = i < doneCount ? 1 : i === doneCount ? unitT : 0;
+        for (const g of UNITS[i].groups) setObjectOpacity(g, o);
+      }
+      while (viewRevealAnnounced < doneCount) {
+        hooks.onViewDrawn?.(UNITS[viewRevealAnnounced].name);
+        viewRevealAnnounced++;
+      }
+    },
+    onComplete: () => {
+      viewRevealHandle = null;
+      viewRevealUnits = null;
+      viewRevealHooks = null;
+      viewRevealAnnounced = 0;
+      for (const u of UNITS) for (const g of u.groups) setObjectOpacity(g, 1);
+      // Deferred from the two solo setters above: Compare's 2D gate + any open sheet, and the
+      // first-seen spotlight chips, now that all three views are actually on the sheet.
+      syncCompareChipVisibility();
+      if (compareOpen) drawCompare();
+      onboarding?.spotlight('front-view');
+      onboarding?.spotlight('top-view');
+      onboarding?.spotlight('side-view');
+      hooks.onDone?.();
+    },
+  });
 }
 
 /**
@@ -2074,9 +2217,9 @@ function buildScene(container) {
 
   ppHingeGroup = new THREE.Group();
   ppHingeGroup.position.z = DEFAULT_PP_STANDOFF; // origin on the VP∩PP line (0, 0, z0) in vpFoldGroup's frame
-  // The profile plane is the LAST plane introduced (Step 5), so it stays hidden
-  // through the empty start and Steps 1–4 to keep the viewport uncluttered while the
-  // learner works the HP/VP top + front views. setSideViewVisible reveals it.
+  // The profile plane is introduced together with the other two views by Step 5's single
+  // reveal action (ADR-162), so it stays hidden through the empty start and Steps 1–4 to
+  // keep the viewport uncluttered until then. setSideViewVisible reveals it.
   ppHingeGroup.visible = false;
   ppHingeGroup.add(ppGrid);
   vpFoldGroup.add(ppHingeGroup); // ADR-106 — nested so the PP fold rides the VP fold down
@@ -2091,7 +2234,7 @@ function buildScene(container) {
   // view — re-verify it doesn't collide with the side-view linework after the fold change.
   ppPlaneLabel = makePlaneLabel('PP', 'pp');
   ppPlaneLabel.position.set(4, 4, 0);
-  ppPlaneLabel.visible = false; // hidden with the profile plane until Step 5 (see ppPlaneLabel decl)
+  ppPlaneLabel.visible = false; // hidden with the profile plane until Step 5's reveal (ADR-162; see ppPlaneLabel decl)
   ppHingeGroup.add(ppPlaneLabel);
 
   // (The x/y and x1/y1 ground-line reference marks are intentionally not created for now —
@@ -2987,8 +3130,10 @@ function updateCompareChip() {
   compareChip?.setAttribute('aria-pressed', String(compareOpen));
 }
 
-/** Hide the chip until the lesson's 2D gate passes (Step 5's top + front views), preserving
- *  the pedagogy that the 2D drawing is meaningless before any view is projected. A closed
+/** Hide the chip until the lesson's 2D gate passes (showProjectionsFlag; ADR-162's
+ *  revealViewsSequence defers the call that checks this to its onComplete, so the chip in
+ *  practice waits for all three of Step 5's views, not merely this one flag), preserving
+ *  the pedagogy that the 2D drawing is meaningless before it's actually complete. A closed
  *  gate also force-closes an open card (e.g. a reset mid-Compare). */
 function syncCompareChipVisibility() {
   if (!compareChip) return;
@@ -5135,8 +5280,15 @@ const simController = {
 
   /** Step 4–6 layer toggles (idempotent). */
   setLabels(on) { setLabelsVisible(on); },
+  // setProjections/setSideView (ADR-162): the wizard itself now only calls drawViews below —
+  // these two kept as their own idempotent facade members (matching setLabels/setDimensions'
+  // shape) so re-asserting one flag alone stays possible for a future direct caller without
+  // replaying the whole reveal animation. window.simAPI.reset() bypasses all three, writing
+  // the raw module flags itself (it also resets state a full rebuild would otherwise animate).
   setProjections(on) { setProjectionsVisible(on); },
   setSideView(on) { setSideViewVisible(on); },
+  /** Step 5 (ADR-162): the wizard's single "Draw the three views" action — see revealViewsSequence. */
+  drawViews(hooks) { revealViewsSequence(hooks); },
   setDimensions(on) { setDimensionsVisible(on); },
 
   /** De-clutter toggle for the dashed connector lines (persists across rebuild). */

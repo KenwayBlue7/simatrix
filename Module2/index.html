@@ -462,9 +462,11 @@
     /* ---- Compare chip (ADR-012 family): the third member of the top-left pill family —
        same shell as the connector toggle, but a real button whose aria-pressed mirrors the
        Compare card's open state (filled accent while open). Hidden until the 2D gate passes
-       (main.js syncCompareChipVisibility: showProjectionsFlag, i.e. Step 5's top+front —
-       the 2D drawing is meaningless before any view is projected). Ported from the Points
-       topic (graphics_module_1_topic_3_points), which is the finished ADR-037 reference. */
+       (main.js syncCompareChipVisibility: showProjectionsFlag) — the 2D drawing is meaningless
+       before any view is projected. ADR-162: Step 5's revealViewsSequence defers this sync call
+       to the reveal's onComplete, so in practice the chip now waits for all three views (front,
+       top, side), not merely the flag's own name. Ported from the Points topic
+       (graphics_module_1_topic_3_points), which is the finished ADR-037 reference. */
     .compare-chip {
       position: relative; /* anchors the centred 44px hit-area ::before */
       display: inline-flex;
@@ -973,6 +975,7 @@
     }
     .vp-spotlight--hp  .vp-spotlight__dot { background: var(--color-hp-line); }
     .vp-spotlight--vp  .vp-spotlight__dot { background: var(--color-vp-line); }
+    .vp-spotlight--pp  .vp-spotlight__dot { background: var(--color-pp-line); } /* ADR-162: side-view spotlight */
     .vp-spotlight--ink .vp-spotlight__dot { background: var(--color-ink-secondary); }
     .vp-spotlight__text { text-wrap: balance; }
 
@@ -2498,10 +2501,10 @@
           </p>
         </section>
 
-        <!-- STEP 5 — Draw the views (ADR-161: merged from the former Step 4 top+front and
-             Step 5 side-view panels — one idea, cast onto the three reference planes, not two
-             lessons). Top & front stays a one-shot primary action (gates the step); Side view
-             is a true Show/Hide toggle (mirrors #btn-dimensions on Step 6) that does not gate. -->
+        <!-- STEP 5 — Draw the views (ADR-162, supersedes ADR-161's two-button merge: the former
+             one-shot "top+front" button and the toggle "side view" button collapse into ONE
+             primary action that plays a single Front→Top→Side reveal on click. All three views
+             are now mandatory — the step no longer completes on just two of the three. -->
         <section class="step-panel" data-step="5" hidden>
           <p class="hint">
             <svg class="hint__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
@@ -2509,21 +2512,24 @@
               <button type="button" class="term" aria-describedby="def-ortho">orthographic projection<span class="term__pop" role="tooltip" id="def-ortho">Each point drops straight onto a plane along a perpendicular, with no perspective. The view keeps the solid's true lengths and angles.</span></button>:
               the views keep the solid's true sizes, and edges the body hides are drawn dashed.</span>
           </p>
-          <button id="btn-project" class="btn btn--primary btn--block" type="button">Draw top &amp; front views</button>
-          <p class="done-badge" id="done-project">
-            <svg class="done-badge__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Top &amp; front views drawn
-          </p>
           <p class="hint">
             <svg class="hint__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             <span>The
               <button type="button" class="term" aria-describedby="def-pp">profile plane<span class="term__pop" role="tooltip" id="def-pp">The <strong>Profile Plane</strong>: an upright wall standing at the solid's side. Looking at it from the side gives the side view — the third of the three views that fix the solid completely.</span></button>
-              (PP, violet) stands at the solid's side. Bring it in to cast the side view onto it, completing the set of three views.</span>
+              (PP, violet) stands at the solid's side, ready to carry the side view — the third view that, together with the front and top, fixes the solid completely.</span>
           </p>
-          <button id="btn-sideview" class="btn btn--block" type="button" aria-pressed="false">Add side view</button>
-          <p class="done-badge" id="done-sideview">
+          <button id="btn-draw-views" class="btn btn--primary btn--block" type="button">Draw the three views</button>
+          <p class="done-badge" id="done-front">
             <svg class="done-badge__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Side view shown
+            Front view drawn
+          </p>
+          <p class="done-badge" id="done-top">
+            <svg class="done-badge__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Top view drawn
+          </p>
+          <p class="done-badge" id="done-side">
+            <svg class="done-badge__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Side view drawn
           </p>
         </section>
 
@@ -2631,10 +2637,11 @@
       <!-- Compare chip (ADR-012 family): the on-demand 2D-drawing view. Ported from
            Module1/src/chrome.js #compare-chip via the Points topic's reference build.
            Hidden until the lesson's 2D gate passes (main.js syncCompareChipVisibility:
-           showProjectionsFlag — Step 5's top+front views must exist first), preserving
-           the pedagogy that the 2D drawing is meaningless before any view is projected.
-           main.js wires it to compare.toggle() — the chip is Compare's only open/close
-           control (ADR-080). -->
+           showProjectionsFlag). ADR-162: Step 5's revealViewsSequence defers that sync
+           to the reveal's onComplete, so this chip now waits for all three views (front,
+           top, side) to land, preserving the pedagogy that the 2D drawing is meaningless
+           before it's actually complete. main.js wires it to compare.toggle() — the chip
+           is Compare's only open/close control (ADR-080). -->
       <button id="compare-chip" class="compare-chip" type="button" aria-pressed="false" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="3" y="5" width="8" height="14" rx="1.5"/><rect x="13" y="5" width="8" height="14" rx="1.5"/>
@@ -2690,11 +2697,12 @@
       <button id="vp-orbit-dismiss" class="vp-hint__dismiss" type="button" aria-label="Dismiss hint">&times;</button>
     </div>
 
-    <!-- Contextual spotlight hint: a queued, first-seen chip pointing out the top view,
-         front view (Step 5), and connector lines (Step 6 flatten) the first time each is
-         revealed. Shares the bottom-centre slot with the orbit hint; onboarding.js shows
-         one at a time. The leading dot's colour ties to the linework (teal HP / amber VP /
-         ink), so it carries colour AND label (Two-Cue Rule). Dismisses on click/orbit/timeout. -->
+    <!-- Contextual spotlight hint: a queued, first-seen chip pointing out the front, top, and
+         side views (Step 5, ADR-162: now three chips in reveal order, not two) and the
+         connector lines (Step 6 flatten) the first time each is revealed. Shares the
+         bottom-centre slot with the orbit hint; onboarding.js shows one at a time. The leading
+         dot's colour ties to the linework (teal HP / amber VP / violet PP / ink), so it carries
+         colour AND label (Two-Cue Rule). Dismisses on click/orbit/timeout. -->
     <div id="vp-spotlight" class="vp-hint vp-spotlight" role="status" hidden>
       <span class="vp-spotlight__dot" aria-hidden="true"></span>
       <span class="vp-spotlight__text"></span>
