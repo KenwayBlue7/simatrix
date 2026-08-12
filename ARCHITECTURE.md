@@ -420,9 +420,10 @@ into the orchestrator directly.
 
 - **`stepper.js`** — The Guided Stepper controller: sequences the six steps
   (1 Add & rest → 2 Position → 3 Inclinations → 4 Label vertices → 5 Draw the views
-  [top+front, then side] → 6 Flatten to 2D; ADR-161), gates each step behind the
-  previous, and drives the step card + numbered rail. **Imports:** none (injected
-  controller). **Provides:** `initStepper(sim)` → `{ sync, reset, dispose }`.
+  [one click, Front → Top → Side, all three mandatory; ADR-162, supersedes ADR-161's
+  two-button merge] → 6 Flatten to 2D), gates each step behind the previous, and drives
+  the step card + numbered rail. **Imports:** none (injected controller). **Provides:**
+  `initStepper(sim)` → `{ sync, reset, dispose }`.
 
 - **`problemLibrary.js`** — The textbook Problem Library: a focus-trapped modal of
   problem cards, hints revealed one at a time, and a tolerant self-check that compares
@@ -438,10 +439,18 @@ into the orchestrator directly.
   mirroring `problemLibrary.js`'s own overlay shell — NOT the Compare card; the sim
   loop pauses while it's open, same contract as the Problem Library. Back/Next/Exit
   float bottom-centre and the Set-N chips float top-right, overlaying the drawing
-  directly; there is no title bar. **Imports:** nothing (injected controller only — the
-  headless per-Set projection pipeline itself lives in `main.js`, reusing
-  `meshAnalyzer.js`/`projectionDrawer.js`/`vertexLabeler.js`'s exports). **Provides:**
-  `initMethodController(sim)` → `{ sync, dispose }`.
+  directly; there is no title bar. **Second container (ADR-163):** a live `#method-3d`
+  toggle in the button bar swaps between that plain takeover and a `body.method-split`
+  30/70 grid — `#sim-viewport` (30%, live orbitable 3D: the solid on the HP/VP planes,
+  tweening to each Set's own pose via quaternion slerp as the walkthrough crosses a Set
+  boundary) beside the unchanged sheet (70%). Toggling does NOT pause the sim loop (the
+  3D pane needs `animate()` running) and does not lose `curSet`/`curBeat`/`focusSet`.
+  The pose-drive itself (`applyMethodPose`/`enterMethodPose`/`exitMethodPose`) lives in
+  `main.js`, beside the rest of Show Method's engine half — see ADR-163. **Imports:**
+  nothing (injected controller only — the headless per-Set projection pipeline itself
+  lives in `main.js`, reusing `meshAnalyzer.js`/`projectionDrawer.js`/
+  `vertexLabeler.js`'s exports). **Provides:** `initMethodController(sim)` →
+  `{ sync, dispose }`.
 
 - **`terms.js`** — The inline glossary popovers (dotted-underline terms like "HP",
   "VP" that explain themselves on hover/focus/tap). **Imports:** nothing. **Provides:**

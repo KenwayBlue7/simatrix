@@ -2,10 +2,48 @@
 
 All notable changes to Module 2 (Solids Inclined to Both Planes).
 
+## 2026-08-12
+- Fixed: the 3D pane in `body.method-split` still read as over-zoomed on FIRST entry even after
+  the prior over-zoom fix — that fix corrected the framing's timing (aspect was, in fact, already
+  correct), but the fit itself was still `frameToSolid`'s default full-viewport `FRAME_PADDING`
+  (10% margin), framing the solid alone and cropping the HP/VP reference planes right at its
+  silhouette in the narrow 30% pane — the exact planes the mode exists to read inclination
+  against. `resetMethodPoseCamera()` (used by both entry and "Reset camera") now fits with a new
+  `METHOD_POSE_FRAME_PADDING` (60% margin, matching the platform's existing "not too tight"
+  content-fit precedent, ADR-155). Confirmed via a temp debug hook: `cameraAspect` matched
+  `paneAspect` to within rounding on first entry (0.5806 vs 0.5814), and "Reset camera" clicked on
+  an un-rotated Set was a true no-op — the fit was self-consistent, just too tight.
+- Fixed: the Top/Front/Side quick-view chips silently broke "Reset camera" — latching a quick view
+  swaps the live camera to the ortho camera (and can arm the ortho↔perspective morph), so fitting
+  against the (untouched) perspective camera did nothing. `resetMethodPoseCamera()` now un-latches
+  via `restorePerspective()` first when a quick view is active.
+- Changed: `.vp-cluster`'s Compare chip and Connector-lines toggle are now hidden in
+  `body.method-split` — Compare force-unflattens the solid (destroying the mode's own
+  `foldProgress === 1` precondition) and the connector toggle is provably inert once
+  `setMethodPoseVisible(true)` has hidden every group it could reach. The quick-view chips stay
+  (see above). See `../RULES.md` §5.16c.
+- Changed: `#method-pose-reset` renamed "Reset view" → "Reset camera" with the platform's existing
+  four-corner frame glyph (reused from "Expand compare view" in two sibling topics), replacing a
+  headless circular-arrow that read as the module's destructive, confirm-guarded `#btn-reset`.
+- Docs: `../DECISIONS.md` ADR-163's `restorePerspective()` note corrected — `enterMethodPose()`
+  calls it with no args, which is the instant hand-off branch, not the animated §5.18 morph.
+
+## 2026-08-11 (3)
+- Fixed: `body.method-split`'s 70% sheet pane carried a drop shadow and square corners — it inherited `.method-view`'s takeover-mode `box-shadow` (a Flat-Ink exception meant only for the full-viewport overlay) and had no `overflow: hidden` to clip the canvas into the already-set `border-radius`. `body.method-split #method-view` now resets `box-shadow: none` and adds `overflow: hidden`, matching the `#sim-viewport`/`.compare-card` docked-card recipe (DESIGN.md §5.13); the sheet-only takeover is untouched.
+- Fixed: the 3D pane's solid read as over-zoomed in `body.method-split` — `enterMethodPose()` never re-framed the camera after the pane narrowed to 30% width, so it kept the distance fitted for the prior full-width viewport. `enterMethodPose()` now re-frames via the existing `resetMethodPoseCamera()` (the same helper `#method-pose-reset` already calls) once the split layout has actually reflowed, so entry framing and Reset view now agree by construction.
+- Fixed: exiting the 3D mode could leave Step 6's answer sheet at the wrong zoom — `exitMethodPose()`'s `swoopToAnswerSheet()` was fitting against the still-30%-wide pane before the layout had reflowed back to full width. The `method-split` class is now removed and the layout resize forced (`handleResize`) before the swoop runs.
+
+## 2026-08-11 (2)
+- Added: Show Method gains a second container — a live `#method-3d` toggle ("3D view" / "Sheet only") in the button bar swaps between the plain full-viewport sheet takeover and a `body.method-split` 30/70 grid: a live, orbitable 3D pane (the solid on the HP/VP planes) beside the unchanged n-Set sheet. The solid tweens (quaternion slerp, ~2s, `easeFold`) to each Set's own pose as the walkthrough crosses a Set boundary (Next/Back/Skip, or a Set focus chip click) — watching the textbook's own "tip, then turn" construction as a physical rotation, not just a changing drawing. Camera is preserved across Set changes and a reset-view affordance recentres it; toggling loses neither the walkthrough's progress nor the drawing sheet. See `../DECISIONS.md` ADR-163 (amends ADR-085) and `../RULES.md` §5.16c.
+- Fixed (caught live during the same pass): exiting Show Method after using the new 3D mode left the wizard's Step 6 panel showing the live 3D viewport on a free-orbit perspective camera instead of the clean top-down answer-sheet view `Flatten to 2D` had originally set up. `exitMethodPose()` now re-engages that view (`swoopToAnswerSheet()`) before the sim loop re-pauses. See ADR-163.
+
 ## 2026-08-11
 - Changed: `meta.json` title renamed from "Orthographic Projection of Solids" to "Solids Inclined to Both Planes" (description + tags rewritten to match), since Module 2 is the only build that teaches the both-planes tier and the old name overlapped its own Simple Positions clone. `index.html`'s `<title>` updated in lockstep per RULES.md §1.12. See `../DECISIONS.md` ADR-161.
 - Changed: the wizard's "Position & incline" step split into a dedicated Step 3 "Inclinations" (angle sliders + face-inclination toggles), and the old top+front / side-view steps merged into one Step 5 "Draw the views" (side view is now a Show/Hide toggle that no longer gates the step). Net step count unchanged at 6. See `../DECISIONS.md` ADR-161.
 - Note: the merged-views step (change 2 above) was **not** backported to `graphics_module_2_topic_2_simple_positions` this session — pending. That clone has no inclination controls, so only the view-merge applies there.
+- Changed: Step 5's two view-drawing buttons (one-shot "Draw top & front views" + toggle "Add/Hide side view") collapsed into ONE primary button, "Draw the three views" — a single click now plays a Front→Top→Side sequential reveal and the step gates on all three views being drawn, not just two. Supersedes the same-day ADR-161 decision that let a learner advance without ever revealing the side view. See `../DECISIONS.md` ADR-162.
+- Added: a third onboarding spotlight chip for the side view (violet PP tone), and a shorter hold for any spotlight chip with another already queued behind it, so the new three-chip Step 5 queue reads in ~8.5s instead of ~14s. (`src/onboarding.js`.)
+- Note: the two-revision gap noted above between Module 2 and `graphics_module_2_topic_2_simple_positions` widens further with this change — the clone remains on the pre-ADR-161 separate-steps shape and has not received either the view-merge or this single-button reveal.
 
 ## 2026-08-04
 - Fixed: the Side view folded down beside the Top view instead of the Front view, violating standard first-angle convention (Side must share Front's height band via shared horizontal projectors, not Top's). The Profile Plane's fold hinge (`ppHingeGroup`) was a world-space sibling of the VP fold pivot (`vpFoldGroup`), folding `−90°` about local X onto the HP; it's now nested inside `vpFoldGroup` and folds `+90°` about local Y into the VP plane about the VP∩PP line, riding the VP's own fold down with the front view. Updated `positionRefLabels()`, `answerSheetBox()`, `drawCompare()`'s `sheetPP` formula and its X1-Y1 reference line (now the VP∩PP hinge, spanning Front+Side), and `projectionDrawer.js`'s flat side-view connector (now ties to the folded Front point). The Step-6 tutorial caption already read correctly ("beside the front") and needed no change — only the code disagreed with its own copy. See `../DECISIONS.md` ADR-106.

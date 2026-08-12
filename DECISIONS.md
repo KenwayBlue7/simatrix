@@ -7750,6 +7750,8 @@ one decision because each is a consequence of naming the topic honestly:
    Side view becomes a true Show/Hide toggle (the `#btn-dimensions` idiom, Step 6) that no longer
    gates advancement — a learner who has drawn top+front may proceed without ever revealing the
    side view, since the pedagogy of *drawing* it doesn't require leaving it visible.
+   **⚠ SUPERSEDED 2026-08-11 by ADR-162, filed the same day** — see below: the two-button shape
+   this decision landed lasted less than a day before the side view was made mandatory instead.
 
 Net step count is unchanged at 6 (`Add & rest → Position → Inclinations → Label → Draw the views →
 Flatten`). `stepper.js`'s `STEPS`/`isComplete`/`canAdvance` were updated accordingly, with a new
@@ -7772,6 +7774,262 @@ clone (`graphics_module_2_topic_2_simple_positions`) was **not** backported this
 no inclination controls at all (its own CLAUDE.md: "no tilt … `angleHP`/`angleVP` are removed"),
 so only the Step 4/5 view-merge would apply there, and that backport is deliberately deferred
 (flagged in its own CHANGELOG).
+**Status:** Active for decisions 1–2. Decision 3 (the two-button Step 5 shape) superseded by
+ADR-162.
+
+---
+
+## ADR-162: Step 5's two view-drawing buttons collapse into one; all three views become mandatory
+
+**Date:** 2026-08-11
+**Supersedes:** ADR-161 decision 3 (filed the same day).
+**Decision:** Module 2's Step 5 ("Draw the views") shipped ADR-161's merge as TWO buttons —
+`#btn-project` (one-shot "Draw top & front views", gated the step) and `#btn-sideview` (a
+Show/Hide toggle, "Add side view" / "Hide side view", that did not gate). That shape is replaced
+with **one** primary button, `#btn-draw-views` ("Draw the three views"), whose single click plays
+a sequential reveal — **Front → Top → Side**, in that order — and Next now unlocks only once all
+three have landed (`stepper.js` `isComplete(5)`: `state.viewsDrawn === 3`, replacing the old
+`state.projections`/`state.sideView` pair).
+
+**Why reopen a decision filed the same day:** ADR-161's own text named the tradeoff it was
+accepting — "a learner who has drawn top+front may proceed without ever revealing the side view."
+On reflection that tradeoff undercuts the topic's own pedagogy: front, top, and side together are
+what *fix* the solid (RULES §6.30's "one question" for this step is "draw the views", not "draw
+two of the views"), so a drawing a learner can complete without the third view is an incomplete
+drawing the wizard nonetheless calls done. A single mandatory action also brings the step back
+into DESIGN.md §5.1 ("the one loud action per step") — the two-button shape had briefly regressed
+that, shipping two `.btn--block` actions on one panel.
+
+**Implementation:**
+- **Reveal idiom reused, not invented.** `main.js` `revealViewsSequence` copies Show Method's own
+  beat-reveal shape (`startMethodBeatAnim`): one `tween()` whose value is a fractional unit index —
+  `floor(v)` counts units fully drawn, `v − floor(v)` (re-eased by `easeDraw`) is the current
+  unit's own 0→1 draw-on. Total duration `3 × DRAW_DURATION_MS` (3000ms), linear across units.
+  Reduced motion needed **no** special-casing: `tween()` (`src/anim.js`) already resolves
+  synchronously to its end value under `prefers-reduced-motion` and still walks the same
+  announce-loop, so all three views land instantly and the gate still opens correctly.
+- **Ordering is load-bearing, not cosmetic.** `setProjectionsVisible` must run before
+  `setSideViewVisible` — `refreshProjections()` early-returns on `!showProjectionsFlag`, so calling
+  the side-view setter first would leave `activeProjection` null and the PP linework would never
+  build. Both setters gained a `{ sequenced: true }` option so the sequence can flip their flags
+  and build geometry without triggering their own solo draw-on tween or their spotlight/Compare
+  side-effects a second time.
+- **Cancel-and-snap, not freeze.** `stopViewReveal()` (mirrors `stopMethodBeatAnim`'s contract)
+  snaps every view group to full opacity and, critically, force-fires whatever `onViewDrawn`/
+  `onDone` callbacks the cancelled tween hadn't yet announced — because `tween.cancel()` by
+  contract never fires `onComplete`. Without this, an edit mid-reveal (a Step 2/3 slider nudge,
+  which triggers a `rebuild()` → `disposeActiveProjection()` → `stopViewReveal()`) would strand
+  the wizard: the button stays hidden (`state.viewsDrawing` never clears) and Next stays disabled
+  forever, even though the views are now visibly, fully drawn. `window.simAPI.reset()` reaches the
+  same chokepoint via `rebuild(null)`.
+- **Compare chip and spotlight queue deferred to completion.** Both used to fire off the Front-only
+  solo tween (`setProjectionsVisible`'s old unconditional path); now deferred to
+  `revealViewsSequence`'s `onComplete` so the Compare chip doesn't pop mid-sequence and the
+  spotlight queue plays in the correct Front→Top→Side order. A third spotlight entry, `side-view`
+  (tone `pp`, reading `--color-pp-line`), was added — previously the PP reveal got no spotlight at
+  all. Queuing three chips at the existing 4500ms hold would read as ~14s of chip traffic on one
+  click (a Quiet Chrome violation), so `onboarding.js` gained `HINT_HOLD_QUEUED` (2600ms): any chip
+  with another already queued behind it gets the shorter hold, so three in a row read in ~8.5s. A
+  lone chip (Step 6's `connectors` hint) is unaffected — nothing is queued behind it.
+- **Badges:** the mismatched hide-on-done / label-swap-toggle idioms collapse to one — three
+  independent badges (`#done-front`/`#done-top`/`#done-side`), each lighting as its own view lands,
+  giving a legible progress readout across the reveal instead of one badge appearing at the end.
+  The button itself is one-shot (the `#btn-label` idiom): it hides the instant it's clicked
+  (`state.viewsDrawing`), not merely once the reveal finishes, so it can't be re-triggered mid-flight.
+
+**Rejected alternatives:**
+- *Unlock Next on click, before the reveal finishes.* Snappier, but a learner could click Next
+  before the side view ever visibly draws — directly undercuts "mandatory."
+- *Keep the button as a Hide-all toggle after completion.* Re-opens the very question this ADR
+  closes (a hideable "mandatory" view isn't mandatory) for no pedagogical gain — nothing in the
+  topic asks the learner to hide a drawn view.
+
+**Consequences:** `graphics_module_2_topic_2_simple_positions` (the clone) is still on the
+*pre*-ADR-161 two-separate-steps shape and is now two revisions behind Module 2's Step 5; its
+backport was already deferred by ADR-161 and stays deferred here.
+**Status:** Active.
+
+---
+
+## ADR-163: Show Method gains a second container — a live 30/70 3D-pose-visualizer split, alongside the ADR-085 full-sheet takeover
+
+**Date:** 2026-08-11
+**Amends:** ADR-085 (adds a second container; the sheet-only takeover ADR-085 shipped is unchanged
+and remains the default/only container a learner starts in).
+**Decision:** Show Method's `#method-view` takeover gains a live toggle, in `.method-bar`
+(`#method-3d`, "3D view" / "Sheet only"), between today's plain full-viewport sheet and a
+`body.method-split` 30/70 grid — a live, orbitable 3D pane (`#sim-viewport`, 30%) showing the
+solid on the HP/VP reference planes, beside the unchanged n-Set sheet (`#method-view`, 70%). The
+solid's pose tweens to match whichever Set the walkthrough is currently drawing, so a learner
+watches the textbook's own "tip, then turn" construction as a physical rotation, not just a
+changing drawing. Toggleable live, mid-walkthrough, in either direction, without losing
+`curSet`/`curBeat`/`focusSet`.
+
+**Implementation, in order of how a request flows:**
+- **The pose was already computed and thrown away.** `projectSetPose()` (`main.js`) has always
+  returned `{ eff, m, q, seat }` for every Set — `projectSet()` destructured only `{ eff, m }`. `q`
+  (the exact world quaternion, including the ADR-093 sequential yaw composition for a both-planes
+  Set 3) and `seat` (the matching x/y placement) are now kept on each Set object. No new pose math
+  anywhere — this is the SAME derivation the 2D sheet's own harvest already depends on.
+- **Container: CSS grid-area only, no re-parenting.** `#method-view` and `#sim-viewport` are both
+  already direct `<body>` children (unlike Compare, whose `#compare-card` `enterWorkbench()` must
+  move out of `#sim-viewport` first) — `body.method-split` just assigns `grid-area: view` /
+  `grid-area: method` and drops `#method-view`'s own `position: fixed; inset: 0` for a plain grid
+  cell while the class is on. `handleResize()` already had a `methodViewOpen` branch
+  (`queueMethodRedraw()`) since ADR-085; the existing `#sim-viewport` `ResizeObserver` fires on the
+  grid reflow with no code change.
+- **`enterWorkbench()`/`exitWorkbench()`/`#workbench-rail` are NOT reused.** `enterWorkbench()`
+  force-unflattens (`if (foldProgress > 0) simController.unflatten()`), which would destroy
+  `methodCanRun()`'s own `foldProgress === 1` precondition, and re-parents the 7
+  `WORKBENCH_CONTROLS` drivers into a live rail beside a walkthrough one slider nudge invalidates —
+  the exact two of ADR-085's four original grievances that moved Show Method OUT of Compare in the
+  first place. This mode has no rail; the wizard is hidden, same as it already is for the plain
+  takeover.
+- **The sim loop does NOT pause in this mode** — `enterMethodPose()` calls `window.simAPI.resume()`
+  (undoing `beginShowMethod()`'s own `pause()`), since a live 3D pane needs `animate()`'s render +
+  `tickTweens` running. This reopens the exact precondition ADR-085's own pause clause depended on
+  ("no `anim.js` tween may be added to this view while the pause contract holds") — voided for THIS
+  mode only; the sheet-only takeover keeps the pause contract verbatim. Consequently the private
+  `methodAnimFrame` rAF pump (ADR-091, stood up because `animate()` was paused) must NOT also start
+  while pose mode is active — `startMethodBeatAnim`/`startMethodFocusAnim`/`startMethodTilt` each
+  gate their pump-start on `!methodPoseMode`, or every Show Method tween would tick twice per frame
+  (once from `animate()`, once from the private pump) once both are live.
+- **Fold state: a display-only override, not a real unfold.** `applyFoldVisual(p)` is a pure
+  display function that also happens to write the module `foldProgress` var. `enterMethodPose()`
+  snapshots it and calls `applyFoldVisual(0)` (stands the VP/PP back up, fades the solid back in);
+  `exitMethodPose()` restores it with `applyFoldVisual(savedFold)`. `stepper.setFlattened()` is
+  never touched, so the wizard's own flatten latch (`#btn-unfold` label) survives untouched.
+- **Pose write is quaternion SLERP + linear lerp on seat.x/y — never Euler-lerp.** A both-planes
+  Set 3's pose is a composed quaternion (`yaw · q1`, `projectSequentialBothPlanesPose`), not a
+  single Euler at all; component-lerping Euler angles would produce a visibly wrong intermediate
+  pose even for the simpler Set 1→2 case. Duration `METHOD_POSE_MS = 2000` (slower than
+  `QUICK_VIEW_MS`'s 1500 — the rotation is the whole point here, not a means to an end), eased with
+  `easeFold` (the same "physical hinge" curve the fold and the ADR-105 ghost already use).
+- **Trigger lives ENGINE-side (`setMethodProgress`/`setMethodFocus`, `main.js`), not in
+  `methodController.js`.** `setMethodProgress` already computes the previous flat index; comparing
+  `Math.floor(prevFlat / METHOD_BEAT_COUNT)` against the new `methodSet` catches a Set crossing for
+  Next/Back/Skip uniformly with zero `methodController.js` changes to the trigger. Unlike the
+  ADR-105 ghost (a one-way forward-only flourish), a stale 3D pose is a genuine state
+  inconsistency — Back re-poses too, unlike the ghost. `setMethodFocus` fires the same way on a
+  genuine chip focus (never on the re-click-to-defocus zoom-out, which has no "whole row" pose to
+  revert to).
+- **Live pose/dimension/label layers are hidden, not the whole projection pipeline.**
+  `setMethodPoseVisible(on)` toggles `activeProjection.group`/`vpGroup`/`ppConnectorGroup`
+  directly (nothing else already gates them at `foldProgress === 0`), and routes the dimension
+  layer and the PP/side view through the EXISTING `applyDimensionVisibility`/
+  `applyProfilePlaneVisibility` helpers rather than a second, incomplete `.visible` toggle — both
+  already handle the r160 CSS2D-ignores-ancestor-visibility gotcha (PP pill, dimension labels) that
+  a naive group-hide would miss. Vertex labels fade via `labeler.setOpacity(0)`: they were planned
+  against the live pose and are not re-planned per Set, so they would read as detached from the
+  moving solid if left visible. PP/side view is unconditionally hidden while posing — ADR-088
+  already excludes the side view from the replay for the same "no budget for a third view" reason.
+- **`currentEdgeOverlay` is a sibling, not a child — every pose write hits both.** It copies the
+  mesh's transform once at `rebuild()` time (`main.js:942-945`) and never follows it automatically;
+  missing this would leave a phantom edge overlay frozen at the live pose while the shaded mesh
+  rotated under it.
+- **Exit is identity-guarded against a mid-edit abort.** `stepper.js`'s `reflowFrom` runs
+  `sim.method.abort()` (→ `teardownShowMethod()` → `exitMethodPose()`) AFTER uiManager's own commit
+  has already called `rebuild()` — so `currentMesh` may already be a brand-new object by the time
+  the pose-restore runs. `exitMethodPose()` snapshots `currentMesh`'s identity at entry and only
+  writes the saved quaternion/position back if that identity is unchanged; otherwise the fresh
+  mesh's own (correct) live pose is left alone.
+- **Camera: `restorePerspective()` on entry (free perspective orbit, §5.18 morph — never a hard
+  swap), preserved verbatim across Set changes (pose writes touch mesh transforms only, never the
+  camera), and a reset-view affordance (`#method-pose-reset`, a `<body>` sibling styled and gated
+  exactly like `#rail-toggle`) reuses `simController.unflatten()`'s own orbit-angle-preserving
+  `frameToSolid(dir.normalize())` idiom rather than a hard snap to `DEFAULT_CAMERA_POSITION`.**
+  **Caught live, fixed same pass:** `enterMethodPose()`'s `restorePerspective()` call switches
+  `activeCamera` away from the answer-sheet ortho camera `flatten()`/`swoopToAnswerSheet()` had
+  established — without an explicit hand-back, exiting Show Method left the wizard's Step 6 panel
+  showing the live viewport on a free-orbit perspective camera instead of the clean top-down
+  drawing read, reading as "flatten broke" even though `foldProgress`/state were correct
+  underneath. Fixed by re-calling `swoopToAnswerSheet()` in `exitMethodPose()` (guarded on
+  `methodPoseSavedFold === 1`, which `methodCanRun()`'s own precondition makes the only value ever
+  seen) BEFORE `window.simAPI.pause()` — the swoop is a real `anim.js` tween needing `animate()`'s
+  own `tickTweens` to advance, and pausing first would strand it. A mid-walkthrough "Sheet only"
+  toggle (not a full exit) that freezes the swoop mid-flight this way is harmless: nothing renders
+  the covered `#sim-viewport` while the plain takeover is up, and `teardownShowMethod()`'s own
+  unconditional `window.simAPI.resume()` (reached whenever Show Method fully closes) resumes and
+  completes it from wherever it was frozen, never stuck.
+- **§5.16a checked, not engaged; new §5.16c governs instead.** §5.16a forbids exactly one thing —
+  Compare being demoted from its docked 50/50 split to a floating/compact card, the specific
+  resize-stranding bug ADR-080 fixed. This feature adds no second Compare shape and never touches
+  `compare.show()`/`enterWorkbench()`; `enterMethodPose()` calls `compare.hide()` up front purely
+  because the two docked grids (`body.compare-split`, `body.method-split`) would otherwise compete
+  for the same layout — a one-directional exclusion, not a demotion. The 30/70 ratio itself is
+  new, not borrowed from ADR-037's "true 50/50" (which is about Compare's own pane balance) — see
+  RULES.md §5.16c, added by this ADR, for the narrower rule this establishes: a non-Compare docked
+  split may set its own ratio, but must still be a docked grid (never floating/compact, never a
+  second Compare shape) and must restack to a single column below 768px, mirroring
+  `body.compare-split`'s own restack.
+
+**Why:** Inclination only means anything measured against a reference plane. The sheet-only
+takeover shows the CONSTRUCTION changing between Sets but never the solid physically turning from
+simple position → inclined to one plane → inclined to both — the exact motion the textbook's own
+"tip, then turn" method describes. A live 3D pane beside the sheet lets a learner watch that
+rotation directly, with the same all-Sets sheet still doing the construction bookkeeping.
+**Alternatives rejected:** (a) *Reuse `enterWorkbench()`/Compare's split* — rejected, reopens two
+of ADR-085's own four founding grievances (forced unflatten, live drivers beside an invalidatable
+walkthrough). (b) *Re-parent the renderer into `#method-view`* — rejected, moves a live WebGL
+canvas's host element and needs bespoke resize wiring for no benefit over grid-area assignment,
+which needs none. (c) *A permanent second rAF pump, so pose tweens don't need the main loop live* —
+rejected (mirrors ADR-085's own rejection of a second pump for Set-focus zoom); the main loop is
+cheap to keep running for the one mode that actually needs live rendering, and running two pumps at
+once is exactly the double-tick bug this ADR's own private-pump guard exists to prevent.
+**Consequences:** ADR-085's pause-contract clause is amended a third time (ADR-101 for the tilt,
+ADR-102 for chip focus, this ADR for the whole pose-visualizer mode) — the sheet-only container it
+governs is otherwise untouched. `swoopToAnswerSheet()` gains a caller outside the wizard's own
+`flatten()` path; it was already idempotent/safe to re-invoke. No `METHOD_BEAT_COUNT`/`BEAT_COUNT`
+change — the pose is a Set-boundary event, not a beat, the same shape as the ADR-105 ghost.
+
+**Follow-up fixes (same day, caught in a design/code audit before ship):** three scoping misses,
+none reversing anything decided above. (1) `body.method-split #method-view` inherited
+`.method-view`'s base-rule `box-shadow` (the takeover shape's own §4.9 Flat-Ink exception for a
+transient full-viewport overlay) with nothing resetting it for the docked pane — added
+`box-shadow: none` to the split rule, scoped so the takeover container is untouched. (2) The same
+rule already set `border-radius` but nothing clipped the sheet's canvas into it — added
+`overflow: hidden`, the same clip `#sim-viewport`'s own split rule already carries. Both land in
+the one existing `body.method-split #method-view` block — see RULES.md §5.16c's new clause. (3)
+The 3D pane read as over-zoomed: `enterMethodPose()` called no framing helper at all, so the
+camera kept the distance `fitPerspectiveDistance()` chose for the prior full-width viewport — the
+framing math itself is aspect-correct (it already derives horizontal half-FOV from
+`camera.aspect`), it simply never re-ran after the pane narrowed to 30%. Fixed by having
+`remeasureAfterReflow()` accept an optional post-resize callback and passing it
+`resetMethodPoseCamera` — the same helper `#method-pose-reset` already calls — so entry framing
+and Reset view now agree by construction, no new constant. `exitMethodPose()` had the mirror bug
+on the way out (`swoopToAnswerSheet()` fitting against the still-30% pane before the class was
+removed); fixed by removing `body.method-split` and forcing the resize before the swoop runs.
+
+**Second follow-up (2026-08-12, design/code audit of the shipped mode):** the pane still read as
+over-zoomed on FIRST entry, and "Reset view" did nothing there yet worked correctly once a Set
+had advanced — one bug with two symptoms, not two bugs. Diagnosed with a temp `window.__dbg`
+hook rather than assumed: on first entry `cameraAspect` (0.5806) already matched the pane's own
+aspect (0.5814) to well within rounding, and `activeCamera === camera` with `projectionMorphK ===
+null` throughout — so the prior follow-up's timing fix (above) was working correctly, and the
+mode's own `restorePerspective()` call (no args, `enterMethodPose()`) is genuinely the plain
+instant hand-off, never the animated §5.18 morph (that branch is unreachable from this call site
+— worth flagging since this ADR's own Camera bullet above reads as if it always morphs). The
+real cause: `resetMethodPoseCamera` → `frameToSolid` → `fitPerspectiveDistance` was correctly
+computing a fit, just to the platform's default `FRAME_PADDING` (10%, tuned for the full-width
+viewport) around the solid ALONE — cropping the HP/VP reference planes right at its silhouette in
+a narrow 30% pane, which is exactly the context the mode exists to show. "Reset view" being a true
+no-op on an un-rotated Set (idempotent — the fit is self-consistent, just too tight) and a real
+zoom-out once a Set's rotation grew the bounding box (a legitimately larger required distance for
+different content) was the tell. Fixed with a new `METHOD_POSE_FRAME_PADDING` (60% margin —
+matching the platform's existing "not too tight" capped content-fit precedent, ADR-155) threaded
+through a new optional `padding` param on `frameToSolid`, used only by
+`resetMethodPoseCamera` — every other caller keeps the unchanged default. Same pass:
+`resetMethodPoseCamera` un-latches an active quick view first (`restorePerspective()`) before
+fitting — Top/Front/Side swap the live camera to `orthoCamera`, which the fit was silently
+computing against the (untouched, stale) perspective camera otherwise. Also hid `.vp-cluster`'s
+Compare chip (force-unflattens, destroying `methodCanRun()`'s own precondition) and Connector
+lines (provably inert once `setMethodPoseVisible(true)` runs) inside `body.method-split` —
+`display: none`, not the DESIGN.md §5.4 padlock, since this is a container swap exposing
+`#sim-viewport` for the first time, not a control hierarchy within one panel (RULES.md §5.16c
+gains a clause for this). The quick-view chips stay, now pose-mode-safe. `#method-pose-reset`
+renamed "Reset view" → "Reset camera" with the platform's existing four-corner frame glyph (reused
+from "Expand compare view" in two sibling topics), replacing a headless circular-arrow that read
+as the module's destructive, confirm-guarded `#btn-reset`.
 **Status:** Active.
 
 ---

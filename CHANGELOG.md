@@ -3,11 +3,35 @@
 All notable changes at the Simatrix project root (spanning Module1, Module2, and the
 topic deploy copies). Per-module changelogs live inside each module folder.
 
+## 2026-08-12
+- Fixed: `Module2`'s method-split 3D pane was still over-zoomed on first entry — the prior
+  ADR-163 follow-up fix corrected the framing's TIMING but not its target, which still framed
+  the solid alone at the full-viewport padding, cropping the HP/VP planes in the narrow pane. See
+  `Module2/CHANGELOG.md`, ADR-163 second follow-up.
+- Changed: `Module2`'s method-split 3D pane now hides the Compare and Connector-lines controls
+  (both dead or actively harmful in that mode) and keeps the quick-view camera chips working with
+  its Reset-camera button. See `Module2/CHANGELOG.md`, `RULES.md` §5.16c.
+
+## 2026-08-11 (3)
+- Fixed: `Module2`'s ADR-163 method-split docked pane had a stray drop shadow, unclipped square
+  corners, and an over-zoomed 3D pane (camera never re-framed after the pane narrowed to 30%
+  width); exit could also leave the answer sheet at the wrong zoom. See `Module2/CHANGELOG.md`.
+
+## 2026-08-11 (2)
+- Added: `Module2`'s Show Method gains a second, live-toggleable container — a 30/70 3D-pose-
+  visualizer split alongside the existing full-viewport sheet takeover — so a learner can watch the
+  solid physically rotate between construction Sets, not just watch the drawing change. See
+  `Module2/CHANGELOG.md`, ADR-163 (amends ADR-085); `RULES.md` gains §5.16c (non-Compare docked
+  splits may set their own pane ratio).
+
 ## 2026-08-11
 - Changed: `Module2` (the master) renamed from "Orthographic Projection of Solids" to "Solids
   Inclined to Both Planes" (`meta.json` + `index.html` `<title>`), and its wizard restructured —
   inclination moved into its own Step 3, and the top+front/side-view steps merged into one Step 5.
   See `Module2/CHANGELOG.md`, ADR-161.
+- Changed: `Module2`'s Step 5 restructure (above) revised same-day — the two view-drawing buttons
+  collapsed into one, and the side view (previously skippable) is now mandatory, drawn together
+  with front and top in a single sequential reveal. See `Module2/CHANGELOG.md`, ADR-162.
 - Fixed: `graphics_diploma_module_1_topic_1_4_regular_polygons`'s two most-clicked wizard
   controls (`.construction-picker__item`, `.method-switcher__btn`) had no hover state and a
   focused Play All button advanced a slide on Space instead of playing. See module CHANGELOG.md.

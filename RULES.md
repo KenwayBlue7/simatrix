@@ -543,7 +543,42 @@ Every rule is formatted:
 > the rail toggle all collapsed with it. A control the split cannot show is reached by leaving the
 > split, exactly as the sibling topics do.
 
-
+> **§5.16c ✅ DO** let a docked split OTHER than Compare set its own pane ratio — Module 2's Show
+> Method 3D-pose-visualizer split (`body.method-split`) is 30/70 (3D pane / sheet), not Compare's
+> 50/50. **❌ NEVER** let it become a floating/compact card, a second Compare shape, or skip the
+> narrow-viewport restack: below 768px it collapses to a single column exactly like
+> `body.compare-split` does (3D pane first, the larger-share content below it). *(ADR-163, which
+> narrows §5.16a to Compare specifically — see that ADR for why §5.16a itself is not engaged: no
+> second Compare shape, no demotion listener, `compare.hide()` is a one-way exclusion between two
+> independent docked grids, not a fallback state either can be stranded in.)*
+> Reason: the 50/50 balance in §5.16/ADR-037 answers Compare's own job — a 3D↔2D read where neither
+> pane should dominate. A different docked split can have a genuinely asymmetric job (here, the
+> drawing is the deliverable and the 3D pane is the explanation) without that asymmetry becoming
+> the kind of floating/compact fallback state ADR-080 spent an entire fix removing.
+>
+> **Chrome, regardless of ratio:** a docked split's panes still take the §5.13 card recipe —
+> hairline border + `--radius-md` + `overflow: hidden`, **never** a shadow (Flat-Ink, §4.9). If a
+> pane reuses an element that ALSO has its own non-docked shape (e.g. `#method-view`, which is a
+> `position:fixed` full-viewport overlay outside `body.method-split` and legitimately carries the
+> §4.9 transient-overlay shadow there), the docked rule must explicitly reset that shadow — it does
+> not fall away on its own just because the element now sits in a grid cell. *(ADR-163 follow-up
+> fixes, same day: `body.method-split #method-view` was missing exactly this reset.)*
+>
+> **If the split EXPOSES a pane that was previously only ever covered** (unlike Compare's own
+> `#sim-viewport`, always live behind `.vp-cluster`), audit that pane's existing chrome against the
+> new mode rather than assuming it still applies — a control can be dead (does nothing once the
+> mode's own state gates the thing it toggles), actively wrong (fights the mode's own
+> precondition), or fine as-is. **✅ DO** hide (`display: none`, scoped to the mode's body class)
+> whichever controls are dead or wrong; **❌ NEVER** reach for the §5.4 padlock here — that pattern
+> is for a control HIERARCHY within one panel (one live control disabling another), not a container
+> swap, and a padlock also implies an in-panel path to unlocking that a mode swap doesn't have.
+> *(ADR-163 second follow-up: Show Method's pose split hides `.vp-cluster`'s Compare chip —
+> force-unflattens, destroying the mode's own precondition — and Connector-lines toggle — inert
+> once the mode's own visibility pass has run — but keeps the quick-view chips, which stay a
+> legitimate way to inspect the pose.)*
+> Reason: a mode that reuses a pane inherits every control already anchored to it, whether or not
+> that control's assumptions still hold — the plain full-viewport takeover never surfaced this
+> because it fully covers `#sim-viewport` instead of sharing it.
 
 > **§5.17 ❌ NEVER** mirror/duplicate the driver or construction-launcher controls into the rail, or
 > give the docked rail a shadow — **re-parent** the existing nodes (one source of truth) and
@@ -885,6 +920,7 @@ Every rule is formatted:
 - ❌ Use a per-frame exponential camera follow, or run tight-fit and push-back in one rebuild. *(§5.2, §5.3)*
 - ❌ Reintroduce the persistent dual-pane PiP/`swap()`, or show a snapshot in the Compare card. *(§5.11, §5.14)*
 - ❌ Demote an expanded Compare split to a floating/compact card on resize. *(§5.16a)*
+- ❌ Force a non-Compare docked split (e.g. Show Method's 3D-pose-visualizer split) to Compare's own 50/50 ratio, or let it skip the narrow-viewport restack. *(§5.16c)*
 - ❌ Put a CSS `transform` on `#sim-viewport`/`#canvas-area`/`body`. *(§5.13)*
 - ❌ Mirror the workbench rail controls instead of re-parenting, or give the docked rail a shadow. *(§5.17)*
 - ❌ Hard-swap perspective↔orthographic cameras in one frame instead of the `projectionMorphK` morph. *(§5.18)*
