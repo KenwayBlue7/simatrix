@@ -607,85 +607,63 @@
       grid-template-areas: "view compare";
     }
 
-    /* ---- Construction-launcher dock (topic-local; mirrors #rail-toggle's floating-corner
-       convention, just anchored to the opposite pane/corner): the True Length & Angles + Show
-       Traces launchers (and their Replay buttons) float at the 2D drawing panel's bottom-right
-       during the split workbench, instead of docking inside #workbench-rail's control clusters.
-       A direct <body> child (JS-created, main.js ensureConDock()) so it persists independent of
-       the rail's own show/hide state — exactly as #rail-toggle persists independent of the
-       wizard. Shares grid-area:compare with #compare-card (CSS Grid allows overlapping items;
-       #rail-toggle already uses the same technique on grid-area:view). */
-    .con-dock {
-      display: none; /* shown only in the split, see body.compare-split #con-dock below */
-      z-index: 95; /* above the Compare card (--z-compare 90), below the mobile notice (100) */
-      gap: var(--space-3);
-    }
-    body.compare-split #con-dock {
+    /* Step-through nav pill — the in-Compare twin of .method-bar. A direct <body> child (main.js
+       ensureConNav()), positioned by the SAME CSS-Grid overlap idiom #rail-toggle already uses:
+       it claims grid-area:compare alongside #compare-card and pins itself to that cell's bottom
+       centre. Its paint half (panel bg / border / radius) is grouped onto .method-bar's own rule
+       below, so the two walkthrough entry points share one declaration. Not a takeover (no focus
+       trap, no Escape) — no Exit button, Back/Next only. The beat CAPTION no longer lives in this
+       pill — see .compare-card__top / .compare-card__caption below, and main.js ensureConNav() —
+       this row is buttons only now. */
+    .con-nav { display: none; }
+    body.compare-split #con-nav {
       display: flex;
       flex-direction: column;
-      align-items: flex-end;
+      align-items: center;
+      gap: var(--space-2);
       grid-area: compare;
       align-self: end;
-      justify-self: end;
+      justify-self: center;
       margin: var(--space-4);
+      z-index: 95; /* same floating-chrome band as #rail-toggle */
+      /* max-width cap REMOVED (ADR-166, 2026-08-17): it existed only to clear #con-dock's 180px
+         launcher column (measured 34px overlap at 1536px, two sessions ago) — #con-dock is now
+         deleted (launchers moved into #workbench-rail), so the collision it guarded against can't
+         happen anymore. No replacement value yet: user wants to see the pill unconstrained first
+         and decide afterward whether it still needs any cap for its own sake. */
     }
-    /* Each launcher keeps the fixed-width column it used inside the rail — a single button,
-       not a slider. Its own label swaps to "Replay …" once triggered (main.js setConLabel);
-       there is no separate Replay button. */
-    #con-dock .ctrl { flex: 0 0 auto; width: 180px; margin: 0; display: flex; flex-direction: column; gap: var(--space-2); }
-    /* Per-step disclosure (`hidden`) still targets these wrappers by [data-ctrl] regardless of
-       DOM parent (stepper.js) — override it here the same way the rail does, so a stray
-       reset/problem-load re-render can never re-hide a launcher while it's docked (ADR-051's
-       rationale, ported). */
-    #con-dock .ctrl[hidden] { display: flex !important; }
-    /* Match the #rail-toggle Hide/Show pill's chrome (panel bg, secondary ink, and its
-       0.8125rem/600 label size — .rail-toggle__text / .quick-view / .connector-toggle /
-       .compare-chip's shared floating-pill size, not the generic .btn's inherited body
-       --text-base) so the two floating-corner docks read as one visual family. Hover
-       override lives in the @media (hover: hover) block below, alongside .btn:hover. */
-    #con-dock .btn {
-      background: var(--color-panel);
-      color: var(--color-ink-secondary);
-      font-size: 0.8125rem;
-      font-weight: 600;
-    }
-
-    /* Step-through nav row (Phase B, main.js ensureConNav()) — sits below whichever launcher
-       is docked, same 180px column width as the .ctrl launchers beside it. Not '.ctrl' (see
-       main.js's own comment on why) so its [hidden] toggle isn't fought by the launcher
-       override two rules up. */
-    #con-dock .con-nav { flex: 0 0 auto; width: 180px; display: flex; flex-direction: column; gap: var(--space-2); }
-    #con-dock .con-nav[hidden] { display: none; }
-    .con-nav__caption {
-      margin: 0;
-      font-size: 0.8125rem;
-      line-height: 1.4;
-      color: var(--color-ink-secondary);
-      background: var(--color-panel);
-      border: 1px solid var(--color-border);
-      border-radius: var(--radius-md);
-      padding: var(--space-2) var(--space-3);
-      min-height: 2.6em;
-    }
-    .con-nav__btns { display: flex; gap: var(--space-2); }
-    .con-nav__btns .btn { flex: 1 1 0; }
+    /* Beats the display:flex above by specificity (0-1-2-1 > 0-1-1-1) so enterCon()/
+       teardownCon()'s own hidden toggle still wins. */
+    body.compare-split #con-nav[hidden] { display: none; }
+    .con-nav__btns { display: flex; padding: var(--space-2); gap: var(--space-2); }
     .con-nav__btns .btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
     /* The docked driver rail — spans both panes, hosts the re-parented [data-ctrl]
        wrappers laid out as a horizontal instrument row. A paper-white rounded card
        matching the other two panes (DESIGN.md §5.13) on the grey shell; no shadow
        (Flat-Ink — docked surfaces don't earn the transient-overlay shadow). Topic-local
-       clustering (this file's own rules — not a shared-file change): the five geometry
-       drivers are grouped into two titled .dock__group clusters (main.js WORKBENCH_GROUPS) —
-       Dimensions / Inclination — instead of one flat undifferentiated row, so the rail scans
-       instead of reading as a wall of equal controls. The construction launchers (True Length
-       & Angles / Traces) no longer live here — they dock at the 2D panel's corner instead, see
-       .con-dock above. */
+       clustering (this file's own rules — not a shared-file change): all seven controls are
+       grouped into three titled .dock__group clusters (main.js WORKBENCH_GROUPS) — Dimensions /
+       Inclination / Constructions — instead of one flat undifferentiated row, so the rail scans
+       instead of reading as a wall of equal controls. The construction launchers (True Length &
+       Angles / Traces) dock in their own Constructions cluster here (ADR-166 — reverses the
+       ADR-165-audit #con-dock corner-dock exception; #con-dock is deleted). Two-lane row
+       (ADR-167): Dimensions + Inclination nest inside #rail-drivers on the left, which grows to
+       fill the row and pins Constructions to the right end; see #rail-drivers below for the
+       mechanism and the .field clamp() that lets the whole bench hold one row down to a 158px
+       floor before it falls back to wrapping. Cluster cross-axis is `stretch`, not `flex-end`
+       (ADR-167 amendment, 2026-08-17): Constructions' body is a bare 44px .ctrl button with no
+       label line above it, so bottom-aligning the clusters by flex-end left its shorter column
+       25.6px taller of headroom than Dimensions/Inclination, dropping its title that far below
+       theirs even though all three sat on the same row. Stretching each cluster to the flex
+       line's full height equalises the title tops; .rail__group's own justify-content:
+       space-between (below) then pushes each cluster's body back down to the shared bottom, so
+       the controls stay level with the slider rows exactly as flex-end gave them before. */
     #workbench-rail { display: none; }
     body.compare-split #workbench-rail {
       display: flex;
-      flex-wrap: wrap; /* whole CLUSTERS reflow as units on a tight viewport — never a mid-cluster split */
-      align-items: flex-end;
+      flex-wrap: wrap; /* below the 158px floor, CLUSTERS reflow as units — never a mid-cluster split */
+      align-items: stretch; /* was flex-end — see the ADR-167 amendment note above */
       justify-content: center; /* Centre the clusters so they sit balanced across the full-width rail. */
       gap: var(--space-3) 0; /* row-gap only when clusters wrap; column rhythm now comes from each
                                  cluster's own divider (.rail__group + .rail__group), so this stays 0 */
@@ -695,12 +673,19 @@
       border-radius: var(--radius-md);
       overflow-x: auto;
     }
-    /* Each cluster: title-over-body (.dock__group's own column direction), sized to its content. */
-    #workbench-rail .rail__group { flex: 0 0 auto; }
-    /* A cluster's controls run horizontally beneath its eyebrow title. */
+    /* Each cluster: title-over-body (.dock__group's own column direction), sized to its content.
+       justify-content: space-between (ADR-167 amendment) pairs with the rail/#rail-drivers
+       stretch above — it re-anchors this cluster's OWN body to the bottom of its now-stretched
+       column, so a shorter cluster (Constructions) still lines its controls up with the taller
+       ones' controls instead of leaving a gap under a shorter body. */
+    #workbench-rail .rail__group { flex: 0 0 auto; justify-content: space-between; }
+    /* A cluster's controls run horizontally beneath its eyebrow title. Fixed nowrap (not wrap,
+       ADR-167): a cluster's own fields must reflow as ONE unit with the rest of the row (the
+       rail's own flex-wrap below is the only place this bench is allowed to break), never split
+       mid-cluster onto their own second line. */
     #workbench-rail .rail__group-body {
       display: flex;
-      flex-wrap: wrap;
+      flex-wrap: nowrap;
       align-items: flex-end;
       gap: var(--space-5);
     }
@@ -711,14 +696,78 @@
     #workbench-rail .rail__group + .rail__group {
       padding-left: calc(var(--space-6) + var(--space-3)); /* 32px + 12px = 44px, was var(--space-6) */
     }
-    /* Each driver reflows from the wizard's vertical stack into a fixed-width column
-       so the row reads as an instrument bench. */
-    #workbench-rail .field { flex: 0 0 auto; width: 200px; margin: 0; gap: var(--space-2); }
+    /* Two-lane row (ADR-167): #rail-drivers (Dimensions + Inclination, main.js
+       ensureWorkbenchRail()) grows into all the row's leftover width, which is what pins the
+       Constructions cluster to the row's right end — NOT an auto margin, which flexbox spec
+       §9.5 would zero this lane's own flex-grow to make room for (auto-margin and shrink-to-fit
+       are mutually exclusive on the same axis). The 44px gutter before Constructions mirrors
+       the .rail__group + .rail__group rule above, now re-declared across the lane boundary. */
+    #workbench-rail #rail-drivers {
+      display: flex;
+      flex: 1 1 auto;
+      align-items: stretch; /* was flex-end (ADR-167 amendment, see #workbench-rail's comment
+                                above) — stretches Dimensions/Inclination to match the outer
+                                rail's own stretched line, so the two lanes' cluster heights (and
+                                therefore title rows) agree with each other too */
+      min-width: 0; /* let the lane shrink below its children's natural sum — the .field
+                        clamp() below is what actually keeps content inside it */
+    }
+    #workbench-rail #rail-drivers + .rail__group {
+      margin-left: calc(var(--space-6) + var(--space-3)); /* 44px, matches the intra-lane gutter */
+    }
+    /* Each driver reflows from the wizard's vertical stack into a column so the row reads as an
+       instrument bench. Width is viewport-derived, not fixed (ADR-167 — supersedes the fixed
+       200px width and the 2026-07-15 auto-fit-grid amendment to ADR-021, which this file's
+       .dock__group clustering had already replaced with a flex row before this change).
+       Derivation: five fields at width F plus the two clusters' own gaps/gutters total
+       (5F + 544)px; that must fit the rail's content box (viewport − 82px of body/rail
+       padding+border), which solves to F ≤ 0.2·vw − 125.2px. calc(20vw - 130px) sits 4.8px
+       under that cap — comfortable slack, still viewport-driven rather than a step-function
+       media query. The clamp() floor is 158px: the width where "Distance from HP (end A)"
+       (this rail's longest label) still fits on one line — narrower and the label wraps to two
+       lines and grows the rail's own height (see the .field__label rule, ~line 1268). Below
+       that floor the rail's own flex-wrap (below) takes over and Constructions drops to its own
+       row, exactly as it did before this change. */
+    #workbench-rail .field {
+      flex: 0 0 auto;
+      width: clamp(158px, calc(20vw - 130px), 200px);
+      margin: 0;
+      gap: var(--space-2);
+    }
+    /* 4.5rem (.field__num, ~line 1332) was sized for a 3-digit-plus-decimal angle value
+       ("360.0") — a width copied from a different topic; this rail's widest live value is "200"
+       (30.7px). Narrowed here, scoped to the rail only (the wizard dock keeps 4.5rem), to give
+       the shrinking slider back the track space the wider box would otherwise take at the
+       158px floor (64px of track instead of 52px). */
+    #workbench-rail .field__num { width: 3.75rem; }
     /* The card's per-step reveal used `hidden` to show only the current step's control(s)
        (stepper.js keeps doing this even once a wrapper is re-parented here, since it
        queries by [data-ctrl] regardless of DOM parent); in the rail every driver is live at
        once (ADR-051 — the rail overrides per-step disclosure with the full set). */
     #workbench-rail .field[hidden] { display: flex !important; }
+    /* The construction-launcher wrapper (.ctrl, not .field — a single button, not a slider)
+       keeps the fixed-width column it used at the old #con-dock (ADR-166). */
+    #workbench-rail .ctrl { flex: 0 0 auto; width: 180px; margin: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+    /* Constructions cluster's own vertical anchor (ADR-167 second amendment, 2026-08-17): the
+       shared `.rail__group { justify-content: space-between }` above anchors a cluster's body to
+       the BOTTOM of its stretched column, which for Dimensions/Inclination lands their sliders
+       level with each other's tracks — but Constructions' `.ctrl` is a bare button with no label
+       row above it, so bottom-anchoring instead landed the button flush with the slider TRACKS
+       (699.2px in the 1536px audit), 27.2px below where a `.field`'s own label text starts. User
+       asked for the opposite anchor here: button top level with the θ/φ LABEL text, not the
+       track. `flex-start` on just this cluster (higher specificity than the shared rule via the
+       `[data-group]` attribute selector, so no rewrite of the shared rule needed) packs its
+       title+body from the column's top instead — verified live this lands the button's top edge
+       exactly on the label's top edge (672.0px, 0px off) at 1536px, leaves the just-fixed title
+       alignment and the below-158px wrap fallback untouched (both re-checked). Buttons no longer
+       sit level with the slider tracks — that was never a deliberate design intent, only a side
+       effect of the first amendment's bottom-anchor; this supersedes it on request. */
+    #workbench-rail .rail__group[data-group="constructions"] { justify-content: flex-start; }
+    /* Per-step disclosure (`hidden`) still targets these wrappers by [data-ctrl] regardless of
+       DOM parent (stepper.js) — override it here the same way .field[hidden] does, so a stray
+       reset/problem-load re-render can never re-hide a launcher while it's docked (ADR-051's
+       rationale, ported from #con-dock). */
+    #workbench-rail .ctrl[hidden] { display: flex !important; }
 
     /* ---- 44px hit-area floor (DESIGN.md). These viewport-corner controls stay visually
        compact so the chrome stays quiet, but a transparent, centred ::before guarantees a
@@ -1526,6 +1575,17 @@
       background: transparent;
       border-color: transparent;
     }
+    /* Compact walkthrough-pill variant (this session), ported verbatim from Module2/index.html's
+       .btn--small — the reference implementation has shipped this size on #method-back/-next
+       since ADR-095 without ever documenting it as a variant (see DESIGN.md §5.1 amendment).
+       #con-nav-back/-next and #method-back/-next/-exit all take it now, so both walkthrough
+       entry points' buttons read at the same size Module 2's do. Below DESIGN.md §5.1's general
+       44px target floor by design — accepted there as the one sanctioned exception. */
+    .btn--small {
+      min-height: 32px;
+      padding: 0 var(--space-3);
+      font-size: var(--text-sm);
+    }
 
     /* --- Step-action hint + completion badge (Steps 3–5) --- */
     .hint {
@@ -1770,6 +1830,99 @@
     @keyframes libraryIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
     .problem-library:not([hidden]) { animation: libraryIn var(--dur-step) var(--ease-standard); }
 
+    /* --- Show Method takeover (ADR-165) — follows the .problem-library overlay recipe above
+       exactly: position:fixed, --z-overlay, the Flat-Ink transient-overlay shadow exception,
+       the same libraryIn entrance. position:fixed escapes both the base flex row and the
+       body.compare-split grid with no layout-mode branching. --- */
+    .method-view {
+      position: fixed;
+      inset: 0;
+      z-index: var(--z-overlay);
+      display: flex;
+      flex-direction: column;
+      background: var(--color-paper);
+      box-shadow: var(--shadow-md);
+    }
+    .method-view[hidden] { display: none; }
+    .method-view:not([hidden]) { animation: libraryIn var(--dur-step) var(--ease-standard); }
+    .method-view__top {
+      flex: none;
+      padding: var(--space-3) var(--space-5);
+      border-bottom: 1px solid var(--color-border);
+    }
+    /* #compare-card's own twin of .method-view__top (this session) — the in-Compare beat caption
+       moves here from the floating #con-nav pill, so it reads at the TOP of the 2D drawing card
+       instead of stacked on the Back/Next pill at the bottom. A flow child of .compare-card
+       (below), NOT an overlay — the stage shrinks to make room (Module 2 ADR-095's rationale,
+       applied to the card instead of the takeover), so the caption can never sit on top of the
+       drawing. Built once by main.js ensureConNav() as .compare-card__top, prepended to
+       #compare-card; hidden whenever no construction is active (enterCon()/teardownCon()). */
+    .compare-card__top {
+      flex: none;
+      padding: var(--space-3) var(--space-5);
+      border-bottom: 1px solid var(--color-border);
+    }
+    /* One shared voice for both walkthrough captions (this session) — previously
+       .con-nav__caption alone matched Module 2's .method-title (--text-lead/600, a painted
+       chip); that read as louder than this topic's OWN Show Method caption right next to it,
+       and --text-lead is DESIGN.md-retired (post-ADR-073, no other consumer). Both now render
+       at the quieter --text-base/400 .method-caption already used here, as plain flow text with
+       no chip paint — only a border-bottom on the containing band (.method-view__top /
+       .compare-card__top above). */
+    .method-caption,
+    .compare-card__caption {
+      margin: 0;
+      text-align: center;
+      font-size: var(--text-base);
+      color: var(--color-ink);
+      min-height: 1.4em; /* holds the band's height steady as caption length varies beat to beat */
+    }
+    /* Empty for the whole ~9s continuous auto-play (enterCon/replayCon/teardownCon clear it) —
+       visibility not display, so the reserved min-height keeps the drawing stage from resizing
+       (and re-triggering compareSheet's ortho-frustum resolution sync) when the first beat's
+       caption lands, but no empty band paints above the drawing. */
+    .compare-card__caption:empty { visibility: hidden; }
+    /* The re-parented .compare-card__stage becomes this flex column's sized middle child —
+       compare-card__stage already carries `flex: 1 1 auto; min-height: 0` (see rule above), so
+       no extra sizing rule is needed here beyond scoping the stage's own canvas/overlay rules
+       (declared once, above) to also apply inside this container. */
+    /* Shared beat-pill chrome — the PAINT half of the walkthrough button pill(s): .method-bar
+       inside the #method-view takeover, and #con-nav__btns floating over the 2D pane inside
+       Compare. The beat CAPTION no longer shares this rule (this session) — it moved to its own
+       flow band above the card/takeover (.method-caption / .compare-card__caption, above), a
+       plain bordered strip, not a painted pill. #con-nav itself is a transparent flex column,
+       not a painted surface. Layout axis and positioning stay with each consumer (.method-bar is
+       position:absolute inside a position:fixed overlay; #con-nav rides the body.compare-split
+       grid instead) — only the surface treatment is shared here. Padding stays on each consumer's
+       own rule below (.method-bar / .con-nav__btns), not here, since #con-nav .con-nav__btns
+       (id+class) would out-rank a shared padding declaration by specificity anyway. No shadow —
+       Flat-Ink (RULES.md §4.9); the sibling floating dock #rail-toggle carries none
+       either. */
+    .method-bar,
+    #con-nav .con-nav__btns {
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: calc(var(--radius-sm) + var(--space-2)); /* concentric with the buttons across the pill's own padding */
+    }
+    .method-bar {
+      position: absolute;
+      left: 50%;
+      bottom: var(--space-5);
+      transform: translateX(-50%);
+      z-index: 1; /* floats ON the stage, not behind it */
+      display: flex;
+      padding: var(--space-2);
+      gap: var(--space-2);
+    }
+    /* No min-width here (this session, dropped) — Module 2's .method-bar .btn carries none
+       either; a 96px floor is what made these buttons read visibly larger than Module 2's own
+       Back/Next (audited: both sides' plain .btn is byte-identical, the gap was this floor plus
+       the missing .btn--small class, see .btn--small below). */
+    @media (max-width: 480px) {
+      .method-bar { flex-direction: column; }
+      .method-bar .btn { width: 100%; }
+    }
+
     .problem-library__header {
       flex: none;
       display: flex;
@@ -1951,9 +2104,9 @@
       .quad-btn[aria-pressed="true"]:hover { background: var(--color-accent-soft); border-color: var(--color-accent); }
       .toggle input:hover { border-color: var(--color-ink-secondary); }
       .btn:hover { background: var(--color-panel); border-color: var(--color-bench-grey); }
-      /* #rail-toggle (the Hide/Show pill this dock is matched to) has no hover shift at all —
-         mirror that here instead of inheriting .btn:hover's border-color change. */
-      #con-dock .btn:hover { background: var(--color-panel); border-color: var(--color-border); }
+      /* #con-dock deleted (ADR-166) — its "no hover shift" launcher-button override went with
+         it. The True Length/Traces buttons now take the plain .btn:hover above like every other
+         rail control. */
       .btn:disabled:hover { background: var(--color-paper); border-color: var(--color-border); }
       .btn--primary:hover { background: var(--color-accent-strong); border-color: var(--color-accent-strong); }
       .btn--primary:disabled:hover { background: var(--color-accent); border-color: var(--color-accent); }
@@ -2104,6 +2257,27 @@
 
     <div class="problem-library__body">
       <div id="problem-library-list" class="problem-library__inner"></div>
+    </div>
+  </div>
+
+  <!-- Show Method (ADR-165): a full-viewport, focus-trapped, beat-gated Back/Next walkthrough
+       of the True-Length construction — src/methodView.js drives the shell, main.js owns the
+       geometry (re-parents .compare-card__stage in here on open, back to #compare-card on
+       close — ADR-076's own-canvas sheet is untouched, no 3rd render surface). A direct <body>
+       child, sibling of #problem-library, following its exact overlay recipe (position:fixed,
+       --z-overlay, the Flat-Ink transient-overlay shadow exception). Chrome floats ON the sheet
+       (a top caption bar + a bottom-centre control pill) rather than framing it, per ADR-085's
+       "no title bar" precedent — there is no Set/chip machinery here to make room for. -->
+  <div id="method-view" class="method-view" role="dialog" aria-modal="true" aria-label="Show Method — True Length construction" hidden>
+    <div class="method-view__top">
+      <p id="method-caption" class="method-caption" role="status" aria-live="polite"></p>
+    </div>
+    <!-- .compare-card__stage (canvas + CSS2D label overlay) re-parents in here as the flexible
+         middle child — see main.js methodBegin()/methodEnd(). -->
+    <div class="method-bar" role="group" aria-label="Walkthrough controls. Press Escape to exit, Space to advance.">
+      <button type="button" class="btn btn--small" id="method-back">Back</button>
+      <button type="button" class="btn btn--small btn--primary" id="method-next" title="Press Space to advance">Next step</button>
+      <button type="button" class="btn btn--small" id="method-exit">Exit method</button>
     </div>
   </div>
 
@@ -2265,6 +2439,11 @@
               <svg class="done-badge__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
               Orthographic projection generated.
             </span>
+            <!-- Show Method (ADR-165): a full-viewport, beat-gated Back/Next walkthrough of the
+                 True-Length construction. Hidden until folded, primary once it is (stepper.js
+                 renderActions — one loud action per step, DESIGN.md §5.1); disabled if the
+                 current line has no constructible beats (a degenerate point-view line). -->
+            <button type="button" class="btn btn--primary btn--block btn--icon" id="btn-show-method" hidden disabled><span class="btn__icon" aria-hidden="true">▶</span><span>Show Method</span></button>
           </div>
         </div>
       </div>

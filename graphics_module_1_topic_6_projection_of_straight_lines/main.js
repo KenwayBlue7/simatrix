@@ -29,7 +29,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 import { defaultLineData, resolveLine } from './src/lineData.js';
 import { STEPS } from './src/lineSteps.js';
-import { tween, tick as tickTweens, cancelAll as cancelTweens, easeFold, easeStandard, easeCamera } from './src/anim.js';
+import { tween, tick as tickTweens, cancelAll as cancelTweens, easeFold, easeStandard, easeCamera, easeDraw } from './src/anim.js';
 import { createLineRig } from './src/lineRig.js';
 import { initStepper } from './src/stepper.js';
 import { initUIManager } from './src/uiManager.js';
@@ -39,7 +39,8 @@ import { createCompareSheet } from './src/compareSheet.js';
 import { createTraces } from './src/traces.js';
 import { createTrueLength } from './src/trueLength.js';
 import { initConstructionStepper } from './src/constructionStepper.js';
-import { layout2D, computeTraces } from './src/sheet2DLayout.js';
+import { initMethodView } from './src/methodView.js';
+import { layout2D, computeTraces, methodII } from './src/sheet2DLayout.js';
 import { initProblemLibrary } from './src/problemLibrary.js';
 import { PROBLEMS as LINE_PROBLEMS, TIERS as LINE_TIERS, FIELD_LABELS as LINE_FIELD_LABELS } from './src/lineProblems.js';
 
@@ -148,7 +149,6 @@ let onboarding = null;
 let compareOpen = false;
 let workbenchOpen = false;
 let workbenchRail = null;
-let conDock = null;                          // floating construction-launcher dock (2D panel's bottom-right corner)
 let compareCard = null;
 let compareChip = null;
 let compareSheet = null;                     // the dedicated ortho-sheet leaf (its own scene + camera)
@@ -159,16 +159,20 @@ let sheetResizeObserver = null;              // keeps the sheet canvas sized to 
 let comparePanWired = false;                 // setupComparePan() guard — wire the stage listeners once
 const WORKBENCH_CONTROLS = ['tl', 'disthp', 'distvp', 'theta', 'phi', 'truelength', 'traces'];
 // Rail clustering (topic-local visual grouping, not a platform convention): breaks the flat
-// 5-wide instrument row into two titled .dock__group clusters so the rail scans instead of
+// 7-wide instrument row into three titled .dock__group clusters so the rail scans instead of
 // reading as one undifferentiated wall. Mirrors the lesson's own step structure (ADR-017) —
-// dimensions (Steps 1-2) / inclination (Step 3).
+// dimensions (Steps 1-2) / inclination (Step 3) — plus a Constructions cluster for the two
+// launchers (ADR-166: reverses the ADR-165-audit #con-dock corner-dock exception — they dock
+// in the rail now, like every other WORKBENCH_CONTROLS member).
+// `lane` (ADR-167) sorts each cluster into one of #workbench-rail's two flex children on build:
+// 'drivers' clusters nest inside the growing #rail-drivers wrapper (left, shrinks-to-fit as a
+// unit against the viewport); 'end' clusters stay direct rail children, pinned to the row's
+// right end by the drivers wrapper's own growth — see ensureWorkbenchRail() below.
 const WORKBENCH_GROUPS = [
-  { id: 'dimensions',  title: 'Dimensions',  keys: ['tl', 'disthp', 'distvp'] },
-  { id: 'inclination', title: 'Inclination', keys: ['theta', 'phi'] },
+  { id: 'dimensions',    title: 'Dimensions',    keys: ['tl', 'disthp', 'distvp'], lane: 'drivers' },
+  { id: 'inclination',   title: 'Inclination',   keys: ['theta', 'phi'],           lane: 'drivers' },
+  { id: 'constructions', title: 'Constructions', keys: ['truelength', 'traces'],   lane: 'end' },
 ];
-// The construction launchers dock separately, at the 2D drawing panel's bottom-right corner
-// (#con-dock), not inside a rail cluster — see ensureConDock()/enterWorkbench() below.
-const CON_DOCK_CONTROLS = ['truelength', 'traces'];
 
 // --- Constructions (Phase 4E): the Traces (HT/VT) + True-Length overlays on the ortho sheet ---
 let conMode = null;   // null | 'trace' | 'tl'
@@ -180,6 +184,20 @@ let conRAF = null;    // the construction animation rAF handle (continuous playb
 // on continuous playback); stepCon() below is what starts one. ---
 let conStepper = null;
 let conNav = null; // { row, caption, backBtn, nextBtn } — built once by ensureConNav()
+
+// --- Show Method (ADR-165) — a full-viewport, beat-gated Back/Next walkthrough of the True-
+// Length construction, launched from Step 4 once folded. Re-parents the 2D sheet's EXISTING
+// stage (own-canvas, ADR-076 untouched) into #method-view rather than opening a 3rd render
+// surface; reuses constructionStepper.js — the SAME beat adapter the in-Compare .con-nav row
+// uses — on a dedicated leaf instance, so the two entry points never share or fight over state.
+let methodView = null;    // { sync, close, dispose } — src/methodView.js's handle
+let methodOpen = false;
+let methodLeaf = null;    // the takeover's own construction leaf, independent of conLeaf
+let methodStepper = null; // constructionStepper.js instance for methodLeaf
+let methodStageHome = null; // .compare-card__stage's parent to restore on close (#compare-card)
+let methodNavWired = false; // #method-back/#method-next are static DOM — wire their clicks ONCE
+                             // (methodBegin() below), same "wire once, read the live stepper
+                             // variable each click" idiom ensureConNav()/stepCon() already use
 
 // --- Problem Library (ADR-015) — the textbook exercise selector; never auto-fills ---
 let problemLibrary = null;
@@ -400,6 +418,8 @@ function rebuild() {
  *  surfaces re-sync afterward from the settled state. */
 function commit(patch) {
   if (conMode) teardownCon(); // a value edit invalidates an animated construction (can't update live)
+  methodView?.close(); // …and any open Show Method takeover, same reasoning — defensive: no
+                        // control that reaches commit() is visible while the takeover is open
   currentData = { ...currentData, ...patch };
   rebuild();
   ui?.sync();
@@ -812,6 +832,10 @@ const simController = {
    *  wizard drives the scene through (routes into rebuild()). */
   applyView(stepView) {
     if (conMode) teardownCon(); // a step change closes any open construction
+    methodView?.close(); // …and any open Show Method takeover (unreachable via UI today — the
+                          // takeover traps focus and covers the wizard — but this is the same
+                          // seam every OTHER step-change teardown routes through, so a future
+                          // external nav path (goStep, Problem Library routing) can't strand it
     currentView = { ...DEFAULT_VIEW, ...stepView };
     rebuild();
     syncCompareChipVisibility(); // the 2D drawing is meaningless before both views exist
@@ -827,6 +851,8 @@ const simController = {
   },
   unfold() {
     if (!folded) return;
+    methodView?.close(); // Show Method requires folded === true — closing it BEFORE the flip
+                          // keeps that invariant true for every frame it's ever open
     folded = false;
     driveFold(0);
   },
@@ -834,6 +860,9 @@ const simController = {
   spotlight(id) { onboarding?.spotlight(id); },
   orbitHint() { onboarding?.orbitHint(); },
   reset() { window.simAPI.reset(); },
+
+  // --- Show Method (ADR-165) — see the methodBegin/methodEnd/canShowMethod definitions above.
+  method: { canRun: canShowMethod, begin: methodBegin, end: methodEnd },
 
   // --- Problem Library seam (ADR-015) — the small read/route facade the textbook self-check
   //     consumes. It NEVER auto-fills: loading a problem only resets to defaults + routes to
@@ -935,10 +964,18 @@ function ensureWorkbenchRail() {
   workbenchRail.id = 'workbench-rail';
   workbenchRail.setAttribute('role', 'group');
   workbenchRail.setAttribute('aria-label', 'Line parameters');
-  // Build the two titled clusters once (WORKBENCH_GROUPS); enterWorkbench() re-parents the
+  // Build the titled clusters once (WORKBENCH_GROUPS); enterWorkbench() re-parents the
   // existing [data-ctrl] wrappers into each cluster's body on every split entry. The platform's
   // own .dock__group / .dock__group-title convention (DESIGN.md — see topics 2/4/5, Module 2,
   // Sections of Solids), reused here rather than invented fresh.
+  // Two-lane row (ADR-167): 'drivers' clusters (Dimensions, Inclination) nest inside
+  // #rail-drivers, a growing flex child that shrinks its .field width to fit the viewport
+  // before ever wrapping (CSS clamp() in index.html) — this is what pins the 'end' clusters
+  // (Constructions) to the row's right edge without an auto-margin, which flexbox spec §9.5
+  // would otherwise zero the drivers lane's own flex-grow.
+  const drivers = document.createElement('div');
+  drivers.id = 'rail-drivers';
+  workbenchRail.appendChild(drivers);
   for (const grp of WORKBENCH_GROUPS) {
     const wrap = document.createElement('div');
     wrap.className = 'dock__group rail__group';
@@ -953,64 +990,62 @@ function ensureWorkbenchRail() {
     const body = document.createElement('div');
     body.className = 'rail__group-body';
     wrap.append(title, body);
-    workbenchRail.appendChild(wrap);
+    (grp.lane === 'drivers' ? drivers : workbenchRail).appendChild(wrap);
   }
   document.body.appendChild(workbenchRail);
   return workbenchRail;
 }
 
-/** The construction-launcher dock: a direct <body> child, built once, that floats at the 2D
- *  drawing panel's bottom-right corner during the split (mirrors #rail-toggle's floating-corner
- *  convention on the opposite pane — see index.html .con-dock). enterWorkbench()/exitWorkbench()
- *  re-parent the existing truelength/traces [data-ctrl] wrappers into and out of it. */
-function ensureConDock() {
-  if (conDock) return conDock;
-  conDock = document.createElement('div');
-  conDock.id = 'con-dock';
-  conDock.className = 'con-dock';
-  conDock.setAttribute('role', 'group');
-  conDock.setAttribute('aria-label', 'Constructions');
-  document.body.appendChild(conDock);
-  return conDock;
-}
-
-/** The step-through nav row (Phase B): a caption + Back/Next pair, living inside #con-dock
- *  alongside the True Length/Traces launcher buttons. Built once, hidden until a construction
- *  is active (enterCon()/teardownCon() toggle it) — re-appended on every enterCon() so it
- *  always lands as #con-dock's LAST child regardless of whether the truelength/traces launcher
- *  wrappers were re-parented in before or after it (appendChild moves an existing node). */
+/** The step-through nav: a Back/Next pill floating bottom-centre over the 2D drawing pane (its
+ *  own direct <body> child, a grid sibling of #compare-card — grid-area:compare, same overlap
+ *  idiom #rail-toggle already uses on grid-area:view), PLUS a beat caption band
+ *  prepended into #compare-card itself (this session — moved off the floating pill so it reads
+ *  at the top of the 2D drawing card, not stacked on the buttons at the bottom; Module 2 ADR-095's
+ *  flow-row rationale, applied to the card instead of the takeover). The buttons wear
+ *  .method-bar's own pill chrome and .btn--small sizing (index.html) — the in-Compare
+ *  step-through and the Show Method takeover are the same beat model (ADR-165) and read as one
+ *  control. Built once; both pieces hidden until a construction is active
+ *  (enterCon()/teardownCon() toggle both). */
 function ensureConNav() {
-  const dock = ensureConDock();
-  if (conNav) { dock.appendChild(conNav.row); return conNav; } // re-append: always the LAST child
-  const row = document.createElement('div');
-  // Deliberately NOT '.ctrl' — #con-dock .ctrl[hidden] forces display:flex!important (ADR-051's
-  // rationale, so a stray reset can't re-hide the truelength/traces launchers) which would
-  // fight this row's own hidden toggle (enterCon()/teardownCon() below, no per-step disclosure
-  // concern applies to it).
-  row.className = 'con-nav';
-  row.hidden = true;
+  if (conNav) return conNav;
+  const capRow = document.createElement('div');
+  capRow.className = 'compare-card__top';
+  capRow.hidden = true;
   const caption = document.createElement('p');
-  caption.className = 'con-nav__caption';
-  caption.id = 'con-nav-caption';
+  caption.className = 'compare-card__caption';
+  caption.id = 'compare-caption';
   caption.setAttribute('role', 'status');
+  capRow.appendChild(caption);
+  // prepend, not appendChild — .compare-card__stage may be re-parented OUT (Show Method takeover,
+  // methodBegin()) or back IN (methodEnd()) at any time; prepend keeps this band first regardless
+  // of when either happens relative to this call.
+  compareCard?.prepend(capRow);
+
+  const row = document.createElement('div');
+  // '.con-nav', not '.ctrl' — '.ctrl' is the launcher-wrapper class #workbench-rail's per-step
+  // disclosure forces visible (ADR-051); this row never lived under that rule and has its own
+  // independent hidden toggle (enterCon()/teardownCon() below).
+  row.className = 'con-nav';
+  row.id = 'con-nav';
+  row.hidden = true;
   const btnRow = document.createElement('div');
   btnRow.className = 'con-nav__btns';
   const backBtn = document.createElement('button');
   backBtn.type = 'button';
   backBtn.id = 'con-nav-back';
-  backBtn.className = 'btn';
+  backBtn.className = 'btn btn--small';
   backBtn.textContent = 'Back';
   const nextBtn = document.createElement('button');
   nextBtn.type = 'button';
   nextBtn.id = 'con-nav-next';
-  nextBtn.className = 'btn';
+  nextBtn.className = 'btn btn--small btn--primary'; // matches .method-bar's Back/Next hierarchy (ADR-165 follow-up)
   nextBtn.textContent = 'Next step';
   btnRow.append(backBtn, nextBtn);
-  row.append(caption, btnRow);
-  dock.appendChild(row);
+  row.append(btnRow);
+  document.body.appendChild(row);
   backBtn.addEventListener('click', () => stepCon('back'));
   nextBtn.addEventListener('click', () => stepCon('next'));
-  conNav = { row, caption, backBtn, nextBtn };
+  conNav = { row, capRow, caption, backBtn, nextBtn };
   return conNav;
 }
 
@@ -1022,20 +1057,13 @@ function enterWorkbench() {
   workbenchOpen = true;
   if (simController.isFolded()) simController.unfold(); // the split shows unfolded 3D (ADR-013)
   const rail = ensureWorkbenchRail();
-  const dock = ensureConDock();
   const controls = document.getElementById('controls');
   for (const grp of WORKBENCH_GROUPS) {
     const body = rail.querySelector(`[data-group="${grp.id}"] .rail__group-body`);
     for (const key of grp.keys) {
       const wrap = controls?.querySelector(`[data-ctrl="${key}"]`);
-      if (wrap && body) { wrap.hidden = false; body.appendChild(wrap); } // all five drivers live at once, clustered
+      if (wrap && body) { wrap.hidden = false; body.appendChild(wrap); } // all seven controls live at once, clustered
     }
-  }
-  // The construction launchers dock separately, floating at the 2D panel's bottom-right
-  // corner (#con-dock) rather than joining a rail cluster.
-  for (const key of CON_DOCK_CONTROLS) {
-    const wrap = controls?.querySelector(`[data-ctrl="${key}"]`);
-    if (wrap) { wrap.hidden = false; dock.appendChild(wrap); }
   }
   if (compareCard && compareCard.parentElement !== document.body) document.body.appendChild(compareCard);
   document.body.classList.add('compare-split');
@@ -1059,7 +1087,7 @@ function exitWorkbench() {
   const anchor = controls?.querySelector('[data-ctrl="fold"]');
   if (controls) {
     for (const key of WORKBENCH_CONTROLS) {
-      const wrap = workbenchRail?.querySelector(`[data-ctrl="${key}"]`) || conDock?.querySelector(`[data-ctrl="${key}"]`);
+      const wrap = workbenchRail?.querySelector(`[data-ctrl="${key}"]`);
       if (wrap) controls.insertBefore(wrap, anchor);
     }
   }
@@ -1256,13 +1284,21 @@ function setConLabel(id, on) {
 }
 
 /** A construction needs the sheet visible. The launcher lives inside a
- *  [data-ctrl="truelength"/"traces"] wrapper, which is now part of WORKBENCH_CONTROLS —
- *  it re-parents into #con-dock (the 2D panel's bottom-right corner) on split entry, so the
+ *  [data-ctrl="truelength"/"traces"] wrapper, which is part of WORKBENCH_CONTROLS —
+ *  it re-parents into #workbench-rail's Constructions cluster on split entry (ADR-166), so the
  *  expanded 50/50 split stays fully usable during a construction (no more forced demotion to
  *  the compact card). */
 function ensureCompareForCon() {
   if (!compareOpen) compare.show();
 }
+
+/** The tween driver injected into constructionStepper.js's `startTween` option (both call
+ *  sites below): a thin wrapper over anim.js's own tween(), ticked by the existing render loop
+ *  (tickTweens(), see loop()) and auto-landing on its end value under prefers-reduced-motion —
+ *  so a stepped Next/Back sweeps a beat's arc/projector the same way runCon()'s continuous
+ *  Replay ramp does, instead of snapping straight to the end state. easeDraw is anim.js's own
+ *  palette entry for projection draw-ons — the same role this beat motion plays. */
+const beatTween = (o) => tween({ ...o, ease: easeDraw });
 
 /** Play the construction animation once (reduced motion snaps to the finished construction). */
 function runCon(duration) {
@@ -1295,6 +1331,7 @@ function stepCon(dir) {
     conStepper = initConstructionStepper({
       leaf: conLeaf, captionEl: nav.caption, backBtn: nav.backBtn, nextBtn: nav.nextBtn,
       startIndex: dir === 'back' ? (conLeaf.phases?.length ?? 1) - 1 : 0,
+      startTween: beatTween,
     });
     return;
   }
@@ -1305,10 +1342,11 @@ function stepCon(dir) {
  *  and reset the launcher chrome. Idempotent. */
 function teardownCon() {
   if (conRAF) { cancelAnimationFrame(conRAF); conRAF = null; }
+  conStepper?.dispose(); // cancel any in-flight beat tween BEFORE the leaf it targets goes away
   compareSheet?.clearConstruction();
   conLeaf = null;
   conStepper = null;
-  if (conNav) { conNav.row.hidden = true; conNav.caption.textContent = ''; }
+  if (conNav) { conNav.row.hidden = true; conNav.capRow.hidden = true; conNav.caption.textContent = ''; }
   setConBtn('btn-traces', false); setConBtn('btn-tl', false);
   setConLabel('btn-traces', false); setConLabel('btn-tl', false);
   conMode = null;
@@ -1327,6 +1365,7 @@ function enterCon(mode, build, btnId) {
   // first click (stepCon() above), rather than requiring a separate mode-switch control.
   const nav = ensureConNav();
   nav.row.hidden = false;
+  nav.capRow.hidden = false;
   nav.backBtn.disabled = true;
   nav.nextBtn.disabled = !((conLeaf.phases?.length ?? 0) > 1);
   nav.caption.textContent = '';
@@ -1350,6 +1389,7 @@ const enterTL = () => enterCon('tl', (r) => createTrueLength({
  *  also drops any live step session back to continuous mode (a step click can resume from
  *  wherever afterward, same lazy stepCon() path as a fresh construction). */
 function replayCon() {
+  conStepper?.dispose(); // cancel any in-flight beat tween — runCon()'s ramp takes over driving conLeaf.animate() below
   conStepper = null;
   if (conNav) {
     conNav.backBtn.disabled = true;
@@ -1362,6 +1402,92 @@ function replayCon() {
 function setupConstructions() {
   document.getElementById('btn-traces')?.addEventListener('click', () => (conMode === 'trace' ? replayCon() : enterTrace()));
   document.getElementById('btn-tl')?.addEventListener('click', () => (conMode === 'tl' ? replayCon() : enterTL()));
+}
+
+// ============================================================================
+// SHOW METHOD (ADR-165) — the full-viewport True-Length walkthrough. See methodView.js's own
+// header for the container/contract rationale; this half owns everything methodView.js cannot
+// (compareSheet, the sheet renderer, the construction leaf — ADR-007, main.js is the one place
+// leaf modules meet).
+// ============================================================================
+
+/** How many beats the CURRENT line's True-Length construction has, without building the full
+ *  THREE leaf (cheap — pure sheet2DLayout.js math only, safe to call on every render/sync).
+ *  Method I is always 12 (now 14, ADR-165) — its phase table is unconditional. Method II
+ *  (θ+φ=90°, ADR-110) is variable: 0, 4, or 8, depending on which trapezoid(s) a point-view end
+ *  degenerates. */
+function methodPhaseCount(resolved) {
+  const L = layout2D(resolved);
+  if (computeTraces(L).method !== 'II') return 14;
+  const M = methodII(L);
+  return (M.tv ? 4 : 0) + (M.fv ? 4 : 0);
+}
+
+/** Gate for the Show Method launcher: folded (ADR-165's stand-in for ADR-085's `foldProgress
+ *  === 1` — this topic's fold is Step 4 of 5, not a terminal step, so there is no equivalent
+ *  "flattened answer sheet" state to borrow beyond the fold itself) AND a constructible line
+ *  (guards the point-view-line edge case — Method II can legitimately return 0 beats). */
+function canShowMethod() {
+  return folded && methodPhaseCount(resolveLine(currentData)) > 0;
+}
+
+/** Open the takeover: re-parent the sheet's EXISTING stage in (never ensureCompareForCon() /
+ *  enterWorkbench() — routing through either would force-unfold and destroy this function's own
+ *  precondition, ADR-085's founding grievance), build a DEDICATED leaf (independent of conLeaf —
+ *  the two entry points must never share or fight over one mounted overlay), and hand the nav
+ *  DOM methodView.js already grabbed to constructionStepper.js. Returns false (methodView.js
+ *  then does nothing) if the precondition slipped between the button's last sync and this click. */
+function methodBegin({ captionEl, backBtn, nextBtn }) {
+  if (!canShowMethod()) return false;
+  if (conMode) teardownCon(); // defensive — unreachable today (step 4 has no construction
+                               // launcher of its own), but the takeover owns the sheet's ONE
+                               // construction overlay same as .con-nav does, never both at once
+  const methodEl = document.getElementById('method-view');
+  const bar = methodEl?.querySelector('.method-bar');
+  ensureSheetRenderer(); // guarantees compareStage/sheetRenderer exist even if Compare was never opened
+  if (!compareStage || !methodEl || !bar) return false;
+
+  methodStageHome = compareStage.parentElement; // #compare-card — restored in methodEnd()
+  methodEl.insertBefore(compareStage, bar);
+  resizeSheetRenderer(); // the stage's box just changed (0×0 if Compare was never opened) — size NOW,
+                          // don't wait on the ResizeObserver's next tick
+
+  const resolved = resolveLine(currentData);
+  // The base sheet (XY line, view lines, dims, a′/b′/a/b chips) is normally painted by
+  // rebuild()'s `if (compareOpen) compareSheet.setData(...)` — which never ran if Compare was
+  // never opened. Paint it explicitly so the cold path (Show Method without ever opening
+  // Compare) isn't a bare construction floating with no base drawing under it.
+  compareSheet.setData(resolved, currentView);
+
+  methodLeaf = createTrueLength({ resolved, method: computeTraces(layout2D(resolved)).method });
+  compareSheet.mountConstruction(methodLeaf.group);
+  methodStepper = initConstructionStepper({ leaf: methodLeaf, captionEl, backBtn, nextBtn, startTween: beatTween });
+  // initConstructionStepper() wires no DOM listeners of its own (constructionStepper.js is a
+  // pure adapter — .con-nav's own backBtn/nextBtn are wired by ensureConNav() the same way).
+  // #method-back/#method-next are static HTML, so wire them ONCE, reading whichever
+  // methodStepper is CURRENT at click time — never a stale closure over this one instance.
+  if (!methodNavWired) {
+    methodNavWired = true;
+    backBtn.addEventListener('click', () => methodStepper?.goBack());
+    nextBtn.addEventListener('click', () => methodStepper?.goNext());
+  }
+  methodOpen = true;
+  return true;
+}
+
+/** Close the takeover: dispose the construction (ADR-004 contract), hand the stage back to
+ *  #compare-card, and drop the dedicated leaf/stepper. Idempotent — safe to call whether or not
+ *  the takeover is actually open (every force-close site below calls it unconditionally). */
+function methodEnd() {
+  if (!methodOpen) return;
+  methodOpen = false;
+  methodStepper?.dispose(); // cancel any in-flight beat tween BEFORE the leaf it targets goes away
+  compareSheet?.clearConstruction();
+  methodLeaf = null;
+  methodStepper = null;
+  if (compareStage && methodStageHome) methodStageHome.appendChild(compareStage);
+  methodStageHome = null;
+  resizeSheetRenderer(); // the stage's box just changed again — size NOW
 }
 
 // ============================================================================
@@ -1436,9 +1562,11 @@ function loop(now) {
   // viewport, so the 3D scene's CSS2D labels no longer need hiding while Compare is open.
   labelRenderer.render(scene, activeCamera); // 3D scene labels
 
-  // The 2D sheet renders on its OWN renderer into its OWN canvas — only while Compare is
-  // open (a closed card costs nothing beyond the idle GL context).
-  if (compareOpen && compareSheet && sheetRenderer) {
+  // The 2D sheet renders on its OWN renderer into its OWN canvas — while Compare is open OR
+  // the Show Method takeover is (ADR-165 — the takeover re-parents this SAME stage, and can be
+  // open without Compare ever having been; a closed/unused sheet costs nothing beyond the idle
+  // GL context).
+  if ((compareOpen || methodOpen) && compareSheet && sheetRenderer) {
     compareSheet.render(sheetRenderer);
     sheetLabelRenderer?.render(compareSheet.scene, compareSheet.camera); // 2D sheet labels
   }
@@ -1480,6 +1608,8 @@ window.simAPI = {
   resume() { startLoop(); },
   reset() {
     teardownCon();                // drop any open construction first
+    methodView?.close();          // …and any open Show Method takeover (an external caller can
+                                   // reach this even though the takeover has no in-sim UI path to it)
     compare.hide();               // close Compare/split; the reset announcement lands last
     currentData = defaultLineData();
     currentView = { ...DEFAULT_VIEW };
@@ -1551,6 +1681,10 @@ function init() {
     setupConstructions();
     setupQuickViews();
     syncCompareChipVisibility();
+
+    // Show Method (ADR-165) — after setupCompareCard/setupConstructions so #btn-show-method's
+    // sibling DOM (#method-view, .compare-card__stage) all exist.
+    methodView = initMethodView(simController);
 
     // The textbook Problem Library (ADR-015) — AFTER the stepper (goStep), onboarding (cueHint),
     // and the dock exist, so its facade calls all resolve. Data-driven from lineProblems.js;
