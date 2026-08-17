@@ -196,7 +196,7 @@ graphics_module_1_topic_1_1_dimensioning/
 ├── README.md                   this file
 ├── CLAUDE.md                   the topic's build notes + session digest protocol
 ├── CHANGELOG.md                dated change log
-├── assets/fonts/               the three bundled woff2 faces (byte-identical platform-wide)
+│                                 (no local assets/fonts/ — fonts load from the shared platform host, ADR-086)
 └── src/
     ├── main.js                 orchestrator: scene, ortho camera, rebuild(), redraw(), simAPI
     ├── dimensionData.js        PURE DATA — the FIGURES catalogue (plate · hole · slot ·

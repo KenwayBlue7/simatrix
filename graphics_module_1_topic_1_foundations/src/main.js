@@ -224,6 +224,20 @@ function markBooted() {
   }
   const fallback = document.getElementById('sim-fallback');
   if (fallback) fallback.hidden = true;
+  // Platform iframe contract (ADR-078): announce a displayable sim to the host loader.
+  // Gated on document.fonts.ready so the host never reveals us mid-FOUT.
+  document.fonts.ready.then(() => {
+    window.parent.postMessage({ type: 'sim:ready' }, '*');
+  });
+}
+
+/**
+ * Signal lesson completion to the host (ADR-078 addendum, revised 2026-07-31): fired by the
+ * "Finish lesson" button. Latchless — every click reposts, no per-page-load ceiling, since the
+ * host is confirmed to support repeated triggers.
+ */
+function markComplete() {
+  window.parent.postMessage({ type: 'sim:complete' }, '*');
 }
 
 // ============================================================================
@@ -1044,8 +1058,10 @@ const simController = {
    *  `restoreView` here is the hoisted module function (no recursion); no-op unless zoomed. */
   restoreView() { restoreView(); },
 
-  /** Step 4 terminal: calm success toast + narration. Leaves the finished four-type
-   *  drawing on screen (no reset) so the learner can keep exploring it. */
+  /** Step 4 terminal: calm success toast + narration for the content milestone (all four BIS
+   *  line types now shown). Leaves the finished drawing on screen (no reset) so the learner can
+   *  keep exploring it. Decoupled from the host signal — "Finish lesson" (stepper.js) fires
+   *  markComplete() on its own click, not as a side effect of this milestone. */
   completeLesson() {
     showToast('Lesson complete — all four BIS line types shown.');
     announce('Lesson complete. All four BIS line types — A, E/F, G and B — are now shown on the part.');
@@ -1054,6 +1070,7 @@ const simController = {
   /** Single reset path (RULES.md §2.9). */
   reset() { window.simAPI.reset(); },
 
+  markComplete,
   announce,
 };
 

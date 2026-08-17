@@ -63,25 +63,30 @@
 
   <style>
     /*
-      Bundled web fonts (DESIGN.md §3). Local subset woff2 in ./assets/fonts/ — no
-      runtime Google-Fonts fetch, so the sim still works offline after the initial load
-      (relative paths, RULES.md §2.5/§2.15). Atkinson Hyperlegible for UI/body,
-      IBM Plex Mono for numeric readouts (tabular figures).
+      Bundled web fonts (DESIGN.md §3). Shared platform font host (ADR-086, amends
+      RULES.md §2.12/§2.15's local-only mandate for this track). Atkinson Hyperlegible
+      for UI/body, IBM Plex Mono for numeric readouts (tabular figures).
     */
     @font-face {
       font-family: "Atkinson Hyperlegible";
-      font-style: normal; font-weight: 400; font-display: swap;
-      src: url("./assets/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
     }
     @font-face {
       font-family: "Atkinson Hyperlegible";
-      font-style: normal; font-weight: 700; font-display: swap;
-      src: url("./assets/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+      font-weight: 700;
+      font-style: normal;
+      font-display: swap;
     }
     @font-face {
       font-family: "IBM Plex Mono";
-      font-style: normal; font-weight: 400; font-display: swap;
-      src: url("./assets/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
     }
 
     /*
@@ -218,13 +223,11 @@
     /* ---- Wizard hide/show toggle: floats over the canvas so it is reachable in both states. */
     .wizard-toggle {
       position: absolute;
-      /* Same band as `.vp-controls` opposite it, matching the benchmark's own pairing. */
-      top: calc(44px + var(--space-5));
-      /* The benchmark's inset plus a requested 2 mm inboard nudge. Right-anchored, so moving the
-         button LEFT means a LARGER `right`. `mm` for the same reason as `.vp-controls`: millimetres
-         are what was asked for and CSS resolves them exactly (2 mm = 7.56 px at 96 dpi). The
-         vertical position, the 44 px box and every other style are untouched. */
-      right: calc(var(--space-3) + 2mm);
+      /* NOT the .vp-controls 44px+space-3 clearance opposite it — this top-right toggle has
+         nothing above it, so it is decoupled from the left cluster's host-chrome-avoidance
+         logic entirely (platform Jul-16 regression fix). */
+      top: var(--space-3);
+      right: var(--space-3);
       z-index: 7; /* above the flow note (6), which is pointer-events:none and may pass under it */
       width: 44px;
       height: 44px;
@@ -1211,12 +1214,8 @@
     */
     .vp-controls {
       position: absolute;
-      top: calc(44px + var(--space-5));
-      /* The benchmark's own inset, plus a requested inboard nudge — 5 mm right, then 3 mm back
-         left, so 2 mm net. The vertical position, the gap and every chip style stay the
-         benchmark's to the pixel; `mm` rather than a px count because millimetres are what was
-         asked for and CSS resolves them exactly (2 mm = 7.56 px at 96 dpi). */
-      left: calc(var(--space-4) + 2mm);
+      top: calc(44px + var(--space-3)); /* current host-chrome clearance (DESIGN.md §5.12) */
+      left: var(--space-4);
       display: flex;
       gap: var(--space-2);
       z-index: 5;
@@ -1727,6 +1726,12 @@
         </div>
         <button id="btn-back" class="btn btn--nav" type="button" hidden>Back</button>
         <button id="btn-next" class="btn btn--primary btn--nav" type="button">Next</button>
+        <!-- Finish lesson: takes over the footer's primary slot once Next hides at the
+             terminal step (Step 2). Fires sim:complete (ADR-078 addendum, revised — no
+             latch, every click reposts). Own element, own listener: NOT a relabel of
+             #btn-next. Gated on isDrawingComplete() (main.js) — the sheet's own last
+             stage reached, not mere arrival at Step 2 (which opens blank). -->
+        <button id="btn-finish" class="btn btn--primary btn--nav" type="button" hidden disabled>Finish lesson</button>
       </footer>
     </section>
     </div>

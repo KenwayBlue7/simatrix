@@ -68,27 +68,27 @@
 
   <style>
     /*
-      Bundled web fonts (DESIGN.md typography). Local subset woff2 in
-      ./assets/fonts/ — no runtime Google Fonts fetch, so the sim still works
-      offline after the initial load (relative paths per CLAUDE.md). Atkinson
-      Hyperlegible for UI/body (legibility-first, chosen for the struggling /
-      low-vision learner), IBM Plex Mono for numeric readouts (tabular figures).
-      font-display:swap paints immediately in the system fallback, then swaps in.
+      Web fonts served from Supabase Storage CDN (DESIGN.md typography / ADR-086 —
+      reverses the prior bundled-woff2/no-CDN rule). Atkinson Hyperlegible for UI/body
+      (legibility-first, chosen for the struggling / low-vision learner), IBM Plex Mono
+      for numeric readouts (tabular figures). font-display:swap paints immediately in
+      the system fallback, then swaps in once fetched — offline-first load no longer
+      holds for type.
     */
     @font-face {
       font-family: "Atkinson Hyperlegible";
-      font-style: normal; font-weight: 400; font-display: swap;
-      src: url("./assets/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+      font-weight: 400; font-style: normal; font-display: swap;
     }
     @font-face {
       font-family: "Atkinson Hyperlegible";
-      font-style: normal; font-weight: 700; font-display: swap;
-      src: url("./assets/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+      font-weight: 700; font-style: normal; font-display: swap;
     }
     @font-face {
       font-family: "IBM Plex Mono";
-      font-style: normal; font-weight: 400; font-display: swap;
-      src: url("./assets/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+      font-weight: 400; font-style: normal; font-display: swap;
     }
 
     /*
@@ -314,7 +314,7 @@
        chevron flips when collapsed; the viewport reflows to full width via flex. */
     .wizard-toggle {
       position: absolute;
-      top: calc(44px + var(--space-5));
+      top: var(--space-3);
       right: var(--space-3);
       z-index: 4;
       width: 44px;  /* DESIGN.md 44px target floor (was 40px) */
@@ -352,7 +352,7 @@
        top-left cluster) */
     .vp-cluster {
       position: absolute;
-      top: calc(44px + var(--space-5)); /* mirrors the 44px quick-view hit target — one button-height down (Fix 2, supersedes the old 10% host-overlay clearance); + --space-5 clears the host a11y text-scaler header */
+      top: calc(44px + var(--space-3)); /* mirrors the 44px quick-view hit target — one button-height down (Fix 2, supersedes the old 10% host-overlay clearance) */
       left: var(--space-3);
       z-index: 4;
       display: flex;
@@ -492,85 +492,22 @@
       border-color: var(--color-accent);
     }
 
-    /* ---- Compare card (ADR-012 family): the on-demand floating "drawing sheet" frame
-       hosting the 2D orthographic drawing. Absolute inside #sim-viewport (the positioned
-       ancestor) in the compact state; re-parented to <body> and placed as the grid's right
-       pane when expanded (ADR-037 workbench, see body.compare-split below). Single-canvas
-       invariant (ADR-034): the stage owns a plain 2D <canvas> that main.js drawCompare()
-       live-redraws from the edge map on every commit — never a second WebGL context. */
+    /* ---- Compare card (ADR-012 family, narrowed by ADR-080): the docked drawing-sheet
+       frame hosting the 2D orthographic drawing. Compare has exactly one shape now — always
+       a cell of the body.compare-split grid (grid-area: compare, assigned below) — so this is
+       a plain flex column, never position:absolute and never a transient overlay (no Flat-Ink
+       shadow exception; a docked surface doesn't earn one). Single-canvas invariant
+       (ADR-034): the stage owns a plain 2D <canvas> that main.js drawCompare() live-redraws
+       from the edge map on every commit — never a second WebGL context. */
     .compare-card {
-      position: absolute;
-      z-index: var(--z-compare);
       display: flex;
       flex-direction: column;
       overflow: hidden;
       background: var(--color-paper);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
-      box-shadow: var(--shadow-md);
     }
     .compare-card[hidden] { display: none; }
-    /* Sits below the wizard-toggle chevron (top-right, 44px) so the card never covers it. */
-    .compare-card[data-size="compact"] {
-      top: calc(var(--space-3) + 44px + var(--space-2));
-      right: var(--space-3);
-      width: min(420px, 38vw);
-      height: min(320px, 42vh);
-    }
-    /* Expanded = the 50/50 workbench split (ADR-037). The card is re-parented to <body> and
-       placed as the grid's right pane by the body.compare-split rules below; here it just
-       sheds the floating-card's absolute positioning. The card KEEPS its base .compare-card
-       border/radius/paper fill so it reads as a floating rounded card on the gray split
-       background (mirrors the Points/topic-4 rounded-card trial); box-shadow stays off
-       (Flat-Ink rule — docked surfaces don't earn the transient-overlay shadow). */
-    body.compare-split #compare-card {
-      position: static;
-      inset: auto;
-      width: auto;
-      height: auto;
-      min-height: 0;
-      transform: none;
-      box-shadow: none;
-    }
-    .compare-card__head {
-      flex: 0 0 auto;
-      display: flex;
-      align-items: center;
-      gap: var(--space-1);
-      padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
-      background: var(--color-panel);
-      border-bottom: 1px solid var(--color-border);
-    }
-    .compare-card__tab {
-      flex: 1 1 auto;
-      font-family: var(--font-sans);
-      font-size: 0.6875rem;
-      font-weight: 700;
-      line-height: 1;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: var(--color-ink-secondary);
-    }
-    .compare-card__btn {
-      position: relative; /* anchors the centred 44px hit-area ::before */
-      flex: none;
-      width: 32px;
-      height: 32px;
-      display: grid;
-      place-items: center;
-      padding: 0;
-      border: 0;
-      background: none;
-      color: var(--color-ink-secondary);
-      cursor: pointer;
-      border-radius: var(--radius-xs);
-      transition: background var(--dur-fast) var(--ease-standard),
-                  color var(--dur-fast) var(--ease-standard),
-                  transform var(--dur-fast) var(--ease-standard);
-    }
-    .compare-card__btn svg { width: 18px; height: 18px; }
-    .compare-card__btn:active { transform: scale(0.97); }
-    .compare-card__btn:focus-visible { outline: none; box-shadow: var(--ring-focus); }
     .compare-card__stage {
       flex: 1 1 auto;
       position: relative;
@@ -597,8 +534,10 @@
          └────────────────────────────────┘
        The wizard drops out; the geometry drivers re-parent into the rail (main.js
        enterWorkbench). Because #sim-viewport IS the left pane, handleResize() (which
-       measures it) sizes the renderer to half-width with no JS sizing change. Desktop-only
-       (mobile keeps the bottom-sheet card). */
+       measures it) sizes the renderer to half-width with no JS sizing change. Compare has
+       exactly one shape at every viewport width (ADR-080 — no floating/compact fallback);
+       the mobile @media block below restyles this same grid into a single stacked column
+       instead of switching to a different Compare UI. */
     body.compare-split {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -622,10 +561,9 @@
     /* The wizard is collapsed BY the split; the chevron (main.js) exits the split to bring
        it back, mirroring ADR-021/ADR-037. */
     body.compare-split #wizard { display: none; }
-    /* In the 50/50 split the 2D-drawing head (tab + expand/close) and the viewport chevron
-       are redundant chrome — the still-visible, pressed Compare chip in the left 3D pane
-       toggles the split closed, so it is the single exit. */
-    body.compare-split .compare-card__head { display: none; }
+    /* The Compare card has no head chrome to hide anymore (ADR-080) — the still-visible,
+       pressed Compare chip in the left 3D pane is the split's only exit, same as the
+       viewport chevron is redundant and hidden here. */
     body.compare-split #wizard-toggle { display: none; }
 
     /* The docked driver rail — spans both panes, hosts the re-parented [data-ctrl]
@@ -739,7 +677,6 @@
     .quick-view::before,
     .connector-toggle::before,
     .compare-chip::before,
-    .compare-card__btn::before,
     .vp-hint__dismiss::before {
       content: "";
       position: absolute;
@@ -1749,7 +1686,17 @@
       padding: var(--space-4) var(--space-5);
       border-bottom: 1px solid var(--color-border);
     }
+    /* Counterweight for the 44px close button, so the title reads on true centre
+       without un-anchoring the button from its top-right corner (§5.12 convention). */
+    .problem-library__header::before {
+      content: "";
+      flex: none;
+      width: 44px;
+    }
     .problem-library__title {
+      flex: 1 1 auto;
+      min-width: 0;
+      text-align: center;
       margin: 0;
       font-size: var(--text-title);
       font-weight: 700;
@@ -1933,6 +1880,19 @@
       /* Wizard folded away → viewport reclaims the freed height (overrides the 42%
          slice above; grow=1 lets it fill the column once #wizard is display:none). */
       body.wizard-collapsed #sim-viewport { flex: 1 1 100%; }
+
+      /* Compare split, narrow viewport (ADR-080): no floating/bottom-sheet fallback —
+         the same docked split just restacks to a single column, 3D on top, the 2D
+         drawing under it, the rail at the bottom. */
+      body.compare-split {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) auto;
+        grid-template-areas: "view" "compare" "rail";
+      }
+      body.compare-split.rail-collapsed {
+        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-areas: "view" "compare";
+      }
 
       /* The panel now stacks BELOW the viewport, so the chevron points along that
          axis instead of sideways: down = push the panel closed, up = pull it back
@@ -2321,6 +2281,12 @@
         </div>
         <button id="btn-back" class="btn btn--nav" type="button" hidden>Back</button>
         <button id="btn-next" class="btn btn--primary btn--nav" type="button">Next</button>
+        <!-- Finish-button pilot: Step 6's footer primary once flattened, replacing #btn-next's
+             slot (stepper.js hides one exactly when the other shows — same idiom as
+             #btn-flatten/#btn-unfold). Fires sim:complete (ADR-078 addendum, revised — no latch,
+             every click reposts). Own element, own listener: NOT a relabel of #btn-next, since
+             #btn-next's click handler advances the wizard, an unrelated action. -->
+        <button id="btn-finish" class="btn btn--primary btn--nav" type="button" hidden disabled>Finish lesson</button>
       </footer>
     </section>
     </div>
@@ -2366,7 +2332,8 @@
            Hidden until the lesson's 2D gate passes (main.js syncCompareChipVisibility:
            showProjectionsFlag — Step 4's top+front views must exist first), preserving
            the pedagogy that the 2D drawing is meaningless before any view is projected.
-           main.js wires it to applyCompareSize('expanded' | 'compact') via compare.toggle(). -->
+           main.js wires it to compare.toggle() — the chip is Compare's only open/close
+           control (ADR-080). -->
       <button id="compare-chip" class="compare-chip" type="button" aria-pressed="false" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="3" y="5" width="8" height="14" rx="1.5"/><rect x="13" y="5" width="8" height="14" rx="1.5"/>
@@ -2375,25 +2342,14 @@
       </button>
     </div>
 
-    <!-- Compare card (ADR-012 family): the on-demand floating "drawing sheet" frame hosting
-         the finished 2D orthographic drawing (top / front / side views). Ported from the
-         Points topic's reference build; the stage owns a plain 2D <canvas> that main.js
+    <!-- Compare card (ADR-012 family, narrowed by ADR-080): the docked drawing-sheet frame
+         hosting the finished 2D orthographic drawing (top / front / side views). Ported from
+         the Points topic's reference build; the stage owns a plain 2D <canvas> that main.js
          drawCompare() live-redraws from the edge map on every commit (ADR-034: no second
-         WebGL context). compact / expanded via data-size; main.js wires the head buttons. -->
-    <div id="compare-card" class="compare-card" data-size="compact" role="region" aria-label="Compare: the finished 2D drawing" hidden>
-      <div class="compare-card__head">
-        <span class="compare-card__tab">2D drawing</span>
-        <button id="compare-expand" class="compare-card__btn" type="button" aria-label="Expand compare view" title="Expand">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M9 3H5a2 2 0 0 0-2 2v4M15 3h4a2 2 0 0 1 2 2v4M9 21H5a2 2 0 0 1-2-2v-4M15 21h4a2 2 0 0 0 2-2v-4"/>
-          </svg>
-        </button>
-        <button id="compare-close" class="compare-card__btn" type="button" aria-label="Close compare view" title="Close">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M6 6l12 12M18 6L6 18"/>
-          </svg>
-        </button>
-      </div>
+         WebGL context). Compare has exactly one shape now (ADR-080): the docked 50/50 split.
+         There is no floating/compact state and no head chrome — the still-visible Compare
+         chip in the 3D pane is the single open/close control. -->
+    <div id="compare-card" class="compare-card" role="region" aria-label="Compare: the finished 2D drawing" hidden>
       <div class="compare-card__stage">
         <canvas id="compare-canvas" aria-label="2D orthographic drawing: top, front, and side views of the solid"></canvas>
       </div>

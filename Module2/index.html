@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
   <meta name="color-scheme" content="light only" />
-  <title>Orthographic Projection of Solids</title>
+  <title>Solids Inclined to Both Planes</title>
   <meta name="description" content="Guided step-by-step viewport for studying orthographic projection of solids onto the Horizontal and Vertical planes." />
 
   <!--
@@ -68,27 +68,27 @@
 
   <style>
     /*
-      Bundled web fonts (DESIGN.md typography). Local subset woff2 in
-      ./assets/fonts/ — no runtime Google Fonts fetch, so the sim still works
-      offline after the initial load (relative paths per CLAUDE.md). Atkinson
-      Hyperlegible for UI/body (legibility-first, chosen for the struggling /
-      low-vision learner), IBM Plex Mono for numeric readouts (tabular figures).
-      font-display:swap paints immediately in the system fallback, then swaps in.
+      Web fonts served from Supabase Storage CDN (DESIGN.md typography / ADR-086 —
+      reverses the prior bundled-woff2/no-CDN rule). Atkinson Hyperlegible for UI/body
+      (legibility-first, chosen for the struggling / low-vision learner), IBM Plex Mono
+      for numeric readouts (tabular figures). font-display:swap paints immediately in
+      the system fallback, then swaps in once fetched — offline-first load no longer
+      holds for type.
     */
     @font-face {
       font-family: "Atkinson Hyperlegible";
-      font-style: normal; font-weight: 400; font-display: swap;
-      src: url("./assets/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+      font-weight: 400; font-style: normal; font-display: swap;
     }
     @font-face {
       font-family: "Atkinson Hyperlegible";
-      font-style: normal; font-weight: 700; font-display: swap;
-      src: url("./assets/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+      font-weight: 700; font-style: normal; font-display: swap;
     }
     @font-face {
       font-family: "IBM Plex Mono";
-      font-style: normal; font-weight: 400; font-display: swap;
-      src: url("./assets/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+      font-weight: 400; font-style: normal; font-display: swap;
     }
 
     /*
@@ -242,7 +242,7 @@
       user-select: none;
     }
 
-    /* Vertex labels (Step 3) — CSS2DObject DOM pills positioned at 3D points by
+    /* Vertex labels (Step 4) — CSS2DObject DOM pills positioned at 3D points by
        main.js. Themed from tokens; never intercept pointer events (orbit through). */
     .vlabel {
       font-family: var(--font-mono);
@@ -357,7 +357,7 @@
        top-left cluster) */
     .vp-cluster {
       position: absolute;
-      top: calc(44px + var(--space-5)); /* mirrors the 44px quick-view hit target — one button-height down (Fix 2, supersedes the old 10% host-overlay clearance); + --space-5 clears the host a11y text-scaler header */
+      top: calc(44px + var(--space-3)); /* mirrors the 44px quick-view hit target — one button-height down (Fix 2, supersedes the old 10% host-overlay clearance); + --space-5 clears the host a11y text-scaler header */
       left: var(--space-3);
       z-index: 4;
       display: flex;
@@ -462,9 +462,11 @@
     /* ---- Compare chip (ADR-012 family): the third member of the top-left pill family —
        same shell as the connector toggle, but a real button whose aria-pressed mirrors the
        Compare card's open state (filled accent while open). Hidden until the 2D gate passes
-       (main.js syncCompareChipVisibility: showProjectionsFlag, i.e. Step 4's top+front —
-       the 2D drawing is meaningless before any view is projected). Ported from the Points
-       topic (graphics_module_1_topic_3_points), which is the finished ADR-037 reference. */
+       (main.js syncCompareChipVisibility: showProjectionsFlag) — the 2D drawing is meaningless
+       before any view is projected. ADR-162: Step 5's revealViewsSequence defers this sync call
+       to the reveal's onComplete, so in practice the chip now waits for all three views (front,
+       top, side), not merely the flag's own name. Ported from the Points topic
+       (graphics_module_1_topic_3_points), which is the finished ADR-037 reference. */
     .compare-chip {
       position: relative; /* anchors the centred 44px hit-area ::before */
       display: inline-flex;
@@ -496,85 +498,22 @@
       border-color: var(--color-accent);
     }
 
-    /* ---- Compare card (ADR-012 family): the on-demand floating "drawing sheet" frame
-       hosting the 2D orthographic drawing. Absolute inside #sim-viewport (the positioned
-       ancestor) in the compact state; re-parented to <body> and placed as the grid's right
-       pane when expanded (ADR-037 workbench, see body.compare-split below). Single-canvas
-       invariant (ADR-034): the stage owns a plain 2D <canvas> that main.js drawCompare()
-       live-redraws from the edge map on every commit — never a second WebGL context. */
+    /* ---- Compare card (ADR-012 family, narrowed by ADR-080): the docked drawing-sheet
+       frame hosting the 2D orthographic drawing. Compare has exactly one shape now — always
+       a cell of the body.compare-split grid (grid-area: compare, assigned below) — so this is
+       a plain flex column, never position:absolute and never a transient overlay (no Flat-Ink
+       shadow exception; a docked surface doesn't earn one). Single-canvas invariant
+       (ADR-034): the stage owns a plain 2D <canvas> that main.js drawCompare() live-redraws
+       from the edge map on every commit — never a second WebGL context. */
     .compare-card {
-      position: absolute;
-      z-index: var(--z-compare);
       display: flex;
       flex-direction: column;
       overflow: hidden;
       background: var(--color-paper);
       border: 1px solid var(--color-border);
       border-radius: var(--radius-md);
-      box-shadow: var(--shadow-md);
     }
     .compare-card[hidden] { display: none; }
-    /* Sits below the wizard-toggle chevron (top-right, 44px) so the card never covers it. */
-    .compare-card[data-size="compact"] {
-      top: calc(var(--space-3) + 44px + var(--space-2));
-      right: var(--space-3);
-      width: min(420px, 38vw);
-      height: min(320px, 42vh);
-    }
-    /* Expanded = the 50/50 workbench split (ADR-037). The card is re-parented to <body> and
-       placed as the grid's right pane by the body.compare-split rules below; here it just
-       sheds the floating-card's absolute positioning. The card KEEPS its base .compare-card
-       border/radius/paper fill so it reads as a floating rounded card on the gray split
-       background (mirrors the Points/topic-4 rounded-card trial); box-shadow stays off
-       (Flat-Ink rule — docked surfaces don't earn the transient-overlay shadow). */
-    body.compare-split #compare-card {
-      position: static;
-      inset: auto;
-      width: auto;
-      height: auto;
-      min-height: 0;
-      transform: none;
-      box-shadow: none;
-    }
-    .compare-card__head {
-      flex: 0 0 auto;
-      display: flex;
-      align-items: center;
-      gap: var(--space-1);
-      padding: var(--space-2) var(--space-2) var(--space-2) var(--space-3);
-      background: var(--color-panel);
-      border-bottom: 1px solid var(--color-border);
-    }
-    .compare-card__tab {
-      flex: 1 1 auto;
-      font-family: var(--font-sans);
-      font-size: 0.6875rem;
-      font-weight: 700;
-      line-height: 1;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: var(--color-ink-secondary);
-    }
-    .compare-card__btn {
-      position: relative; /* anchors the centred 44px hit-area ::before */
-      flex: none;
-      width: 32px;
-      height: 32px;
-      display: grid;
-      place-items: center;
-      padding: 0;
-      border: 0;
-      background: none;
-      color: var(--color-ink-secondary);
-      cursor: pointer;
-      border-radius: var(--radius-xs);
-      transition: background var(--dur-fast) var(--ease-standard),
-                  color var(--dur-fast) var(--ease-standard),
-                  transform var(--dur-fast) var(--ease-standard);
-    }
-    .compare-card__btn svg { width: 18px; height: 18px; }
-    .compare-card__btn:active { transform: scale(0.97); }
-    .compare-card__btn:focus-visible { outline: none; box-shadow: var(--ring-focus); }
     .compare-card__stage {
       flex: 1 1 auto;
       position: relative;
@@ -591,6 +530,177 @@
       touch-action: none; /* let pointer events pan the sheet instead of scrolling the page */
     }
 
+    /* ---- Show Method takeover (ADR-085) — a full-viewport, focus-trapped view scoped to the
+       sim's own iframe, cloning #problem-library's own shell (position:fixed, same --z-overlay,
+       same libraryIn slide+fade — no bespoke entrance animation). Entirely independent of
+       #compare-card: no split, no workbench rail, Step 1/2's sliders stay covered + focus-trapped.
+       methodController.js toggles [hidden] on start/stop and owns every child except the canvas,
+       which main.js draws into. The rAF loop is paused while this is open (main.js
+       beginShowMethod/teardownShowMethod), so nothing here may rely on an anim.js tween — only
+       CSS transitions/animations or instant state changes. */
+    .method-view {
+      position: fixed;
+      inset: 0;
+      z-index: var(--z-overlay);
+      display: flex;
+      flex-direction: column;
+      background: var(--color-paper);
+      box-shadow: var(--shadow-md); /* transient floating surface (Flat-Ink exception) */
+    }
+    .method-view[hidden] { display: none; }
+    .method-view:not([hidden]) { animation: libraryIn var(--dur-step) var(--ease-standard); }
+    /* ---- ADR-095: per-beat step description, promoted to a flow row ABOVE the stage — a
+       flex child of .method-view (which is flex-direction:column), not an absolute overlay.
+       That makes it structurally impossible for this title to collide with the canvas' own
+       Set caption (painted near the bottom of the drawing) or with .set-chips (top-right of
+       the stage): the stage shrinks to make room instead of this floating over it. Reserves
+       its line-height even when empty (no `:empty{display:none}`) so the canvas never resizes
+       mid-walkthrough as beats come and go. NOT a reintroduction of the ADR-085-removed title
+       bar — no border/background, no step count, just the current beat's plain-language text
+       (methodController.js syncCaption(); #sim-status already narrates the same text, hence
+       aria-hidden). */
+    .method-title {
+      flex: 0 0 auto;
+      padding: var(--space-4) var(--space-5) var(--space-2);
+      min-height: calc(var(--text-lead) * 1.4);
+      text-align: center;
+      font-size: var(--text-lead);
+      font-weight: 600;
+      color: var(--color-ink);
+    }
+    .method-view__stage {
+      flex: 1 1 auto;
+      position: relative;
+      min-height: 0;
+      background: var(--color-paper);
+    }
+    /* The 2D drawing canvas fills the stage; main.js drawMethodView() sizes its backing store
+       to the stage rect × devicePixelRatio and redraws from the harvested Set data. */
+    .method-view__stage canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab; /* drag-to-pan, forked from the Compare sheet's own ADR-054 affordance */
+      touch-action: none; /* let pointer events pan the sheet instead of scrolling the page */
+    }
+
+    /* ---- Walkthrough controls — floating group, bottom-centre, overlaying the drawing
+       (ADR-085; no title bar — Back/Next/Exit are the entire toolbar now). The per-beat
+       caption used to stack above this pill (ADR-094) but moved to .method-title (ADR-095) —
+       this wrapper now holds only the pill. */
+    .method-controls {
+      position: absolute;
+      bottom: var(--space-5);
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .method-bar {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      padding: var(--space-2) var(--space-3);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      /* ADR-095: concentric with the .btn--small children's --radius-sm (6px) across this
+         bar's own var(--space-2) = 8px vertical padding, not an unrelated stadium 999px. */
+      border-radius: calc(var(--radius-sm) + var(--space-2));
+      font-size: var(--text-sm);
+      box-shadow: var(--shadow-md); /* transient floating surface (Flat-Ink exception) */
+    }
+
+    /* ---- Set-N focus chips + the ADR-105 turn-replay control — floating group, top-right,
+       mirroring .quick-views' pill group (same token language, same segmented-pill shape) but
+       for Set-1/2/3 focus rather than Top/Front/Side. "Set" not "Stage" in every class/attr name
+       here: .compare-card__stage (the Compare sheet's own canvas area) already owns that word
+       (ADR-084 naming note, still true post-ADR-085). A direct child of #method-view in the
+       markup (position:fixed, inset:0), NOT .method-view__stage — its containing block is the
+       whole takeover, so top/right stay a flush ~8px corner inset regardless of .method-title's
+       height above the stage (ADR-098 addendum). ADR-105 moved the absolute positioning here,
+       one level up from .set-chips itself, so the replay button can sit as its own sibling
+       pill immediately next to the chip row without being wiped by renderChips()'s
+       `chipRow.innerHTML = ''` rebuild. */
+    .method-corner {
+      position: absolute;
+      top: var(--space-2);
+      right: var(--space-2);
+      z-index: 1;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    .set-chips {
+      display: inline-flex;
+      gap: 2px;
+      padding: 3px;
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+    }
+    .set-chips[hidden] { display: none; }
+    .set-chip {
+      min-height: 28px;
+      padding: 0 var(--space-3);
+      font-family: var(--font-sans);
+      font-size: var(--text-xs);
+      font-weight: 600;
+      line-height: 1;
+      color: var(--color-ink-secondary);
+      background: transparent;
+      border: 0;
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard);
+    }
+    .set-chip:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .set-chip:disabled { opacity: 0.4; cursor: not-allowed; }
+    .set-chip.is-active { background: var(--color-accent); color: var(--color-paper); }
+
+    /* ADR-105 — small circular icon twin of .set-chip (same 28px footprint, same token
+       language) for the turn-replay control: a deliberate, explicit exception to "chips only
+       focus/zoom" (ADR-084 Decision 7) rather than an overload of chip-click behaviour, so it is
+       its own pill, not a chip. */
+    .method-replay {
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      font-size: var(--text-md);
+      /* Bold (700) — the Two-Weight Rule's "never bold a button" clause (§5.1) is scoped to the
+         .btn family (Add/Next/Draw/Flatten, whose hierarchy must come from fill/color instead);
+         this is a standalone icon pill, same category as #rail-toggle, not a .btn, so bolding
+         the ↻ glyph itself (not a label) doesn't conflict with it. */
+      font-weight: 700;
+      line-height: 1;
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard);
+    }
+    .method-replay:hover { color: var(--color-ink); }
+    .method-replay:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .method-replay[hidden] { display: none; }
+
+    /* Narrow iframe: stack the bar's buttons instead of letting them overflow. Width now lives
+       on .method-controls (ADR-094's outer wrapper) — .method-bar is no longer itself
+       absolutely positioned, so a percentage width on it would resolve against the wrapper's
+       own shrink-to-fit size instead of the stage. */
+    @media (max-width: 480px) {
+      .method-controls { width: calc(100% - var(--space-6)); }
+      /* Stacked buttons keep the same concentric radius law as the row layout above. */
+      .method-bar { flex-direction: column; border-radius: calc(var(--radius-sm) + var(--space-2)); width: 100%; }
+    }
+
     /* ============================================================
        Compare-split workbench (ADR-037 pattern, ported from Points) — the true 50/50.
        body flips from the wizard-beside-viewport flex row into a grid:
@@ -601,8 +711,10 @@
          └────────────────────────────────┘
        The wizard drops out; the 8 geometry drivers re-parent into the rail (main.js
        enterWorkbench). Because #sim-viewport IS the left pane, handleResize() (which
-       measures it) sizes the renderer to half-width with no JS sizing change. Desktop-only
-       (mobile keeps the bottom-sheet card). */
+       measures it) sizes the renderer to half-width with no JS sizing change. Compare has
+       exactly one shape at every viewport width (ADR-080 — no floating/compact fallback);
+       the mobile @media block below restyles this same grid into a single stacked column
+       instead of switching to a different Compare UI. */
     body.compare-split {
       display: grid;
       grid-template-columns: 1fr 1fr;
@@ -626,10 +738,9 @@
     /* The wizard is collapsed BY the split; the chevron (main.js) exits the split to bring
        it back, mirroring ADR-021/ADR-037. */
     body.compare-split #wizard { display: none; }
-    /* In the 50/50 split the 2D-drawing head (tab + expand/close) and the viewport chevron
-       are redundant chrome — the still-visible, pressed Compare chip in the left 3D pane
-       toggles the split closed, so it is the single exit. */
-    body.compare-split .compare-card__head { display: none; }
+    /* The Compare card has no head chrome to hide anymore (ADR-080) — the still-visible,
+       pressed Compare chip in the left 3D pane is the split's only exit, same as the
+       viewport chevron is redundant and hidden here. */
     body.compare-split #wizard-toggle { display: none; }
 
     /* The docked driver rail — spans both panes, hosts the re-parented [data-ctrl]
@@ -730,13 +841,92 @@
       line-height: 1;
     }
     /* Collapsed: drop the rail out of the grid (its row + gap reclaimed) and flip the
-       chevron to point back down toward where the rail will reappear. */
+       chevron to point back down toward where the rail will reappear. Scoped to #rail-toggle
+       (not every .rail-toggle) so #method-pose-reset's own icon — the same base class, a
+       different glyph with no "flip" meaning — can never inherit this transform even though
+       the two modes' classes are not expected to co-occur (exitWorkbench() already clears
+       rail-collapsed before method-split can be entered). */
     body.rail-collapsed #workbench-rail { display: none !important; }
-    body.rail-collapsed .rail-toggle__icon { transform: rotate(180deg); }
+    body.rail-collapsed #rail-toggle .rail-toggle__icon { transform: rotate(180deg); }
     body.compare-split.rail-collapsed {
       grid-template-rows: minmax(0, 1fr);
       grid-template-areas: "view compare";
     }
+
+    /* ============================================================
+       Show Method — 3D pose-visualizer mode (ADR-085 amendment; RULES.md §5.16c). A SECOND,
+       independent docked split — NOT the Compare workbench above (mutually exclusive; entering
+       this mode closes Compare first, main.js enterMethodPose). §5.16a's "Compare has exactly
+       one shape" is Compare's own rule; this is a different feature with its own ratio (§5.16c),
+       still a docked grid, never a floating/compact card.
+         ┌───────────┬───────────────────────┐
+         │  3D pane  │   #method-view (sheet) │   ← one row, 3fr/7fr columns
+         │  (30%)    │   (70%)                │
+         └───────────┴───────────────────────┘
+       #sim-viewport and #method-view are BOTH already direct <body> children (unlike Compare's
+       #compare-card, which enterWorkbench re-parents out of #sim-viewport first) — so this is
+       grid-area assignment only, no re-parenting, no JS sizing change (handleResize measures
+       #sim-viewport exactly as it already does outside this mode). #method-view drops its own
+       position:fixed/inset:0 (the plain-takeover shape) for a normal grid cell while this class
+       is on; ADR-085's original takeover markup/CSS is otherwise untouched — this class is the
+       only thing toggling between the two container shapes. */
+    body.method-split {
+      display: grid;
+      grid-template-columns: 3fr 7fr;
+      grid-template-rows: minmax(0, 1fr);
+      grid-template-areas: "view method";
+      background: var(--color-panel);
+      gap: var(--space-4);
+      padding: var(--space-4);
+    }
+    body.method-split #sim-viewport {
+      grid-area: view;
+      min-width: 0;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      overflow: hidden; /* clip the WebGL canvas to the rounded corners, matches compare-split */
+    }
+    body.method-split #method-view {
+      position: relative; /* was fixed; inset:0 — see the block comment above */
+      inset: auto;
+      grid-area: method;
+      z-index: auto;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      box-shadow: none;  /* docked grid cell, not a transient overlay — the .method-view base
+                            rule's --shadow-md is the takeover shape's Flat-Ink exception
+                            (DESIGN.md §4.2) and does not carry over here. */
+      overflow: hidden;  /* clip .method-view__stage + #method-canvas to the rounded corners,
+                            same as #sim-viewport above and .compare-card's own base rule. */
+    }
+    /* The wizard is collapsed BY this mode too (same reasoning as compare-split: the reserved
+       panel cramps both panes) — #method-exit is this mode's own way back, mirroring how the
+       still-visible Compare chip is that split's only exit. */
+    body.method-split #wizard,
+    body.method-split #wizard-toggle { display: none; }
+    /* #method-pose-reset (index.html, beside #rail-toggle) — hidden by default via the shared
+       .rail-toggle base rule; floats at the 3D pane's bottom-left, exactly like #rail-toggle
+       does for the Compare split's own viewport pane. */
+    body.method-split #method-pose-reset {
+      display: inline-flex;
+      grid-area: view;
+      align-self: end;
+      justify-self: start;
+      margin: var(--space-4);
+    }
+    /* Pose mode is the first container that ever EXPOSES #sim-viewport (the plain ADR-085
+       takeover just covers it) — so two of .vp-cluster's controls, dead here, surface for the
+       first time (ADR-163 follow-up, RULES.md §5.16c). Hidden, not padlocked (DESIGN.md §5.4's
+       padlock is for a control HIERARCHY within one panel; this is a container swap, the repo's
+       settled idiom for that is display:none — body.compare-split #wizard, .rail-toggle itself).
+       Compare chip: enterMethodPose() already calls compare.hide() up front because the two
+       docked grids can't coexist, and opening it would run enterWorkbench()'s unconditional
+       unflatten() — destroying methodCanRun()'s own foldProgress===1 precondition. Connector
+       lines: provably inert here — setMethodPoseVisible(true) has already hidden every group
+       the toggle can reach (main.js). The quick-view chips (Top/Front/Side) stay: they are a
+       legitimate way to inspect the pose, and resetMethodPoseCamera un-latches them itself. */
+    body.method-split #compare-chip,
+    body.method-split .connector-toggle { display: none; }
 
     /* ---- 44px hit-area floor (DESIGN.md). These viewport-corner controls stay visually
        compact so the chrome stays quiet, but a transparent, centred ::before guarantees a
@@ -746,7 +936,6 @@
     .quick-view::before,
     .connector-toggle::before,
     .compare-chip::before,
-    .compare-card__btn::before,
     .vp-hint__dismiss::before {
       content: "";
       position: absolute;
@@ -870,6 +1059,7 @@
     }
     .vp-spotlight--hp  .vp-spotlight__dot { background: var(--color-hp-line); }
     .vp-spotlight--vp  .vp-spotlight__dot { background: var(--color-vp-line); }
+    .vp-spotlight--pp  .vp-spotlight__dot { background: var(--color-pp-line); } /* ADR-162: side-view spotlight */
     .vp-spotlight--ink .vp-spotlight__dot { background: var(--color-ink-secondary); }
     .vp-spotlight__text { text-wrap: balance; }
 
@@ -1508,6 +1698,13 @@
       background: transparent;
       border-color: transparent;
     }
+    /* Compact modifier (ADR-084's .method-bar toolbar — Back/Next/Exit need to fit a slim
+       row above the Compare canvas, not the standard 44px full-width step button). */
+    .btn--small {
+      min-height: 32px;
+      padding: 0 var(--space-3);
+      font-size: var(--text-sm);
+    }
 
     /* --- Step-action hint + completion badge (Steps 3–5) --- */
     .hint {
@@ -1756,7 +1953,17 @@
       padding: var(--space-4) var(--space-5);
       border-bottom: 1px solid var(--color-border);
     }
+    /* Counterweight for the 44px close button, so the title reads on true centre
+       without un-anchoring the button from its top-right corner (§5.12 convention). */
+    .problem-library__header::before {
+      content: "";
+      flex: none;
+      width: 44px;
+    }
     .problem-library__title {
+      flex: 1 1 auto;
+      min-width: 0;
+      text-align: center;
       margin: 0;
       font-size: var(--text-title);
       font-weight: 700;
@@ -1941,6 +2148,28 @@
          slice above; grow=1 lets it fill the column once #wizard is display:none). */
       body.wizard-collapsed #sim-viewport { flex: 1 1 100%; }
 
+      /* Compare split, narrow viewport (ADR-080): no floating/bottom-sheet fallback —
+         the same docked split just restacks to a single column, 3D on top, the 2D
+         drawing under it, the rail at the bottom. */
+      body.compare-split {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) auto;
+        grid-template-areas: "view" "compare" "rail";
+      }
+      body.compare-split.rail-collapsed {
+        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-areas: "view" "compare";
+      }
+
+      /* Show Method's pose-visualizer split (RULES.md §5.16c mirrors ADR-080's restack rule for
+         Compare): 3D on top, the sheet given the larger share underneath — the drawing is the
+         deliverable at this width, the 3D pane is the explanation. */
+      body.method-split {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) minmax(0, 2fr);
+        grid-template-areas: "view" "method";
+      }
+
       /* The panel now stacks BELOW the viewport, so the chevron points along that
          axis instead of sideways: down = push the panel closed, up = pull it back
          open (drawer-from-bottom). +90° offset over the desktop right/left states. */
@@ -2049,6 +2278,74 @@
     </div>
   </div>
 
+  <!-- Show Method (ADR-085): a full-viewport, focus-trapped takeover, scoped to the sim's own
+       iframe (NOT the browser Fullscreen API — stays inside the window.simAPI sandbox boundary),
+       mirroring #problem-library's own shell exactly. Walks the loaded problem's textbook
+       construction as 2-3 side-by-side Sets on a dedicated canvas — entirely independent of the
+       Compare card (no split, no workbench rail; Step 1/2's sliders stay covered + focus-trapped,
+       never reachable while this is open). The rAF loop is paused while it is open (same contract
+       as #problem-library), so nothing in here may rely on anim.js — only CSS transitions or
+       instant state changes. methodController.js (src/methodController.js) owns every child here
+       except the canvas, which main.js draws into (drawMethodView/drawMethodSheet). -->
+  <div id="method-view" class="method-view" role="dialog" aria-modal="true" aria-label="Show Method — construction walkthrough" hidden>
+    <!-- ADR-095: plain-language caption for the CURRENT beat only ("Outline of the top view",
+         not a step count — ADR-089 Decision 2 already rejected the numeric counter this
+         deliberately isn't), promoted to its own top-of-view flow row (.method-title) — clear
+         of the canvas' own bottom-of-block Set caption ("Set N — <label>") and of the
+         .method-controls pill below, so the two captions can never overlap or repeat each
+         other (beat 0 reads "Starting Set N" here, never the Set label itself). aria-hidden:
+         #sim-status already narrates the identical text (methodController.js syncCaption), so
+         this is not a second live region. -->
+    <div id="method-caption" class="method-title" aria-hidden="true"></div>
+    <!-- Direct child of #method-view (position:fixed, inset:0), not .method-view__stage — the
+         stage now starts BELOW .method-title, so anchoring here instead keeps this row flush
+         with the view's actual top-right corner regardless of the title row's height, matching
+         the platform's normal ~8px corner-inset spacing rather than inheriting the stage's own
+         lower top edge as extra empty space above it. ADR-105: now also carries the turn-replay
+         control (moved off .method-bar — the turn itself auto-plays on the Next click that
+         crosses Set 2 -> Set 3, so this is a replay affordance, not the primary trigger),
+         positioned right after the chips so it sits next to Set 3's own chip — the LAST chip,
+         since .set-chips is a plain left-to-right row and this whole group is right-anchored. -->
+    <div class="method-corner">
+      <div id="method-chips" class="set-chips" role="group" aria-label="Focus a Set" hidden></div>
+      <!-- Hidden, not merely disabled, whenever sim.method.canTilt() is false —
+           methodController.js's own focusables() selects `button` and filters on
+           `!disabled && offsetParent !== null`, so a hidden button needs no separate focus-trap
+           handling. Shown only while the current Set is a Set-to-Set ghost's destination — either
+           a TURN (both-planes Set 3, ADR-093's turnDeg + ADR-099's methodArcEligible) or a TILT
+           (ADR-110's methodStepIsXTilt). Label stays generic since which one applies varies by
+           Set; the specific motion is narrated by startMethodTilt's own announce() instead.
+           Replays idempotently — sim.method.playTilt() cancels a live tilt before starting a new
+           one. -->
+      <button type="button" class="method-replay" id="method-replay-turn" hidden
+              title="Replay the motion" aria-label="Replay the Set-to-Set motion">↻</button>
+    </div>
+    <div class="method-view__stage">
+      <canvas id="method-canvas" aria-label="Construction walkthrough: the problem's textbook construction drawn as successive Sets"></canvas>
+      <div class="method-controls">
+        <div class="method-bar" role="group" aria-label="Walkthrough controls. Press Space to advance.">
+          <button type="button" class="btn btn--small" id="method-back">Back</button>
+          <button type="button" class="btn btn--small btn--primary" id="method-next" title="Press Space to advance"></button>
+          <!-- ADR-087 Decision 2: mitigates the 15-beat/Set template's click cost — jumps to
+               the NEXT Set's first beat only, never the whole method. Hidden entirely once the
+               walkthrough is on its last Set — there is no Set left to skip to
+               (methodController.js renderProgress; ADR-094 made the code actually match this
+               comment, which the disabled-only original never did). ADR-105: does NOT auto-play
+               the Set 2 -> Set 3 turn even when it skips into Set 3 — Skip exists to cut click
+               cost, playing a 1.65s animation there fights that. -->
+          <button type="button" class="btn btn--small" id="method-skip-set">Skip to next Set</button>
+          <!-- ADR-085 amendment (3D pose-visualizer mode): the SECOND Show Method container —
+               body.method-split, a live 30/70 3D+sheet split — toggled live, mid-walkthrough,
+               without losing curSet/curBeat/focusSet. aria-pressed mirrors the mode; label swaps
+               (the #btn-dimensions/#btn-flatten idiom). methodController.js wires this; main.js
+               drives simController.method.setPoseMode via enterMethodPose/exitMethodPose. -->
+          <button type="button" class="btn btn--small" id="method-3d" aria-pressed="false">3D view</button>
+          <button type="button" class="btn btn--small" id="method-exit">Exit method</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Guided Stepper chrome — step rail + step card. stepper.js drives it. -->
   <aside id="wizard" aria-label="Guided steps">
     <!-- Active-problem header: shown only while a textbook problem is loaded. The
@@ -2078,9 +2375,9 @@
     <ol id="step-rail" aria-label="Progress">
       <li class="rail__item" data-step="1"><button type="button" class="rail__btn"><span class="rail__marker">1</span><span class="rail__label">Add &amp; rest</span></button></li>
       <li class="rail__item" data-step="2"><button type="button" class="rail__btn"><span class="rail__marker">2</span><span class="rail__label">Position</span></button></li>
-      <li class="rail__item" data-step="3"><button type="button" class="rail__btn"><span class="rail__marker">3</span><span class="rail__label">Label</span></button></li>
-      <li class="rail__item" data-step="4"><button type="button" class="rail__btn"><span class="rail__marker">4</span><span class="rail__label">Top &amp; front</span></button></li>
-      <li class="rail__item" data-step="5"><button type="button" class="rail__btn"><span class="rail__marker">5</span><span class="rail__label">Side view</span></button></li>
+      <li class="rail__item" data-step="3"><button type="button" class="rail__btn"><span class="rail__marker">3</span><span class="rail__label">Inclinations</span></button></li>
+      <li class="rail__item" data-step="4"><button type="button" class="rail__btn"><span class="rail__marker">4</span><span class="rail__label">Label</span></button></li>
+      <li class="rail__item" data-step="5"><button type="button" class="rail__btn"><span class="rail__marker">5</span><span class="rail__label">Draw views</span></button></li>
       <li class="rail__item" data-step="6"><button type="button" class="rail__btn"><span class="rail__marker">6</span><span class="rail__label">Flatten</span></button></li>
     </ol>
 
@@ -2170,7 +2467,7 @@
             <h3 class="dock__group-title">Resting plane</h3>
             <p class="dock__note">The base sits flat on one reference plane, and the axis stays <strong>perpendicular to it</strong>. On the
               <button type="button" class="term" aria-describedby="def-hp">HP<span class="term__pop" role="tooltip" id="def-hp">The <strong>Horizontal Plane</strong>: the flat floor the solid rests above. Looking straight down onto it gives the top view.</span></button> the axis stands upright; on the
-              <button type="button" class="term" aria-describedby="def-vp">VP<span class="term__pop" role="tooltip" id="def-vp">The <strong>Vertical Plane</strong>: the upright wall behind the solid. Looking at it from the front gives the front view.</span></button> the solid lies down with its axis horizontal. Inclination (Step&nbsp;2) then tilts it from there.</p>
+              <button type="button" class="term" aria-describedby="def-vp">VP<span class="term__pop" role="tooltip" id="def-vp">The <strong>Vertical Plane</strong>: the upright wall behind the solid. Looking at it from the front gives the front view.</span></button> the solid lies down with its axis horizontal. Inclination (Step&nbsp;3) then tilts it from there.</p>
             <!-- data-ctrl="resting": see the "size" wrapper's comment above. -->
             <div data-ctrl="resting">
               <div class="field">
@@ -2184,7 +2481,7 @@
           </div>
         </section>
 
-        <!-- STEP 2 — Position & turn (distance from each plane, base orientation, then inclination) -->
+        <!-- STEP 2 — Position (distance from each plane, then base orientation) -->
         <section class="step-panel" data-step="2" hidden>
           <div class="dock__group">
             <h3 class="dock__group-title">Placement</h3>
@@ -2242,7 +2539,11 @@
               <svg class="toggle__lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
             </label>
           </div>
+        </section>
 
+        <!-- STEP 3 — Inclinations (ADR-161: split out of the old Step 2's third group,
+             RULES.md §6.30 — "where does it sit" and "how is it tilted" are two questions). -->
+        <section class="step-panel" data-step="3" hidden>
           <div class="dock__group">
             <h3 class="dock__group-title">Inclination</h3>
             <p class="dock__note">Tilt the solid toward a plane. Use the angle sliders for a standard-axis tilt, or
@@ -2280,11 +2581,14 @@
               <span class="toggle__text">Face inclination &rarr; VP</span>
               <svg class="toggle__lock" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
             </label>
+            <!-- Cross-step lock note (plan risk 1): the padlock alone doesn't say WHY these two
+                 are disabled when Step 2's "Orient to corner" preset is on — name the cause. -->
+            <p class="dock__note" id="incl-lock-hint" hidden>Face inclination is unavailable while <strong>Orient to corner/edge</strong> (Step&nbsp;2) is on — turn that off first.</p>
           </div>
         </section>
 
-        <!-- STEP 3 — Label vertices -->
-        <section class="step-panel" data-step="3" hidden>
+        <!-- STEP 4 — Label vertices -->
+        <section class="step-panel" data-step="4" hidden>
           <p class="hint">
             <svg class="hint__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             <span>Each label stays pinned to its corner as you rotate the view, so you never lose track of which point is which across the projections.</span>
@@ -2296,33 +2600,35 @@
           </p>
         </section>
 
-        <!-- STEP 4 — Draw top & front views (HP + VP only) -->
-        <section class="step-panel" data-step="4" hidden>
+        <!-- STEP 5 — Draw the views (ADR-162, supersedes ADR-161's two-button merge: the former
+             one-shot "top+front" button and the toggle "side view" button collapse into ONE
+             primary action that plays a single Front→Top→Side reveal on click. All three views
+             are now mandatory — the step no longer completes on just two of the three. -->
+        <section class="step-panel" data-step="5" hidden>
           <p class="hint">
             <svg class="hint__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             <span>This is
               <button type="button" class="term" aria-describedby="def-ortho">orthographic projection<span class="term__pop" role="tooltip" id="def-ortho">Each point drops straight onto a plane along a perpendicular, with no perspective. The view keeps the solid's true lengths and angles.</span></button>:
               the views keep the solid's true sizes, and edges the body hides are drawn dashed.</span>
           </p>
-          <button id="btn-project" class="btn btn--primary btn--block" type="button">Draw top &amp; front views</button>
-          <p class="done-badge" id="done-project">
-            <svg class="done-badge__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Top &amp; front views drawn
-          </p>
-        </section>
-
-        <!-- STEP 5 — Add the side view (reveal the profile plane) -->
-        <section class="step-panel" data-step="5" hidden>
           <p class="hint">
             <svg class="hint__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             <span>The
               <button type="button" class="term" aria-describedby="def-pp">profile plane<span class="term__pop" role="tooltip" id="def-pp">The <strong>Profile Plane</strong>: an upright wall standing at the solid's side. Looking at it from the side gives the side view — the third of the three views that fix the solid completely.</span></button>
-              (PP, violet) stands at the solid's side. We bring it in and cast the side view onto it, completing the set of three views.</span>
+              (PP, violet) stands at the solid's side, ready to carry the side view — the third view that, together with the front and top, fixes the solid completely.</span>
           </p>
-          <button id="btn-sideview" class="btn btn--primary btn--block" type="button">Add side view</button>
-          <p class="done-badge" id="done-sideview">
+          <button id="btn-draw-views" class="btn btn--primary btn--block" type="button">Draw the three views</button>
+          <p class="done-badge" id="done-front">
             <svg class="done-badge__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-            Side view added
+            Front view drawn
+          </p>
+          <p class="done-badge" id="done-top">
+            <svg class="done-badge__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Top view drawn
+          </p>
+          <p class="done-badge" id="done-side">
+            <svg class="done-badge__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M4 10.5l4 4 8-9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            Side view drawn
           </p>
         </section>
 
@@ -2332,7 +2638,7 @@
             <svg class="hint__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true"><circle cx="10" cy="10" r="8" stroke="currentColor" stroke-width="1.5"/><path d="M10 9v5M10 6h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
             <span>The planes hinge along the
               <button type="button" class="term" aria-describedby="def-ground">ground line<span class="term__pop" role="tooltip" id="def-ground">The line where the HP and VP meet. The planes fold open along it to bring every view onto one flat sheet.</span></button>
-              where they meet, so the front view ends up directly across from the top view, with the side view beside it: the standard sheet layout.</span>
+              where they meet, so the front view ends up directly across from the top view, with the side view beside the front view: the standard sheet layout.</span>
           </p>
           <button id="btn-flatten" class="btn btn--primary btn--block" type="button">Flatten to 2D</button>
           <button id="btn-unfold" class="btn btn--block" type="button" hidden>Unfold to 3D</button>
@@ -2342,10 +2648,24 @@
                simController.setDimensions on/off. Confirmation is a transient viewport
                flowNote (see stepper.js), not a panel badge — keeps the panel compact. -->
           <button id="btn-dimensions" class="btn btn--block" type="button" aria-pressed="false">Show dimensions</button>
-          <!-- Feature 1: appears once flattened. Celebrates, clears the active problem,
-               resets through the single path, and opens the Problem Library (stepper.js
-               wires it via simController.completeAndNext). Label adapts in free-play. -->
-          <button id="btn-complete-next" class="btn btn--primary btn--block" type="button" hidden>Complete &amp; next problem</button>
+          <!-- Show Method (ADR-085): walks through the loaded problem's textbook construction
+               as 2-3 side-by-side Sets on its OWN full-screen takeover (#method-view), entirely
+               independent of the Compare card — no split, no workbench rail. Wired entirely by
+               methodController.js (src/methodController.js), not stepper.js — it grabs this
+               button by id itself, mirroring how the Problem Library wires its own DOM. Starts
+               hidden/disabled; methodController shows+enables it once a solid is flattened AND
+               actually has an axis inclined (one-plane/both-planes tiers only — 'base' and
+               'corner-edge' have nothing to walk through — this fold-first sequencing is
+               unchanged by ADR-085, it was never about the container). Hidden again while the
+               walkthrough itself is running (its own controls live in #method-view, see
+               index.html's .method-view/.method-bar/.set-chips markup near #problem-library). -->
+          <button id="btn-show-method" class="btn btn--block" type="button" hidden disabled>Show Method</button>
+          <!-- Feature 1: appears once flattened. Clears the active problem, resets through
+               the single path, and opens the Problem Library (stepper.js wires it via
+               simController.completeAndNext). Plain-weight (not primary) since Finish lesson
+               (footer nav) is now Step 6's one loud action — this stays the repeatable
+               practice-loop action, same visual weight as Dimensions/Show Method. -->
+          <button id="btn-complete-next" class="btn btn--block" type="button" hidden>Try another problem</button>
         </section>
       </div>
       </div><!-- /.card__scroll -->
@@ -2367,6 +2687,12 @@
         </div>
         <button id="btn-back" class="btn btn--nav" type="button" hidden>Back</button>
         <button id="btn-next" class="btn btn--primary btn--nav" type="button">Next</button>
+        <!-- Finish-button pilot: Step 6's footer primary once flattened, replacing #btn-next's
+             slot (stepper.js hides one exactly when the other shows — same idiom as
+             #btn-flatten/#btn-unfold). Fires sim:complete (ADR-078 addendum, revised — no latch,
+             every click reposts). Own element, own listener: NOT a relabel of #btn-next, since
+             #btn-next's click handler advances the wizard, an unrelated action. -->
+        <button id="btn-finish" class="btn btn--primary btn--nav" type="button" hidden disabled>Finish lesson</button>
       </footer>
     </section>
     </div>
@@ -2410,9 +2736,11 @@
       <!-- Compare chip (ADR-012 family): the on-demand 2D-drawing view. Ported from
            Module1/src/chrome.js #compare-chip via the Points topic's reference build.
            Hidden until the lesson's 2D gate passes (main.js syncCompareChipVisibility:
-           showProjectionsFlag — Step 4's top+front views must exist first), preserving
-           the pedagogy that the 2D drawing is meaningless before any view is projected.
-           main.js wires it to applyCompareSize('expanded' | 'compact') via compare.toggle(). -->
+           showProjectionsFlag). ADR-162: Step 5's revealViewsSequence defers that sync
+           to the reveal's onComplete, so this chip now waits for all three views (front,
+           top, side) to land, preserving the pedagogy that the 2D drawing is meaningless
+           before it's actually complete. main.js wires it to compare.toggle() — the chip
+           is Compare's only open/close control (ADR-080). -->
       <button id="compare-chip" class="compare-chip" type="button" aria-pressed="false" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <rect x="3" y="5" width="8" height="14" rx="1.5"/><rect x="13" y="5" width="8" height="14" rx="1.5"/>
@@ -2421,25 +2749,14 @@
       </button>
     </div>
 
-    <!-- Compare card (ADR-012 family): the on-demand floating "drawing sheet" frame hosting
-         the finished 2D orthographic drawing (top / front / side views). Ported from the
-         Points topic's reference build; the stage owns a plain 2D <canvas> that main.js
+    <!-- Compare card (ADR-012 family, narrowed by ADR-080): the docked drawing-sheet frame
+         hosting the finished 2D orthographic drawing (top / front / side views). Ported from
+         the Points topic's reference build; the stage owns a plain 2D <canvas> that main.js
          drawCompare() live-redraws from the edge map on every commit (ADR-034: no second
-         WebGL context). compact / expanded via data-size; main.js wires the head buttons. -->
-    <div id="compare-card" class="compare-card" data-size="compact" role="region" aria-label="Compare: the finished 2D drawing" hidden>
-      <div class="compare-card__head">
-        <span class="compare-card__tab">2D drawing</span>
-        <button id="compare-expand" class="compare-card__btn" type="button" aria-label="Expand compare view" title="Expand">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M9 3H5a2 2 0 0 0-2 2v4M15 3h4a2 2 0 0 1 2 2v4M9 21H5a2 2 0 0 1-2-2v-4M15 21h4a2 2 0 0 0 2-2v-4"/>
-          </svg>
-        </button>
-        <button id="compare-close" class="compare-card__btn" type="button" aria-label="Close compare view" title="Close">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-            <path d="M6 6l12 12M18 6L6 18"/>
-          </svg>
-        </button>
-      </div>
+         WebGL context). Compare has exactly one shape now (ADR-080): the docked 50/50 split.
+         There is no floating/compact state and no head chrome — the still-visible Compare
+         chip in the 3D pane is the single open/close control. -->
+    <div id="compare-card" class="compare-card" role="region" aria-label="Compare: the finished 2D drawing" hidden>
       <div class="compare-card__stage">
         <canvas id="compare-canvas" aria-label="2D orthographic drawing: top, front, and side views of the solid"></canvas>
       </div>
@@ -2479,11 +2796,12 @@
       <button id="vp-orbit-dismiss" class="vp-hint__dismiss" type="button" aria-label="Dismiss hint">&times;</button>
     </div>
 
-    <!-- Contextual spotlight hint: a queued, first-seen chip pointing out the top view,
-         front view (Step 4), and connector lines (Step 6 flatten) the first time each is
-         revealed. Shares the bottom-centre slot with the orbit hint; onboarding.js shows
-         one at a time. The leading dot's colour ties to the linework (teal HP / amber VP /
-         ink), so it carries colour AND label (Two-Cue Rule). Dismisses on click/orbit/timeout. -->
+    <!-- Contextual spotlight hint: a queued, first-seen chip pointing out the front, top, and
+         side views (Step 5, ADR-162: now three chips in reveal order, not two) and the
+         connector lines (Step 6 flatten) the first time each is revealed. Shares the
+         bottom-centre slot with the orbit hint; onboarding.js shows one at a time. The leading
+         dot's colour ties to the linework (teal HP / amber VP / violet PP / ink), so it carries
+         colour AND label (Two-Cue Rule). Dismisses on click/orbit/timeout. -->
     <div id="vp-spotlight" class="vp-hint vp-spotlight" role="status" hidden>
       <span class="vp-spotlight__dot" aria-hidden="true"></span>
       <span class="vp-spotlight__text"></span>
@@ -2518,6 +2836,32 @@
       <path d="M6 9l6 6 6-6" />
     </svg>
     <span class="rail-toggle__text">Hide</span>
+  </button>
+
+  <!-- Show Method's 3D pose-visualizer reset-camera affordance (ADR-085 amendment; renamed +
+       re-iconed in the ADR-163 follow-up). Same precedent as #rail-toggle above: a direct
+       <body> child (not nested inside #method-view, which owns the sheet pane, not the 3D one —
+       #sim-viewport is a SIBLING body child, see the container note on ADR-085's original
+       decision), claiming grid-area:view so it floats at the 3D pane's bottom-left. Only visible
+       while body.method-split is active (see CSS below). Deliberately OUTSIDE #method-view's own
+       focus trap (methodController.js focusables() only queries inside #method-view) — correct,
+       not an oversight: entering this mode sets #method-view's aria-modal to "false" precisely
+       because a live, orbitable pane now sits beside it and the rest of the document is no
+       longer inert, so this button is reached the same way the quick-view chips and #rail-toggle
+       already are. Wired in methodController.js (poseResetBtn) to
+       simController.method.resetPoseView() — recentres/refits the CURRENT camera direction on
+       the posed solid rather than snapping to an unrelated default angle (resetMethodPoseCamera's
+       own header). Icon: the platform's existing four-corner frame/fit glyph (same one used for
+       "Expand compare view" in the Sections-of-Solids and Understanding-Orthographic-Views
+       topics), not the platform's circular-arrow undo glyph — this button only re-centres/
+       re-fits, it never discards anything, and the module already has a genuinely destructive
+       #btn-reset behind a two-state confirm; the old circular-arrow (plus a headless "arrow" that
+       was really just a bracket) read as "wipe my work". Label follows: "Reset camera". -->
+  <button id="method-pose-reset" class="rail-toggle" type="button" aria-label="Reset camera" title="Reset camera">
+    <svg class="rail-toggle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M9 3H5a2 2 0 0 0-2 2v4M15 3h4a2 2 0 0 1 2 2v4M9 21H5a2 2 0 0 1-2-2v-4M15 21h4a2 2 0 0 0 2-2v-4" />
+    </svg>
+    <span class="rail-toggle__text">Reset camera</span>
   </button>
 
   <!-- Live region: main.js + stepper.js narrate step + mode changes for screen readers. -->

@@ -63,6 +63,7 @@ export function initStepper(sim) {
 
   const btnBack = $('btn-back');
   const btnNext = $('btn-next');
+  const btnFinish = $('btn-finish');
   const btnFold = $('btn-fold');
   const doneFold = $('done-fold');
 
@@ -148,6 +149,10 @@ export function initStepper(sim) {
       btnNext.hidden = currentStep >= TOTAL; // terminal step: no Next
       btnNext.disabled = !canAdvance(currentStep);
     }
+    // Finish lesson: takes over the footer's primary slot exactly when Next vacates
+    // it (terminal step "Traces" has no gate of its own — reaching it already implies
+    // the Step 4 fold is done, canAdvance's own gate to get here).
+    if (btnFinish) btnFinish.hidden = currentStep < TOTAL;
   }
 
   /** Show one step (progressive disclosure): card copy, control wrappers, rail,
@@ -203,6 +208,10 @@ export function initStepper(sim) {
   // ----------------------------------------------------------------------------
 
   // Step 4 — the reversible fold (Generate Orthographic Projections). One toggle.
+  // The fold's own toast still celebrates on first generation; lesson completion itself
+  // moved to the terminal Step 5 "Traces" via the learner's own "Finish lesson" click
+  // (Finish-button pilot, ADR-078 addendum revised — a deliberate change from this fold
+  // moment, confirmed: Traces is real content, not an epilogue).
   btnFold?.addEventListener('click', () => {
     if (sim.isFolded()) {
       sim.unfold();
@@ -211,13 +220,23 @@ export function initStepper(sim) {
       sim.fold();
       const firstWin = !celebrated;
       celebrated = true;
-      if (firstWin) sim.showToast?.('Orthographic projection generated');
+      if (firstWin) {
+        sim.showToast?.('Orthographic projection generated');
+      }
       sim.announce('Top view unfolded onto the vertical plane — the orthographic projection is complete.');
     }
     renderRail(); renderActions(); renderNav();
   }, listen);
 
   // Navigation.
+  // Finish lesson: posts sim:complete to the host (no latch — every click reposts,
+  // ADR-078 addendum revised). Button stays as-is afterward (no disable/relabel,
+  // locked decision) — announce() is the only feedback.
+  btnFinish?.addEventListener('click', () => {
+    sim.markComplete?.();
+    sim.announce?.('Lesson marked complete.');
+  }, listen);
+
   btnNext?.addEventListener('click', () => { if (canAdvance(currentStep)) goToStep(currentStep + 1); }, listen);
   btnBack?.addEventListener('click', () => goToStep(currentStep - 1), listen);
 

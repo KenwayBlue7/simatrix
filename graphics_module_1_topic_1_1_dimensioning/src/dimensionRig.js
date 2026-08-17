@@ -24,7 +24,7 @@
 //
 // Layering (ADR-007 / RULES.md §3.6): leaf module. It imports THREE, the fat-line addons,
 // and `dimensionData.js` — this topic's single PURE-DATA module, the sibling-importable
-// exception in the same spirit as `genericSolid.js` (see ADR-078). It never imports another
+// exception in the same spirit as `genericSolid.js` (see ADR-133). It never imports another
 // behavioural leaf, and never main.js.
 //
 // FAT LINES (RULES.md §3.12–§3.13, §3.16–§3.17): every stroke is LineSegments2 +
@@ -49,7 +49,7 @@ const cssColor = (name) => new THREE.Color(rootStyle.getPropertyValue(name).trim
  * screen. THESE ARE THE SIBLING FOUNDATIONS TOPIC'S NUMBERS, deliberately identical: the same
  * dashed countersink is drawn by THIS file in the elevation and by `lineDrawer.js` the moment
  * the part is turned, and a learner must not be able to tell the two apart. Foundations is the
- * reviewed benchmark, so its constants are the ones both sides use (ADR-081).
+ * reviewed benchmark, so its constants are the ones both sides use (ADR-136).
  */
 const WIDTH_PX = Object.freeze({
   visible: 2.5, // Type A — continuous wide
@@ -459,7 +459,7 @@ export function createRig(options = {}) {
       // exactly the long sides of the rectangle it projects to, and the drawing needs them.
       // Swung into the pictorial they become a crease down a smooth surface, so they come off.
       // That is a named-POSE switch, not per-edge classification — nothing is recomputed on
-      // orbit, so ADR-078 stands.
+      // orbit, so ADR-133 stands.
       for (const s of [1, -1]) {
         silhouettePos.push(faceX, cy + s * r, 0, x1, cy + s * r, 0);
       }
@@ -572,7 +572,7 @@ export function createRig(options = {}) {
    * Whether the AUTHORED linework is the one on show. It is, in the elevation — a drawing is
    * a fixed agreed projection. In the 3-D inspection `lineDrawer.js` classifies the same
    * solid live against the camera instead, and this whole authored set steps aside so the
-   * two never double up (ADR-081).
+   * two never double up (ADR-136).
    */
   let authoredWanted = true;
   /** Whether the lesson wants the part pushed into the background behind a dimension study. */

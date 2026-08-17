@@ -81,6 +81,11 @@ rig) — per RULES.md §1.15. `src/anim.js` was then re-copied from `Module2/src
 byte-identical to the master (§7.1); the sibling's own copy had drifted to CRLF and was NOT the
 file taken.
 
+> **Note (2026-08-07, merge):** that sibling topic is not yet in this repo — on `feat/mod4` it
+> existed only as a dangling gitlink (never pushed, ADR-039 violation), excluded from the merge.
+> See `DECISIONS.md` ADR-142. The attribution above is accurate history; the path just doesn't
+> resolve yet.
+
 **Shared engine files carried (RULES.md §1.16 — nothing carried that is not imported):**
 `anim.js` (byte-identical to Module 2's master — never edit it here; fix it in the master and
 re-copy), `tokens.js`, `cameraRig.js`, `stepper.js`, `terms.js`, `onboarding.js`. No shape
@@ -140,6 +145,9 @@ generator, no `meshAnalyzer.js`, no `iShape.js`, no `problems.js`.
   guarded by the inline two-state confirm (RULES.md §2.9, §4.19).
 - Self-starting on load; import map pins `three@0.160.0`; `.js` extensions; relative paths.
 - Dismissible "Best experienced on desktop." notice below 768px, which reserves its own height.
+- **`sim:ready` boot signal** (ADR-078, narrows ADR-002): `markBooted()` posts
+  `{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` — the one
+  sanctioned outbound `postMessage`. Do not add any other `postMessage`/inbound listener.
 
 ## Cross-cutting rules
 - Every geometry change routes through the single `rebuild()`; nothing else touches the scene graph.

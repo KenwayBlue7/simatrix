@@ -51,7 +51,7 @@ undimensioned view, redraws a figure to scale, or performs a Method-1 → Method
 hand. This is the chapter's terminal objective and it remains the topic's largest gap. It is
 postponed rather than half-built because it needs an authoring surface, lane snapping, a
 production validation engine and a scoring model — a different interaction architecture from the
-declarative spec pipeline this topic runs on (ADR-080). Bolting a partial authoring mode onto the
+declarative spec pipeline this topic runs on (ADR-135). Bolting a partial authoring mode onto the
 spec renderer would produce a worse teaching tool than an honest absence plus an exercise sheet.
 
 ### Residual known gaps
@@ -577,7 +577,7 @@ ISO symbols is correct, cited and well documented.
 6. Six "elements" are presented where the book enumerates five. Handled honestly in the copy
    ("the five elements … plus the note a leader carries") — not a defect, recorded for completeness.
 
-ADR-079's arrowhead carve-out is correct and correctly reasoned. No objection.
+ADR-134's arrowhead carve-out is correct and correctly reasoned. No objection.
 
 ---
 
@@ -784,7 +784,7 @@ cannot **dimension** one, because they were never once asked to.
 ### Closing note
 
 The engineering, architecture and documentation are strong and honest. The scope note on absent ISO
-symbols is exactly right, and ADR-078 / ADR-079 are properly argued rather than quietly assumed.
+symbols is exactly right, and ADR-133 / ADR-134 are properly argued rather than quietly assumed.
 
 The academic problem is not sloppiness. It is that the topic was scoped as a **reading and
 recognition** lesson, while the chapter's second half is a **drawing and production** curriculum.

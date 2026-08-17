@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="color-scheme" content="light only" />
+  <!-- <title> MUST equal meta.json.title (ADR-026 / RULES.md §1.12). -->
+  <title>Development of Surfaces</title>
+  <meta name="description" content="Unroll a rectangular prism, a cylinder, and a two-piece 90° pipe elbow into their true-size flat patterns — front view, top view, and development on one continuous sheet, transfer lines carrying every true height across." />
+
+  <!--
+    See ../CLAUDE.md, ../DECISIONS.md ADR-112. This is Diploma Module 2, Topic 1.1
+    ("Development of Surfaces") — the first Diploma topic in Module 2 (ADR-095/ADR-096
+    invoked, not superseded). Unlike every other Diploma topic, this one's viewport is
+    ONE <canvas>, not SVG (ADR-112 §1) — the front view, top view, and development share
+    one continuous plate, with transfer lines crossing freely between them, matching how
+    the source textbooks (Bhatt Ch.15, K.C. John Ch.15) actually draw this subject.
+
+    3D View (ADR-097/ADR-112 addenda, 2026-08-05): this track's FIRST Three.js dependency —
+    lets the student orbit the actual solid alongside its flat pattern. Originally built as
+    a separate sequential step; reconsidered SAME DAY once Bhatt Fig. 15-1/15-3/15-8 (the
+    small isometric pictorial always sits BESIDE the front/top+development plate, never
+    before it) and ADR-080 (Compare has exactly one shape platform-wide — the docked 50/50
+    split, never a floating card) were checked — see ../DECISIONS.md addendum. Now a Compare
+    card (ADR-012/037/080), roles reversed from the platform's usual shape: THIS topic's
+    Canvas2D plate is already the primary pane, so Compare docks the 3D solid instead.
+    Pinned exactly per Module2/CLAUDE.md's non-negotiable contract.
+  -->
+  <script type="importmap">
+  { "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }}
+  </script>
+
+  <!--
+    Boot watchdog (classic script, runs before the ES module). This topic's only
+    "runtime dependency" is its own module script evaluating successfully — there is no
+    WebGL and no CDN fetch to fail, so the fallback copy stays generic.
+  -->
+  <script>
+    (function () {
+      window.__simBooted = false;
+      window.__showSimFallback = function () {
+        if (window.__simBooted) return;
+        var el = document.getElementById('sim-fallback');
+        if (el) el.hidden = false;
+      };
+      window.addEventListener('error', function () {
+        if (!window.__simBooted) window.__showSimFallback();
+      });
+      window.__simBootTimer = window.setTimeout(function () {
+        if (!window.__simBooted) window.__showSimFallback();
+      }, 15000);
+      document.addEventListener('DOMContentLoaded', function () {
+        var btn = document.getElementById('sim-fallback-reload');
+        if (btn) btn.addEventListener('click', function () { window.location.reload(); });
+      });
+    })();
+  </script>
+
+  <style>
+    /*
+      Bundled web fonts (DESIGN.md typography). Shared platform font host (ADR-086, amends
+      RULES.md §2.12/§2.15's local-only mandate for this track) — Atkinson Hyperlegible
+      (UI/body), IBM Plex Mono (numbers).
+    */
+    @font-face {
+      font-family: "Atkinson Hyperlegible";
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "Atkinson Hyperlegible";
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+      font-weight: 700;
+      font-style: normal;
+      font-display: swap;
+    }
+    @font-face {
+      font-family: "IBM Plex Mono";
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
+    }
+
+    /*
+      ============================================================
+      Design tokens — mirrors the root DESIGN.md token table (§2.1), plus this topic's
+      own construction-line tokens (this file's ../DESIGN.md appendix §2).
+      ============================================================
+    */
+    :root {
+      --color-paper:        #ffffff;
+      --color-panel:        #f0f2f5;
+
+      --color-ink:          #06070b;
+      --color-ink-secondary:#5a5d66;
+
+      --color-bench-grey:   #938b7b;
+      --color-border:       #e0e1e5;
+      --color-track:        #e0e1e5;
+
+      --color-accent:        #1f66b5;
+      --color-accent-strong: #17539b;
+      --color-accent-soft:   #e3ecf7;
+      --color-focus:         var(--color-accent);
+      --ring-focus:          0 0 0 3px color-mix(in srgb, var(--color-accent) 26%, transparent);
+      --shadow-md:           0 4px 16px color-mix(in srgb, var(--color-ink) 12%, transparent);
+
+      --color-success:       #2e7d52;
+      --color-success-soft:  #e2efe8;
+
+      /* This topic's own construction-line encoding (DESIGN.md appendix §2/§3). Phase 1
+         rebuild (Module2-parity pass): `given` aliases --color-ink (the primary problem
+         statement); `result` is the one answer hue (the development pattern); `move`
+         (projectors, transfer lines) now aliases --color-ink-secondary instead of carrying
+         its own saturated violet — Module2 never gives an auxiliary construction mark its
+         own hue, it drops it to gray and carries the MEANING in dash pattern instead (see
+         renderConstruction.js's file header dash vocabulary). The retired violet value was
+         #7b4fb5. */
+      --color-construct-given:  var(--color-ink);
+      --color-construct-move:   var(--color-ink-secondary);
+      --color-construct-result: #1f8a4c;
+
+      /* 3D View step only (ADR-097/ADR-112 addenda) — canonical token per DESIGN.md §"solid-fill
+         is canonical", matches Module2/Foundations/every 3D topic's own solid colour. */
+      --color-solid-fill: #e7e1d4;
+
+      --space-1: 4px;  --space-2: 8px;  --space-3: 12px;
+      --space-4: 16px; --space-5: 24px; --space-6: 32px;
+
+      --radius-xs: 4px; --radius-sm: 6px; --radius-md: 10px;
+
+      --font-sans: "Atkinson Hyperlegible", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono", Consolas, "Liberation Mono", monospace;
+      --text-xs: 0.75rem; --text-sm: 0.875rem; --text-base: 1rem; --text-title: 1.35rem;
+
+      --dur-fast: 150ms; --dur-base: 200ms; --dur-step: 380ms;
+      --ease-standard: cubic-bezier(0.22, 1, 0.36, 1);
+
+      --z-term: 60;
+      --z-overlay: 120;
+      --z-notice: 100;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: var(--font-sans);
+      font-size: var(--text-base);
+      color: var(--color-ink);
+      background: var(--color-paper);
+      overflow: hidden;
+      font-variant-numeric: tabular-nums;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      text-rendering: optimizeLegibility;
+      display: flex;
+      flex-direction: row;
+      position: relative;
+    }
+    button { font: inherit; color: inherit; }
+    .sr-only {
+      position: absolute; width: 1px; height: 1px;
+      padding: 0; margin: -1px; overflow: hidden;
+      clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
+
+    /* ============================================================
+       Viewport — ONE canvas carries the whole plate (ADR-112 §1): front view, top
+       view/auxiliary circle, development, and transfer lines all on one continuous
+       sheet. main.js/renderConstruction.js are the only files that paint into it.
+       ============================================================ */
+    #sim-viewport {
+      position: relative;
+      flex: 1 1 0;
+      min-width: 0;
+      height: 100%;
+      background: var(--color-paper);
+      order: 1;
+    }
+    #construction-canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+    #construction-canvas:active { cursor: grabbing; }
+
+    /* 3D View (ADR-097/ADR-112 addenda) — fills the Compare card's stage (see the Compare
+       block below); main.js toggles the CARD's [hidden], not this element's. Own WebGL
+       canvas, own orbit controls, own rAF loop (view3d.js) — paused/torn down whenever the
+       card is hidden. */
+    #viewport-3d { position: absolute; inset: 0; background: var(--color-paper); touch-action: none; cursor: grab; }
+    #viewport-3d:active { cursor: grabbing; }
+    #viewport-3d canvas { display: block; width: 100%; height: 100%; }
+
+    /* Prism corner-numeral pills (labels3d.js, CSS2DObject) — same mono/ink/paper-knockout
+       token set as the 2D plate's own station numerals (renderConstruction.js paintNumeral),
+       ported verbatim from Module2/index.html's .vlabel so the two read as one annotation. */
+    .vlabel {
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      line-height: 1;
+      color: var(--color-ink);
+      background: color-mix(in srgb, var(--color-paper) 88%, transparent);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xs);
+      padding: 2px 5px;
+      white-space: nowrap;
+      user-select: none;
+    }
+
+    /* Hide/show the guided-steps wizard to enlarge the viewport (platform family
+       pattern). Floats over the canvas so it stays reachable in both states; main.js
+       toggles the body class. #sim-viewport is flex:1, so it reflows to fill the freed
+       space — main.js's paint() reads the canvas's live CSS size every frame, so no
+       separate resize handler is needed. */
+    .wizard-toggle {
+      position: absolute;
+      top: var(--space-3);
+      right: var(--space-3);
+      z-index: 5;
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      padding: 0;
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .wizard-toggle:hover { color: var(--color-ink); border-color: var(--color-ink-secondary); }
+    .wizard-toggle:active { transform: scale(0.97); }
+    .wizard-toggle__icon { width: 20px; height: 20px; transition: transform var(--dur-base) var(--ease-standard); }
+    body.wizard-collapsed #wizard { display: none; }
+    body.wizard-collapsed .wizard-toggle__icon { transform: rotate(180deg); }
+
+    .vp-hint {
+      /* Bottom-left, NOT this track's usual top-left (DESIGN.md appendix note) — the
+         compare-chip now owns top-left with host-chrome clearance, so the hint moved down
+         into the slot the removed onboarding toast vacated. Values match the two KTU
+         topics that already use bottom-left (graphics_module_1_topic_1_foundations /
+         _topic_2_spatial_framework). */
+      position: absolute; bottom: var(--space-4); left: var(--space-4);
+      padding: var(--space-2) var(--space-4);
+      border-radius: var(--radius-sm);
+      background: color-mix(in srgb, var(--color-paper) 88%, transparent);
+      border: 1px solid var(--color-border);
+      color: var(--color-ink-secondary);
+      font-size: var(--text-sm);
+      pointer-events: none;
+      z-index: 5;
+    }
+    /* Compare-split parks #rail-toggle in this same corner (min-height 44px + its own
+       --space-4 margin, see .rail-toggle below), so the hint steps above it there. Child
+       combinator is load-bearing: #compare-card's own small-pane .vp-hint (inside
+       #viewport-3d) lives INSIDE #sim-viewport too and must not be caught by this rule. */
+    body.compare-split #sim-viewport > .vp-hint {
+      bottom: calc(44px + var(--space-4) + var(--space-3));
+    }
+    #vp-empty {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: var(--space-3);
+      color: var(--color-ink-secondary);
+      pointer-events: none;
+      text-align: center;
+      padding: var(--space-6);
+    }
+    #vp-empty svg { width: 64px; height: 64px; opacity: 0.4; }
+    /* .vp-play-hint (the "Press Play…" toast + its #vp-play-hint markup) removed — it
+       duplicated the Step-3 panel's own copy next to the Play button. onboarding.js stays
+       byte-identical across all 10 Diploma topics (RULES §1.3/§1.4): its playHint()/
+       dismissHint() short-circuit cleanly on the missing #vp-play-hint element, so no JS
+       edit was needed. #vp-empty above is unrelated and still in use. */
+
+    /* Transient inline note (uiManager's "Kept N mm" on invalid entry). */
+    #flow-note {
+      position: absolute;
+      top: var(--space-4); left: 50%;
+      transform: translateX(-50%);
+      padding: var(--space-2) var(--space-4);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      font-size: var(--text-sm);
+      opacity: 0;
+      transition: opacity var(--dur-base) var(--ease-standard);
+      z-index: 5;
+    }
+    #flow-note.is-visible { opacity: 1; }
+
+    /* ============================================================
+       Compare view + docked 50/50 workbench (ADR-012 / ADR-037, narrowed by ADR-080 —
+       ported from graphics_module_3_topic_2_development_of_surfaces, roles REVERSED: this
+       topic's construction canvas (#sim-viewport) is already the primary pane, so the
+       Compare card holds the 3D solid instead of a 2D drawing — the peek at the actual
+       object beside its unrolled pattern, matching how Bhatt/K.C. John actually lay the
+       isometric pictorial and the construction out (see ../DECISIONS.md addendum). Compare
+       has exactly one shape platform-wide (ADR-080): the docked split, never a floating
+       card — do not reintroduce a `.compare-card[data-size="compact"]`/head-chrome variant.
+       ============================================================ */
+    .compare-chip {
+      position: absolute;
+      top: calc(44px + var(--space-3)); /* host-chrome clearance (DESIGN.md §5.12) — matches
+        Module2's .vp-cluster and this file's own .vp-hint; do not shrink to plain --space-3. */
+      left: var(--space-3); /* top-LEFT, matching platform convention (ADR-080/012/037 —
+        Module2's .vp-cluster #compare-chip is left-anchored); .wizard-toggle keeps the
+        top-right corner, so this mirrors it rather than stacking beside it. */
+      z-index: 5;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      min-height: 44px;
+      padding: 0 var(--space-3);
+      font-family: var(--font-sans);
+      font-size: 0.8125rem;
+      font-weight: 600;
+      line-height: 1;
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: 999px;
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .compare-chip[hidden] { display: none; }
+    .compare-chip svg { flex: none; width: 16px; height: 16px; }
+    .compare-chip:active { transform: scale(0.97); }
+    .compare-chip:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .compare-chip[aria-pressed="true"] {
+      background: var(--color-accent);
+      color: var(--color-paper);
+      border-color: var(--color-accent);
+    }
+
+    /* Compare card — static home is inside #sim-viewport (see the body markup); main.js's
+       enterWorkbench()/exitWorkbench() re-parents it to <body> and back. A plain flex
+       column / grid cell (ADR-080) — never position:absolute, never a transient overlay,
+       so it doesn't earn the Flat-Ink shadow exception. */
+    .compare-card {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+    }
+    .compare-card[hidden] { display: none; }
+    .compare-card__stage {
+      flex: 1 1 auto;
+      position: relative;
+      min-height: 0;
+      background: var(--color-paper);
+    }
+
+    /* The true 50/50: body flips from the wizard-beside-viewport flex row into a grid:
+         "compare view"   (minmax(0,1fr) row, two 1fr columns — 3D solid LEFT, 2D plate
+                            RIGHT, matching Bhatt's own side-by-side figure layout and every
+                            other Compare topic's 3D-left convention)
+         "rail  rail"      (auto row spanning both panes)
+       Compare has exactly one shape at every viewport width (ADR-080 — no floating/compact
+       fallback); the mobile @media block below restacks this SAME grid into a single
+       column instead of switching to a different Compare UI. */
+    body.compare-split {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: minmax(0, 1fr) auto;
+      grid-template-areas:
+        "compare view"
+        "rail rail";
+      background: var(--color-panel);
+      gap: var(--space-4);
+      padding: var(--space-4);
+    }
+    body.compare-split #sim-viewport {
+      grid-area: view;
+      min-width: 0;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      overflow: hidden;
+    }
+    body.compare-split #compare-card { grid-area: compare; }
+    body.compare-split #workbench-rail { grid-area: rail; }
+    /* The wizard collapses BY the split; the still-visible, pressed Compare chip in the
+       viewport is the split's only exit (ADR-080 — no separate head chrome on the card). */
+    body.compare-split #wizard { display: none; }
+    body.compare-split #wizard-toggle { display: none; }
+
+    /* Docked driver rail — spans both panes, hosts #given-fields (main.js re-parents it in
+       on enterWorkbench()) so the solid's dimensions stay adjustable while comparing it
+       against the pattern with the wizard collapsed. */
+    #workbench-rail { display: none; }
+    body.compare-split #workbench-rail {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: flex-start;
+      gap: var(--space-5);
+      padding: var(--space-4) var(--space-5);
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+    }
+    #workbench-rail .dock__group { flex: 1 1 260px; min-width: 220px; }
+
+    /* Rail hide/reveal toggle — independent of the wizard chevron (collapsing the rail
+       never exits the split). Claims grid-area:view so it floats at the viewport's
+       bottom-left corner, above the rail's top edge, in both open and collapsed states. */
+    .rail-toggle {
+      display: none;
+      position: relative;
+      align-items: center;
+      gap: var(--space-2);
+      z-index: 6;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0 var(--space-3);
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    body.compare-split #rail-toggle {
+      display: inline-flex;
+      grid-area: view;
+      align-self: end;
+      justify-self: start;
+      margin: var(--space-4);
+    }
+    .rail-toggle:active { transform: scale(0.97); }
+    .rail-toggle:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .rail-toggle__icon { width: 20px; height: 20px; flex: none; transition: transform var(--dur-base) var(--ease-standard); }
+    .rail-toggle__text { font-family: var(--font-sans); font-size: 0.8125rem; font-weight: 600; line-height: 1; }
+    body.rail-collapsed #workbench-rail { display: none !important; }
+    body.rail-collapsed .rail-toggle__icon { transform: rotate(180deg); }
+    body.compare-split.rail-collapsed {
+      grid-template-rows: minmax(0, 1fr);
+      grid-template-areas: "compare view";
+    }
+
+    /* Compare split, narrow viewport (ADR-080): no floating/bottom-sheet fallback — the
+       same docked split just restacks to a single column, the 3D solid on top, the 2D
+       plate under it, the rail at the bottom (mirrors the desktop left-to-right order). */
+    @media (max-width: 767px) {
+      body.compare-split {
+        grid-template-columns: 1fr;
+        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr) auto;
+        grid-template-areas: "compare" "view" "rail";
+      }
+      body.compare-split.rail-collapsed {
+        grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
+        grid-template-areas: "compare" "view";
+      }
+    }
+
+    /* ============================================================
+       Wizard dock (right)
+       ============================================================ */
+    #wizard {
+      order: 2;
+      flex: 0 0 auto;
+      width: clamp(340px, 34vw, 460px);
+      height: 100%;
+      background: var(--color-panel);
+      border-left: 1px solid var(--color-border);
+      display: flex;
+      flex-direction: column;
+      padding: var(--space-5) var(--space-4);
+      overflow: hidden;
+    }
+    .wizard-main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: row; gap: var(--space-4); }
+    #step-card {
+      flex: 1 1 auto; min-width: 0; order: 1;
+      display: flex; flex-direction: column;
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      padding: var(--space-5) var(--space-4);
+      padding-right: var(--space-3);
+      overflow-y: auto; overflow-x: hidden;
+    }
+    #step-card::-webkit-scrollbar { width: 10px; }
+    #step-card::-webkit-scrollbar-track { background: transparent; }
+    #step-card::-webkit-scrollbar-thumb { background: var(--color-border); background-clip: padding-box; border: 3px solid transparent; border-radius: 999px; }
+    @supports (-moz-appearance: none) { #step-card { scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; } }
+
+    .card__eyebrow-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+    .card__eyebrow { margin: 0 0 var(--space-1); font-family: var(--font-mono); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-ink-secondary); }
+    .card__title { margin: 0 0 var(--space-2); font-size: var(--text-title); line-height: 1.2; font-weight: 700; letter-spacing: -0.01em; }
+    .card__lead { margin: 0; max-width: 60ch; font-size: var(--text-sm); line-height: 1.55; color: var(--color-ink-secondary); }
+
+    /* Practice-problems entry (persistent, beside the eyebrow — platform family pattern). */
+    .library-entry {
+      flex: none; display: inline-flex; align-items: center; gap: var(--space-2);
+      min-height: 44px; margin-right: calc(var(--space-2) * -1); padding: 0 var(--space-2);
+      font: inherit; font-size: var(--text-sm); color: var(--color-ink-secondary);
+      background: transparent; border: 1px solid transparent; border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard);
+    }
+    .library-entry:active { transform: scale(0.97); }
+    .library-entry:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .library-entry__icon { flex: none; width: 18px; height: 18px; }
+
+    /* Active-problem header — a quiet paper card pinned above the wizard's step card
+       while a textbook problem is loaded (platform family pattern). */
+    #active-problem {
+      flex: 0 0 auto; display: flex; flex-direction: column; gap: var(--space-2);
+      padding: var(--space-3); background: var(--color-paper);
+      border: 1px solid var(--color-border); border-radius: var(--radius-md);
+      margin-bottom: var(--space-3);
+    }
+    #active-problem[hidden] { display: none; }
+    .active-problem__head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); }
+    .active-problem__eyebrow { margin: 0; font-family: var(--font-mono); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-ink-secondary); }
+    .active-problem__toggle { flex: none; }
+    .active-problem__statement { margin: 0; font-size: var(--text-sm); line-height: 1.5; color: var(--color-ink); }
+    #active-problem.is-collapsed .active-problem__statement { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .active-problem__hint-btn { align-self: flex-start; }
+    .active-problem__hints { padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm); background: var(--color-accent-soft); font-size: var(--text-sm); line-height: 1.5; color: var(--color-ink); }
+    .active-problem__hints[hidden] { display: none; }
+    .hint-steps { margin: 0; padding-left: var(--space-5); display: flex; flex-direction: column; gap: var(--space-2); }
+    .hint-steps li { padding-left: var(--space-1); animation: hintStepIn var(--dur-step) var(--ease-standard); }
+    @keyframes hintStepIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    #active-problem.is-collapsed .active-problem__hints, #active-problem.is-collapsed .active-problem__hint-btn { display: none; }
+    .active-problem__actions { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+    .match-status { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--text-sm); line-height: 1.4; color: var(--color-ink-secondary); }
+    .match-status--ok { color: var(--color-success); font-weight: 700; padding: var(--space-1) var(--space-2); background: var(--color-success-soft); border-radius: var(--radius-xs); }
+
+    .term { padding: 0; border: 0; background: none; cursor: help; color: var(--color-accent-strong); border-bottom: 1px dotted var(--color-accent-strong); font-size: inherit; line-height: inherit; }
+    .term__pop {
+      position: fixed; z-index: var(--z-term); max-width: 32ch; padding: var(--space-3);
+      font-size: var(--text-sm); line-height: 1.45; color: var(--color-ink);
+      background: var(--color-accent-soft); border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm); box-shadow: var(--shadow-md);
+      pointer-events: none; opacity: 0; visibility: hidden;
+      transform: translateY(4px) scale(0.96); transform-origin: top left;
+      transition: opacity var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard), visibility 0s linear var(--dur-fast);
+    }
+    .term.is-open .term__pop { opacity: 1; visibility: visible; transform: none; transition-delay: 0s; }
+
+    /* --- Step rail --- */
+    #step-rail { position: relative; flex: 0 0 auto; order: 2; width: 64px; margin: 0; padding: var(--space-2) 0; list-style: none; display: flex; flex-direction: column; justify-content: space-between; }
+    #step-rail::before { content: ""; position: absolute; left: 50%; top: 30px; bottom: 30px; width: 2px; transform: translateX(-50%); background: var(--color-border); }
+    .rail__item { position: relative; display: flex; }
+    .rail__btn { flex: 1 1 auto; min-width: 44px; display: flex; flex-direction: column; align-items: center; gap: var(--space-1); margin: 0; padding: var(--space-1) 0; border: 0; background: none; font: inherit; color: inherit; text-align: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .rail__btn:disabled { cursor: default; }
+    .rail__marker { width: 34px; height: 34px; display: grid; place-items: center; border: 1.5px solid var(--color-border); border-radius: 50%; background: var(--color-paper); font-family: var(--font-mono); font-size: var(--text-sm); font-weight: 700; color: var(--color-ink-secondary); transition: background var(--dur-base) var(--ease-standard), border-color var(--dur-base) var(--ease-standard), color var(--dur-base) var(--ease-standard), box-shadow var(--dur-base) var(--ease-standard), transform var(--dur-fast) var(--ease-standard); }
+    .rail__label { font-size: var(--text-xs); line-height: 1.2; color: var(--color-ink-secondary); max-width: 60px; }
+    .rail__item.is-upcoming .rail__marker { opacity: 0.5; }
+    .rail__item.is-upcoming .rail__label { opacity: 0.5; }
+    .rail__item.is-current .rail__marker { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-paper); box-shadow: 0 0 0 4px var(--color-accent-soft); }
+    .rail__item.is-current .rail__label { color: var(--color-ink); font-weight: 700; }
+    .rail__item.is-complete .rail__marker { background: var(--color-success); border-color: var(--color-success); color: var(--color-paper); }
+    .rail__item.is-complete .rail__label { color: var(--color-ink-secondary); }
+    .rail__btn:active:not(:disabled) .rail__marker { transform: scale(0.94); }
+    .rail__btn:focus-visible { outline: none; }
+    .rail__btn:focus-visible .rail__marker { box-shadow: var(--ring-focus); }
+
+    /* --- Per-step panels --- */
+    .step-panel { margin-top: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--color-border); }
+    .step-panel:first-of-type { border-top: 0; padding-top: 0; margin-top: var(--space-3); }
+
+    /* Construction picker (Step 1) — three solids, one column */
+    .construction-picker { display: grid; grid-template-columns: 1fr; gap: var(--space-3); margin-top: var(--space-2); max-width: 340px; }
+    .construction-picker__item {
+      min-height: 56px; padding: var(--space-3) var(--space-4);
+      border: 1px solid var(--color-border); border-radius: var(--radius-sm);
+      background: var(--color-paper); text-align: left; cursor: pointer;
+      font-size: var(--text-sm); line-height: 1.4;
+      transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard);
+    }
+    .construction-picker__item:active { transform: scale(0.97); }
+    .construction-picker__item[aria-pressed="true"] { background: var(--color-accent-soft); border-color: var(--color-accent); box-shadow: inset 0 0 0 1px var(--color-accent); }
+    .construction-picker__item:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+
+    /* Given-step dynamic fields (uiManager.js populates #given-fields) */
+    .dock__group { display: flex; flex-direction: column; gap: var(--space-3); }
+    .field { display: flex; flex-direction: column; gap: var(--space-1); }
+    .field__label { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-2); font-size: var(--text-sm); }
+    .field__name { color: var(--color-ink); }
+    .field__row { display: flex; align-items: center; gap: var(--space-3); min-height: 44px; }
+    .field__range { flex: 1 1 auto; min-width: 0; height: 44px; margin: 0; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; }
+    .field__range::-webkit-slider-runnable-track { height: 3px; border-radius: 999px; background: var(--color-track); }
+    .field__range::-moz-range-track { height: 3px; border-radius: 999px; background: var(--color-track); }
+    .field__range::-moz-range-progress { height: 3px; border-radius: 999px; background: var(--color-accent); }
+    .field__range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 14px; height: 14px; margin-top: -5.5px; border-radius: 50%; background: var(--color-accent); border: none; transition: box-shadow var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard); }
+    .field__range::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: var(--color-accent); border: none; transition: box-shadow var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard); }
+    .field__range:focus-visible { outline: none; }
+    .field__range:focus-visible::-webkit-slider-thumb, .field__range:active::-webkit-slider-thumb { background: var(--color-accent-strong); box-shadow: var(--ring-focus); }
+    .field__range:focus-visible::-moz-range-thumb, .field__range:active::-moz-range-thumb { background: var(--color-accent-strong); box-shadow: var(--ring-focus); }
+    .field__num { flex: 0 0 auto; width: 4.5rem; padding: var(--space-2); text-align: right; font-family: var(--font-mono); font-size: var(--text-sm); font-variant-numeric: tabular-nums; color: var(--color-ink); background: var(--color-paper); border: 1px solid var(--color-border); border-radius: var(--radius-xs); transition: border-color var(--dur-fast) var(--ease-standard), box-shadow var(--dur-fast) var(--ease-standard); }
+    .field__num:focus { outline: none; border-color: var(--color-accent); box-shadow: var(--ring-focus); }
+    .field__unit { flex: 0 0 auto; width: 2.4ch; font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-ink-secondary); }
+
+    /* Construct step */
+    .construct-actions { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); }
+
+    /* Verify step */
+    .result-panel { display: flex; flex-direction: column; gap: var(--space-4); }
+    .result-block__eyebrow { margin: 0 0 var(--space-1); font-family: var(--font-mono); font-size: var(--text-xs); text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-ink-secondary); }
+    .result-given { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: var(--space-1); }
+    .result-given li { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); font-size: var(--text-sm); }
+    .result-given__label { color: var(--color-ink-secondary); }
+    .result-given__value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+    #result-text { font-family: var(--font-mono); font-size: var(--text-sm); font-variant-numeric: tabular-nums; margin: 0; padding: var(--space-3); background: var(--color-panel); border: 1px solid var(--color-border); border-radius: var(--radius-sm); }
+    #result-warning { margin: 0; padding: var(--space-3); background: var(--color-accent-soft); border: 1px solid color-mix(in srgb, var(--color-accent) 25%, var(--color-border)); border-radius: var(--radius-sm); font-size: var(--text-sm); }
+    .result-principle { margin: 0; font-size: var(--text-sm); line-height: 1.55; color: var(--color-ink-secondary); }
+    .verify-actions { display: flex; flex-direction: column; gap: var(--space-2); padding-top: var(--space-1); }
+
+    /* --- Buttons --- */
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2); min-height: 44px; padding: var(--space-3) var(--space-4); border-radius: var(--radius-sm); border: 1px solid var(--color-border); background: var(--color-paper); color: var(--color-ink); font-size: var(--text-base); font-weight: 400; cursor: pointer; transition: border-color var(--dur-fast) var(--ease-standard), background var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard); }
+    .btn:active:not(:disabled) { transform: scale(0.97); }
+    .btn:disabled { opacity: 0.55; cursor: default; }
+    .btn--primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-panel); }
+    .btn--primary:hover:not(:disabled) { background: var(--color-accent-strong); border-color: var(--color-accent-strong); }
+    .btn--ghost { min-height: 36px; padding: 0 var(--space-3); font-size: var(--text-sm); font-weight: 400; color: var(--color-ink-secondary); background: transparent; border-color: transparent; }
+    .btn--block { width: 100%; }
+    :where(button, [tabindex]):focus-visible { outline: none; box-shadow: var(--ring-focus); }
+
+    /* --- Card navigation (Back / Next) --- */
+    .card__nav { margin-top: auto; padding-top: var(--space-4); display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); }
+    .card__nav-next { display: flex; align-items: center; gap: var(--space-2); }
+    .card__nav #btn-next { margin-left: auto; }
+    #reset-control { margin-right: auto; }
+    .card__nav.is-reset-armed #btn-back,
+    .card__nav.is-reset-armed #btn-next,
+    .card__nav.is-reset-armed #btn-finish { display: none; }
+    .reset-confirm { display: flex; align-items: center; flex-wrap: wrap; gap: var(--space-1) var(--space-2); font-size: var(--text-sm); animation: resetConfirmIn var(--dur-fast) var(--ease-standard); }
+    .reset-confirm[hidden] { display: none; }
+    .reset-confirm__prompt { color: var(--color-ink); }
+    .reset-confirm__sep { color: var(--color-bench-grey); user-select: none; }
+    .reset-confirm .reset-confirm__action { min-height: 44px; padding: 0 var(--space-2); }
+    @keyframes resetConfirmIn { from { opacity: 0; } to { opacity: 1; } }
+
+    /* ============================================================
+       Textbook Problem Library — full-viewport overlay (matches the platform family).
+       ============================================================ */
+    .problem-library {
+      position: fixed; inset: 0; z-index: var(--z-overlay);
+      display: flex; flex-direction: column;
+      background: var(--color-paper);
+      box-shadow: var(--shadow-md);
+    }
+    .problem-library[hidden] { display: none; }
+    @keyframes libraryIn { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: none; } }
+    .problem-library:not([hidden]) { animation: libraryIn var(--dur-step) var(--ease-standard); }
+    .problem-library__header { flex: none; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-5); border-bottom: 1px solid var(--color-border); }
+    .problem-library__title { margin: 0; font-size: var(--text-title); font-weight: 700; line-height: 1.2; letter-spacing: -0.01em; color: var(--color-ink); }
+    .problem-library__close { flex: none; width: 44px; height: 44px; display: grid; place-items: center; padding: 0; color: var(--color-ink-secondary); background: var(--color-panel); border: 1px solid var(--color-border); border-radius: var(--radius-sm); cursor: pointer; transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), color var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard); }
+    .problem-library__close:active { transform: scale(0.97); }
+    .problem-library__close:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .problem-library__close svg { width: 20px; height: 20px; }
+    .problem-library__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: var(--space-5); padding-right: var(--space-3); }
+    .problem-library__body::-webkit-scrollbar { width: 10px; }
+    .problem-library__body::-webkit-scrollbar-track { background: transparent; }
+    .problem-library__body::-webkit-scrollbar-thumb { background: var(--color-border); background-clip: padding-box; border: 3px solid transparent; border-radius: 999px; }
+    @supports (-moz-appearance: none) { .problem-library__body { scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; } }
+    .problem-library__inner { max-width: 760px; margin: 0 auto; }
+
+    .problem-group { margin: 0 0 var(--space-6); }
+    .problem-group__title { margin: 0 0 var(--space-1); font-size: var(--text-xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.07em; color: var(--color-ink-secondary); }
+    .problem-group:first-of-type .problem-group__title { margin-top: 0; }
+    .problem-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: var(--space-3); margin-top: var(--space-3); }
+    .problem-card {
+      display: flex; flex-direction: column; gap: var(--space-1);
+      min-height: 44px; padding: var(--space-3) var(--space-4);
+      text-align: left; color: var(--color-ink);
+      background: var(--color-paper); border: 1px solid var(--color-border); border-radius: var(--radius-md);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard), border-color var(--dur-fast) var(--ease-standard), transform var(--dur-fast) var(--ease-standard);
+    }
+    .problem-card:active { transform: scale(0.97); }
+    .problem-card:focus-visible { outline: none; border-color: var(--color-accent); box-shadow: var(--ring-focus); }
+    .problem-card.is-active { border-color: var(--color-accent); background: var(--color-accent-soft); }
+    .problem-card__statement { font-size: var(--text-sm); line-height: 1.4; }
+
+    /* ============================================================
+       Mobile advisory
+       ============================================================ */
+    #mobile-notice { position: fixed; left: var(--space-4); right: var(--space-4); bottom: var(--space-4); z-index: var(--z-notice); display: flex; align-items: center; justify-content: space-between; gap: var(--space-4); padding: var(--space-3) var(--space-4); background: var(--color-panel); border: 1px solid var(--color-border); border-radius: var(--radius-md); box-shadow: var(--shadow-md); }
+    #mobile-notice .notice__text { margin: 0; font-size: var(--text-sm); }
+    .notice__dismiss { flex: 0 0 auto; min-height: 40px; padding: var(--space-2) var(--space-3); border: 1px solid var(--color-border); border-radius: var(--radius-sm); background: var(--color-paper); cursor: pointer; }
+
+    /* ============================================================
+       Boot fallback
+       ============================================================ */
+    .sim-fallback { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; padding: var(--space-6); background: var(--color-paper); }
+    .sim-fallback__inner { max-width: 30rem; text-align: center; }
+    .sim-fallback__icon { width: 48px; height: 48px; color: var(--color-bench-grey); margin-bottom: var(--space-4); }
+    .sim-fallback__title { font-size: var(--text-title); margin: 0 0 var(--space-3); }
+    .sim-fallback__body { color: var(--color-ink-secondary); line-height: 1.5; margin: 0 0 var(--space-5); }
+
+    /* ============================================================
+       Reduced motion (§4.13)
+       ============================================================ */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+    }
+
+    @media (max-width: 767px) {
+      #wizard { width: 300px; }
+      .wizard-main { flex-direction: column; }
+      #step-card { order: 1; flex: 1 1 auto; min-height: 0; }
+      #step-rail { order: 2; flex: 0 0 auto; flex-direction: row; width: 100%; padding: var(--space-3) 0 0; }
+      #step-rail::before { left: 30px; right: 30px; top: calc(var(--space-3) + 17px); bottom: auto; width: auto; height: 2px; transform: translateY(-50%); }
+      .construction-picker { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <!-- Boot/runtime failure fallback. role="alert" so AT announces it. -->
+  <div id="sim-fallback" class="sim-fallback" role="alert" hidden>
+    <div class="sim-fallback__inner">
+      <svg class="sim-fallback__icon" viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M24 8 40 17 24 26 8 17Z" />
+        <path d="M40 17V31L24 40 8 31V17" />
+        <path d="M8.5 8.5 39.5 39.5" />
+      </svg>
+      <h1 class="sim-fallback__title">We could not load the simulation</h1>
+      <p class="sim-fallback__body">It looks like the page did not finish starting up. Check your connection, then reload to try again.</p>
+      <button type="button" class="btn btn--primary" id="sim-fallback-reload">Reload the simulation</button>
+    </div>
+  </div>
+
+  <!-- Mobile advisory. Hidden until confirmed a < 768px viewport (inline chrome script). -->
+  <aside id="mobile-notice" role="status" hidden>
+    <p class="notice__text">Best experienced on desktop.</p>
+    <button id="mobile-notice-dismiss" class="notice__dismiss" type="button">Dismiss</button>
+  </aside>
+
+  <!-- ============================================================
+       Viewport — the construction canvas. main.js/renderConstruction.js paint the front
+       view, top view, and development onto this ONE surface (ADR-112 §1); nothing else
+       touches it.
+       ============================================================ -->
+  <main id="sim-viewport" aria-label="Construction drawing area.">
+    <button id="wizard-toggle" class="wizard-toggle" type="button" aria-controls="wizard" aria-expanded="true" title="Hide steps panel">
+      <svg class="wizard-toggle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M9 6l6 6-6 6" />
+      </svg>
+      <span class="sr-only">Toggle steps panel</span>
+    </button>
+
+    <!-- Compare chip (ADR-012/037/080): opens/toggles the 3D solid pane (the Compare card
+         below). aria-pressed mirrors the card's open state. Hidden until a construction is
+         chosen (main.js) — there is no solid to peek at before then. -->
+    <button id="compare-chip" class="compare-chip" type="button" aria-pressed="false" hidden>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 16.5V7.5L12 3 3 7.5v9L12 21l9-4.5Z" /><path d="M3 7.5 12 12l9-4.5M12 12v9" />
+      </svg>
+      <span class="chip__label">Compare 3D solid</span>
+    </button>
+
+    <canvas id="construction-canvas" role="img" aria-label="Development construction drawing"></canvas>
+
+    <!-- Compare card (ADR-012/037/080) — the docked 3D "solid" pane. Static home is here,
+         inside #sim-viewport; main.js's enterWorkbench()/exitWorkbench() re-parents it to
+         <body> (the compare-split grid) and back. view3d.js mounts its renderer's own
+         canvas into the stage; own WebGL context, own orbit controls, own rAF loop —
+         paused/torn down whenever the card is hidden. -->
+    <div id="compare-card" class="compare-card" role="region" aria-label="Compare: the solid itself" hidden>
+      <div class="compare-card__stage">
+        <div id="viewport-3d" role="img" aria-label="3D preview of the chosen solid">
+          <p class="vp-hint">Drag to orbit · Scroll to zoom</p>
+        </div>
+      </div>
+    </div>
+
+    <p class="vp-hint">Scroll to zoom · Drag to pan · Double-click to reset view</p>
+
+    <div id="vp-empty">
+      <svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true">
+        <circle cx="24" cy="24" r="18" />
+        <path d="M24 6 L24 12 M24 36 L24 42 M6 24 L12 24 M36 24 L42 24" />
+      </svg>
+      <p>Choose a solid to begin.</p>
+    </div>
+
+    <p id="flow-note" hidden></p>
+  </main>
+
+  <!-- Docked driver rail for the Compare workbench split (ADR-037). A direct child of
+       <body> so it can be the grid's full-width bottom row under body.compare-split; stays
+       display:none until the split is on. main.js re-parents #given-fields into it on
+       enterWorkbench() and restores it on exitWorkbench(). -->
+  <div id="workbench-rail" role="group" aria-label="Given dimensions"></div>
+
+  <!-- Rail hide/reveal toggle: a direct <body> child, NOT a child of #workbench-rail — a
+       child would vanish along with the rail on collapse and become impossible to reveal
+       again. Only visible while body.compare-split is active; claims grid-area:view (the
+       2D pane) so it floats at the viewport's bottom-left, above the rail, in both open and
+       collapsed states. Independent of #wizard-toggle: collapsing the rail never exits the
+       split. -->
+  <button id="rail-toggle" class="rail-toggle" type="button" aria-controls="workbench-rail" aria-expanded="true" aria-label="Hide controls" title="Hide controls">
+    <svg class="rail-toggle__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M6 9l6 6 6-6" />
+    </svg>
+    <span class="rail-toggle__text">Hide</span>
+  </button>
+
+  <!-- ============================================================
+       Wizard — the four-step shape (Choose / Given / Construct / Verify).
+       ============================================================ -->
+  <aside id="wizard" aria-label="Guided steps">
+    <!-- Active-problem header: shown only while a textbook problem is loaded. -->
+    <section id="active-problem" aria-label="Current problem" hidden>
+      <div class="active-problem__head">
+        <p class="active-problem__eyebrow">Textbook problem</p>
+        <button id="active-problem-toggle" class="btn btn--ghost active-problem__toggle" type="button" aria-expanded="true">Hide text</button>
+      </div>
+      <p class="active-problem__statement" id="active-problem-statement"></p>
+      <button id="active-problem-hint-btn" class="btn btn--ghost active-problem__hint-btn" type="button" hidden>Need a hint?</button>
+      <div class="active-problem__hints" id="active-problem-hints" hidden>
+        <ol class="hint-steps" id="active-problem-hint-list"></ol>
+      </div>
+      <div class="active-problem__actions">
+        <p class="match-status" id="active-problem-status"></p>
+        <button id="exit-problem" class="btn btn--ghost" type="button">Exit problem</button>
+      </div>
+    </section>
+
+    <div class="wizard-main">
+      <ol id="step-rail" aria-label="Construction steps">
+        <li class="rail__item" data-step="1"><button type="button" class="rail__btn"><span class="rail__marker" aria-hidden="true">1</span><span class="rail__label">Choose</span></button></li>
+        <li class="rail__item" data-step="2"><button type="button" class="rail__btn"><span class="rail__marker" aria-hidden="true">2</span><span class="rail__label">Given</span></button></li>
+        <li class="rail__item" data-step="3"><button type="button" class="rail__btn"><span class="rail__marker" aria-hidden="true">3</span><span class="rail__label">Construct</span></button></li>
+        <li class="rail__item" data-step="4"><button type="button" class="rail__btn"><span class="rail__marker" aria-hidden="true">4</span><span class="rail__label">Verify</span></button></li>
+      </ol>
+
+      <section id="step-card">
+        <div class="card__eyebrow-row">
+          <p class="card__eyebrow">Step <span id="step-current">1</span> of <span id="step-total">4</span></p>
+          <button id="btn-open-problems" class="library-entry" type="button" aria-haspopup="dialog">
+            <svg class="library-entry__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5Z" />
+              <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5A1.5 1.5 0 0 1 20 20.5Z" />
+            </svg>
+            <span>Practice problems</span>
+          </button>
+        </div>
+        <h2 class="card__title" id="step-title"></h2>
+        <p class="card__lead" id="step-lead"></p>
+
+        <!-- Step 1 — the picker. -->
+        <div class="step-panel" data-step="1">
+          <p class="card__lead">
+            The <span class="term" data-term="development" tabindex="0">development<span class="term__pop"></span></span>
+            of a solid is the true-size flat pattern obtained by unrolling its surface — every
+            line on it must be a TRUE length. Prisms and cylinders unroll by the
+            Parallel-Line method: a <span class="term" data-term="stretch-out line" tabindex="0">stretch-out line<span class="term__pop"></span></span>
+            equal to the base perimeter (or circumference), with true-height
+            <span class="term" data-term="fold line" tabindex="0">fold lines<span class="term__pop"></span></span>
+            marking each corner or <span class="term" data-term="generator" tabindex="0">generator<span class="term__pop"></span></span>.
+          </p>
+          <div class="construction-picker" role="group" aria-label="Three developments">
+            <button type="button" class="construction-picker__item" data-construction-id="prism" aria-pressed="false">Rectangular Prism</button>
+            <button type="button" class="construction-picker__item" data-construction-id="cylinder" aria-pressed="false">Cylinder</button>
+            <button type="button" class="construction-picker__item" data-construction-id="elbow" aria-pressed="false">Two-Piece 90° Elbow</button>
+          </div>
+        </div>
+
+        <!-- Step 2 — Given. Compare chip (viewport chrome) opens the 3D solid alongside
+             this dock at any step, ADR-012/037/080 — no separate "view the solid" step. -->
+        <div class="step-panel" data-step="2" hidden>
+          <div class="dock__group" id="given-fields"></div>
+        </div>
+
+        <!-- Step 3 — Construct. -->
+        <div class="step-panel" data-step="3" hidden>
+          <div class="construct-actions">
+            <button type="button" class="btn btn--primary btn--block" id="btn-play-construction">Play construction</button>
+            <p class="card__lead">Press Play to watch the front view, top view, and development draw together.</p>
+          </div>
+        </div>
+
+        <!-- Step 4 — Verify. -->
+        <div class="step-panel" data-step="4" hidden>
+          <div class="result-panel">
+            <div class="result-block">
+              <p class="result-block__eyebrow">You built</p>
+              <ul id="result-given" class="result-given"></ul>
+            </div>
+
+            <p id="result-text"></p>
+            <p id="result-warning" hidden></p>
+
+            <div class="result-block">
+              <p class="result-block__eyebrow">Why it works</p>
+              <p id="result-principle" class="result-principle"></p>
+            </div>
+
+            <div class="verify-actions">
+              <button type="button" class="btn btn--primary btn--block" id="btn-verify-restart">Choose another solid</button>
+              <button type="button" class="btn btn--block" id="btn-verify-problems">Try it as a problem</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="card__nav">
+          <div id="reset-control">
+            <button id="btn-reset" class="btn btn--ghost" type="button">Reset</button>
+            <div id="reset-confirm" class="reset-confirm" role="group" aria-label="Reset confirmation" hidden>
+              <span class="reset-confirm__prompt">Reset everything?</span>
+              <span class="reset-confirm__sep" aria-hidden="true">·</span>
+              <button id="btn-reset-yes" class="btn btn--ghost reset-confirm__action" type="button" aria-label="Yes, reset everything">Yes</button>
+              <span class="reset-confirm__sep" aria-hidden="true">/</span>
+              <button id="btn-reset-cancel" class="btn btn--ghost reset-confirm__action" type="button" aria-label="Cancel reset">Cancel</button>
+            </div>
+          </div>
+          <div class="card__nav-next">
+            <button type="button" class="btn" id="btn-back" hidden>Back</button>
+            <button type="button" class="btn btn--primary" id="btn-next" disabled>Next</button>
+            <button type="button" class="btn btn--primary" id="btn-finish" hidden disabled>Finish lesson</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <!-- Textbook Problem Library — full-viewport overlay (ADR-015 pattern). -->
+  <div id="problem-library" class="problem-library" role="dialog" aria-modal="true" aria-labelledby="problem-library-title" hidden>
+    <header class="problem-library__header">
+      <h1 class="problem-library__title" id="problem-library-title">Practice problems</h1>
+      <button id="problem-library-close" class="problem-library__close" type="button" aria-label="Close practice problems">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18" /></svg>
+      </button>
+    </header>
+    <div class="problem-library__body">
+      <div id="problem-library-list" class="problem-library__inner"></div>
+    </div>
+  </div>
+
+  <!-- Live region for state narration (screen readers). -->
+  <div id="sim-status" class="sr-only" role="status" aria-live="polite"></div>
+
+  <script type="module" src="./src/main.js"></script>
+
+  <!-- Inline chrome wiring: mobile-notice dismiss only. -->
+  <script>
+    (function () {
+      var dismiss = document.getElementById('mobile-notice-dismiss');
+      var notice = document.getElementById('mobile-notice');
+      function checkWidth() { if (notice) notice.hidden = window.innerWidth >= 768; }
+      dismiss && dismiss.addEventListener('click', function () { if (notice) notice.hidden = true; });
+      window.addEventListener('resize', checkWidth);
+      checkWidth();
+    })();
+  </script>
+</body>
+</html>

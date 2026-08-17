@@ -1,0 +1,6 @@
+{
+  "title": "Spiral Curves",
+  "description": "One radius vector sweeping about a fixed pole, two growth laws — a fixed amount per radian (Archimedean) or a fixed ratio per equal angle step (logarithmic) — built from one shared engine with a toggle to compare them directly, then verified with the tangent and normal at any point.",
+  "difficulty": "intermediate",
+  "tags": ["diploma-engineering-graphics", "spiral-curves", "archimedean-spiral", "logarithmic-spiral", "guided-stepper", "2d-svg"]
+}

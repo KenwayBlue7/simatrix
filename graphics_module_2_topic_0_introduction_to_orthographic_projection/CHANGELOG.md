@@ -8,6 +8,9 @@
   same object in first angle, one press at a time. Scaffolded from
   `graphics_module_4_topic_2_isometric_construction` per RULES.md §1.15 — the nearest sibling, and
   the only one already carrying an SVG first-angle sheet and a named-direction camera rig.
+  **Note (2026-08-07, merge):** that sibling topic is not yet in this repo — it shipped on
+  `feat/mod4` only as a dangling gitlink, excluded from the merge; see `DECISIONS.md` ADR-142.
+  This attribution stands, it just cannot be followed to a real path yet.
 - **Added** `src/objectData.js`, the single place an object is described: 3D part specs, the three
   views as layered 2D linework, the aligned dimensions, and the Step-1 copy per direction. Its
   header states the four coordinate frames once, and the two sign flips in them **are** first-angle

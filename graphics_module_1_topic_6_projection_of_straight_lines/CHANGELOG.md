@@ -1,5 +1,112 @@
 # Changelog — Projection of Straight Lines
 
+## 2026-08-05 — Discrete step-through for True Length & Angles / Traces (ports Module 2's Show Method pattern)
+- Added: `src/constructionStepper.js` — a thin Next/Back adapter over `trueLength.js`/`traces.js`'s existing `animate(p)` contract, modelled on Module 2's `methodController.js` (one int of local state, Next/Back, a caption sync, no read-back into the leaf). Unlike Module 2's Show Method, no snapshot/harvest step is needed: `animate(p)` is already a pure, idempotent function of `p`, so stepping is just calling it with a discrete `t` instead of a ramping one.
+- Added: `phases` arrays on the leaf object returned by `createTrueLength()`/`createTraces()` — per-construction breakpoint tables (`{t, caption}`) along each leaf's own existing animation domain (trueLength.js's `G/TL_N` or `G/TL2_N`; traces.js's `prog` 0–1 directly), not a shared cross-file constant (ADR-094 in Module 2 flagged exactly that hazard — ours can't drift since each leaf owns its own table). Captions grounded verbatim in True Length.pdf Art 10-8 (figs 10-15/10-16/10-17 Method I, figs 10-18/10-19 Method II), Traces.pdf Art 10-10/10-11 (figs 10-23–10-26), and Inclined to Both.pdf Art 10-5/10-6 (α/β apparent-angle wording) — 12 stops for True-Length Method I, 8 for Method II, 3/side for Traces Method I, 4/side for Traces Method II. A side with no real trace (`htReason`/`vtReason !== 'trace'`) folds its reason into that side's own first-stop slot instead of a separate stop, reusing the file's existing "NO H.T."/"NO TRACE"/"AB IN HP" wording.
+- Added: `main.js` — `stepCon(dir)` (cancels the continuous rAF ramp, lazily builds a `constructionStepper` on the first Next/Back click) and `ensureConNav()` (a caption + Back/Next row built once inside `#con-dock`, re-appended on every `enterCon()` so it always lands after whichever launcher is docked). `runCon()` itself — the continuous auto-play path every existing caller (including the `prefersReducedMotion` snap-to-`animate(1)` branch) depends on — is untouched; `replayCon()` (the launcher's own "click again to restart" behavior) now also drops any live step session back to continuous mode.
+- Changed: `index.html` — `.con-nav`/`.con-nav__caption`/`.con-nav__btns` CSS for the new row. Deliberately not reusing the `.ctrl` class the True Length/Traces launcher wrappers use — `#con-dock .ctrl[hidden]{display:flex!important}` (so a stray reset can't re-hide a docked launcher) would otherwise fight the nav row's own `hidden` toggle.
+- Changed (polish, found while smoke-testing): two Method II caption pairs (`trueLength.js`'s "Join the two perpendiculars' far ends…" and `traces.js`'s "Erect the second perpendicular, completing the trapezoid.") read byte-identical between their top-view and front-view stops. Harmless functionally (each still lands on the correct geometry), but confusing side-by-side — added "on the top view"/"on the front view" qualifiers to disambiguate.
+- Verified: headless Edge via raw CDP (no browser extension available this session, so driven directly over the Node 22+ built-in `WebSocket`/`fetch` rather than Claude-in-Chrome) — 14/14 scripted checks: forward/back navigation lands on the correct caption at each stop for True-Length Method I (default line) and Method II (θ=φ=45°, forced via the θ/φ inputs), Traces Method II (same forced line), and the fold-in case (θ=0°, φ=30° — line parallel to the H.P., verified the "no H.T." caption appears at stop 1 and the V.T. side still walks its normal 3 stops); Back/Next disable correctly at the first/last stop; zero console/runtime exceptions across the whole session. Screenshots confirm the on-screen geometry matches the caption at several stops (a mid-construction True-Length Method I frame, the completed Method II trapezoid pair with α/β/θ/φ all visible, and the fold-in case showing "NO H.T." struck through on the top view alongside a fully-drawn V.T. construction on the front view).
+
+## 2026-08-04 — True-Length no-op fixed; apparent angles (α/β) drawn; dead validity check removed
+- Fixed: `createTrueLength()`'s Method I rotating-line construction (`src/trueLength.js`) ran its full 9000ms animation even at the default θ=φ=0 state, where both views are already true length and the rotation locus sweeps zero radians — 9 seconds of visibly nothing. Now gates on `layout2D()`'s existing `fvTrue`/`tvTrue` flags (previously computed but unused by this module) and returns a 400ms duration when both are true; every genuinely inclined case (45/45, one-incline, perp-HP/VP, Method II) keeps the full duration, unchanged.
+- Added: α/β (apparent angles of inclination, Inclined_to_Both.pdf Art 10-5 fig. 10-13 — "always ≥ θ/φ") now drawn as a second, wider arc nested at the same pivot as θ/φ, in both the Method I and Method II branches of `src/trueLength.js`. The direction was already sitting unused in scope (`startB`/`startA` in Method I — the original unrotated view's own angle; the raw `P→Q` segment angle in Method II) — no new trig, just a second arc + label reusing the existing pattern. `lineData.js`'s `alpha`/`beta` (computed since the original topic build, never consumed anywhere — confirmed by grep) now finally reach the screen.
+- Fixed (found while verifying the above via headless Chrome, not by inspection): the new α/β labels were positioned via `bisectorAnchor(pivot, angle, R * 1.4)`, where `R` (`PLACEMENT.sheet2D.angleRadius`) is an `{x,y}` object — `R * 1.4` silently evaluates to `NaN`, so the labels rendered at `NaN` coordinates (invisible, no thrown error; the analytic/stub test harness couldn't catch this because its `bisectorAnchor` stub ignores its arguments). Fixed to `{ x: R.x * 1.4, y: R.y * 1.4 }`. Caught only by actually looking at the headless screenshot, not by the "zero console errors" check — logged as a reminder that a clean console does not mean a correct render.
+- Fixed (same verification pass): `resolveLine()`'s `valid` flag (`src/lineData.js`) — `lat2 >= 0` — flips to `false` at floating-point noise (~1e-13, an order of magnitude below any real invalid margin) right at the exact θ+φ=90° boundary (e.g. θ=75°, φ=15°, both integer-slider-reachable), because `sin²θ+sin²φ` can land fractionally above 1 there even though the trig identity says it's exactly 1. Previously harmless since nothing read `valid`; now that F8 (below) wires it into the UI, an unpatched boundary would have shown a spurious "θ+φ must stay ≤90°" warning at a perfectly valid angle pair. Added an `eps*TL²` tolerance (reusing the module's existing `1e-6` epsilon convention). Verified equivalence with the old check across a 361-point grid (0–90° in 5° steps on each axis, both axes) post-fix — no inversions.
+- Removed: `uiManager.js:165`'s duplicate `(data.theta + data.phi) > 90` validity check — proved algebraically equivalent to `lineData.js`'s `valid` flag (`sin²θ+sin²φ≤1 ⟺ θ+φ≤90°` for θ,φ∈[0°,90°], via the `sin²+cos²=1` identity at the boundary plus strict monotonicity) before deleting, not just assumed. Routed through a new `simController.isValid()` (`main.js`) rather than importing `lineData.js` into `uiManager.js` directly — RULES.md §3.6 only names `genericSolid.js`-style pure-math modules as the cross-leaf-import exception, and `lineData.js` isn't on that list, so the orchestrator stays the one place leaves meet.
+- Verified: analytic case matrix (θ=φ=0 duration gate across 7 cases, α≥θ/β≥φ + arc-direction-matches-resolved-value across 5 cases including asymmetric ones, F8's grid re-proof through the real `resolveLine()` — 28 assertions total, all passing) + the existing 97-assertion trace regression suite (unaffected, still 97/97) + a Method-I/Method-II runtime smoke test (7 cases, no throw, correct duration per case) + headless Chrome via CDP (ADR-019): clean boot, zero console errors across two independent page loads, screenshots confirm the default state completes near-instantly (not mid-rotation) and the α/β arcs render as a visibly distinct outer arc with correct values (α=41° vs θ=25°, β=58° vs φ=50°, at TL=90/θ=25°/φ=50°).
+- Noted, not fixed (orthogonal to this pass): re-entering a construction (e.g. True Length & Angles) a second time within the same page session, right after changing sliders, intermittently failed to repaint on the 2D sheet in headless Chrome even though `conMode`/the button label updated correctly — only ever reproduced across two `enterCon()` calls in one uninterrupted session; a fresh page load each time (the two-run headless test above) never showed it. Not touched by this diff (no F6/F7/F8 code path change explains it) and not confirmed as user-reachable; flagging for awareness, not claiming it as a bug.
+
+## 2026-08-04 — In-plane traces distinguished from "no trace"; explicit callouts added
+- Fixed: `computeTraces()` (`src/sheet2DLayout.js`) reported `noHT`/`noVT` for two physically different situations with no way to tell them apart — a line genuinely parallel to a plane at a nonzero offset (Art 10-9(i), correctly no trace) and a line lying WHOLLY in that plane (θ=0 or φ=0 combined with a zero HP/VP offset — every point of AB is common to the line and the plane, so there's no single trace point, a third outcome distinct from both "a real trace" and "no trace"). Both collapsed onto the same `xAtY`/`yAtX` null-guard. Affects the shipped **`ln-incl-vp-2`** problem (θ=0, aHP=0) on its HT side; no other shipped problem is affected (checked all 12). Confirmed the existing single-end-in-plane case (fig. 10-22(i), e.g. `ln-incl-both-simple`) was already correct and is unchanged.
+- Added: `htReason`/`vtReason` fields on `computeTraces()`'s return, one of `'trace' | 'parallel' | 'inPlane'` per side — same discriminator pattern as F1/ADR-110's `method` field, not a bare boolean.
+- Changed: `src/traces.js` — where `noHT`/`noVT` used to draw nothing, now shows a reason-driven callout: **"NO TRACE"** when both sides are genuinely parallel (fig. 10-20(i)), else per-side **"NO H.T."** / **"NO V.T."** (figs. 10-20(ii)/(iii), 10-21), or **"AB IN HP"** / **"AB IN VP"** for the in-plane case (this topic's own "line AB" convention — no textbook figure in the excerpted pages covers that exact degenerate combo). The point-view coincidence case (F2) now also labels its absent side instead of silently showing nothing there.
+- Verified: extended the same analytic script (97/97 passing, up from 59) — `ln-incl-vp-2`'s exact case, the VP mirror, the both-in-plane edge case (all four offset sliders at zero), the single-end-in-plane regression guard, and a check that exactly one shipped problem gets an `inPlane` reason. Runtime smoke test (no throw) across the callout paths. Headless Chrome via CDP (ADR-019): clean boot, zero console errors driving all five case-matrix configurations through the Traces launcher. Screenshots of `ln-incl-vp-2` and `ln-parallel-both` confirm the callouts render at the correct on-screen location with the correct text.
+
+## 2026-08-04 — Art 10-8 Method II; θ+φ=90° traces fixed (ADR-110)
+- Fixed: `computeTraces()` (`src/sheet2DLayout.js`) put HT/VT off by the full `aVP`/`aHP` offset whenever a line's projections were both ⟂ xy (θ+φ=90°, Art 10-7's profile-plane case — e.g. TL 60, θ=45°, φ=45°, both traces analytically land ON xy). Art 10-11 requires Method II there; Method I's null-fallback silently substituted the wrong coordinate instead. Point-view traces (line ⟂ HP/VP, Art 10-9) are unchanged and now branch explicitly rather than sharing that fallback by accident.
+- Added: `trapezoid()` + `methodII()`, pure exports on `sheet2DLayout.js` — Art 10-8 Method II (True Length.pdf figs. 10-18/10-19), signed offsets so problem 10-7's opposite-sides case needs no special branch.
+- Changed: `src/traces.js` gained a Method II animation branch (perpendiculars → hypotenuse → produced-to-trace) for the θ+φ=90° case. `src/trueLength.js`'s `createTrueLength()` takes a `method: 'I'|'II'` param (default `'I'`, existing rotating-line construction unchanged); `main.js`'s True-Length launcher auto-selects `'II'` from `computeTraces(...).method` so both construction launchers agree.
+- Verified: 59/59 analytic assertions (scratch Node script, shipped `lineData.js`/`sheet2DLayout.js` imported directly) + 16/16 proving the True-Length angle arc sweeps the exact resolved θ/φ; runtime smoke test (no throw across the full case matrix); headless Chrome via CDP (ADR-019) — clean boot, zero console errors, both launchers click through the θ+φ=90° case, `renderer.info.memory` flat across 50 real-slider-driven rebuilds.
+- Not in this pass (same audit, separate scope): a line lying wholly in the HP/VP still reports "no trace" instead of Art 10-9's "coincides with the line" (reachable via the shipped `ln-incl-vp-2` problem), and there's no on-screen "NO TRACE" callout for the legitimate Method-I no-trace cases. See ADR-110.
+
+## 2026-07-31
+- Added: "Finish lesson" button (Module 2 Finish-button pilot rollout) — `#btn-finish` takes over the footer's primary slot at the terminal Step 5 "Traces" exactly when `#btn-next` vacates it. Click posts `sim:complete` and announces "Lesson marked complete." (`main.js`, `src/stepper.js`, `index.html`.)
+- Changed: `sim:complete` (`markComplete()`) drops its one-shot `window.__simComplete` latch — fires on every "Finish lesson" click now. **Behavior change**: the old auto-fire sat at Step 4's fold ("Generate Orthographic Projections"); completion now requires reaching the terminal Step 5 "Traces" instead, matching Module 2 parity (confirmed change — Traces is real content, not an epilogue). The fold's own "Orthographic projection generated" toast is unchanged, still fires once on first fold. (`main.js`, `src/stepper.js`.)
+
+## 2026-07-28
+- Added: a new `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` once, fired on first fold alongside the existing "Orthographic projection generated" toast — the host's second sanctioned signal, for a "next topic / stay" overlay (ADR-078 addendum). (`main.js`, `src/stepper.js`.)
+
+## 2026-07-27
+- Changed: the Problem Library overlay's title now centers in its header row (was hard-left) — a 44px spacer counterweights the close button so it stays corner-anchored (ADR-082). (`index.html`.)
+
+## 2026-07-25 — Tighter default 3D camera framing
+
+- Changed: the free-orbit perspective camera's default boot pose (`CAMERA_POSITION`) is pulled in
+  from a distance of ~32.8 to ~28.1 world units (same direction/target, so the same 3/4 viewing
+  angle) — the old distance was tuned for the legacy 60×60 sheet and never revisited after ADR-079
+  shrank it, leaving the line looking small against a lot of empty HP/VP plane. Verified the
+  clip-aware auto-zoom (ADR-014) still yields to a manual orbit, still leaves ordinary single-slider
+  exploration (e.g. aHP or aVP alone at its 100 mm slider max) untouched, and still dollies back
+  with no clipping at the typed-field ceilings (TL 200 mm, aHP/aVP 150 mm).
+
+## 2026-07-25 — 3D BIS dimension now rolls to face the camera in every view (ADR-081)
+
+- Fixed: the True-Length dimension's extension/tick marks and filled arrowheads read correctly
+  only in the Top quick-view; Front and Side showed a skewed parallelogram with edge-on
+  (near-invisible) arrowheads. Root cause: the dimension's standoff direction was computed once
+  from a fixed world-up vector (`cross(rod, worldUp)`), which is only screen-perpendicular to the
+  rod from directly overhead — Top was a coincidence, not a design guarantee. `dimensions.js`
+  gained `addOrientedDimension`/`orientDimension`: the same Type-B geometry is now built once in a
+  dedicated group's own local frame (rod along local +X, standoff along local +Y) and that group's
+  rotation is re-driven every render frame to keep the standoff perpendicular to BOTH the rod and
+  the current view direction, in any camera pose (free-orbit, Top/Front/Side, or the fold swoop).
+  Verified: Top is an exact fixed point of the new formula (cannot regress); Front/Side/free-orbit
+  now render a clean perpendicular bracket with filled arrowheads. The flat 2D Compare sheet
+  (`compareSheet.js`, a fixed square-on ortho camera) was unaffected and left untouched.
+
+## 2026-07-25 — Floating Compare card removed; split is now the only shape (ADR-080)
+
+- Fixed: resizing the browser while the Compare split was open could strand the 2D drawing panel
+  as a small floating "picture-in-picture" window (its own title bar, expand button, close button)
+  instead of the docked 50/50 split. Root cause was a one-way narrow-viewport listener (added
+  2026-07-19) that demoted the split to the compact floating card below 768px but never re-entered
+  the split on widening back past it.
+- Removed: the compact floating Compare card entirely — `applyCompareSize`, `compareSize`,
+  `isWorkbenchViewport`, the card's head chrome (tab + expand + close buttons), and the breakpoint
+  listener are gone. Compare is now always the docked split, at every viewport width; below 768px
+  the same split restacks to a single column instead of switching to a different Compare UI.
+
+## 2026-07-25 — Clip-aware 3D camera auto-zoom (ADR-014)
+
+- Added: the free-orbit perspective camera now dollies back automatically when typed-field values
+  (TL/aHP/aVP up to their 150–200 mm ceilings) push the line past the default frame — the case
+  ADR-079 flagged but didn't fix, since a larger reference grid can't compensate for a fixed camera
+  pose. Ported from Module 2 / Module 1's `reframeIfClipped` (`main.js`); push-back only, boot/reset
+  keeps the existing fixed pose unchanged.
+
+## 2026-07-25 — 3D reference-plane overrun fixed (ADR-079)
+
+- Fixed: at high end-A distances + steep inclination, the line's endpoint, front/top views, and
+  their labels could run off the edge of the 3D HP/VP reference-plane grid. Root cause was two
+  compounding mis-sizings: the planes were origin-centred (`PlaneGeometry` at `0,0`) while the
+  drawing only ever occupies the first quadrant, so half of every plane's `SHEET=24` extent was
+  permanently dead (real ceiling was 120 mm, not 240 mm); and the sizing was measured against the
+  slider max (`r-tl` 150 / `r-ahp`,`r-avp` 100) rather than the wider typed-field ceiling
+  (`uiManager.js` `inputMax`: TL 200, aHP/aVP 150 each) a learner can type directly. `lineRig.js`
+  `SHEET` 24 → 44 with a new `PLANE_LIFT = 16` world-space offset (planes now span `[-6, +38]`
+  instead of `[-12, +12]`), `GRID.divs` 24 → 44 to keep the 1.0u = 10 mm cell; `referencePlane()`
+  gained an `offset` parameter. `labels/LabelPlacement.js`'s `PLANE_HP/VP_ANCHOR` and
+  `AXIS_X/Y_ANCHOR` updated to track the new plane edges. `main.js` `SHEET_HALF` 12 → 22 (verified
+  unreferenced; kept as a documented constant only). Same fix applied to the sibling
+  `graphics_module_1_topic_5_projection_of_line_types` topic with its own numbers (SHEET 24 → 32,
+  `PLANE_LIFT = 10`). `contentBoxWorld()`/`flatSheetBox()` (camera framing) and `sheet2DLayout.js`
+  (the separate 2D Compare sheet, ADR-075) were confirmed out of scope and untouched.
+- Fixed: the plane-offset fix above left VP/HP flush at the fold line instead of visibly crossing through each other (the tail past the fold line shrank from the pre-fix 12u to 6u); planes are now rectangular (fold-line width unchanged, lift axis grown to `PLANE_REACH + PLANE_OVERHANG`) so they overhang the fold line by 12u again, matching the original look, without reducing the overrun fix's reach (ADR-079 addendum).
+
+## 2026-07-24
+- Added: `markBooted()` now posts `{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` resolves — the host loading screen's boot-ready signal (ADR-078, narrows ADR-002). (`main.js`.)
+
 ## 2026-07-23 — Compare 2D panel gains drag-to-pan + scroll-wheel zoom
 
 - Added: drag-to-pan and scroll-wheel zoom (zeroed-in on the cursor, clamped 0.4–5×) on the 2D

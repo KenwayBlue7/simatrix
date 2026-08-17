@@ -2,6 +2,9 @@
 
 All notable changes to Module 1 (Engineering Graphics — Foundations of Projection).
 
+## 2026-07-27
+- Changed: the Problem Library overlay's title now centers in its header row (was hard-left) — a 44px spacer counterweights the close button so it stays corner-anchored (ADR-082). (`src/shell.css`.)
+
 ## 2026-07-20
 - Changed: `--color-vp-line` darkened `#bc5d1e → #b25718` (platform-wide AA promotion, ~4.92:1 on paper) — `src/shell.css` `:root`; `CLAUDE.md`'s token reference updated to match.
 

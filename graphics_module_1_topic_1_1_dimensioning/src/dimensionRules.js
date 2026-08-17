@@ -1,7 +1,7 @@
 // The rule catalogue (Module 1 Topic 1.1 — Dimensioning), Step 2.
 //
 // PURE DATA LEAF (ADR-007 / RULES.md §3.6) apart from the pure-data `dimensionData.js`
-// import (ADR-078). Each entry pairs the CORRECT drawing of one dimension with the drawing
+// import (ADR-133). Each entry pairs the CORRECT drawing of one dimension with the drawing
 // that breaks exactly one rule, so the student can flip between them and watch the ambiguity
 // appear. Nothing here renders — `dimensionDraw.js` does.
 //

@@ -66,10 +66,6 @@ const GENERATOR_DASH = Object.freeze({ size: 0.1, gap: 0.07 });
  */
 const CHAIN = Object.freeze({ long: 0.16, dot: 0.04, gap: 0.05 });
 
-/** How far the centre line overshoots the solid's body at each end (world units) —
- *  centre lines project a little past the outline in a real drawing. */
-const AXIS_OVERSHOOT = 0.12;
-
 /**
  * Vertex labels CASCADE in on generate(): each starts transparent and eases to full
  * opacity, staggered by its vertex index, so the annotation set appears one after
@@ -150,8 +146,13 @@ function sampleRing(ring, n) {
  *   axis: { bottom: THREE.Vector3, top: THREE.Vector3 },
  *   generators: [THREE.Vector3, THREE.Vector3][],
  * }}
+ *
+ * Exported (ADR-084) so main.js's Show Method walkthrough can plan corner labels + the
+ * chain-line axis for a HEADLESS stage pose (a Set that is not the live 3D solid) — this
+ * function is already pure local-space math with no scene/DOM dependency, so exporting it
+ * changes nothing about generate()'s own behaviour above.
  */
-function planAnnotations(geometry) {
+export function planAnnotations(geometry) {
   const verts = uniqueLocalVertices(geometry);
   const empty = {
     labels: [],
@@ -201,11 +202,13 @@ function planAnnotations(geometry) {
   }
 
   // --- Central axis + its O / P labels. The axis runs base centre → top/apex,
-  //     overshooting a touch at each end like a real centre line. P marks the base
-  //     centre for every solid; O marks the top — reuse the apex O if one exists
-  //     (pyramid/cone), otherwise add it at the top-face centre (prism/cube/cylinder). ---
-  const bottom = new THREE.Vector3(0, minY - AXIS_OVERSHOOT, 0);
-  const topAxis = new THREE.Vector3(0, maxY + AXIS_OVERSHOOT, 0);
+  //     terminating exactly at those points (no overshoot — see chainPositions'
+  //     period-fit below, which lands a full dash on both ends instead). P marks
+  //     the base centre for every solid; O marks the top — reuse the apex O if one
+  //     exists (pyramid/cone), otherwise add it at the top-face centre
+  //     (prism/cube/cylinder). ---
+  const bottom = new THREE.Vector3(0, minY, 0);
+  const topAxis = new THREE.Vector3(0, maxY, 0);
   labels.push({ local: new THREE.Vector3(0, minY, 0), text: 'P' });
   if (!apex && !flat) labels.push({ local: new THREE.Vector3(0, maxY, 0), text: 'O' });
 
@@ -220,35 +223,46 @@ function planAnnotations(geometry) {
  * Emit the chain-line (centre-line) segments between two world points as a flat
  * [x,y,z,x,y,z,…] position buffer — long dash, gap, dot, gap, repeating, authored
  * as real breaks so a plain (non-dashed) LineMaterial renders the alternation.
+ * The pattern is scaled to fit the span exactly, starting AND ending on a long
+ * dash — with the axis endpoints no longer overshot (see planAnnotations), a
+ * pattern that just repeats at its authored length would land short or mid-gap
+ * at `b` on all but a lucky span; fitting an integer number of periods and
+ * uniformly scaling every length keeps the classic long/dot rhythm intact while
+ * guaranteeing both ends terminate exactly on drawn ink.
  * @param {THREE.Vector3} a Axis start (world).
  * @param {THREE.Vector3} b Axis end (world).
  * @returns {number[]}
  */
-function chainPositions(a, b) {
+export function chainPositions(a, b) {
   const out = [];
   const total = a.distanceTo(b);
   if (total < 1e-4) return out;
   const dir = b.clone().sub(a).multiplyScalar(1 / total);
   const at = (d) => a.clone().add(dir.clone().multiplyScalar(d));
-  // One period: [drawn long][gap][drawn dot][gap].
-  const steps = [
-    { len: CHAIN.long, draw: true },
-    { len: CHAIN.gap, draw: false },
-    { len: CHAIN.dot, draw: true },
-    { len: CHAIN.gap, draw: false },
-  ];
+  // Leading long dash, then n repeats of [gap, dot, gap, long] — built explicitly
+  // (not by cycling a 4-step array from index 0) so the sequence provably starts
+  // AND ends on a long dash: total = CHAIN.long + n*cycle, scaled uniformly to
+  // land exactly on `total` for whatever span this axis turns out to be.
+  const cycle = CHAIN.gap + CHAIN.dot + CHAIN.gap + CHAIN.long;
+  const n = Math.max(1, Math.round((total - CHAIN.long) / cycle));
+  const scale = total / (CHAIN.long + n * cycle);
+  const long = CHAIN.long * scale;
+  const dot = CHAIN.dot * scale;
+  const gap = CHAIN.gap * scale;
+
   let d = 0;
-  let i = 0;
-  while (d < total) {
-    const step = steps[i % steps.length];
-    const end = Math.min(d + step.len, total);
-    if (step.draw) {
-      const p = at(d);
-      const q = at(end);
-      out.push(p.x, p.y, p.z, q.x, q.y, q.z);
-    }
-    d = end;
-    i += 1;
+  const drawTo = (len) => {
+    const p = at(d);
+    d += len;
+    const q = at(d);
+    out.push(p.x, p.y, p.z, q.x, q.y, q.z);
+  };
+  drawTo(long);
+  for (let i = 0; i < n; i++) {
+    d += gap;
+    drawTo(dot);
+    d += gap;
+    drawTo(long);
   }
   return out;
 }

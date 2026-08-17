@@ -33,7 +33,7 @@ compared programmatically; both topics screenshotted at boot at 1600 × 950.
 | 3.3 | Prose describing hidden controls | Medium | **Implemented** | New `renderCopy()` + `controlsVisible(i)`; Step 1's `postBody` is withheld until "Add the dimensions" discloses the controls it describes, and repainted at that moment |
 | 1.4 | Focus hand-off helper | Low | **Implemented** | `refocus(preferred)` extracted verbatim from Foundations' stepper and used at the one site that previously inlined it |
 | 3.4 | Wizard module size | Low | **Not applicable** | The audit's own recommendation was to leave it and note it. Noted in `CLAUDE.md`; splitting mid-topic would be the architectural drift the brief forbids |
-| §4 | All intentional differences | — | **Not applicable** | Correct by design (ADR-078, ADR-079). Untouched |
+| §4 | All intentional differences | — | **Not applicable** | Correct by design (ADR-133, ADR-134). Untouched |
 
 Verification after the changes: camera restored on Next and on a rail jump while a real CDP
 drag still orbits freely; summary hidden at boot and on entering an incomplete step, revealed in
@@ -97,11 +97,11 @@ already recorded in an ADR.
 
 | Category | Foundations | Dimensioning | Why it is correct |
 |---|---|---|---|
-| Cameras | Perspective + orthographic, `projectionMorphK` blend, smooth hand-back on drag / scroll / pan | One `OrthographicCamera` | **ADR-078** — a dimension only measures truly under parallel projection. RULES.md §5.18's morph governs a hand-off between two cameras that does not exist here |
-| Edge classification | `meshAnalyzer.js` + a per-edge occlusion raycaster + `three-mesh-bvh`, re-run on every orbit | None. Linework is authored from the outline the solid is extruded from, and the one genuinely hidden outline is designed into the part | **ADR-078**. Foundations' raycaster is load-bearing for *its* lesson (ADR-029 Phase-3 reversal note); nothing here is camera-dependent |
-| Arrowhead proportions | Platform default 3:1 (RULES.md §6.19) | Textbook Figs. 4.5–4.6 / §4.5 — ≈15° included angle, 3–4 mm, drawn thick | **ADR-079** — this topic *teaches* the proportion, and 3:1 sits outside the band the figure prints |
+| Cameras | Perspective + orthographic, `projectionMorphK` blend, smooth hand-back on drag / scroll / pan | One `OrthographicCamera` | **ADR-133** — a dimension only measures truly under parallel projection. RULES.md §5.18's morph governs a hand-off between two cameras that does not exist here |
+| Edge classification | `meshAnalyzer.js` + a per-edge occlusion raycaster + `three-mesh-bvh`, re-run on every orbit | None. Linework is authored from the outline the solid is extruded from, and the one genuinely hidden outline is designed into the part | **ADR-133**. Foundations' raycaster is load-bearing for *its* lesson (ADR-029 Phase-3 reversal note); nothing here is camera-dependent |
+| Arrowhead proportions | Platform default 3:1 (RULES.md §6.19) | Textbook Figs. 4.5–4.6 / §4.5 — ≈15° included angle, 3–4 mm, drawn thick | **ADR-134** — this topic *teaches* the proportion, and 3:1 sits outside the band the figure prints |
 | Viewport chips | `Turn 90°` plus an `Inspect arrowhead` micro-zoom | `Front view` / `3-D view` / `Turn over` | Both are named poses on the same `.vp-chip` component. The micro-zoom has no subject here |
-| Pure-data leaves | 1 (`foundationSteps.js`) | 6 catalogues | **ADR-078** / RULES.md §3.6a — content volume, not an architectural difference |
+| Pure-data leaves | 1 (`foundationSteps.js`) | 6 catalogues | **ADR-133** / RULES.md §3.6a — content volume, not an architectural difference |
 | Design tokens | Base set | Base set **plus** `--color-flag-wrong`, `--color-flag-right`, `--color-flag-wrong-soft` | RULES.md §4.16 additions, documented, and never used alone — a faulted dimension always also carries a ✗ marker and a written rule (Two-Cue Rule) |
 | Step 1 gating | Always complete — the block is present and orbitable from the start | Gated on adding the dimensions and inspecting four elements | The undimensioned plate *is* the lesson's opening argument |
 | Extra viewport furniture | — | `.vp-split` (before/after captions), `.vp-caption` (§4.5 item 6 caption band) | Subject-specific |

@@ -107,10 +107,13 @@ Decide this **before** you create a folder. The case determines your template.
 > instead of copying `Module2/` and deleting domain files by hand. It is **fully sanitised**:
 > `main.js` is rewritten to a clean empty-scene boot (it imports only the platform leaves —
 > `stepper`, `terms`, `onboarding`, `anim` — plus Three.js and `OrbitControls`, with a
-> disposal-contract-only `rebuild()`), and every Engineering-Graphics domain leaf (`iShape.js`,
-> `meshAnalyzer.js`, `projectionDrawer.js`, `vertexLabeler.js`, `problemLibrary.js`) plus the local
-> `DESIGN.md` is already removed. So each case below spells out only what you **add or wire in** — there
-> is no leftover domain code to delete. **What you still wire yourself:** your own drivers into
+> disposal-contract-only `rebuild()`), and every solids-only domain leaf (`iShape.js`,
+> `meshAnalyzer.js`, `projectionDrawer.js`, `vertexLabeler.js`) plus the local `DESIGN.md` is
+> already removed. `problemLibrary.js` is **not** in that removed set — as of ADR-083 it ships as
+> a generic, empty-bodied stub alongside `problems.js` (RULES.md §6.24–§6.26), since the
+> problem-library interface contract is platform-wide, not solids-specific. So each case below
+> spells out only what you **add or wire in** — there is no leftover domain code to delete beyond
+> the solids leaves. **What you still wire yourself:** your own drivers into
 > `#workbench-rail` (the rail's *internal* control layout — row vs. multi-column grid — is
 > module-scoped, DESIGN.md §5.13) plus your own `drawCompare()`/click handler for `#rail-toggle` and
 > the Compare toggle button; the template ships their chrome, not their behavior.
@@ -143,9 +146,11 @@ deleting domain files by hand. You still (1) replace the copied `CLAUDE.md` — 
 titled for Engineering Graphics — with the filled-in `../CLAUDE.module-template.md`; (2) wire `main.js`
 to your own domain geometry — it boots clean and empty (a disposal-contract-only `rebuild()`), so you
 build your geometry into that empty seam; (3) adapt or replace the platform leaves that still ship as
-stubs (`uiManager.js`, `onboarding.js`) for your own controls and hints — the solids-only domain leaves
-(`iShape.js`, `meshAnalyzer.js`, `projectionDrawer.js`, `vertexLabeler.js`, `problemLibrary.js`) are
-already gone, so there is nothing to delete; and (4) write your own `ARCHITECTURE.md`, `DECISIONS.md`,
+stubs (`uiManager.js`, `onboarding.js`, and — if your subject teaches via exercises —
+`problems.js`/`problemLibrary.js`, RULES.md §6.24–§6.26) for your own controls, hints, and
+self-check; the solids-only domain leaves (`iShape.js`, `meshAnalyzer.js`, `projectionDrawer.js`,
+`vertexLabeler.js`) are already gone, so there is nothing to delete there; and (4) write your own
+`ARCHITECTURE.md`, `DECISIONS.md`,
 and `RULES.md` before development starts (Section 5.4) — new, local files, not entries in the root ones.
 Decide 2D vs 3D as your own pattern choice (Section 5.1). See the full Case C walkthrough in Section 5.
 
@@ -226,8 +231,9 @@ the topic — if one needs a fix, fix it in `Module2/` and re-copy (RULES.md §1
 | `src/meshAnalyzer.js` | Edge-welding analyzer. Identical M2 ↔ topic 2. (Keep only if your topic draws projections.) |
 | `src/vertexLabeler.js` | Vertex/axis annotation layer. Identical M2 ↔ topic 2. (Keep only if your topic labels geometry.) |
 
-> The bundled fonts in `assets/fonts/` (the three `woff2` files) are also byte-identical across all
-> four codebases — copy them unchanged (see Section 3.8).
+> Fonts are no longer bundled per-module (ADR-086) — every codebase's `@font-face` block points at
+> the same Supabase Storage CDN URLs, so there is no `assets/fonts/` to copy for a new topic (see
+> Section 3.8).
 
 ### 3.4 File-by-file: adapt (the topic-specific content)
 
@@ -243,12 +249,12 @@ topic-specific parts — what "adapt" concretely means is taken from how topic 2
 | `src/problems.js` | The **`ENABLED_TIERS` flag** — the single switch that scopes a clone (ADR-009, RULES.md §1.6). **Concretely:** Module 2 = `['base','corner-edge','one-plane','both-planes']`; topic 2 narrowed it to `['base','corner-edge','axis-vp']`. Set yours to the tiers your topic can actually solve; add/curate `PROBLEMS` to match (keep textbook wording verbatim — RULES.md §6.7). |
 | `src/iShape.js` | The shape-generator contract + `applyShapeTransform()`. **⚠️ This is NOT a copy-identical file** — Module 2's is larger (it imports THREE and carries the inclination / VP-lay-down composition) and the two topics share an older, smaller version. Adapt the transform to the poses your topic actually uses; keep the explicit **`ZXY` Euler order** and re-derive every sign visually (ADR-005, RULES.md §3.8–§3.10). |
 | `src/uiManager.js` | The parameter dock. Remove sliders/toggles for fields you deleted, and remove the matching mutual-exclusion wiring (e.g. topic 2 dropped the inclination toggles, ADR-008 consequence). |
-| `src/stepper.js` | The Guided Stepper sequence — the steps your topic teaches, gated one behind the next. |
-| `src/problemLibrary.js` | Self-check targets/labels for your problem set. Keep it ±0.5-tolerant and **never auto-fill** (ADR-015, RULES.md §6.1–§6.2). |
+| `src/stepper.js` | The Guided Stepper sequence — the steps your topic teaches, gated one behind the next. Also owns `#btn-finish`'s show/hide + gate — see §3.11 before you ship the terminal step. |
+| `src/problemLibrary.js` | Ships as a generic, empty-bodied stub in `template_starter/` (RULES.md §6.24–§6.26, ADR-083) — start there and fill in `evaluate()` against your own `problems.js` `target` shape. If an existing sibling topic's self-check already matches the shape you need (pose-based vs section/cut-based), copying its `problemLibrary.js` instead of the bare stub is a legitimate shortcut. Keep it ±0.5-tolerant and **never auto-fill** (ADR-015, RULES.md §6.1–§6.2). |
 | `src/projectionDrawer.js` | Only if your topic changes how projections are drawn. (Topic 2's differs slightly; keep the ADR-016 line conventions — RULES.md §6.16–§6.18.) |
 | `src/terms.js` | The inline glossary entries for your topic's vocabulary. |
 | `src/onboarding.js` | Empty-state copy and spotlight chips, adapted to your first step. |
-| `index.html` | **The `<title>`, the `<meta name="description">`, and the control markup.** Tokens, the import map, and the `@font-face` block are **identical** between Module 2 and the topics — leave them. Topic 2 stripped the inclination controls from the markup; you strip/keep controls to match your `shapeData`/`uiManager`. ⚠️ **Update the `<title>`** — topic 2 left its `<title>` reading "Orthographic Projection of Solids" even though its `meta.json` title is "Simple Positions" (a real, shipped inconsistency — do not repeat it). |
+| `index.html` | **The `<title>`, the `<meta name="description">`, and the control markup.** Tokens, the import map, and the `@font-face` block (CDN-hosted, ADR-086) are **identical** between Module 2 and the topics — leave them. Topic 2 stripped the inclination controls from the markup; you strip/keep controls to match your `shapeData`/`uiManager`. ⚠️ **Update the `<title>`** — topic 2 left its `<title>` reading "Orthographic Projection of Solids" even though its `meta.json` title is "Simple Positions" (a real, shipped inconsistency — do not repeat it). |
 | `main.js` | The imports and the rebuild wiring. **Concretely:** topic 2 dropped the `import { slantAngle }` line because it removed inclination; topic 1 dropped seven imports and added two. Import only the leaf modules your topic actually uses, and keep the single `rebuild()` pipeline and the single `simAPI.reset()` path (ADR-004, ADR-002, RULES.md §3.1, §2.9). |
 
 ### 3.5 File-by-file: create fresh (only if your topic needs them)
@@ -291,11 +297,10 @@ Edit the copied `CLAUDE.md` so it describes *this topic* and points at the root 
   and `three/addons/` — byte-identical to the master's map. Never use `@latest`, the UMD global, or
   `npm install three` (ADR-001, RULES.md §2.2–§2.3). Every local import must keep its **`.js`
   extension** and stay relative (`./src/x.js`) (RULES.md §2.4–§2.5).
-- **Fonts:** confirm `assets/fonts/` contains the three `woff2` files
-  (`atkinson-hyperlegible-latin-400-normal.woff2`, `…-700-normal.woff2`,
-  `ibm-plex-mono-latin-400-normal.woff2`) — all byte-identical across the family. The `@font-face`
-  URLs in a Module 2 topic are `./assets/fonts/…` (HTML at the module root). No Google-Fonts CDN
-  (RULES.md §2.15, DESIGN.md §3.1).
+- **Fonts:** confirm the `@font-face` block points at the Supabase Storage CDN (ADR-086) — the
+  same URLs, byte-identical, across the whole family. There is no `assets/fonts/` to add anymore;
+  never point at a Google-Fonts CDN or any other third-party font host (RULES.md §2.15,
+  DESIGN.md §3.1).
 
 ### 3.9 Serve and verify it runs *before* adding content
 
@@ -323,6 +328,39 @@ Module 2 and how heavily it is adapted (RULES.md §8.3). If it introduced or div
 shared/identical file, update **§7** (shared) accordingly. Add a dated entry to the root
 `CHANGELOG.md` (RULES.md §8.2), and if you made any non-obvious two-option decision, add an ADR to
 `DECISIONS.md` (RULES.md §8.1).
+
+### 3.11 The Finish-button pattern (lesson completion)
+
+`template_starter/` already ships the platform's one sanctioned lesson-completion signal, wired and
+working — you do not build this from scratch, but you **do** need to make one decision before you
+ship: whether your topic's Finish button needs a gate.
+
+- **What it is.** A `#btn-finish` button (`"Finish lesson"`) that fires
+  `window.parent.postMessage({ type: 'sim:complete' }, '*')` via `markComplete()` in `main.js`, so
+  the host can surface its "next topic / stay" overlay (ADR-078 addendum, revised). **It is
+  latchless** — every click reposts, with no per-page-load ceiling. (An earlier revision latched it
+  behind a one-shot `window.__simComplete` flag; that was retired platform-wide once the host
+  confirmed it tolerates repeated triggers — do not reintroduce a latch.)
+- **Where it lives.** In the footer nav (`.card__nav`), immediately after `#btn-next`, and the two
+  are **mutually exclusive**: `stepper.js`'s `renderNav()` hides `#btn-next` and shows `#btn-finish`
+  in the same breath, exactly when `currentStep` reaches the terminal step — the same
+  hide-one-show-the-other idiom used elsewhere for paired states (e.g. `#btn-flatten`/`#btn-unfold`).
+  It is its own element with its own click listener; never a relabel of `#btn-next`'s handler.
+- **Decide your own gate — don't just copy the ungated form.** `template_starter/`'s own copy ships
+  **ungated** (`hidden` only, no `disabled`) because the starter has no domain state to gate on. A
+  real topic usually *does* have one, and should gate `#btn-finish.disabled` on whatever signal
+  already means "the learner actually did the thing," not mere arrival at the last step (which can
+  cost as little as repeatedly clicking Next). Reuse a signal your stepper already tracks — don't
+  invent a new completion concept:
+  - `state.flattened` (Module 2 — gated on the drawing being folded flat)
+  - `state.dimensions` (Module 1 Foundations — gated on the BIS dimensions reveal)
+  - `sim.isFolded()` (several Module 1 topics — gated on the fold/unfold state)
+  - `sim.hasSolvedProblem()` (the Diploma constructions family — gated on a solved Problem Library
+    problem, since arriving at the verify step costs only a few clicks)
+  - **Ungated is a legitimate choice too**, not just the starter's fallback — `graphics_module_1_topic_4_understanding_orthographic_views` ships `#btn-finish` with no gate at all (it lives in the
+    Compare workbench rail, reachable only once the full step flow is already behind the learner, so
+    arrival itself is a meaningful enough signal). The point is to make this choice deliberately, the
+    way that topic did, not by default because copying the starter was easier.
 
 ---
 
@@ -361,9 +399,10 @@ mode:
 | `src/anim.js` | Byte-identical to Module 2's tween engine — leave it. |
 | `src/chrome.js`, `src/onboarding.js`, `src/problemLibrary.js` | Shared leaf modules the engine injects/uses. Leave them. |
 
-> Module 1's `@font-face` lives in `src/shell.css`, one level down, so its font URLs are
-> **`../assets/fonts/…`** — different from Module 2's `./assets/fonts/…` (DESIGN.md §3.1/§7.2). This
-> is a path detail, not a violation; don't "fix" it.
+> Module 1's `@font-face` lives in `src/shell.css`, one level down from the page — but since
+> ADR-086 moved every `src:` URL to the absolute Supabase Storage CDN, that path difference no
+> longer applies: Module 1's block is now byte-identical to Module 2's (DESIGN.md §3.1). Don't
+> re-introduce a relative `../assets/fonts/…` path here.
 
 ### 4.4 File-by-file: create fresh (your lesson's data)
 
@@ -437,7 +476,8 @@ cp -r template_starter my_new_subject_module
 
 - The import map pinned to `three@0.160.0`, `window.simAPI` (`pause`/`resume`/`reset`), `meta.json`
   (all four fields), the dismissible < 768px mobile notice, the boot watchdog + WebGL fallback, and
-  the bundled `woff2` fonts (Atkinson Hyperlegible + IBM Plex Mono) — all present and platform-generic.
+  the CDN-hosted fonts (Atkinson Hyperlegible + IBM Plex Mono, ADR-086) — all present and
+  platform-generic.
 - The **3D-solids geometry stripped** (`cube`/`cone`/`cylinder`/`genericPrism`/`genericPyramid`/
   `genericSolid`/`shapeData` removed), `problems.js` + `terms.js` emptied to stubs, and `stepper.js`
   reset to three placeholder steps.
@@ -463,17 +503,22 @@ code to delete — you fill empty seams):
    two platform leaves that still ship as stubs (`uiManager.js`, `onboarding.js`) for your own controls
    and hints, and fill the `problems.js` / `terms.js` stubs for your own problem set and glossary.
 
-The Engineering-Graphics domain leaves (`iShape.js`, `meshAnalyzer.js`, `projectionDrawer.js`,
-`vertexLabeler.js`, `problemLibrary.js`) and the local `DESIGN.md` were already removed when the
+The Engineering-Graphics solids-only domain leaves (`iShape.js`, `meshAnalyzer.js`,
+`projectionDrawer.js`, `vertexLabeler.js`) and the local `DESIGN.md` were already removed when the
 boilerplate was finalised — there is nothing to delete, and you consume the single root `../DESIGN.md`.
+`problemLibrary.js` ships instead as a generic empty stub (RULES.md §6.24–§6.26, ADR-083) — fill it
+in per step (3) above if your subject teaches via exercises.
 
 ### 5.3 Build fresh: your own domain engine
 
-There is no shared geometry/rendering engine to inherit. The Engineering-Graphics domain leaves that
-once shipped inside `template_starter/` — `iShape.js`, `meshAnalyzer.js`, `projectionDrawer.js`,
-`vertexLabeler.js`, `problemLibrary.js` — solved orthographic projection of solids and were **removed**
-when the boilerplate was finalised; they are **not** a contract your subject inherits. Build your own
-domain generators/helpers into the sanitised `main.js` `rebuild()` seam instead (Section 5.2, step 2).
+There is no shared geometry/rendering engine to inherit. The Engineering-Graphics solids-only
+domain leaves that once shipped inside `template_starter/` — `iShape.js`, `meshAnalyzer.js`,
+`projectionDrawer.js`, `vertexLabeler.js` — solved orthographic projection of solids and were
+**removed** when the boilerplate was finalised; they are **not** a contract your subject inherits.
+Build your own domain generators/helpers into the sanitised `main.js` `rebuild()` seam instead
+(Section 5.2, step 2). `problemLibrary.js` is a different case: its *interface* (RULES.md
+§6.24–§6.26, ADR-083) IS a platform-wide contract you inherit as a stub — only its self-check
+*content* is yours to write.
 If it helps, read those leaves in the `Module2/` master (and Module 1's drawing toolkit
 `asg`/`alp`/`acr`/`alb`) as worked examples — the disposal-contract discipline, the
 single-rebuild-pipeline discipline, and "no leaf module imports a sibling" are ideas worth
@@ -535,11 +580,20 @@ are the shared contracts: a fix belongs in `Module2/` and must be re-copied to e
 | `src/genericSolid.js` | Pure polygon trig; the **only** file siblings may import (ADR-007). Identical across all three. | Apothem/slant math diverges; every prism/pyramid in that copy is subtly wrong. |
 | `src/meshAnalyzer.js` | Edge-welding analyzer; identical M2 ↔ topic 2. | Without the `1e-3` weld tolerance staying in sync, curved-solid rims render as double lines (ADR-006). |
 | `src/vertexLabeler.js` | Vertex/axis annotation layer; identical M2 ↔ topic 2. | Labels (A,B,C…/apex O/chain-line axis) drift from the projection geometry. |
-| `assets/fonts/*.woff2` (×3) | The three bundled fonts; byte-identical across **all four** codebases. | Legibility-first typography contract breaks; offline rendering falls back to system fonts. |
+| `@font-face` Supabase CDN URLs (×3 faces) | The same CDN-hosted fonts, byte-identical across **all four** codebases (ADR-086 — no more local `assets/fonts/*.woff2`). | Legibility-first typography contract breaks; on a network failure the fallback is the system font until/unless the CDN fetch resolves. |
 
 **Explicitly NOT in this list — copy, then adapt** (they diverged between M2 and topic 2, by design):
-`iShape.js`, `onboarding.js`, `problemLibrary.js`, `problems.js`, `projectionDrawer.js`,
-`shapeData.js`, `stepper.js`, `terms.js`, `uiManager.js`, plus `index.html`, `main.js`, `meta.json`.
+`iShape.js`, `onboarding.js`, `problems.js`, `projectionDrawer.js`, `shapeData.js`, `stepper.js`,
+`terms.js`, `uiManager.js`, plus `index.html`, `main.js`, `meta.json`.
+
+> ⚠️ **`problemLibrary.js` moved out of this list (ADR-083).** It used to be adapt-from-a-sibling-
+> topic only; it now ships a generic, empty-bodied stub directly in `template_starter/` (RULES.md
+> §6.24–§6.26) — the same six-export / one-argument interface confirmed identical across
+> `Module2`, `graphics_module_2_topic_2_simple_positions`,
+> `graphics_module_3_topic_1_sections_of_solids`, and
+> `graphics_module_3_topic_2_development_of_surfaces`. Start from the template stub; copying a
+> sibling topic's filled-in version instead remains a legitimate shortcut when its self-check
+> shape already matches yours (see Section 3.4).
 
 > ⚠️ **`iShape.js` is a trap.** It looks like a shared contract, but Module 2's version (larger;
 > imports THREE; carries the `restingPlane:'VP'` lay-down + inclination composition) is **not**

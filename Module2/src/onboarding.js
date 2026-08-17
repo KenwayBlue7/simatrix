@@ -9,11 +9,13 @@
 //      that; an anxious beginner could misread a projection that looks flat from
 //      the default angle. It auto-dismisses on the first view interaction.
 //   3. Contextual spotlight hints — the same chip treatment, reused to point out the
-//      Top View, Front View, and connector lines the FIRST time each is revealed.
-//      A shared queue plays them ONE AT A TIME (DESIGN.md "Quiet Chrome" / don't
-//      spam): when Step 4 reveals the top and front views together, the two hints
-//      play in sequence rather than stacking. Each is first-seen-once (persisted),
-//      auto-dismisses, and also dismisses on click or first orbit.
+//      Front View, Top View, Side View, and connector lines the FIRST time each is
+//      revealed. A shared queue plays them ONE AT A TIME (DESIGN.md "Quiet Chrome" /
+//      don't spam): Step 5's single-click reveal (ADR-162) queues all three view
+//      hints in Front→Top→Side order, and a chip with another already queued behind
+//      it gets a shortened hold (HINT_HOLD_QUEUED) so three in a row read in ~8s
+//      total rather than ~14s. Each is first-seen-once (persisted), auto-dismisses,
+//      and also dismisses on click or first orbit.
 //
 // Sandboxed-iframe note (CLAUDE.md "no same-origin assumptions"): localStorage can
 // throw a SecurityError in a sandboxed iframe, so every access is guarded and
@@ -36,17 +38,23 @@ const spotlightKey = (id) => `simatrix-hint-${id}-seen`;
  * Rule). Copy stays in this leaf module, like stepper.js owns its step copy.
  */
 const SPOTLIGHTS = {
-  'top-view':   { tone: 'hp',  text: 'Top view — your solid cast straight down onto the HP (teal).' },
   'front-view': { tone: 'vp',  text: 'Front view — cast back onto the VP (amber).' },
+  'top-view':   { tone: 'hp',  text: 'Top view — your solid cast straight down onto the HP (teal).' },
+  'side-view':  { tone: 'pp',  text: 'Side view — cast sideways onto the PP (violet), the third view that fixes the solid.' },
   'connectors': { tone: 'ink', text: 'Dashed connectors carry each corner between the views, keeping them aligned.' },
 };
 
 /** ms a spotlight stays up before auto-dismissing — generous for the anxious persona. */
 const HINT_HOLD = 4500;
+/** ADR-162: shorter hold used whenever another hint is already queued behind this one (e.g.
+ *  Step 5's front/top/side reveal, queued back-to-back by one click) — keeps three chips
+ *  readable in ~8s total instead of ~14s (DESIGN.md "Quiet Chrome"). A lone chip (e.g. the
+ *  Step 6 connectors hint, nothing queued behind it) still gets the full HINT_HOLD. */
+const HINT_HOLD_QUEUED = 2600;
 /** ms to let the fade-out finish before the chip leaves layout / the next hint plays. */
 const FADE_OUT_MS = 240;
 
-const TONE_CLASSES = ['vp-spotlight--hp', 'vp-spotlight--vp', 'vp-spotlight--ink'];
+const TONE_CLASSES = ['vp-spotlight--hp', 'vp-spotlight--vp', 'vp-spotlight--pp', 'vp-spotlight--ink'];
 
 /**
  * @param {{ addEventListener: (type: string, fn: () => void) => void }} controls
@@ -145,7 +153,10 @@ export function initOnboarding(controls) {
     requestAnimationFrame(() => spot.classList.add('is-visible'));
 
     clearTimeout(spotTimer);
-    spotTimer = setTimeout(dismissSpot, HINT_HOLD);
+    // Shorten the hold when this chip already has another one queued behind it (ADR-162) —
+    // checked at pop time, so it's purely a function of what's actually pending right now,
+    // not which caller enqueued it.
+    spotTimer = setTimeout(dismissSpot, queue.length > 0 ? HINT_HOLD_QUEUED : HINT_HOLD);
   }
 
   function dismissSpot() {

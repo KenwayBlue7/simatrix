@@ -289,6 +289,9 @@ function renderStageChrome() {
     btnNext.textContent = done ? 'Drawing complete' : 'Draw next';
   }
   if (btnRestart) btnRestart.disabled = state.stage < 0;
+  // The wizard's own Finish-button gate reads isDrawingComplete(), which is this same
+  // stage count — refresh its chrome on every stage move, not only on step change.
+  stepper?.sync();
 }
 
 /**
@@ -462,6 +465,21 @@ function markBooted() {
   if (window.__simBootTimer) { clearTimeout(window.__simBootTimer); window.__simBootTimer = null; }
   const fallback = document.getElementById('sim-fallback');
   if (fallback) fallback.hidden = true;
+  // Platform iframe contract (ADR-078): announce a displayable sim to the host loader.
+  // Gated on document.fonts.ready so the host never reveals us mid-FOUT.
+  document.fonts.ready.then(() => {
+    window.parent.postMessage({ type: 'sim:ready' }, '*');
+  });
+}
+
+/**
+ * Signal lesson completion to the host (ADR-078 addendum, revised): the learner
+ * clicked "Finish lesson" at the terminal step. Fires on every call, no latch —
+ * the host confirmed it supports repeated sim:complete triggers, so replaying the
+ * signal is expected, not a bug.
+ */
+function markComplete() {
+  window.parent.postMessage({ type: 'sim:complete' }, '*');
 }
 
 // ============================================================================
@@ -706,6 +724,18 @@ const simController = {
   },
 
   flyToView,
+
+  markComplete,
+
+  /**
+   * Step 2's real payoff: the drawing is fully built (every stage drawn, including the
+   * dimensioned close). Step 2 opens on blank paper, so arrival alone is not "finished" —
+   * this is the same signal that already disables the in-panel "Draw next" button
+   * (`renderStageChrome`'s `done`), read here for the Finish-button gate.
+   */
+  isDrawingComplete() {
+    return stages.length > 0 && state.stage >= stages.length - 1;
+  },
 };
 
 // ============================================================================

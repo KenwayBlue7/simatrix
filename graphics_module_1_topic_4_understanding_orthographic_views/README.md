@@ -179,8 +179,9 @@ and re-copy (RULES.md §1.3, §1.4):
 | `src/meshAnalyzer.js` | Edge-welding analyzer. Identical M2 ↔ topic 2. (Keep only if your topic draws projections.) |
 | `src/vertexLabeler.js` | Vertex/axis annotation layer. Identical M2 ↔ topic 2. (Keep only if your topic labels geometry.) |
 
-> The bundled fonts in `assets/fonts/` (the three `woff2` files) are also byte-identical across all
-> four codebases — copy them unchanged (see Section 3.8).
+> Fonts are no longer bundled per-module (ADR-086) — every codebase's `@font-face` block points at
+> the same Supabase Storage CDN URLs, so there is no `assets/fonts/` to copy for a new topic (see
+> Section 3.8).
 
 ### 3.4 File-by-file: adapt (the topic-specific content)
 
@@ -198,7 +199,7 @@ topic-specific parts. What "adapt" concretely means is taken from how topic 2 ac
 | `src/projectionDrawer.js` | Only if your topic changes how projections are drawn. (Topic 2's differs slightly; keep the ADR-016 line conventions — RULES.md §6.16–§6.18.) |
 | `src/terms.js` | The inline glossary entries for your topic's vocabulary. |
 | `src/onboarding.js` | Empty-state copy and spotlight chips, adapted to your first step. |
-| `index.html` | **The `<title>`, the `<meta name="description">`, and the control markup.** Tokens, the import map, and the `@font-face` block are **identical** between Module 2 and the topics — leave them. Topic 2 stripped the inclination controls from the markup; you strip/keep controls to match your `shapeData`/`uiManager`. ⚠️ **Update the `<title>`** — topic 2 left its `<title>` reading "Orthographic Projection of Solids" even though its `meta.json` title is "Simple Positions" (a real, shipped inconsistency — do not repeat it). |
+| `index.html` | **The `<title>`, the `<meta name="description">`, and the control markup.** Tokens, the import map, and the `@font-face` block (CDN-hosted, ADR-086) are **identical** between Module 2 and the topics — leave them. Topic 2 stripped the inclination controls from the markup; you strip/keep controls to match your `shapeData`/`uiManager`. ⚠️ **Update the `<title>`** — topic 2 left its `<title>` reading "Orthographic Projection of Solids" even though its `meta.json` title is "Simple Positions" (a real, shipped inconsistency — do not repeat it). |
 | `main.js` | The imports and the rebuild wiring. **Concretely:** topic 2 dropped the `import { slantAngle }` line because it removed inclination; topic 1 dropped seven imports and added two. Import only the leaf modules your topic actually uses, and keep the single `rebuild()` pipeline and the single `simAPI.reset()` path (ADR-004, ADR-002, RULES.md §3.1, §2.9). |
 
 ### 3.5 File-by-file: create fresh (only if your topic needs them)
@@ -241,11 +242,10 @@ Edit the copied `CLAUDE.md` so it describes *this topic* and points at the root 
   and `three/addons/` — byte-identical to the master's map. Never use `@latest`, the UMD global, or
   `npm install three` (ADR-001, RULES.md §2.2–§2.3). Every local import must keep its **`.js`
   extension** and stay relative (`./src/x.js`) (RULES.md §2.4–§2.5).
-- **Fonts:** confirm `assets/fonts/` contains the three `woff2` files
-  (`atkinson-hyperlegible-latin-400-normal.woff2`, `…-700-normal.woff2`,
-  `ibm-plex-mono-latin-400-normal.woff2`) — all byte-identical across the family. The `@font-face`
-  URLs in a Module 2 topic are `./assets/fonts/…` (HTML at the module root). No Google-Fonts CDN
-  (RULES.md §2.15, DESIGN.md §3.1).
+- **Fonts:** confirm the `@font-face` block points at the Supabase Storage CDN (ADR-086) — the
+  same URLs, byte-identical, across the whole family. There is no `assets/fonts/` to add anymore;
+  never point at a Google-Fonts CDN or any other third-party font host (RULES.md §2.15,
+  DESIGN.md §3.1).
 
 ### 3.9 Serve and verify it runs *before* adding content
 
@@ -307,13 +307,14 @@ mode:
 | File | Why it must stay identical |
 |---|---|
 | `src/engine.js` | **The shared engine.** It owns the renderer, the stepper, the Compare View, the fold, the rebuild pipeline, and `window.simAPI`. **Never edit it to add a lesson** (ADR-011, RULES.md §3.28). A new lesson supplies *data*, not engine changes. |
-| `src/shell.css` | The shared chrome + `:root` tokens + `@font-face`. Add only a small page-specific inline `<style>` in your shell if truly needed (as Lines/Dimensioning do); never re-define a shared token (RULES.md §4.16). |
+| `src/shell.css` | The shared chrome + `:root` tokens + `@font-face` (CDN-hosted, ADR-086). Add only a small page-specific inline `<style>` in your shell if truly needed (as Lines/Dimensioning do); never re-define a shared token (RULES.md §4.16). |
 | `src/anim.js` | Byte-identical to Module 2's tween engine — leave it. |
 | `src/chrome.js`, `src/onboarding.js`, `src/problemLibrary.js` | Shared leaf modules the engine injects/uses. Leave them. |
 
-> Module 1's `@font-face` lives in `src/shell.css`, one level down, so its font URLs are
-> **`../assets/fonts/…`** — different from Module 2's `./assets/fonts/…` (DESIGN.md §3.1/§7.2). This
-> is a path detail, not a violation; don't "fix" it.
+> Module 1's `@font-face` lives in `src/shell.css`, one level down from the page — but since
+> ADR-086 moved every `src:` URL to the absolute Supabase Storage CDN, that path difference no
+> longer applies: Module 1's block is now byte-identical to Module 2's (DESIGN.md §3.1). Don't
+> re-introduce a relative `../assets/fonts/…` path here.
 
 ### 4.4 File-by-file: create fresh (your lesson's data)
 
@@ -383,9 +384,9 @@ platform-level pieces every Simatrix sim needs — all documented in `../PLATFOR
 - `window.simAPI` exposing `pause()`, `resume()`, `reset()`.
 - `meta.json` with all four required fields.
 - The dismissible mobile notice below 768px.
-- The bundled `woff2` fonts (Atkinson Hyperlegible + IBM Plex Mono) — copy these three files
-  unchanged from any existing module; they are the platform's own shared typography, not
-  Engineering-Graphics content.
+- The CDN-hosted fonts (Atkinson Hyperlegible + IBM Plex Mono, served from Supabase Storage —
+  ADR-086) — the same `@font-face` block, unchanged, from any existing module; they are the
+  platform's own shared typography, not Engineering-Graphics content.
 - `../CLAUDE.module-template.md`, copied in as your `CLAUDE.md` and filled in per its own
   instructions.
 
@@ -462,7 +463,7 @@ are the shared contracts: a fix belongs in `Module2/` and must be re-copied to e
 | `src/genericSolid.js` | Pure polygon trig; the **only** file siblings may import (ADR-007). Identical across all three. | Apothem/slant math diverges; every prism/pyramid in that copy is subtly wrong. |
 | `src/meshAnalyzer.js` | Edge-welding analyzer; identical M2 ↔ topic 2. | Without the `1e-3` weld tolerance staying in sync, curved-solid rims render as double lines (ADR-006). |
 | `src/vertexLabeler.js` | Vertex/axis annotation layer; identical M2 ↔ topic 2. | Labels (A,B,C…/apex O/chain-line axis) drift from the projection geometry. |
-| `assets/fonts/*.woff2` (×3) | The three bundled fonts; byte-identical across **all four** codebases. | Legibility-first typography contract breaks; offline rendering falls back to system fonts. |
+| `@font-face` Supabase CDN URLs (×3 faces) | The same CDN-hosted fonts, byte-identical across **all four** codebases (ADR-086 — no more local `assets/fonts/*.woff2`). | Legibility-first typography contract breaks; on a network failure the fallback is the system font until/unless the CDN fetch resolves. |
 
 **Explicitly NOT in this list — copy, then adapt** (they diverged between M2 and topic 2, by design):
 `iShape.js`, `onboarding.js`, `problemLibrary.js`, `problems.js`, `projectionDrawer.js`,

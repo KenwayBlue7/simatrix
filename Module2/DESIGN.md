@@ -164,8 +164,8 @@ Near-monochrome warm neutrals carry the chrome; saturation is reserved for guida
 
 ## 3. Typography
 
-**Body / UI Font:** Atkinson Hyperlegible (with `system-ui, sans-serif` fallback), bundled as subset `woff2` in `./assets/fonts/`.
-**Numeric Font:** IBM Plex Mono (with `ui-monospace, monospace` fallback), bundled alongside.
+**Body / UI Font:** Atkinson Hyperlegible (with `system-ui, sans-serif` fallback), served via `@font-face` from the Supabase Storage CDN (ADR-086 — no more local `./assets/fonts/`).
+**Numeric Font:** IBM Plex Mono (with `ui-monospace, monospace` fallback), served alongside.
 
 **Character:** Atkinson Hyperlegible is purpose-built for legibility with disambiguated letterforms (1/l/I, 0/O), chosen so the struggling, low-vision, or reading-fatigued learner reads with the least effort. IBM Plex Mono is warm and humanist enough to sit beside it while keeping live values from jittering.
 

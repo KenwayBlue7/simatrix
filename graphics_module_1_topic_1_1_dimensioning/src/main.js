@@ -318,6 +318,21 @@ function markBooted() {
   }
   const fallback = document.getElementById('sim-fallback');
   if (fallback) fallback.hidden = true;
+  // Platform iframe contract (ADR-078): announce a displayable sim to the host loader.
+  // Gated on document.fonts.ready so the host never reveals us mid-FOUT.
+  document.fonts.ready.then(() => {
+    window.parent.postMessage({ type: 'sim:ready' }, '*');
+  });
+}
+
+/**
+ * Signal lesson completion to the host (ADR-078 addendum, revised): the learner
+ * clicked "Finish lesson" at the terminal step. Fires on every call, no latch —
+ * the host confirmed it supports repeated sim:complete triggers, so replaying the
+ * signal is expected, not a bug.
+ */
+function markComplete() {
+  window.parent.postMessage({ type: 'sim:complete' }, '*');
 }
 
 // ============================================================================
@@ -1640,6 +1655,8 @@ const simController = {
     showToast('All four worked examples read. That is the lesson.');
     announce('Lesson complete. You have read all four worked examples.');
   },
+
+  markComplete,
 
   reset() { window.simAPI.reset(); },
 

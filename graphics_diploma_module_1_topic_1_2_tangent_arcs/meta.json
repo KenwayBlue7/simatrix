@@ -1,0 +1,6 @@
+{
+  "title": "Tangent Arcs",
+  "description": "Four compass-and-straightedge tangent-arc constructions — to two straight lines, to a line and a circle (external and internal cases), and between two circles with a live toggle between the two solutions — each animated step by step with points of tangency marked and labelled, then set up as a textbook problem to verify.",
+  "difficulty": "intermediate",
+  "tags": ["diploma-engineering-graphics", "geometrical-constructions", "tangent-arcs", "guided-stepper", "2d-svg"]
+}

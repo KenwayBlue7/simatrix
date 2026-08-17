@@ -37,7 +37,7 @@ const SPOTLIGHTS = {
   'drawing-sheet': {
     tone: 'ink',
     // The sheet can be opened from Step 1, so this chip must not name apparatus the lesson
-    // has not reached yet — "focus" and "directrix" belong to Step 4 (RULES.md §6.27).
+    // has not reached yet — "focus" and "directrix" belong to Step 4 (RULES.md §6.31).
     text: 'The drawing sheet is the same curve again, drawn flat on paper the way an engineer would.',
   },
 };

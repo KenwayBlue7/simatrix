@@ -14,7 +14,7 @@
 // so main.js can drive it unchanged.
 
 /**
- * Per-step copy. Two sentences at most, everyday words first (ADR-086): the learner should
+ * Per-step copy. Two sentences at most, everyday words first (ADR-141): the learner should
  * be able to start doing the step from the lead alone, and meet the engineering name for
  * what they did afterwards — in the panel's own note, or in a term popover.
  */
@@ -53,6 +53,7 @@ export function initStepper(sim) {
   const elLead = $('step-lead');
   const btnBack = $('btn-back');
   const btnNext = $('btn-next');
+  const btnFinish = $('btn-finish');
   const btnCompleteNext = $('btn-complete-next');
 
   if (elTotal) elTotal.textContent = String(TOTAL);
@@ -89,18 +90,34 @@ export function initStepper(sim) {
     if (elCurrent) elCurrent.textContent = String(currentStep);
     if (btnBack) btnBack.hidden = currentStep === 1;
     if (btnNext) btnNext.hidden = currentStep >= TOTAL; // terminal step has no Next
-    // "Complete & next problem" replaces Next on the terminal step — the payoff moment.
-    // Label adapts to whether a textbook problem is loaded (free-play gets "Pick a
-    // problem", which still opens the library to choose a challenge).
+    // Finish lesson: takes over the footer's primary slot once Next hides at the terminal
+    // step. Ungated — every step here is a reading of the same live model (see `visited`
+    // above), so arrival at Step 6 already IS the payoff; confirmed against the sibling
+    // graphics_module_3_topic_2_development_of_surfaces, which carries a Problem Library
+    // too and is likewise ungated (the Diploma family's hasSolvedProblem() gate does not
+    // transfer to this KTU track).
+    //
+    // ONE loud action per step (DESIGN.md §5.1, ADR-121 + its 2026-08-09
+    // addendum). Three controls now share the terminal step, so the accent is assigned
+    // HERE, in one place, and none of the three carries btn--primary in the markup.
+    // "Set up a cut" is never the loud one at Step 6; the accent sits on the learner's
+    // real payoff — finishing the lesson in free play, or completing the problem they are
+    // part-way through. f8771ab (the Finish-button rollout) deleted this file's own
+    // ADR-121 toggle without replacing what it did — restored and extended here.
+    const solving = !!sim.isProblemActive?.();
+    if (btnFinish) {
+      btnFinish.hidden = currentStep < TOTAL;
+      btnFinish.classList.toggle('btn--primary', !solving);
+    }
+    // "Try another problem" (Finish-button rollout — renamed off "Complete & next
+    // problem"/"Pick a problem" wording since #btn-finish now owns the completion signal):
+    // stays the repeatable practice-loop action only, same label in both problem and
+    // free-play modes (still opens the library to choose a challenge either way). Loud
+    // only while a problem is loaded — mid-problem or already solved, it is the payoff
+    // and takes the accent back from Finish (ADR-121's own reasoning).
     if (btnCompleteNext) {
       btnCompleteNext.hidden = currentStep !== TOTAL;
-      const solving = !!sim.isProblemActive?.();
-      btnCompleteNext.textContent = solving ? 'Complete & next problem' : 'Pick a problem';
-      // ONE loud action per step (DESIGN.md §5.1). On the last step "Set up a cut" is the
-      // exercise, so it owns the accent; this control is loud only when it COMPLETES something.
-      // Mid-problem it is the payoff and takes the accent back. In free play it is one of three
-      // routes to the same library (the card header and the body copy are the others), and three
-      // full-width blue buttons on one panel means none of them is the primary.
+      btnCompleteNext.textContent = 'Try another problem';
       btnCompleteNext.classList.toggle('btn--primary', solving);
     }
   }
@@ -129,9 +146,15 @@ export function initStepper(sim) {
 
   btnNext?.addEventListener('click', () => { if (currentStep < TOTAL) goToStep(currentStep + 1); }, listen);
   btnBack?.addEventListener('click', () => goToStep(currentStep - 1), listen);
-  // Step 6 — complete & move on. completeAndNext (main.js) celebrates, clears any active
-  // problem, resets through the single path, and opens the Problem Library. The reset
-  // re-renders this chrome via reset()→goToStep(1), so no manual re-render is needed here.
+  // Finish lesson: posts sim:complete to the host (no latch — every click reposts,
+  // ADR-078 addendum revised). Own element, own listener — never a relabel of #btn-next.
+  btnFinish?.addEventListener('click', () => {
+    sim.markComplete?.();
+    sim.announce?.('Lesson marked complete.');
+  }, listen);
+  // "Try another problem" — completeAndNext (main.js) clears any active problem, resets
+  // through the single path, and opens the Problem Library. The reset re-renders this
+  // chrome via reset()→goToStep(1), so no manual re-render is needed here.
   btnCompleteNext?.addEventListener('click', () => sim.completeAndNext?.(), listen);
 
   // Rail jump — the current step or any already-visited step is a clickable shortcut.

@@ -156,7 +156,8 @@ graphics_module_1_topic_1_foundations/
 ├── meta.json             ← platform metadata (title, description, difficulty, tags)
 ├── CLAUDE.md             ← THIS plan
 ├── DESIGN.md             ← topic design tokens/spec (to add; inherits ../DESIGN.md)
-├── assets/fonts/         ← bundled woff2 (as Module 2)
+│                          (fonts: @font-face served from Supabase Storage CDN, ADR-086 —
+│                           no local assets/fonts/ anymore)
 └── src/
     ├── main.js           ← orchestrator: scene, OrbitControls, single rebuild(), rAF loop,
     │                       window.simAPI, the on-orbit (rAF-throttled) visible/hidden re-classify
@@ -180,6 +181,9 @@ allocation-light port and is the literal subject of "keep it."
   extensions on every import; all paths relative.
 - `meta.json` with all four fields; `window.simAPI` (`pause`/`resume`/`reset`); mobile notice
   `< 768px`; self-starting on load.
+- **`sim:ready` boot signal** (ADR-078, narrows ADR-002): `markBooted()` posts
+  `{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` — the one
+  sanctioned outbound `postMessage`. Do not add any other `postMessage`/inbound listener.
 - Single `rebuild()` is the only path for geometry change; full disposal contract every rebuild
   (verify `renderer.info.memory` stays flat across 50 rebuilds).
 - Engineering-textbook visual style: flat light, no cast shadows, `MeshPhongMaterial`

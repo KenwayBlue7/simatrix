@@ -240,17 +240,6 @@ let activeQuickView = null;
 /** Whether the Compare card is showing. Only the `compare` state machine writes it. */
 let compareOpen = false;
 
-/** 'compact' | 'expanded' — the card's footprint. 'compact' is the floating
- *  drawing card (ADR-012); 'expanded' is the true 50/50 workbench split (ADR-037),
- *  where the wizard collapses, the 3D viewport takes the left pane, the 2D drawing
- *  docks as the right pane, and the point drivers re-parent into a rail under both. */
-let compareSize = 'compact';
-
-/** compareDefaultSize (ADR-037): the footprint Compare OPENS in on desktop. Points
- *  opens straight into the 50/50 workbench (parity with Lines' ADR-021 mode), unlike
- *  Lines which defaults compact and expands into it. Mobile ignores this (bottom-sheet). */
-const COMPARE_DEFAULT_SIZE = 'expanded';
-
 /** Whether the compare-split workbench is currently mounted (ADR-037). */
 let workbenchOpen = false;
 
@@ -388,6 +377,21 @@ function markBooted() {
   }
   const fallback = document.getElementById('sim-fallback');
   if (fallback) fallback.hidden = true;
+  // Platform iframe contract (ADR-078): announce a displayable sim to the host loader.
+  // Gated on document.fonts.ready so the host never reveals us mid-FOUT.
+  document.fonts.ready.then(() => {
+    window.parent.postMessage({ type: 'sim:ready' }, '*');
+  });
+}
+
+/**
+ * Signal lesson completion to the host (ADR-078 addendum, revised): the learner
+ * clicked "Finish lesson" at the terminal step. Fires on every call, no latch —
+ * the host confirmed it supports repeated sim:complete triggers, so replaying the
+ * signal is expected, not a bug.
+ */
+function markComplete() {
+  window.parent.postMessage({ type: 'sim:complete' }, '*');
 }
 
 // ============================================================================
@@ -611,6 +615,7 @@ function commit(patch) {
 const simController = {
   announce,
   showToast,
+  markComplete,
 
   /** Read-only snapshots — leaves never hold live references to the state. */
   getData: () => ({ ...currentData }),
@@ -718,13 +723,13 @@ const simController = {
   fold() {
     if (folded) return;
     folded = true;
-    driveFold(FOLD_ANGLE);
+    driveFold(FOLD_ANGLE, { snap: true });
     labelLayer?.setSymbol(true); // the BIS first-angle badge rides the fold
   },
   unfold() {
     if (!folded) return;
     folded = false;
-    driveFold(0);
+    driveFold(0, { snap: true });
     labelLayer?.setSymbol(false);
   },
 
@@ -806,6 +811,18 @@ function completeAndNext() {
  *  instead of dragging a short arc over the full 1600 ms. Pure transforms every
  *  frame — no rebuild while swinging.
  *
+ *  `snap` (the two explicit simController entry points — fold()/unfold(), whatever UI
+ *  path calls them: the wizard's Animate-Unfolding/Fold-back buttons, the Front quick-view
+ *  chip's re-click reversal, enterWorkbench's return-to-3D) forces foldAngle to the CLEAN
+ *  rest state opposite `toAngle` (0 or FOLD_ANGLE) before the arc is computed, so arc is
+ *  always 1 and the swing always plays the full FOLD_MS — a deliberately WATCHED animation
+ *  must always take the same visible time, never a shortened resume caught mid-reversal
+ *  (bug: unfolding, then re-folding before the reverse settled, could arc down to a few
+ *  percent of FOLD_MS — a near-instant snap that read as "the fold is broken/too fast").
+ *  Unsnapped (default) is applyView()'s own silent step-navigation sync — that path isn't a
+ *  moment the learner is watching a hinge swing on, so it keeps the proportional resume:
+ *  stepping back while already reversing shouldn't stall nav behind a fixed 1600 ms wait.
+ *
  *  ADR-036 (orthographic fold swoop — OVERTURNS ADR-013's held-angle hold): the fold OWNS the
  *  camera. Any in-flight quadrant flight is cancelled and the open Compare card closes (it
  *  re-opens against the new fold state on demand — ADR-012). Forward, the ORTHOGRAPHIC camera
@@ -818,9 +835,17 @@ function completeAndNext() {
  *  curve, so they read as one movement. Held-angle perspective folds are FORBIDDEN (RULES.md).
  *  Reduced motion snaps both (anim.js lands tweens on their end value immediately;
  *  restorePerspective's guard hands off instantly). */
-function driveFold(toAngle) {
+function driveFold(toAngle, { snap = false } = {}) {
   foldTween?.cancel();
   foldTarget = toAngle;
+  if (snap) {
+    // Land the hinge (+ every leaf riding it) at the clean rest state BEFORE the arc
+    // calc, so an interrupted prior swing can never shrink this one's duration.
+    foldAngle = toAngle === FOLD_ANGLE ? 0 : FOLD_ANGLE;
+    hvPlanes?.setFoldAngle(foldAngle);
+    pointRig?.setFoldAngle(foldAngle);
+    labelLayer?.setFoldAngle(foldAngle);
+  }
   const arc = Math.abs(toAngle - foldAngle) / FOLD_ANGLE;
   const duration = FOLD_MS * arc;
 
@@ -941,15 +966,15 @@ function syncCompareChipVisibility() {
 }
 
 const compare = {
-  show(size) {
+  show() {
     if (foldTween) return; // the fold owns the camera + card (ADR-013)
     compareOpen = true;
     resetCompareView(); // every fresh open starts centred and unzoomed
     if (compareCard) compareCard.hidden = false;
-    // Desktop opens straight into the 50/50 workbench (COMPARE_DEFAULT_SIZE);
-    // mobile has no workbench, so it opens the compact bottom-sheet. applyCompareSize
-    // owns the data-size + workbench mount and repaints.
-    applyCompareSize(size || (isWorkbenchViewport() ? COMPARE_DEFAULT_SIZE : 'compact'));
+    // Compare has exactly one shape now (ADR-080) — always the docked split, at every
+    // viewport width.
+    enterWorkbench();
+    remeasureAfterReflow(); // the grid reflow isn't laid out on frame 1 — measure after 2 frames
     updateCompareChip();
     announce('Compare view opened — 2D drawing.');
   },
@@ -984,25 +1009,10 @@ const compare = {
 // wherever the node lives — one source of truth. Because handleResize() measures
 // #sim-viewport, once that box IS the left pane the renderer resizes correctly with
 // no sizing change; drawCompare() measures its own stage, so it fills the right pane.
-// Desktop-only — mobile keeps the bottom-sheet Compare.
+// Compare has exactly one shape at every viewport width (ADR-080) — below 768px the
+// same docked grid restacks to a single column via CSS instead of falling back to a
+// different Compare UI.
 // ============================================================================
-
-/** The workbench is a desktop affordance (ADR-021 parity); < 768px keeps the
- *  bottom-sheet Compare. Matches the sim's mobile breakpoint. */
-function isWorkbenchViewport() {
-  return window.matchMedia('(min-width: 768px)').matches;
-}
-
-/** Set the compare footprint and mount/unmount the workbench to match. 'expanded'
- *  enters the split (desktop only); anything else is the compact floating card. */
-function applyCompareSize(size) {
-  const wantSplit = size === 'expanded' && isWorkbenchViewport();
-  compareSize = wantSplit ? 'expanded' : 'compact';
-  if (compareCard) compareCard.dataset.size = compareSize;
-  if (wantSplit) enterWorkbench();
-  else exitWorkbench();
-  remeasureAfterReflow();        // TWO frames — the grid reflow isn't laid out on frame 1 (see helper)
-}
 
 /** The docked rail, created once and kept for the session. */
 function ensureWorkbenchRail() {
@@ -1033,7 +1043,8 @@ function enterWorkbench() {
   }
 
   // Re-parent the drawing card out to <body> so the grid can place it as the right
-  // pane (compact anchors absolutely inside #sim-viewport, which is now the left pane).
+  // pane (the card is a plain grid cell in the split — ADR-080 — not absolutely
+  // positioned, but it still needs to leave #sim-viewport to become a body-level sibling).
   if (compareCard && compareCard.parentElement !== document.body) {
     document.body.appendChild(compareCard);
   }
@@ -1056,7 +1067,7 @@ function exitWorkbench() {
   syncRailToggleState(false); // pair the class reset with a facet sync (button is hidden here, but
                               // keeps the invariant symmetric with enterWorkbench's forced-open sync)
 
-  // Card back inside the viewport (the positioned ancestor compact anchors to).
+  // Card back inside the viewport, its normal-flow parent outside the split.
   if (compareCard && viewport && compareCard.parentElement !== viewport) {
     viewport.appendChild(compareCard);
   }
@@ -1316,37 +1327,15 @@ function drawCompare() {
   mark(yTop, hpCol, 'p');
 }
 
-/** Bind + wire the Compare chrome once at boot: the chip toggles the card, the
- *  head buttons close / resize it. The expand button flips compact ↔ expanded
- *  and repaints on the next frame, after the new card size has settled. */
+/** Bind + wire the Compare chrome once at boot: the chip is Compare's only
+ *  open/close control (ADR-080) — there is no separate expand/close head chrome
+ *  and no breakpoint fallback to a floating card. */
 function setupCompareCard() {
   compareCard = document.getElementById('compare-card');
   compareChip = document.getElementById('compare-chip');
   compareCanvas = document.getElementById('compare-canvas');
 
   compareChip?.addEventListener('click', () => compare.toggle());
-  document.getElementById('compare-close')?.addEventListener('click', () => compare.hide());
-
-  const expandBtn = document.getElementById('compare-expand');
-  const syncExpandBtn = () => {
-    const expanded = compareSize === 'expanded';
-    expandBtn?.setAttribute('aria-label', expanded ? 'Shrink to floating card' : 'Expand to split view');
-    if (expandBtn) expandBtn.title = expanded ? 'Shrink' : 'Expand';
-  };
-  syncExpandBtn();
-  expandBtn?.addEventListener('click', () => {
-    // Toggle the 50/50 workbench split (expanded) ↔ the floating card (compact).
-    applyCompareSize(compareSize === 'expanded' ? 'compact' : 'expanded');
-    syncExpandBtn();
-    announce(compareSize === 'expanded' ? 'Compare view expanded to split.' : 'Compare view shrunk to card.');
-  });
-
-  // The workbench is desktop-only (ADR-021 parity). If the viewport narrows below
-  // the mobile breakpoint while the split is up, drop back to the bottom-sheet card
-  // so the layout never wedges between the grid and the mobile stack.
-  window.matchMedia('(min-width: 768px)').addEventListener('change', (e) => {
-    if (!e.matches && workbenchOpen) { applyCompareSize('compact'); syncExpandBtn(); }
-  });
 
   setupComparePan();
 }
@@ -1856,15 +1845,15 @@ function setupWizardToggle() {
   if (!btn) return;
 
   btn.addEventListener('click', () => {
-    // In the workbench split the wizard is collapsed BY the split; the chevron's
-    // job there is to bring the steps back — i.e. shrink out of the split (ADR-037,
-    // mirroring ADR-021). handleResize + the aria-expanded reset happen inside
-    // applyCompareSize → its rAF, so fall through after.
+    // In the workbench split the wizard is collapsed BY the split; the chevron's job
+    // there is to bring the steps back — i.e. close Compare entirely, since the split
+    // is Compare's only shape now (ADR-080, mirroring ADR-037/ADR-021's original
+    // "shrink out of the split").
     if (workbenchOpen) {
-      applyCompareSize('compact');
+      compare.hide();
       btn.setAttribute('aria-expanded', 'true');
       btn.title = 'Hide steps panel';
-      announce('Left the split — steps panel shown.');
+      announce('Compare closed — steps panel shown.');
       return;
     }
     const collapsed = document.body.classList.toggle('wizard-collapsed');

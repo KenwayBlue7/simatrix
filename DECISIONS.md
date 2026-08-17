@@ -75,7 +75,10 @@ access and makes no runtime network calls beyond the CDN. Harder/constraint: the
 button **must** route through `simAPI.reset()` — there is exactly one reset path, no second one.
 The actual host-side code that calls `simAPI.*` lives in the separate host repo and is **not
 verifiable here** (ARCHITECTURE.md §6 flags the exact wiring as "needs review").
-**Status:** Active
+**Status:** Narrowed by ADR-078 (and its 2026-07-28 addendum) — the blanket "no `postMessage`" ban
+no longer holds; two sanctioned outbound messages (`sim:ready`, `sim:complete`) are now part of the
+contract. `window.simAPI` remains the sole *inbound* control surface; nothing here about
+`simAPI`/`meta.json`/the reset-path rule changes.
 
 ---
 
@@ -379,6 +382,29 @@ Harder: a lesson must supply an accurate `contentBox` (returning the whole `S3.g
 the 60-unit grid and never fit); the boot path and edit path must stay distinguishable so the right
 one runs.
 **Status:** Active (supersedes the per-frame exponential follow)
+
+**Addendum (2026-07-25):** Ported into `graphics_module_1_topic_5_projection_of_line_types` and
+`graphics_module_1_topic_6_projection_of_straight_lines`, the fix for the camera-framing gap ADR-079
+flagged and explicitly left open. Two adaptations, both scoped to these two topics:
+1. **Split detect/move pivot.** Both prior ports (Module 2, Module 1's engine.js) pivot the fit
+   distance on the same point they move the camera toward. In these topics the default orbit
+   `target` sits measurably off the content box's centre (the drawing is one-quadrant-only, ADR-079),
+   so engine.js's steady-state guard (`target ≈ centre`) does not hold at defaults — a straight port
+   would pan the target on the very first rebuild, an unrequested drift at boot. Fixed by **detecting**
+   clipping with the fit pivoted on the *live, unmoved* `controls.target` (so a value that already
+   fits leaves the pose untouched, exactly matching pre-port framing) and only pivoting the **move**
+   destination on the box centre once a push-back is actually warranted (engine.js's fix for pivot
+   lurch still applies once movement is happening).
+2. **No boot/reset tight-fit branch.** Both topics keep their existing fixed `CAMERA_POSITION`/
+   `CAMERA_TARGET` pose on boot/reset rather than adding a `frameToSolid`-style fit — ADR-079 verified
+   that pose's default framing by live screenshot the same day, and the tight-fit/push-back XOR this
+   ADR requires is satisfied trivially (boot/reset never fits, edits only push back).
+Verified (headless, projected content-box corners into camera NDC space): worst-case typed values in
+both topics stay inside frame after the dolly settles; default/typical values produce zero camera
+movement; a manual grab (`OrbitControls` `'start'`) cancels an in-flight dolly with the camera frozen
+in place; the fold swoop and quick-view ortho engage own the camera with no interference (per §5.10).
+topic_5 additionally sequences this against its own per-step `frameStep()` vantage glide via a
+`stepFraming` guard, so the two movers never race from the same outgoing pose.
 
 ---
 
@@ -1441,7 +1467,9 @@ PP-tagged buffer in `castProjectors()` target `x = +H`. The exploded pane offset
 longer a fixed constant — it is now computed per rebuild from the domain object's live bounding box
 (see ADR-045), so `createGlassBox()`/`castProjectors()` take an options object instead of positional
 args. `--color-hp/vp/pp-line` tokens are still the only colour source (ADR-003 unaffected).
-**Status:** Active — grid matrices + PP placement stand; the PP **fold clause** superseded by ADR-049
+**Status:** Active — grid matrices + PP placement stand. The PP **fold clause** was superseded by
+ADR-049 (2026-07-13) and then **restored** by ADR-108 (2026-08-04), which found ADR-049's "Module 2
+parity" fold to be the actual regression — see ADR-108.
 
 ---
 
@@ -1640,7 +1668,13 @@ Observer icon get their own `.visible` writes in `applyPlaneOpacity()`/`applyFol
 disposal traversal pulls CSS2D DOM nodes from the overlay per RULES.md §3.5 (`disposeObj` handles
 `isCSS2DObject`), since the auto-remove listener only fires for a directly-removed child, not a
 descendant of a cleared group.
-**Status:** Active (supersedes ADR-044's fold clause; ADR-044's PP placement stands)
+**Status:** The **fold clause** (item 1) is superseded by ADR-108 (2026-08-04: "beside the top view"
+is wrong first-angle convention — Side must share the FRONT view's band, not the Top view's;
+ADR-044's original fold-placement reasoning was correct and this ADR's reversal of it was the
+regression, traced to a bad "Module 2 parity" citation — Module 2 itself carried the same bug at
+the time, fixed separately by ADR-106). ADR-044's PP placement (+X, viewing direction −X) is
+unaffected and stands, as do this ADR's other three clauses (exploded planes, CSS2D plane pills,
+CSS2D Observer icon) — only the fold hinge/direction is reverted, by ADR-108.
 
 ---
 
@@ -1946,7 +1980,9 @@ ADR-052 live-auto-fit era and was never re-derived against ADR-053's world-origi
 **Verify:** via CDP, read the XY line's painted canvas Y (temp probe mirroring the `__dbg`
 pattern used in ADR-054/055's verification) before and after moving **Distance from HP** from 0
 to 50; assert byte-identical. Same check for X1-Y1's canvas X under **Distance from VP**.
-**Status:** Active
+**Status:** Active (amended by ADR-106 — X1-Y1's identity is the VP∩PP hinge, not HP∩PP, and its
+length now spans the Front+Side block, not Top+Side; its analytic position formula, `x1X = -z0`,
+and its slider-invariance proof are unchanged)
 
 ---
 
@@ -2740,6 +2776,3255 @@ via the initial `lookAt`) — pan/zoom only ever touch `position.xy`/`zoom`, nev
 so `setResolution()`'s aspect/frustum recompute on resize composes for free without resetting the
 learner's pan/zoom. `compareSheet.js` in both topics stays byte-parity (as it was pre-existing).
 **Status:** Active.
+
+---
+
+## ADR-078: One sanctioned outbound `postMessage` — `sim:ready` — narrows ADR-002
+
+**Date:** 2026-07-24
+**Decision:** Every sim now emits exactly one outbound message to the host,
+`window.parent.postMessage({ type: 'sim:ready' }, '*')`, fired once from `markBooted()` after
+`document.fonts.ready` resolves — i.e. after the boot watchdog (`__simBootTimer`) would already
+consider the sim successfully booted, and after webfonts are painted so the host never reveals a
+FOUT'd sim. This is the **only** direction of the message (sim → host); the sim still reads nothing
+back via `postMessage` and installs no `message` listener. `window.simAPI` (`pause`/`resume`/`reset`)
+remains the sole *inbound* control surface — this ADR does not touch it.
+**Why:** The host platform's outer loading screen (built by the separate web team) previously had no
+reliable signal for "this iframe is actually displayable" and had to guess, either closing the
+loader over an incomplete scene or holding it open past when the sim was ready. `window.simAPI` is a
+host→sim call surface; it cannot carry a sim→host event, so an outbound channel was unavoidable for
+this one signal. `postMessage` targeting `'*'` was chosen over a fixed origin because the host origin
+is not knowable at build time (the payload is served from "an arbitrary URL prefix," ADR-001) and the
+message payload (`{ type: 'sim:ready' }`) carries no sensitive data, so origin-restriction has no
+security benefit here.
+**Alternatives rejected:** Leaving ADR-002's ban intact and inferring readiness from the iframe's
+`load` event — rejected because `load` fires on document/script load, not on "the 3D scene has
+actually rendered a frame," which is exactly the premature-reveal failure mode the web team reported.
+Polling `window.__simBooted` from the host via a repeated read — rejected as impossible; cross-origin
+iframes cannot read the child's globals synchronously, which is the same reason ADR-002 needed
+`simAPI` as an explicit call surface in the first place. A bidirectional `postMessage` handshake
+(host asks "ready?", sim answers) — rejected as unnecessary complexity; a single fire-once event is
+sufficient since the host already owns its own fallback timeout.
+**Consequences:** Easier: the host loading screen can close exactly on scene-readiness instead of
+guessing. Harder/constraint: `RULES.md §2.10`, `PLATFORM-RULES.md §1.10`/§273, and `ARCHITECTURE.md
+§6` all stated a blanket postMessage ban and needed updating to name this one exception explicitly,
+so the rule stays enforceable rather than quietly violated. Every current topic's `markBooted()` is
+byte-identical, so the change is one identical patch across 10 topics + `template_starter` (so future
+topics inherit it for free); the two capital-letter legacy monoliths (`Module1/`, `Module2/`) were
+left out of this pass — `Module1` has no `markBooted()`/boot-tracking equivalent to hook at all, and
+both are superseded by the split topics, so a decision on their live-embed status was deferred back
+to whoever owns them rather than assumed here.
+**Status:** Active
+
+**Addendum (2026-07-28): a second sanctioned outbound message, `sim:complete`.** The host gained a
+second need — a "next topic / stay" overlay it can only show once it knows the learner *finished*
+the lesson, not merely that the iframe booted. This addendum extends the ADR-078 contract (not a
+new ADR — same decision, same mechanism, a second trigger point) to a second message:
+`window.parent.postMessage({ type: 'sim:complete' }, '*')`, fired from a new `markComplete()`
+sitting beside `markBooted()`. `markComplete()`'s body is byte-identical across every topic that
+carries it (verified by hash), the same parity property as `markBooted()`:
+```js
+function markComplete() {
+  if (window.__simComplete) return;
+  window.__simComplete = true;
+  window.parent.postMessage({ type: 'sim:complete' }, '*');
+}
+```
+**Fires at most once per page load; the `window.__simComplete` latch is deliberately NOT cleared by
+`simAPI.reset()`** — replaying a finished lesson never re-opens the host overlay. This is a
+considered departure from several topics' own in-sim celebration toasts (e.g.
+`graphics_module_1_topic_4_understanding_orthographic_views`'s `lessonCompleteShown`, which *does*
+re-arm on stepping back off the terminal step): the in-sim UI is free to re-celebrate on every
+visit, but the outbound signal to the host is a one-time event, because a host overlay that could
+reopen mid-session would be a worse experience than one that never returns after the first win.
+The payload stays bare (`{ type: 'sim:complete' }`, no topic id or metadata) to preserve
+`sim:ready`'s byte-parity property — the host already knows which iframe it loaded and can
+attribute the event itself. *(Revised 2026-07-31 for Module 2 specifically, then platform-wide the
+same day — see the addenda below. This paragraph is historical: it describes the retired latched
+shape, now migrated everywhere.)*
+
+**Call-site placement varies by topic, same as `markBooted()`'s per-topic call site does** — each
+topic hooks its own existing notion of "finished" rather than a uniform signal, on the reasoning
+that the most honest completion signal is the topic's real payoff moment, not a generic "reached
+the last step" click-through:
+- `graphics_module_1_topic_1_foundations`, `..._topic_2_spatial_framework`, `..._topic_3_points`,
+  `..._topic_4_understanding_orthographic_views`, `..._topic_6_projection_of_straight_lines`, and
+  `graphics_module_2_topic_2_simple_positions` hook an existing semantic payoff already latched
+  in-sim (a dimension reveal, first arrival at a stepper's terminal step, a first fold/rabatment,
+  a first flatten).
+- `graphics_module_1_topic_5_projection_of_line_types`, `graphics_module_3_topic_1_sections_of_solids`,
+  `graphics_module_3_topic_2_development_of_surfaces`, and `template_starter` have no such payoff
+  (a conceptual tour with no answer gates, or a terminal step whose own arrival *is* the payoff), so
+  they use a uniform "first arrival at the terminal step" guard instead, the same
+  `highestVisited`/`visited`-Set idiom `graphics_module_1_topic_2_spatial_framework`'s stepper
+  already used for its own in-sim toast.
+- Several topics' "Complete & next problem" button (`completeAndNext()`) was deliberately **not**
+  used as the hook — that action calls `simAPI.reset()` in the same click, which would fight the
+  "never re-arm" rule above; the fold/flatten/dimension-reveal moment that precedes it is the real
+  finish line. *(The "never re-arm" rule itself is struck by the 2026-07-31 addendum below; this
+  bullet documents why the original 9-topic pass made this call under the old constraint.)*
+
+**Excluded: `graphics_module_2_topic_1_introduction`.** This topic is a free-browse anatomy
+gallery with no stepper, no steps, and no progress tracking (`src/gallery.js` tracks no
+visited/viewed set) — there is no "finished" state to hook without inventing a completion rule
+(e.g. "all 11 solids viewed"), which is a product decision, not something this pass should assume.
+It continues to emit `sim:ready` only. `Module1/` stays out of scope for the same reason ADR-078
+deferred it originally. `Module2/` is no longer out of scope — see the 2026-07-31 addendum below,
+which is where it picked up both signals.
+
+**Addendum (2026-07-31): `sim:complete` becomes re-fireable — the "never re-arm" rule above is
+struck.** Host-side confirmed (Abhiram) the platform now supports repeated `sim:complete` triggers,
+not just a first-arrival latch — the practical driver was Module 2's "Finish lesson" button pilot
+(a new footer-nav button replacing the terminal step's `Next` slot, calling `markComplete()` on
+click instead of an auto-detected payoff moment), which needs every click to notify the host,
+including a second visit after "Try another problem" resets the bench and the learner re-flattens.
+`markComplete()` drops the `window.__simComplete` guard entirely:
+```js
+function markComplete() {
+  window.parent.postMessage({ type: 'sim:complete' }, '*');
+}
+```
+Fires on every call, full stop — no per-page-load ceiling, no reset-immunity clause to reason
+about. **`sim:ready` is unaffected by this addendum** — `markBooted()` keeps its existing one-shot
+shape; it was never a per-click signal, and `init()` itself only runs once (self-start, no external
+`init()` call, CLAUDE.md), so there was never a latch to remove there.
+
+This also **retires** the "replaying a finished lesson never re-opens the host overlay" design
+intent the 2026-07-28 text above asserted as settled — the host can now re-open it, by design, on
+every fire — and the reasoning that excluded `completeAndNext()` as a hook because it "would fight
+the never re-arm rule": that specific constraint no longer exists, though `completeAndNext()`
+remains a poor hook on its own terms (it resets the bench synchronously, still a confusing moment
+to also fire a lesson-complete signal from). Module 2's pilot uses a dedicated `#btn-finish`
+instead, not `completeAndNext()`.
+
+**Pilot, then rolled out.** `Module2/` shipped the button-driven, latchless `markComplete()` first
+(a `markBooted()`/`sim:ready` catch-up alongside it). The same day, the pattern rolled out to 7 of
+the 9 KTU auto-firing topics (`graphics_module_1_topic_2_spatial_framework`,
+`graphics_module_1_topic_3_points`, `graphics_module_1_topic_5_projection_of_line_types`,
+`graphics_module_1_topic_6_projection_of_straight_lines`,
+`graphics_module_2_topic_2_simple_positions`, `graphics_module_3_topic_1_sections_of_solids`,
+`graphics_module_3_topic_2_development_of_surfaces`) and, separately, to all 9 Diploma Engineering
+Graphics topics (see the Diploma paragraph below — a gated variant, not a straight port).
+`template_starter` carried the **old**, latched `markComplete()` body quoted in the 2026-07-28
+addendum above for the rest of that day; it migrated too, later the same day — see the final
+2026-07-31 addendum below, which closes out the rollout entirely.
+
+**2026-07-31, migration completed for the last 2 shipped-topic stragglers.**
+`graphics_module_1_topic_1_foundations` and `graphics_module_1_topic_4_understanding_orthographic_views`
+both migrated to the button-driven, latchless pattern, closing out the rollout across every shipped
+topic (the scaffold, `template_starter`, followed the same day — see the final addendum below):
+- `graphics_module_1_topic_1_foundations` follows the standard footer-nav placement (`#btn-finish`
+  takes `#btn-next`'s slot at terminal Step 4), gated on `state.dimensions` — the Step-4 dimensions
+  reveal is the lesson's real content payoff, not mere step arrival, same reasoning as `points`'
+  `isFolded()` gate.
+- `graphics_module_1_topic_4_understanding_orthographic_views` **deviates from the standard
+  placement**: `#btn-finish` lives in `#workbench-rail` beside "Back to Step 4" and the
+  Fold/Unfold toggle, not the footer nav, because `body.compare-split #wizard { display: none; }`
+  hides the entire wizard (including the footer) for all of Step 5 — the rail is the only surface
+  reachable there. It is **ungated**: this stepper's Next has no per-step completion gate at all
+  (unlike `points`/Diploma), and Step 5's own arrival already auto-drives the box-unfold, the
+  topic's real payoff, so there is no separate in-step action left to gate on. The old
+  arrival-triggered "Lesson complete" toast and its `lessonCompleteShown` re-arm-on-step-back latch
+  are retired along with the auto-fire — the host signal is now solely the button's job, matching
+  Module 2 (no separate arrival celebration). The Fold/Unfold toggle also lost its accent-fill-when-
+  -pressed styling (now plain paper/bordered in both states) so "Finish lesson" is the rail's one
+  accent-filled action; its toggle behaviour and label-swap were already correct pre-existing code,
+  untouched by this pass.
+
+`template_starter` migrated the same day (see the final addendum below) — nothing in the field
+still carries the old auto-triggered, one-shot `markComplete()` shape.
+**Status:** Active
+
+**Note (2026-07-31):** The Diploma Engineering Graphics track (`feat/diplomaMod1`) independently
+arrived at this same `sim:ready`/`sim:complete` contract before this ADR reached that branch,
+recorded there as its own ADR-081 with a Diploma-only carve-out. That ADR is retired on merge —
+its decision was already made here, platform-wide, and this ADR's scope covers the Diploma track
+too. See ADR-095 (that track's renumbered founding decision) for where its independent version
+used to live.
+
+**Diploma rollout (2026-07-31, Phase C — completes the migration for this track):** all 9 Diploma
+topics (`graphics_diploma_module_1_topic_1_1_basic_constructions` through `_1_6_ogee_curves`,
+`_2_1_roulettes` through `_2_3_helix`) replaced their passive auto-fire (`problemLibrary.js`
+detecting a self-check match and calling `main.js`'s one-shot `reportComplete()`/`completeSent`)
+with the same `#btn-finish` pattern — but **gated**, not ungated like
+`graphics_module_1_topic_2_spatial_framework` / `graphics_module_3_topic_1_sections_of_solids` /
+`graphics_module_3_topic_2_development_of_surfaces` above. Diploma's 4-step wizard makes the
+terminal step ("Verify") cheap to reach — pick a construction, click Next three times, nothing
+solved — so `#btn-finish` stays `disabled` until a Problem Library problem has matched at least
+once (`main.js`'s `solvedAny` flag, exposed as `hasSolvedProblem()`; `problemLibrary.js`'s
+`solvedFired` latch now calls `sim.onProblemSolved()` instead of firing the host signal directly).
+This preserves the completion meaning the deleted auto-fire actually had, rather than degrading it
+to mere step-arrival. `solvedAny` is deliberately not cleared by `simAPI.reset()` — the same
+reset-immunity the retired `completeSent` latch carried.
+
+**Addendum (2026-07-31): `template_starter` migrates — rollout is now 100% complete platform-wide.**
+The scaffold was the last file anywhere still carrying the retired auto-fire/latch shape (it was
+deliberately deferred at the top of this rollout, on the reasoning that "a starter template has no
+stepper of its own to hook a Finish button into until a real topic is cut from it" — but it *does*
+ship its own 3-step placeholder stepper for demo purposes, and that stepper was still calling the
+old `markComplete()` shape on first arrival at its terminal step, so it was carrying the exact bug
+a topic cloned from it would have inherited). Fixed to match every other migrated topic:
+`markComplete()` in `main.js` drops the `window.__simComplete` guard (one-line latchless body,
+byte-identical in shape to `Module2/`'s); `stepper.js` removes the `firstArrival`/`visited.has(TOTAL)`
+auto-fire check from `goToStep()` entirely and instead wires a `#btn-finish` click listener (added
+to the `sim` JSDoc typedef, which had never declared `markComplete` despite calling it); `index.html`
+gains the `#btn-finish` button in `.card__nav`, after `#btn-next`.
+**Ungated**, matching `graphics_module_1_topic_4_understanding_orthographic_views`'s precedent, not
+Module 2's/Foundations'/Diploma's gated forms — the starter has no domain state to gate on, the same
+reasoning that made it ungated in the first place, not an oversight this time.
+**New this pass:** `MODULE-STARTER.md` gains a §3.11 documenting the whole pattern for anyone
+building a new topic from this template — what `#btn-finish` is, that `markComplete()` is latchless
+by platform rule (citing this ADR), and, most importantly, that a new topic should **decide its own
+gate condition** rather than reflexively copying the starter's ungated form, citing `state.flattened`/
+`state.dimensions`/`isFolded()`/`hasSolvedProblem()` as gated precedents and
+`understanding_orthographic_views` as the deliberate ungated one. This closes the one remaining gap
+the rollout kept flagging: the pattern existed everywhere in shipped code but nowhere in the
+building-a-new-topic playbook, so a topic cut from the template before this pass would have silently
+regressed to the retired shape with no rule telling its author otherwise.
+Verified via CDP: page loads clean (zero console errors), `#btn-next`/`#btn-finish` are mutually
+exclusive at the terminal step (arrival alone fires nothing), and two `#btn-finish` clicks produce
+two `sim:complete` messages (latchless, not two-then-silence).
+**Status:** Active — the Finish-button migration is complete across every file in the repo that
+carries a stepper; there is no remaining "old pattern" instance to track.
+
+**Addendum (2026-08-09): `graphics_diploma_module_1_topic_1_4_regular_polygons` carve-out from
+the Diploma-wide gated form.** Per explicit user decision (not a rediscovery of the Diploma
+rationale above — that reasoning still holds for the other 8 Diploma topics), Topic 1.4 alone
+unlocks `#btn-finish` on reaching the Verify step, no Problem Library match required. `main.js`
+adds a second, separate flag (`verifyReached`, distinct from `solvedAny` — not a reuse of
+`onProblemSolved()`, so "solved" keeps meaning solved) set by a `MutationObserver` on the Verify
+panel's (`.step-panel[data-step="4"]`) `hidden` attribute; `hasSolvedProblem()` returns
+`solvedAny || verifyReached`. `stepper.js` itself is untouched — the observer watches a DOM node
+`stepper.js` already toggles, rather than adding a step-4-entry hook to the per-topic-copied
+`goToStep()`, so this topic's `stepper.js` stays byte-identical to its 8 Diploma siblings
+(CLAUDE.md's EXTRACTED/unchanged audit note for that file holds). Scope is this one topic only;
+the platform-wide `sim:complete` mechanism (`markComplete()`, this ADR's main body) and the other
+8 Diploma topics' gated form are unaffected.
+**Status:** Active.
+
+---
+
+## ADR-079: The Lines topics' 3D reference planes are OFFSET into the used quadrant, sized to the typed-field ceiling, overturning the earlier 60→24 `SHEET` shrink's stated rationale
+
+**Date:** 2026-07-25
+**Decision:** In `graphics_module_1_topic_6_projection_of_straight_lines/src/lineRig.js` and
+`graphics_module_1_topic_5_projection_of_line_types/src/lineTypeRig.js`, the HP/VP reference
+planes are no longer centred on the origin. `referencePlane()` gained a world-space `offset`
+parameter (a `THREE.Vector3`, applied to the mesh, the grid vertices, and the border after
+`applyEuler` — i.e. after rotation, the same order `Object3D` composes its own transform, so a
+"push +y" offset stays a world +y push regardless of which local axis the plane's `euler` maps
+onto it). Both planes are offset by a new `PLANE_LIFT` constant along the axis the drawing
+actually uses (VP: `+y`; HP: `+z`), so a plane's full `SHEET × SHEET` extent sits in
+`[-6, SHEET-6]` instead of straddling `[-SHEET/2, +SHEET/2]`. `SHEET` itself grew: topic 6
+24 → 44 (`PLANE_LIFT = 16`), topic 5 24 → 32 (`PLANE_LIFT = 10`); `GRID.divs` scaled in step in
+both files so the cell stays the 1.0u = 10 mm engineering grid. `labels/LabelPlacement.js`'s
+`PLANE_HP_ANCHOR`/`PLANE_VP_ANCHOR`/`AXIS_X_ANCHOR`/`AXIS_Y_ANCHOR` (both topics) were
+repositioned to track the new edges — they are hand-placed constants, not derived from `SHEET`.
+**Why:** Live repro (driving both sims to their typed-field maxima, not just the slider maxima)
+found the prior 24u sizing wrong on two counts. First, `referencePlane()` builds a
+`PlaneGeometry(s, s)` centred at the origin, but the line data is constrained to the first
+quadrant (`aHP`/`aVP` ≥ 0, and the resolver's `dy`/`dz` ≥ 0 in every case), so the `-y`/`-z` half
+of every plane was geometrically unreachable — the real usable ceiling was `SHEET/2` (120 mm),
+not `SHEET` (240 mm), roughly twice as tight as the original sizing assumed. Second, `uiManager.js`
+`DRIVERS` gives the typed numeric fields a deliberately wider ceiling than the sliders ("a wider
+ceiling for exact textbook values": TL `inputMax` 200 vs. slider max 150; topic 6's `aHP`/`aVP`
+`inputMax` 150 vs. slider max 100) — reachable today by typing a value, so sizing against the
+slider max left a reachable overrun in place. Together this explains why the reported overrun was
+worse than the "250mm vs. 240mm" estimate that motivated the original bug report. This directly
+overturns the stated rationale of the prior `SHEET` 60→24 shrink (this topic's own CHANGELOG,
+2026-07-1x entries, and both `CLAUDE.md` Architecture sections): that pass sized the sheet to "a
+centred 150mm line's views" under the Points ~87%-fill philosophy, which is a correct read of the
+*visual* framing goal but did not account for the planes being origin-centred while the data is
+one-quadrant-only, nor for the typed-field ceiling above the sliders.
+**Alternatives rejected:** A symmetric enlargement (just grow `SHEET`, keep planes origin-centred)
+was rejected — it would need roughly 2.5× the area of the offset fix to cover the same worst case
+(most of it on the permanently-dead negative side), reintroducing the exact "vast sparse grid, tiny
+line" problem the 60→24 shrink was written to fix. Sizing against the slider ceiling only (TL 150,
+`aHP`/`aVP` 100) was rejected because the typed fields reach further than that today, so it would
+leave the reported bug reachable via the numeric input. Sizing topic 6 to its 12 real Problem
+Library textbook maxima (TL 130, `aHP` 40, `aVP` 55) was rejected for the same reason — free
+slider/typed-field play past those values is still possible and still overruns.
+**Consequences:** Both topics' 3D grid is visually larger at rest — confirmed via live screenshot
+this does not read as oversized/sparse at typical parameter values (grid density is unchanged,
+1.0u = 10 mm cell in both). `contentBoxWorld()` (camera quick-view framing) and `flatSheetBox()`
+(the fold-swoop's flat-sheet framing) were confirmed to derive purely from resolved line geometry,
+never from `SHEET` — genuinely zero changes needed there, unaffected by this ADR. The 2D Compare
+sheet (`sheet2DLayout.js` `SHEET = 60`, ADR-075's intrinsic-TL-scale model) and the Compare
+pan/zoom clamp (`COMPARE_ZOOM_MIN/MAX`, ADR-077) are a fully separate rendering vehicle (own
+`OrthographicCamera`, own `WebGLRenderer`, ADR-076) with no reference to the 3D `SHEET` at all —
+confirmed no interaction, and pan/zoom re-verified working unchanged at both clamp ends. Not fixed
+by this ADR, flagged as a separate finding: at the true worst case (typed-field maxima at a steep
+angle) the line's own endpoint still leaves the *default 3D camera's viewport* (confirmed: `B` at
+~614px above a 776px canvas at topic 6's default framing) — a larger grid cannot fix this, since
+the camera pose (`CAMERA_POSITION`/`CAMERA_TARGET`, unchanged by this ADR) is fixed regardless of
+grid size. `main.js`'s `SHEET_HALF` in both topics was confirmed to have exactly one occurrence
+(its own declaration) in each file — it is dead, unreferenced by any other code — updated to a
+correct value and comment rather than removed, since deleting an unused-but-documented constant
+was not part of the requested change.
+**Status:** Active
+
+**Addendum (2026-07-25):** The offset fix above had an unnoticed side effect on the visual it was
+never meant to touch. Before ADR-079, each plane was a `PlaneGeometry(SHEET, SHEET)` centred on
+the origin, so along its lift axis it spanned `[-SHEET/2, +SHEET/2]`; the negative half (12u, when
+`SHEET` was 24) was the visible "pierce-through" — VP continuing below where HP sits, HP
+continuing behind where VP sits, so the two planes read as genuinely crossing rather than meeting
+at a hinge. Shifting the plane by `PLANE_LIFT` without changing its square shape left only
+`SHEET/2 − PLANE_LIFT` past the fold line — 6u in both topics, down from the pre-ADR-079 12u —
+which reads on screen as flush-at-the-hinge instead of crossing (confirmed by direct arithmetic on
+the diff, not assumed; the camera pose is unchanged so the same absolute tail reads smaller against
+a larger plane). Fixed by making each plane a **rectangle**: the fold-line-axis extent stays
+exactly `SHEET` (44 / 32, untouched, so the fold line and every hand-placed label anchor in
+`labels/LabelPlacement.js` needed no repositioning), while the lift-axis extent becomes a new
+`SHEET_LIFT = PLANE_REACH + PLANE_OVERHANG`, where `PLANE_REACH` is this ADR's original positive
+ceiling kept byte-for-byte (38 / 26 — the overrun fix is untouched) and `PLANE_OVERHANG = 12`
+restores the exact pre-ADR-079 tail. `referencePlane()` in both `lineRig.js` and `lineTypeRig.js`
+gained `w`/`h` parameters (default `SHEET`/`SHEET`) so `PlaneGeometry`, the grid, and the border
+all build from independent width/height instead of one square `s`; `PLANE_LIFT` is now derived
+(`SHEET_LIFT/2 − PLANE_OVERHANG` = 13 / 7) so the span keeps landing on `[-12, +38]` / `[-12, +26]`.
+VP and HP stay equal size within each topic (both calls pass the same `SHEET`/`SHEET_LIFT` pair).
+Verified: topic 6's worst case (aHP/aVP 150 + TL 200 = 35u) still fits inside `PLANE_REACH = 38`;
+topic 5's (TL 200 = 21.8u, no `aHP`/`aVP` driver) still fits inside `PLANE_REACH = 26` — neither
+number changed from this ADR's original sizing. Pan/zoom and `sheet2DLayout.js` remain unaffected
+for the same reason as the original ADR (separate rendering vehicle, no reference to 3D `SHEET`).
+**Status:** Active
+
+---
+
+## ADR-080: Compare platform-wide is collapsed to a single docked shape — the compact floating card is removed, not fixed
+
+**Date:** 2026-07-25
+**Decision:** No Compare-card topic on the platform has a `.compare-card[data-size="compact"]`
+floating state anymore. Compare has exactly one shape everywhere: the docked ADR-037 50/50 split.
+Fixed, in order: `graphics_module_1_topic_5_projection_of_line_types` and
+`graphics_module_1_topic_6_projection_of_straight_lines` (same day, first pass), then confirmed
+present and fixed identically in `graphics_module_1_topic_3_points`,
+`graphics_module_2_topic_2_simple_positions`, `graphics_module_3_topic_2_development_of_surfaces`,
+and `Module2` (the platform-wide reference module). `template_starter`'s CSS/markup scaffolding
+(no JS wiring exists there) was cleaned the same way so a new topic cut from it no longer re-seeds
+the dead compact-card chrome. In every location, `compare.show()` now calls `enterWorkbench()`
+unconditionally, at every viewport width; `applyCompareSize()`, `isWorkbenchViewport()`, the
+`compareSize` state, `COMPARE_DEFAULT_SIZE`, the card's head chrome (`.compare-card__head`/`__tab`/
+`__btn`, the `#compare-expand`/`#compare-close` buttons and their
+`matchMedia('(min-width: 768px)').addEventListener('change', ...)` demotion listener) are deleted
+outright. `.compare-card` is a plain flex column and a grid cell (`grid-area: compare`) — never
+`position: absolute`, never a transient overlay, so it no longer earns the Flat-Ink shadow
+exception. Below the existing 768px mobile breakpoint the same `body.compare-split` grid restacks
+to a single column (`"view" "compare" "rail"`, and `"view" "compare"` when the rail is collapsed)
+via one `@media (max-width: 767px)` override — there is no second Compare UI to fall back to, so
+there is no state a resize can strand.
+**Why:** The floating card was a real, shipped mode (reached via `applyCompareSize('compact')`
+when the wizard-toggle chevron was clicked mid-split, or automatically when the viewport narrowed
+below 768px while the split was open), not a debug artifact — but the demotion listener only had a
+narrowing branch, never a widening one, so widening back past 768px left the card stuck floating at
+full window width: exactly the picture-in-picture-style panel (title bar + expand + close) reported
+against topic 6, reproduced identically in topic 5, and confirmed present (same markup, same
+listener, byte-for-byte) in `graphics_module_1_topic_3_points`,
+`graphics_module_2_topic_2_simple_positions`, `graphics_module_3_topic_2_development_of_surfaces`,
+and `Module2` — pre-existing since the listener's introduction (`60b8ece`, 2026-07-19), not a
+regression from the same-day con-dock/pan-zoom/auto-zoom session that prompted the report. The
+`topic_3_points` wizard-toggle chevron needed the same `applyCompareSize('compact')` →
+`compare.hide()` swap topic 5/6 required; `Module2` and `graphics_module_2_topic_2_simple_positions`
+had no mobile Compare `@media` rules to replace at all (the restack rule is net-new there);
+`graphics_module_3_topic_2_development_of_surfaces` carried its own small standalone
+`@media (max-width: 767px)` block for the compact card, separate from the topic's main mobile
+block, which the restack rule replaced in place. No location needed a camera/`frameStep()`-style
+fix — topic 5's `stepFraming` interaction was ADR-014 auto-zoom landing in the same commit as this
+fix, not part of it. `graphics_module_1_topic_4_understanding_orthographic_views` and
+`graphics_module_3_topic_1_sections_of_solids` were checked and are NOT part of this decision: both
+ship the same dead `.compare-card[data-size="compact"]` CSS/markup but neither has the demotion
+listener (topic_4 drives its own `enterCompareSplit`/`exitCompareSplit`; sections-of-solids has no
+Compare wiring at all) — left alone as pre-existing dead code, not a resize-strandable bug.
+Repairing the listener (adding a widening branch)
+was considered and rejected: Compare's whole point is a full drawing-sheet read next to the 3D
+solid, and a 420×320px floating card serving that job on a phone- or tablet-width viewport is not a
+usable secondary state worth keeping around — it exists only because the split couldn't fit two
+side-by-side panes that narrow, which is exactly what a single-column stack solves without a second
+mode. Module 2's *code* was not usable as a template for this fix — it carries the byte-identical
+compact card and the byte-identical one-way listener — so "make Compare behave the way it already
+reads everywhere else" here means the single-shape outcome, not copying Module 2's implementation.
+**Alternatives rejected:** A two-way `matchMedia` listener that re-enters the split on widening —
+rejected because it still needs the compact card to exist as a landing state during the narrow
+window, and (per the first AskUserQuestion round on this task, overridden by this decision) any
+such listener has an intent-tracking problem: it can't distinguish a breakpoint-forced demotion from
+a user's deliberate Shrink click without extra state, which the single-shape design sidesteps
+entirely by not having a second state to track. Keeping the compact card only for the sub-768px case
+(effectively restoring its pre-ADR-021 mobile role) was rejected for the same reasons above, plus it
+would leave the exact demotion/restoration bug live at that one boundary — just renamed as "expected
+behavior" rather than fixed.
+**Consequences:** `driveFold()`'s forward-fold guard drops its `!workbenchOpen` term (always false
+now that Compare-open implies split-open) but is kept, not deleted, as a defensive no-op guard,
+since `simAPI.reset()` also routes through `compare.hide()`. The `#wizard-toggle` chevron's
+split-exit branch now calls `compare.hide()` (closing Compare) instead of `applyCompareSize('compact')`
+(demoting it) — consistent with the split being Compare's only shape. `loop()` no longer toggles
+`labelRenderer.domElement.style.display` to hide the 3D scene's CSS2D labels while Compare is
+"compact" (that state no longer exists; the split's two panes never overlapped, so the labels render
+unconditionally now). Verified in both topics via a same-origin same-document iframe harness (real
+window/tab resize proved unreliable in this session's browser-automation environment, and a
+backgrounded automation tab suspends `matchMedia` `change`-event dispatch entirely — the exact
+mechanism that hid this bug from earlier manual QA): the grid's `gridTemplateColumns`/
+`gridTemplateAreas` switch correctly and reversibly at 1200→900→760→500→900→1200px, `.compare-card__head`,
+`#compare-expand`, and `#compare-close` are absent from the DOM at every width, and — because the
+fix is now pure CSS with no JS listener driving it — this holds even where the `change` event itself
+never fires. `#rail-toggle` and `#con-dock` needed no changes; both already claim their grid areas
+positionally and follow the stack. The same verification approach (iframe width-walk, DOM absence
+checks for the deleted head-chrome ids, `node --check` syntax validation on every edited `main.js`)
+was repeated for `graphics_module_1_topic_3_points`, `graphics_module_2_topic_2_simple_positions`,
+`graphics_module_3_topic_2_development_of_surfaces`, and `Module2` in the follow-up pass that
+completed this ADR platform-wide the same day. `graphics_module_1_topic_4_understanding_orthographic_views`
+and `graphics_module_3_topic_1_sections_of_solids` remain untouched (see Why) — their dead compact-card
+CSS/markup is a separate, non-urgent cleanup, not covered by this ADR.
+**Status:** Active — resolved platform-wide across every Compare-card topic + `template_starter`.
+
+---
+
+## ADR-081: The Lines topics' 3D BIS dimensions roll about the rod axis to face the live camera, instead of a fixed world-up standoff
+
+**Date:** 2026-07-25
+**Decision:** In `graphics_module_1_topic_6_projection_of_straight_lines/src/dimensions.js` and
+`graphics_module_1_topic_5_projection_of_line_types/src/dimensions.js` (byte-identical, per this
+module pair's existing convention), the True-Length BIS Type-B dimension used in the 3D scene no
+longer computes a single fixed standoff direction at build time (`off = normalize(cross(rod,
+worldUp))`, ADR-041's original geometry). A new `addOrientedDimension()` builds the same extension
++ dimension-line + filled-3:1-arrowhead geometry once, in a dedicated child `THREE.Group`'s own
+local frame (rod along local +X, standoff along local +Y, centred at the rod's midpoint); a new
+`orientDimension()` re-derives that group's rotation every render frame as
+`standoff = normalize(rod × viewDirection)`, both terms taken in the dimension's OWNER group's
+local space (so a dimension riding a folding group — topic 5's top-view dimension parented to
+`hpGroup` — still resolves against the camera correctly through a fold tween, by dividing out the
+owner's world quaternion). `lineRig.js`/`lineTypeRig.js` track every dimension's `{entry, owner}`
+and expose `orientDimensions(camera)`, called once per frame from each topic's `main.js` render
+loop immediately before `renderer.render()`, passing whichever camera is live (free-orbit
+perspective, an engaged Top/Front/Side quick-view, or the fold-swoop ortho camera). The original
+`addLinearDimension()` (fixed world-space `off`) is UNCHANGED and still used by `compareSheet.js`'s
+`addViewDim()` — the flat 2D Compare sheet's own square-on ortho camera never moves, so its
+dimensions were never affected and needed no camera-tracking.
+**Why:** `off = cross(rod, worldUp)` always has zero y-component, committing the dimension to a
+horizontal plane that only reads as screen-perpendicular to the rod from directly overhead — i.e.
+Top was a coincidence of that one camera pose, not a property of the formula. From Front or Side
+the extension/tick marks projected at an angle (reading as a skewed parallelogram instead of a
+drafting bracket) and the filled arrowhead triangles were seen edge-on (near-invisible slivers).
+Reported against topic 6's Front/Side quick-views; reproduced live in both topics via a same-origin
+`:8123` PHP dev server (matching this pair's established `graphics_module_1_topic_5/6`
+browser-verification pattern). Topic 5 additionally dimensions the VIEW PROJECTIONS (not the space
+rod) — for its front-view dimension the rod lies exactly in the VP plane, so the old formula's `off`
+degenerated to a vector ALONG the view axis: the whole dimension collapsed flat onto the `a′b′` line
+in Front view, arrowheads gone entirely, confirmed live at Step 1 (Parallel to both). A per-view
+"pick a different fixed formula for Top vs Front vs Side" fix was rejected in favour of a single
+camera-relative formula, since the quick-view set is not exhaustive (free perspective orbit and the
+fold-swoop ortho camera both need the same correctness with no enumerable set of "known" views).
+**Alternatives rejected:** Billboard the WHOLE dimension flat to face the camera (like the CSS2D
+text labels) — rejected because the extension lines and arrowheads measure real 3D endpoints; a
+free billboard would tear their feet off the rod's actual A/B terminators the instant the camera
+moved off-axis from the billboard plane, which is a correctness defect a text label doesn't have
+(a label's position is a single point; a dimension's extension lines connect TWO specific points to
+a line). The chosen fix keeps every vertex glued to its measured feature and rotates only the
+STANDOFF axis — an axis-constrained roll, not a free billboard. Rebuilding the dimension's geometry
+every frame from a live camera-derived `off` (i.e. keep `addLinearDimension`'s shape, just re-run it
+per frame) was rejected as unnecessary allocation/GC churn against the leaf's ADR-004 disposal
+discipline, when a pure quaternion transform on a static local-frame widget (mirroring the existing
+`setFoldAngle` pattern) achieves the identical visual result with zero new geometry.
+**Consequences:** Every `addOrientedDimension()` call site must also register its returned
+`{group, dLocal, prevPerp}` entry (paired with the owner group it was parented to) so the rig's
+`orientDimensions(camera)` can find it; a dimension built but never registered would freeze at its
+build-time seed pose (the same world-up formula, kept ONLY as a deterministic fallback — see the
+seed-pose note in `dimensions.js`) and silently reproduce the old bug in non-Top views. Disposal
+needed NO new code: both `group.traverse()` (geometry/material) and `disposeLabels(group)`
+(CSS2D DOM) in `lineRig.js`/`lineTypeRig.js`'s `dispose()` already recurse into arbitrarily nested
+children, so the dimension's extra wrapping `THREE.Group` (one level deeper than the old flat
+`addLinearDimension` output) is swept by the same generic traversal, unchanged. A per-frame
+continuity rule (hold the previous frame's standoff sign when `rod × viewDirection` flips or
+degenerates near end-on) prevents the dimension from visibly snapping to the opposite side of the
+rod as the camera orbits past it. Verified: Top view is an exact algebraic fixed point of the new
+formula (`viewDirection = (0,−1,0)` reduces `rod × viewDirection` to the old `(−rod.z, 0, rod.x)`
+up to sign), so it was re-checked for pixel-level parity, not assumed safe. Topic 6's Front/Side
+quick-views, topic 5's Front/Side quick-views and its Step 1/4/5 view-projection dimensions, both
+topics' fold swoop (including topic 5's `hpGroup`-parented top-view dimension riding the fold), and
+a free-orbit drag sweep were all re-verified live; the 2D Compare sheet was confirmed pixel-identical
+to its pre-fix rendering in both topics.
+**Status:** Active — landed in both `graphics_module_1_topic_5_projection_of_line_types` and
+`graphics_module_1_topic_6_projection_of_straight_lines`. No other topic in the catalog builds a 3D
+(non-flat) BIS dimension via this `dimensions.js` pattern, so no further backport is in scope.
+
+---
+
+## ADR-082: Problem Library overlay title centres; close button stays corner-anchored
+
+**Date:** 2026-07-27
+**Decision:** The `.problem-library__title` ("Practice problems", the `<h1>` in the Problem
+Library modal's header) now reads centered in its header row, on every deployed copy. The
+`.problem-library__close` 44px button stays where it was — pinned top-right, the platform's
+standard corner-anchored chip (DESIGN.md §5.12). Achieved with a `44px` `::before` spacer on the
+opposite side of `.problem-library__header` plus `.problem-library__title { flex: 1 1 auto;
+text-align: center }`, so the spacer and the close button counterweight each other and the title
+box sits on true header-width center. No markup changed in any location.
+**Why:** Requested UI polish; the header previously used plain `justify-content: space-between`,
+so the title read hard-left. Audited DECISIONS.md, DESIGN.md, RULES.md, and the graphify knowledge
+graph first — the top-left placement was never a recorded decision (no `#NOTE`/`#WHY` convention
+exists in this repo, and no ADR mentions this title's alignment), and DESIGN.md's §5 component
+catalog had **no subsection for the Problem Library dialog at all** (it ran 5.1→5.13 and stopped).
+Centering it does not overturn anything (§8.4 not triggered) and does not conflict with any
+existing typography or Quiet Chrome rule (§2.3/§3.3), which govern colour coverage and weight, not
+alignment.
+**Alternatives rejected:** Absolute-positioning the close button (`position: absolute; right:
+var(--space-5)`) with `justify-content: center` on the header — also centers the title, but
+requires merging its `translateY(-50%)` into the existing `:active { transform: scale(0.97) }`
+press rule (§6 rule 6) in all 8 files, more edit surface for the same visual result, and touches
+Module 1's no-transform-sensitive shell (DESIGN.md §4.4) for no benefit. Centering the whole header
+group (`justify-content: center` alone) was also rejected — it drags the close button off its
+top-right corner, breaking the platform's §5.12 corner-chip convention.
+**Consequences:** Easier: the header now reads as a conventional centered dialog title, matching
+the pattern learners see in every other full-viewport modal on the platform; DESIGN.md gains a
+proper §5.14 component spec for this overlay so future topic clones inherit the intent instead of
+copying blind. Harder/known: this is one more rule that must be manually re-applied in any *new*
+topic folder that adds its own Problem Library from scratch rather than copying `template_starter/`
+(RULES.md §1.3/§1.4 — no shared file, no build step). The 44px spacer literal deliberately mirrors
+`.problem-library__close`'s own `width: 44px` (the platform's minimum-target constant, DESIGN.md §6
+rule 4) rather than introducing a new token for it.
+**Status:** Active — landed in `Module2/index.html` (master), `Module1/src/shell.css` (Module 1's
+own master), the five deployed topic copies (`graphics_module_2_topic_2_simple_positions`,
+`graphics_module_3_topic_1_sections_of_solids`, `graphics_module_3_topic_2_development_of_surfaces`,
+`graphics_module_1_topic_3_points`, `graphics_module_1_topic_6_projection_of_straight_lines`), and
+`template_starter/index.html` so future topic scaffolds inherit it.
+
+## ADR-083: The problem-library interface contract (`problems.js` six exports, `problemLibrary.js` one-arg `initProblemLibrary(sim)`) is a platform-wide standard for every new topic, not scoped to the Module 2 family
+
+**Date:** 2026-07-27
+**Decision:** Every new `problems.js`/`problemLibrary.js` pair created for a NEW topic — Case A
+(a new Module 2 family topic) or Case C (a whole new subject module) — must follow the interface
+confirmed identical across all four shipped Family-A pairs (`Module2`,
+`graphics_module_2_topic_2_simple_positions`, `graphics_module_3_topic_1_sections_of_solids`,
+`graphics_module_3_topic_2_development_of_surfaces`): `problems.js` exports exactly `TIERS`,
+`ENABLED_TIERS`, `FIELD_LABELS`, `PROBLEMS`, `enabledProblems()`, `groupByTier(list)`;
+`problemLibrary.js` exports exactly one `initProblemLibrary(sim)` (one positional argument),
+importing only `{ PROBLEMS, FIELD_LABELS, enabledProblems, groupByTier }`, returning exactly
+`{ open, exit, isActive, dispose }`. `EXCLUDED_TYPES` + a per-problem `type` field remain an
+additive, optional layer for a hard syllabus-KIND exclusion (already proven by ADR-062/065/069),
+never a required export. This is now documented as RULES.md §6.24–§6.26, and `template_starter/`
+gains a real (empty-bodied) `problemLibrary.js` stub alongside its existing `problems.js` stub, so
+every future Case A/C builder gets working starter code instead of "copy a sibling topic's file"
+instructions (MODULE-STARTER.md §3.4, Section 6 updated to match).
+
+Case B (a new Module 1 lesson) is structurally exempt: it never creates its own
+`problemLibrary.js` — it injects into Module 1's existing **shared engine leaf**
+(`Module1/src/problemLibrary.js`, MODULE-STARTER.md's Case-B shared-leaf table), the same way it
+injects into `engine.js` without ever editing it (ADR-011). This ADR does **not** touch that shared
+file, and does **not** require `graphics_module_1_topic_3_points` or
+`graphics_module_1_topic_6_projection_of_straight_lines` — its two existing consumers, both on the
+2-argument `initProblemLibrary(sim, config)` form — to migrate. Migrating Module 1's shared engine
+leaf onto the 1-arg contract is a real, separately-decided future task, not a consequence of this
+ADR.
+
+**Why:** The interface shape — export names, arity, return keys — is subject-agnostic on
+inspection: nothing in it names a solid, a tier, or an Engineering-Graphics concept. Confining it
+to the Module 2 family was narrower than the evidence supported. Reading all four shipped pairs
+first (rather than generalizing from the richest one) kept the drafted contract from
+over-specifying `EXCLUDED_TYPES`/`setup`/`path` as if universal — they stay optional (§6.25).
+**Alternatives rejected:** (1) Scoping the contract to Case A only, revisiting later — rejected;
+nothing case-specific was found once the four pairs were actually compared, so a narrower rule
+would just need the same widening the next time a Case C module needed a problem library. (2)
+Silently broadening an already-narrow rule instead of stating the platform-wide scope directly —
+not applicable here: RULES.md §6.24 and this ADR did not exist prior to this entry. An earlier
+drafting pass proposed Case-A-only wording for both, but it was never confirmed or committed — no
+prior rule exists to silently reverse. (3) Forcing Module 1's two existing lessons to migrate now —
+rejected, out of scope, working code shouldn't be touched opportunistically just because a new rule
+was written.
+**Consequences:** A future Case A or Case C topic can be checked against §6.24 as a pass/fail
+contract, and can start from a working `template_starter/src/problemLibrary.js` stub instead of
+copying and stripping a sibling topic's filled-in file. `EXCLUDED_TYPES`/`setup`/`path`/`type`
+remain undocumented as generic members — addable by any future topic without contradicting §6.24.
+Known follow-up, not part of this ADR: whether Module 1's shared engine leaf should eventually move
+to the 1-arg form is an open question for a separate ADR.
+**Status:** Active
+
+---
+
+## ADR-084: Show Method lays its construction Sets SIDE BY SIDE on the 2D Compare sheet; ADR-053's scale-lock and ADR-054's anchor extend to an n-Set nominal layout
+
+**Date:** 2026-07-27
+**Decision:** Step 6's "Show Method" walkthrough replays a problem's textbook construction as 2 or 3
+*Sets* (successive poses of the same solid) on the existing Canvas2D Compare sheet. The Sets are drawn
+SIDE BY SIDE, all visible at once, matching the change-of-position convention every textbook and exam
+answer uses — not replaced in place. That requires `drawCompare()` to size for n drawings instead of
+one, which touches the two ADRs that currently assume a single drawing. Both are EXTENDED, not
+reversed; neither ADR's own text is edited.
+
+- **Extends ADR-053 (scale-lock).** ADR-053's invariant is "`scale` derives ONLY from the solid's
+  intrinsic 3D size (`solidSpanUnits`) and never from the live drawn bbox." That invariant is
+  PRESERVED verbatim. What changes is the nominal layout the intrinsic size is measured against:
+  `nomWmm` becomes `(n·blockW + (n−1)·STAGE_GAP) · WORLD_TO_MM`, with
+  `blockW = E + (showSideViewFlag ? GAP + E : 0)` and `STAGE_GAP = GAP = E·0.35`. Every input is
+  still `E`, `GAP`, `showSideViewFlag` and a Set count — all distance- and angle-independent
+  constants. No live bbox is introduced anywhere, including for the per-Set focus targets (below).
+  This is legitimate because a Set is the SAME solid at a different pose: `solidSpanUnits` is a
+  bounding-sphere diameter read off LOCAL geometry before `position`/`quaternion` apply, so it is
+  provably identical for every Set. One scale serves all of them.
+- **Extends ADR-054 (balanced anchor).** ADR-054 centres the nominal layout rather than the world
+  origin. The same reasoning now carries the Set row:
+  `anchorSX = (showSideViewFlag ? (E+GAP)/2 : 0) + (n−1)·(blockW + STAGE_GAP)/2`, `anchorSY = 0`.
+  Same intrinsic-only inputs, same "changes only when base/height resize the solid" guarantee.
+- **n is gated on `methodActive`, and the transition is TWEENED.** The sheet is 1-wide in ordinary
+  use and expands to n-wide only while Show Method runs. Sizing for 3 permanently would shrink the
+  ordinary single-drawing case by ~3× for a feature most sessions never open; snapping between the
+  two would jump `scale` and `anchorSX` visibly. So a `methodSpread` 0→1 tween feeds a continuous
+  `nEff = 1 + (n−1)·methodSpread` into BOTH formulas, and each Set's `dx = i·(blockW+STAGE_GAP)·
+  methodSpread`. The Sets slide apart from a stack; `scale` moves continuously with them and lands
+  on exactly the intrinsic value at both ends. The honest cost this ADR accepts: while Show Method
+  runs, the drawing IS ~3× smaller than normal. That is what the per-Set focus chips exist for.
+- **Captions follow the Set, not the view, while the method runs.** The per-view Top/Front/Side
+  captions are suppressed and each block carries one `Set N — <label>` caption instead; 9 view
+  captions at the reduced scale collide with the dimension numerals. The per-view captions return
+  unchanged on exit.
+- **Per-Set focus is intrinsic too.** A Set's focus target is its block centre, derived from the same
+  `E`/`GAP`/`showSideViewFlag`/index inputs — never a measured bbox of what was actually drawn.
+  Tighter framing from a live per-Set bbox was rejected specifically because it would reintroduce the
+  live-bbox coupling ADR-053 removed. Focus drives `comparePanX/Y` + `compareZoom` only (ADR-054/055
+  screen-space lens), so it composes with the scale-lock instead of fighting it.
+- **On method exit, `resetCompareView()` fires.** `nEff` returning 3→1 changes both `scale` and
+  `anchorSX`; a pan/zoom left pointing at where Set 3 used to be would strand the single drawing
+  off-frame. `resetCompareView()` gains a third call site (fresh open, dblclick, sim reset → plus
+  method exit) and also clears `focusSet`.
+
+**Why:** A learner comparing Set 2 against Set 1 needs both on screen — that comparison IS the
+pedagogy of a change-of-position problem, and it is how the answer is drawn on real exam paper.
+Replace-in-place would have kept the sheet large but destroyed the comparison. Extending the two
+layout ADRs was preferable to carving out an exception because their actual invariant (intrinsic,
+never live-bbox) survives untouched — only a constant in the nominal layout became a variable.
+**Alternatives rejected:** (a) *Size for 3 Sets always* — rejected, penalises every ordinary session
+for a feature most never open. (b) *Snap n on enter/exit* — rejected, a visible scale jump reads as a
+bug. (c) *Replace-in-place, one Set at a time* — rejected, destroys the side-by-side comparison that
+is the whole point. (d) *Per-Set live-bbox framing for tighter focus* — rejected, reopens ADR-053's
+original coupling.
+**Consequences:** ADR-055 (zoom) and ADR-018 (`WORLD_TO_MM`) are untouched and compose unchanged.
+ADR-056's analytic pinning RULE is unchanged but now applies PER SET: each Set draws its own XY at
+`sheetY=0` and its own X1-Y1 at `sheetX=−z0ᵢ`, both offset by that Set's `dx`. `z0` is genuinely
+per-Set (it derives from the pose's world bbox, `main.js:892`), so reading the live `ppHingeGroup`
+would misplace every Set but the live one. ADR-052's "no projector lines on the sheet" de-clutter
+rule gains a scoped exception: projectors ARE drawn during Show Method, because "project across from
+the previous view" is a construction beat — they are gone again the moment the method exits.
+**Status:** Superseded by ADR-085
+
+---
+
+## ADR-085: Show Method moves out of the Compare sheet into its own iframe-scoped full-screen takeover view
+
+**Date:** 2026-07-27
+**Decision:** Show Method is no longer an extension of the 2D Compare sheet. It becomes a dedicated
+full-viewport takeover, scoped to the sim's own iframe — `position: fixed; inset: 0` at
+`--z-overlay`, following the `.problem-library` precedent exactly — and NOT the browser Fullscreen
+API: the sim stays inside its `window.simAPI` sandbox boundary and never requests chrome outside the
+iframe. This SUPERSEDES ADR-084's container decision. ADR-084's pedagogical content is retained
+wholesale and re-hosted:
+
+- **Retained verbatim.** The headless per-Set projection pipeline (`projectSetPose` →
+  `buildEdgeMap` → `drawProjections` → harvest → `dispose()` in the same tick), the fixed 7-beat
+  template, the per-Set `z0`, the corner-label and axis-chain beats built from `planAnnotations`/
+  `chainPositions`, the n-Set side-by-side layout, and the "Set label only" caption. Verified
+  reusable without internal edits: `drawMethodSheet(ctx, w, h)` takes its surface as parameters and
+  reads no Compare DOM.
+- **Retained as sizing law, no longer as an extension of ADR-053/054.** Scale stays intrinsic-only
+  (`solidSpanUnits`/`E`/`GAP`/`showSideViewFlag`/Set count, never a live bbox) and the anchor stays
+  the nominal Set-row centre. Because the takeover owns its own surface, these formulas no longer
+  co-exist with the single-drawing path, so **ADR-053 and ADR-054 revert to governing the ordinary
+  Compare sheet alone**; their n-Set generalisations move here, unchanged in form.
+- **`methodSpread` retires.** The 0→1 spread tween existed only to morph one shared sheet between
+  1-wide and n-wide without a visible `scale` jump (ADR-084 bullet 3). A dedicated container has no
+  1-wide state to morph from: `nEff` is simply the Set count (2 or 3), `dx` is fixed, and the
+  delayed-collapse teardown retires with it. The entrance flourish reuses the Problem Library's
+  existing `libraryIn` slide-and-fade rather than bespoke logic.
+- **The sim loop pauses while the view is open.** `window.simAPI.pause()` on open / `resume()` on
+  close, matching the `.problem-library` contract — the 3D scene is fully covered, so rendering it
+  is wasted GPU and battery. The known consequence is accepted deliberately: `simAPI.pause()`
+  cancels the rAF that `anim.js`'s `tick()` rides, so no `anim.js` tween can run inside this view.
+  The one interaction that used one — Set-focus zoom — becomes an **instant snap**. Building a
+  second, independent rAF-driven animation path for a single interaction was rejected as worse than
+  the snap.
+- **Compare's coupling is removed entirely.** `enterWorkbench(keepFlattened)`,
+  `compare.show(keepFlattened)` and `simController.openCompare` are deleted; `enterWorkbench`'s
+  forced unflatten is unconditional again, restoring its ADR-037/080 invariant ("the left pane
+  always shows the 3D pictorial"). The `teardownShowMethod` unflatten-on-exit block is deleted too —
+  it existed only to undo the `keepFlattened` suspension, and outside Compare it would spring the
+  learner's own Step-6 flatten back to 3D unbidden. Show Method's pan/zoom/focus fork from
+  `comparePanX/Y`/`compareZoom`/`focusSet` into its own variables with their own reset, so a drag on
+  either surface can never re-frame the other.
+- **Chrome moves onto the sheet.** The `Set X of Y — <description>` title bar is REMOVED. Back /
+  Next / Exit method become a floating control bar, bottom-centre, overlaying the drawing; the
+  Set-1/2/3 focus chips a separate floating group, top-right. Focus stays purely visual and never
+  moves the sequence (ADR-084 Decision 7, unchanged). The Set-label text the removed bar carried
+  moves into the `announce()` string, so screen-reader parity survives its deletion.
+- **Abort-on-edit retires on the controller side, stays on the stepper side.** Under ADR-084 the
+  Step 1/2 drivers were re-parented into `#workbench-rail` and left fully live during the
+  walkthrough, which is why `methodController.js` had to bind its own rail listener. The takeover
+  never opens the split, so the rail is never built, the drivers stay in the covered wizard, and
+  that listener is deleted. `stepper.js`'s `sim.method.abort()` calls in `reflowFrom` and on Unfold
+  are KEPT as no-op invariant guards: the overlay blocks the pointer, but only the focus trap keeps
+  Tab out, and a trap gap must not leave an un-abortable edit path.
+- **The `foldProgress === 1` trigger gate is unchanged.** It was always a pedagogical sequencing
+  choice — build fold intuition live, first — not a consequence of needing the flattened sheet's
+  container. The container correction does not touch that reasoning.
+
+**Why:** ADR-084 put Show Method inside the Compare split because that is where the 2D sheet lived.
+Live testing the same day surfaced a container mismatch the design could only paper over: (a) the
+Step-6 trigger and the sheet it draws on can never be visible together, forcing `begin()` to open
+Compare itself; (b) that open forcibly unflattened the very state `methodCanRun()` requires, forcing
+a `keepFlattened` flag through four functions; (c) the split leaves all 8 geometry drivers live
+beside a walkthrough a single slider nudge invalidates, forcing a second abort listener; and (d)
+sharing the sheet forced a `methodSpread` morph tween purely to hide a scale jump. Every one is a
+symptom of borrowing a container built for a different job. A dedicated surface removes all four at
+once rather than adding a fifth compensation.
+**Alternatives rejected:** (a) *Keep it in Compare and fix the symptoms individually* — rejected,
+each fix threaded a new parameter or listener through code with no other reason to know Show Method
+exists. (b) *Browser Fullscreen API* — rejected, crosses the `window.simAPI` sandbox boundary the
+platform contract draws around the iframe. (c) *A new Step 7* — rejected, Show Method reviews Step
+6's answer, it is not a further construction step. (d) *Keep sharing pan/zoom/focus with Compare* —
+rejected, a drag on one surface would silently re-frame the other. (e) *A second rAF pump so tweens
+survive the pause* — rejected, a whole parallel animation path for one zoom interaction.
+**Consequences:** ADR-084 is Superseded. ADR-053/054 revert to governing only the ordinary
+single-drawing Compare sheet. ADR-056's analytic pinning rule still applies per Set. ADR-052's "no
+projectors on the sheet" de-clutter rule keeps ADR-084's scoped exception — projectors are a
+construction beat and exist only inside this view. No `anim.js` tween may be added to this view
+while the pause contract holds; any future motion here must be CSS or an instant state change.
+**Status:** Active
+
+## ADR-086: Platform fonts move from bundled local woff2 to Supabase Storage CDN
+
+**Date:** 2026-07-27
+**Decision:** Every module and topic's `@font-face` rule for Atkinson Hyperlegible (400/700) and
+IBM Plex Mono (400) now points at a public Supabase Storage bucket
+(`https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/…`)
+instead of a local `./assets/fonts/*.woff2` file. This **reverses** the local-bundled-font clause
+of RULES.md §2.15 / PLATFORM-RULES.md §1.15 (and the offline-capability rule they sat beside,
+§2.12/§1.12), which had mandated bundled woff2 + "never use a Google-Fonts CDN" specifically to
+guarantee full offline rendering after first load. The rule is not being re-argued — the web team
+directed the reversal to centralize font hosting in one Supabase-backed location instead of
+maintaining 13 byte-identical copies (39 files) scattered across every module/topic folder.
+
+**What changed:** the `@font-face` `src` in all 13 declaration sites (12 module/topic
+`index.html` files plus `Module1/src/shell.css`) now points at the CDN; each block is otherwise
+unchanged (family, weight, style, `font-display: swap`). All 39 local `.woff2` files and all 13
+`assets/fonts/` directories were deleted (each `assets/` folder held nothing else, so it was
+removed too where it went empty). The three font files themselves are unchanged — same subset,
+same bytes — only their hosting location moved.
+
+**Why:** web-team directive to centralize static asset hosting on Supabase Storage rather than
+duplicate the same three files in every module folder. One authoritative copy is easier to update
+(a subset/format change now ships from one place) and removes 39 duplicated binaries from the repo.
+
+**Consequences (tradeoff accepted):** the sim **no longer renders correct typography fully
+offline on first load** without network access to Supabase — this is the direct reversal of the
+old guarantee. `font-display: swap` means there is no hang or blank-text risk: the system-font
+fallback paints immediately and the real face swaps in once/if the CDN fetch resolves; on a
+network failure the fallback simply stays. A secondary effect: ~10 topics gate first paint on
+`document.fonts.ready` (e.g. `graphics_module_1_topic_3_points/main.js`, "*Gated on
+document.fonts.ready so the host never reveals us mid-FOUT*") — that promise now settles on a
+network round-trip instead of disk. It cannot hang (the promise settles on fetch failure too via
+`swap`), but a slow or absent connection now measurably delays first reveal where it previously
+never would. No JS was changed to compensate; this is accepted as part of the same tradeoff.
+Process note: the initial repo-wide grep for `@font-face`/`assets/fonts`/`.woff2` missed 5
+`CLAUDE.md` file-tree references to the old bundled-font layout — caught only by a follow-up full
+sweep after the first edit pass. Future doc-wide reversals of a platform-wide rule should budget
+for a second grep-and-fix pass before considering the doc sweep complete.
+**Status:** Active
+
+**Note (2026-07-31):** The Diploma Engineering Graphics track (`feat/diplomaMod1`) independently
+arrived at the same shared-Supabase-host font migration before this ADR reached that branch,
+recorded there as its own ADR-082 with a Diploma-only carve-out. That ADR is retired on merge —
+its decision was already made here, platform-wide, and this ADR's scope covers the Diploma track
+too. See ADR-095 (that track's renumbered founding decision) for where its independent version
+used to live.
+
+---
+
+## ADR-087: Show Method's beat template is rewritten to follow Method of Drawing.md's actual draw sequence — outline, then visible/hidden face, then visible/hidden generators, per view, axis last
+
+**Date:** 2026-07-27
+**Decision:** ADR-084's 7-beat template (0 XY/X1-Y1 · 1 true-shape view, all visible lines at once
+· 2 projectors · 3 the other view + side view, bundled · 4 axis + corner labels, bundled · 5 hidden
+dashes, all views at once · 6 dimensions) was audited against the authoritative textbook spec
+("Method of Drawing.md", Section 12.6) and found to diverge on every beat but the first and last.
+The spec's 5-step sequence (outline → visible base/face → hidden base/face → generators
+visible-then-hidden → axis, explicitly LAST) groups by **feature, then visibility**; the shipped
+template grouped by **visibility across a whole view**, which is the transpose and cannot be
+reached by reordering the existing 7 beats. Replaced with a **15-beat-per-Set** template, applied
+per view:
+
+`xy (sheet-wide, ADR-088) → outline(A) → visible face(A) → hidden face(A) → visible
+generators(A) → hidden generators(A) → projectors → outline(B) → visible face(B) → hidden
+face(B) → visible generators(B) → hidden generators(B) → axis (last, both views) → labels →
+dimensions`
+
+Two new edge classifiers were needed to make this representable, added in `meshAnalyzer.js` /
+`projectionDrawer.js` (shared with the live 3D pane, not method-only code):
+
+- **Outline** — the front/back straddle test (an edge is on the 2D outline iff its incident faces
+  include one facing the observer and one not, or it has only one incident face at all). This is
+  NOT `EdgeType.SILHOUETTE` (a purely 3D, orbit-invariant classification) — it is a new per-plane,
+  per-view test alongside the existing `visibleInHP/VP/PP`. Outline edges are a strict SUBSET of
+  each view's visible edges, so the outline beat and the later visible-face/generator beats
+  legitimately redraw the same lines — accepted deliberately, matching how a learner re-traces the
+  outline before adding detail, rather than suppressing the overlap.
+- **Base vs. generator** — every Module 2 solid is generated upright about local +Y (CLAUDE.md);
+  since each Show Method stage's pose matrix is rigid (translate + quaternion + unit scale, no
+  shear), an edge is classified by `|dot(normalize(p2−p1), worldAxis)|` against a tolerance:
+  ≈0 → base/cap edge, ≈1 (or any non-zero slant) → generator. `worldAxis` is `(0,1,0)` rotated by
+  the stage's own quaternion, so the test is correct for every stage without re-deriving per shape.
+
+**Why:** the whole point of Show Method is to teach the textbook's own drawing procedure; a beat
+template that groups by the wrong axis cannot demonstrate that procedure regardless of caption
+text. The spec's "outermost lines first, axis last" rule (Method of Drawing.md §12.6, restated as
+its own rule of thumb) is unambiguous and was being violated on 5 of 7 beats.
+**Alternatives rejected:** (a) *Keep 7 beats, reorder only* — rejected, the grouping axis itself is
+wrong (visibility-across-view vs. feature-then-visibility), no reorder of the existing beats
+reaches the spec sequence. (b) *Merge visible+hidden generators into one beat* (13/Set, 39 clicks)
+and (c) *also merge axis+labels* (12/Set, 36 clicks) — both considered to hold the per-Set click
+count down; rejected because the target sequence explicitly names "generators [visible/hidden
+split]" and folding labels back into the axis beat re-creates the exact divergence (corner labels
+welded to the axis beat) this ADR fixes. 15 beats/Set, mitigated by ADR-088's Skip-to-next-Set
+control, was accepted as the faithful reading.
+**Consequences:** Click cost per full walkthrough rises to `15 × Set count` (30 for a 2-Set
+problem, 45 for a 3-Set problem), up from `7 × Set count` under ADR-084. `METHOD_BEAT_COUNT`
+(`main.js`) and its hand-duplicated twin `BEAT_COUNT` (`methodController.js`, header note explains
+the duplication is deliberate) both become 15 in the same change — they must never drift, or
+`goNext`'s beat-boundary math desyncs from `drawMethodSheet`'s gates. The live 3D pane gains the
+same outline/base/generator classifiers (shared leaf modules) but its own rendering is
+UNCHANGED — colour and line width there still key off `hidden` only, the new `kind` tag is
+Show-Method-only consumption for now. Supersedes ADR-084's beat template (§3) specifically; ADR-084's
+other pedagogy (per-Set headless pipeline, n-Set side-by-side layout, "Set label only" caption)
+is untouched.
+**Status:** Active
+
+---
+
+## ADR-088: Show Method drops the Side (PP) view from its walkthrough; the XY reference line becomes one sheet-wide stroke instead of one per Set
+
+**Date:** 2026-07-27
+**Decision:** Two layout changes to the Show Method takeover (`drawMethodSheet`, `main.js`),
+independent of ADR-087's beat re-sequencing:
+
+1. **Side view removed from the replay.** `showSideViewFlag` — which gated the PP view, its
+   generators, and the X1-Y1 reference line inside the method's own sizing/draw functions
+   (`drawMethodSheet`, `setMethodFocus`) — is replaced by a Show-Method-local `false` at every one
+   of its 5 call sites in those two functions. `drawCompare()`'s own (unrelated) uses of the live
+   flag are untouched — the ordinary Compare sheet still shows the side view exactly as before.
+   The side view itself is NOT removed from the sim: Step 5 still reveals it live on the 3D pane;
+   only its replay inside the Show Method walkthrough is dropped. This shrinks the takeover's
+   nominal layout (`blockW` drops its `showSideViewFlag ? GAP + E : 0` term, roughly halving),
+   which — per ADR-053's intrinsic-only scale law, unchanged — makes every Set draw at roughly 2×
+   the on-screen size. `projectSet`'s per-Set PP harvest and `z0` computation are left in place
+   (harmless, still feed the live 3D pane's own projection); only the METHOD REPLAY's consumption
+   of them is dropped.
+2. **One sheet-wide XY line, not one per Set.** ADR-084's Consequences committed to "each Set draws
+   its own XY at sheetY=0 … offset by that Set's dx" — correct under the n-Set side-by-side layout,
+   but redundant: `drawMethodSheet`'s own `project()` maps sheet-y through an anchor at `y=0` for
+   every Set (`dx` only ever perturbs sheet-x), so every Set's XY line was already landing on the
+   identical screen row. The per-Set loop is replaced with one stroke computed once, before the
+   per-Set loop runs, spanning the full intrinsic row width
+   (`[blockLocalCenterX − blockW/2 … (n−1)(blockW+STAGE_GAP) + blockLocalCenterX + blockW/2]` —
+   `E`/`GAP`/Set-count only, no live bbox). This is STRICTLY TIGHTER than ADR-053's existing
+   invariant, not a new exception: the line's length no longer depends on which views have been
+   drawn so far, only on the same intrinsic constants the block layout itself already uses.
+   X1-Y1 needed no equivalent change — it retires along with the side view (point 1).
+
+**Why:** point 1 removes the last thing the Show Method surface drew that the spec (Method of
+Drawing.md) never asked for and that ADR-087's beat budget can't afford per-view. Point 2 corrects
+a redundant per-Set computation that was never actually producing per-Set output — the "own XY per
+Set" framing in ADR-084 assumed a visual outcome that the shared `anchorSY=0` anchor was already
+preventing.
+**Alternatives rejected:** (a) *Keep the side view, absorb it into ADR-087's per-view beat
+sequence* (adds a third view's worth of outline/face/generator beats — 15 beats/Set becomes ~21) —
+rejected as disproportionate for a view the spec's Section 12.5/12.6 change-of-position procedure
+doesn't itself dimension. (b) *Union-of-bboxes XY span instead of intrinsic* — legal under ADR-056
+(position analytic, length may track drawn content) but rejected as strictly worse: the intrinsic
+span is simpler, already-available, and doesn't grow/shrink beat-to-beat as views appear.
+**Consequences:** Marks ADR-084's Consequences sentence "each Set draws its own XY … offset by that
+Set's dx" (`DECISIONS.md`, ADR-084) and ADR-085's "retained verbatim" bullet's implicit inclusion
+of the per-Set X1-Y1 line as **superseded** for Show Method specifically — ADR-084's n-Set side-by-
+side layout itself (scale-lock, anchor, captions) is untouched. ADR-053/054's intrinsic-only law is
+unchanged and, per point 2, is now honoured by one more surface (the XY line) than before.
+**Status:** Active
+
+---
+
+## ADR-089: Show Method drops its dimensions beat and the "(N of 45)" step counter
+
+**Date:** 2026-07-28
+**Decision:** Two changes to the takeover, found while diagnosing a report that a live desktop
+session showed almost no solid geometry at beat 42/45 of a both-planes walkthrough — the actual
+root cause turned out to be that the session "verifying" ADR-087/088 as working had run inside an
+MCP headless tab (`document.hidden === true`, 0 native `requestAnimationFrame` callbacks measured
+in 600ms), so `queueMethodRedraw()`'s plain-rAF repaint had never actually executed; the "verified"
+report was never watching real output. Re-verifying with a synchronous frame-pump (`requestAnimationFrame`
+replaced with a manually-flushed queue) showed the beat pipeline itself — `projectSet`'s harvest,
+the beat gates in `drawMethodSheet` — drawing correctly. Two real defects surfaced alongside that
+false-confidence finding, fixed here:
+1. **Dimensions beat removed** (was beat 14/Set, `showDims`/`strokeMethodLines(...hpDimLines...)`
+   block in `drawMethodSheet`). Show Method is the construction-method walkthrough; BIS Type-B
+   dimensioning is a separate, already-shipped concern behind the live pane's own "Show dimensions"
+   toggle (ADR-041) — bundling it into the replay taught the wrong lesson (that dimensioning is
+   part of *drawing method*) and cost a beat on every Set. `projectSet`'s `hpDimLines/vpDimLines/
+   hpDimTris/vpDimTris/hpDimLabels/vpDimLabels` harvest, and the now-single-caller
+   `harvestTriGroup`/`harvestLabelGroup` helpers, are deleted with it — nothing else read them.
+   `METHOD_BEAT_COUNT` (`main.js`) and its hand-duplicated twin `BEAT_COUNT` (`methodController.js`)
+   both drop 15 → 14; ADR-087's other 13 beats and their gate thresholds are untouched (the removed
+   beat was strictly last).
+2. **Step counter text removed from the Next button.** `methodController.js`'s `renderProgress()`
+   set `nextBtn.textContent` to `` `Next step (${flatIndex()+1} of ${totalBeats()})` ``; now just
+   `'Next step'` (`'Done'` on the last beat, unchanged). Matches `RULES.md`'s platform-wide
+   step-counter-weight guidance — the count added noise without adding orientation the Set-N focus
+   chips don't already give.
+
+**Why:** both were in-scope, low-risk cleanups found in the same investigation, not separate asks
+requiring their own audit — the counter was pure display logic and the dimensions beat's removal
+doesn't change any other gate's numbering (it was already last).
+**Alternatives rejected:** *Keep the dimensions beat but gate it behind a per-Set toggle* —
+rejected as unnecessary complexity for content that already has a dedicated, discoverable control
+on the live pane.
+**Consequences:** Click budget per full walkthrough drops to `14 × Set count` (28/42 for 2-/3-Set
+problems, down from 30/45). See ADR-090 for the further, pose-dependent reduction from auto-skipping
+empty beats.
+**Status:** Active
+
+---
+
+## ADR-090: Show Method's Next/Back skip beats that add no mark to the sheet
+
+**Date:** 2026-07-28
+**Decision:** Same investigation as ADR-089 surfaced a second, independently real defect: for a
+pose where a given view has no edge of a particular hidden/generator combination (e.g. a prism
+square-on to a plane casts no dashed generator there), that beat's gate in `drawMethodSheet` passes
+but draws zero new segments — the repaint is a byte-for-byte repeat of the previous frame. Measured
+directly (pixel + draw-call diff across a full 45-beat walkthrough, pre-ADR-089): 3 of 45 beats
+were exactly identical to the one before. This is what "Next sometimes does nothing" was — not a
+stuck click or a desynced counter, a genuine no-op repaint the learner has no way to distinguish
+from a broken button.
+
+Fix: `projectSet()` (`main.js`) now computes a `contentBeats: boolean[14]` table per Set at
+`begin()` time — one entry per beat index, `true` iff that beat's own harvested array (the same
+`data.hp/vp/hpOutline/vpOutline` arrays `drawMethodSheet` itself reads, filtered by the same
+`hidden`/`kind` split as `strokeMethodLines`) is non-empty; beat 0 (the Set's caption reveal) is
+always `true`. Exposed read-only via `sim.method.hasContent(set, beat)`. `methodController.js`'s
+`goNext`/`goBack` loop past any beat this reports `false` for (both directions, for symmetry — a
+one-directional skip would make Back land back on the beat Next just skipped past, the same
+"nothing happened" complaint mirrored).
+**Why:** computing content-presence from the SAME harvested arrays the draw call reads (rather than
+e.g. re-simulating `drawMethodSheet`'s gate logic separately) is what keeps this from drifting out
+of sync with what the sheet actually draws — one data source, two consumers.
+**Alternatives rejected:** *Detect emptiness by diffing consecutive canvas frames at runtime* —
+rejected, requires a real paint to have already happened (expensive, and reintroduces exactly the
+document.hidden fragility this investigation started from) where the harvested-array check is free
+and available the instant `begin()` builds `methodSets`.
+**Consequences:** Click budget is now pose-dependent (≤ `14 × Set count`, less whenever a Set has
+no hidden geometry on some sub-beat). `sets()`'s existing `reached` semantics (ADR-084 Decision 7)
+are untouched — a Set is "reached" the moment its first beat draws, regardless of how many of its
+interior beats get skipped.
+**Status:** Superseded by ADR-098 — this ADR's own-array-emptiness test still missed a beat that
+is non-empty but redraws lines an earlier beat already put on the sheet; ADR-098 replaces it with
+a mark-novelty test in sheet-local 2D. The skip *mechanism* this ADR introduced (`goNext`/`goBack`
+loop past `hasVisibleContent(set, beat) === false`) is unchanged and still active.
+
+---
+
+## ADR-091: Show Method's lines stroke in one at a time, sequentially, per beat
+
+**Date:** 2026-07-28
+**Decision:** ADR-087/088 draw each beat's whole batch of lines in one shot — correct data, but it
+pops in as a static group rather than reading as construction. This was the actual pedagogical
+requirement from when the feature was first scoped: within a beat, each individual stroked line
+draws in over ~0.2-0.4s, one after another, before the beat is considered finished.
+
+`drawMethodSheet` (`main.js`) already iterates every beat's harvested segments as a flat sequence
+of atomic `moveTo→lineTo→stroke()` calls (`strokeMethodLines`'s own `k`-loop, the projector loop,
+`strokeAxisInto`'s two passes) — that iteration order IS the animation-unit granularity; no new
+data shape was needed; `strokeMethodLines` gained an optional `reveal: {index, t}` param (draw
+units `0..index-1` in full, unit `index` lerped from its start point by `t`, stop — omitted, this
+is exactly the old full-draw behaviour, so every non-animating call site is provably unchanged).
+
+Only ONE beat can ever be mid-reveal — the current frontier (`methodSet`, `methodBeat`); everything
+behind it already settled, everything ahead hasn't been reached — so a flat set of module vars
+(`methodAnimBeat/-Index/-UnitT`) carries the state, no per-beat map. `setMethodProgress` compares
+the new flat beat-index to the old: forward (Next) starts a fresh reveal (`startMethodBeatAnim`,
+one `tween()` spanning the whole beat linearly across units so each gets an equal slice, `easeDraw`
+reshaping each unit's own reveal — same curve `setProjectionsVisible`'s draw-on already uses);
+anything else (Back, skip, focus jump) snaps straight to fully-drawn, matching how those already
+behaved. Clicking Next again mid-reveal calls `stopMethodBeatAnim()` first — cancels the tween,
+sets `methodAnimBeat = -1` — so the in-flight beat's remaining units render in full on the very
+next paint, then the new beat's reveal starts; Next is never disabled while a beat animates.
+
+**Reused, not reinvented:** the tween/tick primitives are anim.js's existing shared ones (the same
+helper the live pane's Step 4/5/6 draw-on reveals already use). But `animate()`'s own `tickTweens`
+call is paused for Show Method's entire lifetime (ADR-085 pauses the sim loop — the 3D scene is
+fully covered) — reusing `active`'s shared Set is still safe (nothing else can be tweening while
+paused) but nothing would ever call `tick()` to drain it. `main.js` therefore pumps its own,
+independent `requestAnimationFrame` loop (`methodAnimFrame`) only while a beat is actually
+animating, started by `startMethodBeatAnim` and torn down by `stopMethodBeatAnim` (also called from
+`teardownShowMethod`, so Exit/Escape mid-reveal leaves nothing running).
+**Why:** an opacity-fade "draw-on" (the live pane's own cheaper substitute, see
+`setProjectionsVisible`'s header) was rejected here — Show Method draws on a plain Canvas2D sheet,
+where a true per-line length reveal is a lerp of two numbers, not the "per-segment dash trickery"
+LineSegments2/LineMaterial would need; there was no reason to take the cheaper, worse-reading
+option when the real one was this inexpensive.
+**Verification note:** this environment's MCP browser tab cannot render a genuinely-visible
+foreground tab (`document.hidden === true`, confirmed again on a fresh tab — see ADR-089); native
+`requestAnimationFrame` here fires once as an apparent input-driven catch-up frame and then goes
+silent, so real elapsed-time playback could not be observed end-to-end. What WAS verified natively
+(no synthetic pump): opening Show Method, a rapid 37-click Next walkthrough to "Done" with zero
+gaps between clicks (the most aggressive possible exercise of the cancel-and-restart path), and a
+5-click Back walk, all with zero console errors and correct button/state transitions throughout.
+The actual ~0.2-0.4s-per-line visual timing needs confirming in a real, foregrounded desktop
+browser tab — flagged explicitly rather than claimed.
+**Alternatives rejected:** *Group-opacity fade-in per beat* (matches the live pane's existing
+draw-on) — rejected, reads as a beat "appearing," not "being drawn," which is exactly what this ADR
+exists to fix. *A per-beat map of reveal state* — rejected, over-engineered: only the current
+frontier beat is ever reachable in a mid-reveal state by construction, so a single flat set of vars
+sufficed and is simpler to reason about than a Map that could only ever hold one entry.
+**Consequences:** a learner who waits watches each beat's lines draw in one at a time; a learner who
+clicks through quickly sees the same instant-advance experience as before (Next was never gated on
+animation completing). `methodBeatUnitCount`/`methodViewSplit` (`main.js`) are new pure helpers a
+third call site needed — `methodViewSplit` is shared with `drawMethodSheet`'s own viewA/viewB
+construction; `methodContentBeats` (ADR-090) keeps its own, pre-existing independent copy of the
+same split, left untouched rather than risking already-verified beat-skip logic for a style-only
+refactor.
+**Status:** Active — visual timing pending the user's own foregrounded-tab confirmation.
+
+## ADR-092: Show Method's cross-Set derivation lines merge into the existing "projectors" beat
+
+**Date:** 2026-07-28
+**Decision:** The audited plan for cross-Set projection/derivation lines (Sets 2/3 shown as
+*derived* from the previous Set, not appearing fully-formed) proposed a new beat inserted before
+each subsequent Set's own outline/face/generator sequence. Corrected before implementation: view A
+is already a direct rotated copy the moment it's traced, so there is nothing to derive before it —
+the real derivation moment is exactly where the existing beat-6 "projectors" beat already sits
+(after view A, before view B). Merged instead of adding a beat: `BEAT_COUNT`/`METHOD_BEAT_COUNT`
+and `methodController.js` are unchanged; Set 0's projectors beat is untouched (no previous Set to
+draw from), and Sets 1+ gain additional content in that SAME beat — the existing within-Set
+vertical projector line, plus (i>0) a new horizontal line from the previous Set's untouched-view
+point to this Set's own (`drawMethodSheet`, `main.js`).
+**Why:** which view is "active" (view A, just resolved) vs. "untouched" (view B, carried over) at
+each transition is already fully derivable from `methodViewSplit`'s existing `firstIsHP`/viewA/
+viewB split (built from `set.trueShape`, itself from `trueShapeForPlane`) — no new per-problem
+field was needed. And every Set's harvested data (`ann.labels`, world-space) is already retained
+for the walkthrough's entire lifetime (`methodSets = plans.map(projectSet)` at `begin()`), so the
+previous Set's points are already sitting in memory when the current Set's beat 6 runs — nothing
+to restructure. Merging into the existing beat was strictly smaller than a new one and needed
+neither change.
+**Correspondence guard:** the line-pairing assumes `set.ann.labels[k]` and `prevSet.ann.labels[k]`
+name the same vertex (same corner, same label order) across Sets — true because both are built by
+the same `planAnnotations` call against the same `currentMesh.geometry`, but asserted rather than
+assumed: a `console.warn` fires if the two Sets' label counts ever differ.
+**Alternatives rejected:** *A new beat before each Set's own sequence* (the original audited
+plan) — rejected once the merge was seen to need no new beat index, no `BEAT_COUNT` bump, and no
+`methodController.js` change, all of which the new-beat plan would have required. *Restructuring
+`methodSets` from `.map` to a loop* (considered mid-audit, in case draw-time needed the previous
+Set's data before it existed) — rejected/retracted: `.map` already builds every Set before any
+paint call runs, so the data is always available by the time beat 6 draws.
+**Consequences:** the derivation line is not guaranteed pixel-flat by construction — see ADR-093,
+which found (and fixed) that the both-planes Set2→Set3 transition initially drew visibly diagonal
+because of a pose-model property, not a bug in this beat's drawing code.
+**Status:** Active.
+
+## ADR-093: Show Method's both-planes Set 3 computes its pose sequentially, not as one combined Euler
+
+**Date:** 2026-07-28
+**Decision:** ADR-092's cross-Set derivation line drew visibly diagonal for the both-planes
+Set2→Set3 transition (verified on `sqpyr-both`: label heights diverged up to 0.866 units). Root
+cause, confirmed analytically before any code changed: `planMethodStages`' Set-3 pose used the
+combined-Euler shortcut `overrides: {}` → the SAME single Euler (`iShape.js` `applyShapeTransform`,
+order `'ZXY'`) the live solid uses, computed FROM THE ORIGINAL UPRIGHT SHAPE with both angles set
+at once. Because order `'ZXY'` applies the VP (Z) lean before the HP (X) tilt, adding the second
+angle re-derives the whole pose from scratch rather than building on Set 2's own — a genuine
+structural property of the "manual dual-angle decomposition" (self-flagged in that function's own
+comment as an accepted simplification), not floating-point noise.
+Added `projectSequentialBothPlanesPose` (`main.js`), used ONLY when `planMethodStages` attaches a
+new `sequential: {firstPlane, firstAngle, secondAngle}` marker to Set 3's plan (both-planes tier):
+it builds Set 2's pose the normal way (the same `applyShapeTransform` call everyone else uses,
+called here read-only), then yaws that quaternion about world-Y by the second angle — reproducing
+the real textbook auxiliary-view technique (tip to the first plane, THEN turn the already-tipped
+solid about the true vertical to bring it true to the second; turning is a yaw about world-up, not
+a second lean).
+**Why this is provably right, not just visually close:** a rotation about world Y can only ever mix
+a point's x/z — it leaves y (height) exactly alone, for every vertex, always (not just the axis).
+`computeSeating`'s re-seat is driven by `minY`, itself untouched by that same yaw. So Set 3's
+labeled vertices come out with world-Y bit-for-bit identical to Set 2's, which is exactly what a
+flat derivation line needs. Verified on both existing both-planes problems: `sqpyr-both` (equal
+30°/30° angles) — every label's height diff exactly `0`; `hexprism-both` (unequal 20°/30°,
+12 labels incl. top-hexagon primes) — every diff `~4.4e-16` (float epsilon). Screenshots of a live
+both-planes walkthrough confirm both the Set0→Set1 and Set1→Set2 (= UI "Set 2→Set 3") connector
+lines now draw fully horizontal.
+**Self-contained, as scoped:** `iShape.js`, `computeEffectiveAngles`, and the live solid's own pose
+(`rebuild()`) are untouched — `projectSequentialBothPlanesPose` only reads `currentShapeData`/
+`currentMesh.geometry` the same read-only way `projectSetPose`'s existing branch already does.
+**Alternatives rejected:** *Solve for the exact yaw angle that reproduces the target VP angle via
+auxiliary-view trigonometry* — rejected: only has a closed form for a vertex lying exactly on the
+solid's central axis (x₀=z₀=0), and no closed form in general (the derivation showed no real
+solution exists for some angle pairs under that model) — over-engineered for what this beat needs,
+which is height-preserving flatness, not a re-derivation of true-angle drafting trigonometry.
+Any yaw angle already preserves height exactly (proven above), so reusing the second stage's own
+angle magnitude keeps the label ("Axis X° to the HP and Y° to the VP") meaningful without solving
+anything new. *Reordering the live Euler to apply Z last* (`iShape.js` order change) — rejected:
+still a Z-axis operation, which mixes x/y regardless of ordering, so it would NOT have fixed
+flatness — the fix had to be a different axis (Y), not a different order of the same axes; also
+would have touched the live solid's protected rotation math, which was out of scope.
+**Consequences:** Set 3's rendered pose for both-planes problems is now geometrically distinct from
+"the live solid's exact final orientation" (the two are mathematically different compositions of
+the same two angles) — acceptable because Show Method is a construction-method walkthrough, not a
+byte-for-byte replay of the live pane's pose, and Set 3's own labeled angles are unchanged.
+**Status:** Active.
+
+---
+
+## ADR-094: Show Method's Next/Done boundary becomes content-aware; a left-active Set-N chip no longer strands new beats off-screen; the duplicated beat count is asserted at init; the Skip button's hide/disable actually match its own doc comment; every beat gets a plain-language caption
+
+**Date:** 2026-07-28
+**Decision:** A follow-up audit of ADR-089/ADR-090's "Next sometimes does nothing" fix found the
+fix was incomplete, plus a separate, unrelated cause of the same symptom, plus documentation that
+no longer matched the code it described. Five changes, all confined to `src/methodController.js`
++ `main.js` (Show Method has no clone anywhere else in the repo — confirmed by a repo-wide sweep —
+so none of this needs backporting):
+1. **Content-aware end-of-walkthrough** (`methodController.js`). ADR-090's `hasVisibleContent`
+   skip loop in `goNext`/`goBack` was still bounded by the positional `totalBeats() - 1` — if the
+   very last beat (13, labels) of the very last Set drew nothing for a given pose, the loop exited
+   there anyway (guard `flatIndex() < totalBeats() - 1`) and the click repainted an identical
+   frame, reproducing ADR-090's own defect at the one beat a learner is most likely to remember.
+   Worse, `renderProgress`'s `isLast` test was the same positional check, so "Done" could arrive a
+   full click late (relabel-then-exit, reading as two separate malfunctions). Added
+   `computeFinalIndex()`: scans backward from `totalBeats() - 1` once per run (`contentBeats` is
+   fixed at `begin()` time, so it can't change mid-run) for the true last content-bearing flat
+   index, using the exact same `hasVisibleContent` the skip loops already trust. `goNext`'s entry
+   guard/loop and `renderProgress`'s `isLast` now compare against this instead.
+2. **Focus-chip strand** (`methodController.js`). Independent of the above and not previously
+   documented as a defect: `focusSet` (main.js) is deliberately decoupled from walkthrough
+   progress (a Set-N chip only moves the camera, never `methodSet`/`methodBeat` — ADR-084
+   Decision 7), but nothing cleared it when Next/Back/Skip crossed into a *different* Set. A
+   student who zoomed into Set 2's chip and kept clicking Next would have every subsequent mark
+   drawn into Set 3 while the camera stayed locked on Set 2's block — Next visibly "doing
+   nothing" with none of ADR-090's beat-emptiness logic involved. `clearFocusChip()` now clears
+   the active chip's `is-active`/`aria-pressed` state and calls `sim.method.setFocus(null)`
+   (re-framing to the whole row) whenever `goNext`/`goBack` land in a different Set than they
+   started in, and unconditionally in `goSkipSet` (which always crosses a Set boundary). Chosen
+   over the alternative of re-targeting the chip to follow the walkthrough — clearing is less
+   surprising, and preserves Decision 7's "chips never move the sequence" by touching only
+   `setFocus`.
+3. **Runtime-asserted beat count** (`methodController.js`, `main.js`). `BEAT_COUNT`
+   (`methodController.js`) and `METHOD_BEAT_COUNT` (`main.js`) are hand-duplicated by design
+   (ADR-087) and have already moved once together (15 → 14, ADR-089) on a comment-only invariant
+   ("the two constants MUST move together"). If they ever drift, `main.js`'s `setMethodProgress`
+   clamp silently swallows the excess beat while this controller's own `flatIndex()` keeps
+   counting past it — reproducing "Next does nothing" wholesale, with no error anywhere, the
+   worst-case failure mode in the whole system. `main.js`'s `sim.method` surface now exposes
+   `beatCount: METHOD_BEAT_COUNT`; `initMethodController` compares it against its own `BEAT_COUNT`
+   at init and, on mismatch, logs a `console.error` naming both values and degrades to the same
+   no-op return the missing-markup guard already uses, rather than silently limping along.
+4. **Skip button hide/disable parity** (`methodController.js`, `index.html`). `index.html`'s own
+   comment on `#method-skip-set` said the button is "Hidden entirely on ... the walkthrough's last
+   Set" — `renderProgress` only ever set `.disabled`, never `.hidden`, leaving a visible, inert
+   button for the entire final Set (a third to a half of a full walkthrough). `renderProgress` now
+   sets both `skipBtn.hidden` and `skipBtn.disabled` from the same `noSetToSkipTo` condition; the
+   comment's stray "a Set's last beat" clause (never actually implemented) is dropped so the doc
+   describes only the one condition that is.
+5. **Per-beat captions** (`main.js`, `methodController.js`, `index.html`). Post-ADR-085/ADR-089
+   the only progress signal left was Set chips flipping enabled — inside a 14-beat Set there was
+   no way to tell what a beat had just drawn, and a skipped beat (ADR-090) was indistinguishable
+   from one that never existed, discarding real teaching content ("this view has no dashed
+   generators because the base sits square-on to the plane"). Added `methodBeatLabel(set, beat)`
+   (`main.js`, beside `methodContentBeats`, reusing its exact `firstIsHP` split so a beat's caption
+   never disagrees with its own content gate) returning plain English ("Outline of the top view",
+   "Hidden face lines — front view", "Projectors linking the two views") with beat 0 matching the
+   Set's own canvas caption verbatim [SUPERSEDED by ADR-098: beat 0 now reads "Starting Set N" —
+   verbatim duplication of the canvas caption turned out to be the second half of a layout defect,
+   see ADR-098 §2]. Exposed as `sim.method.beatLabel`. `methodController.js`'s new `syncCaption()`
+   pushes it into a new visible `#method-caption` pill (`index.html`, wrapped with `.method-bar`
+   inside a new `.method-controls` flex-column, `aria-hidden="true"`) [SUPERSEDED by ADR-098: the
+   caption moved out of `.method-controls` to its own top-of-view title row — stacking it above
+   the pill still collided with the canvas' own Set caption at the same screen row] AND the
+   platform's one `#sim-status` live region via the existing `sim.announce`, on every
+   Next/Back/Skip and once on `start()`.
+**Why:** all five were found in one investigation and are individually small, but bundled here
+rather than five ADRs because they share one root cause category — the gap between what ADR-089/
+ADR-090 intended ("every click visibly changes the sheet, orientation comes from chips not a
+counter") and what was actually wired.
+**Alternatives rejected:** *Numeric or tick-mark in-Set progress indicator* (would restore what
+ADR-089 Decision 2 deliberately removed, citing `RULES.md`'s step-counter-weight guidance; raised
+to the user as an explicit question before this pass began and confirmed rejected — captions
+carry the orientation load instead, no counter, no tick row). *Announce every auto-skipped beat
+individually* (cheaper than full captions, but leaves the beats a student does land on
+unlabelled — captions subsume this). *Give the projectors beat (6) its own content predicate
+independent of the labels beat (13)* — deferred; both currently gate on `hasLabels` and no shipped
+problem is confirmed to reach zero labels, so this is unconfirmed dead-code risk, not a live
+defect.
+**Consequences:** "Done" now always lands on a beat that actually drew something; a Set-N chip
+click can no longer strand the walkthrough off-screen; a `BEAT_COUNT`/`METHOD_BEAT_COUNT`
+mismatch now fails loudly at init instead of silently corrupting every subsequent click; the Skip
+button's visibility matches its own doc comment; every beat narrates itself in plain language with
+no step count reintroduced.
+**Status:** Active.
+
+---
+
+## ADR-095: A new curriculum track ("Diploma Engineering Graphics") shares this repo's root docs; its Module 1 ("Geometrical Constructions") is namespaced `graphics_diploma_module_1_topic_1_<N>_<slug>` on a 2D SVG/Canvas orchestrator
+
+**Date:** 2026-07-26
+**Decision:** A new curriculum track — **"Diploma Engineering Graphics" [PLACEHOLDER — confirm
+exact syllabus/issuing-body name before this track's first topic ships]** — shares this repo's
+existing root docs (`ARCHITECTURE.md`, `DECISIONS.md`, `RULES.md`, `PRODUCT.md`, `DESIGN.md`) and
+continues the same ADR sequence rather than forking Case-C-style. Its Module 1, "Geometrical
+Constructions," is namespaced `graphics_diploma_module_1_topic_1_<N>_<slug>` to avoid colliding with
+the current syllabus's existing Module 1 (`graphics_module_1_topic_*` — foundations: planes, line
+types, dimensioning, quadrants, first-angle, points, lines). The numbering scheme (module.subtopic,
+e.g. `topic_1_1` = subtopic "1.1") is **final**; the six provisional subtopics — 1.1
+`basic_constructions`, 1.2 `tangent_arcs`, 1.3 `tangent_lines`, 1.4 `regular_polygons`, 1.5
+`polygon_circle_relations`, 1.6 `ogee_curves` — and their final count remain **provisional pending
+topic-level scoping**. None of these subtopics involve 3D solid geometry, so this Module adopts
+Module 2's orchestrator discipline (single `main.js`, no-cross-import leaves, one `rebuild()` funnel,
+`window.simAPI`) over a 2D SVG/Canvas renderer instead of Three.js.
+**Why:** RULES.md §1.11 (sourced from ADR-025) requires a subject that fits neither the Module 2
+(3D) nor Module 1 (2D-from-3D projection) template cleanly to get its own ADR before work starts —
+compass-and-straightedge plane-geometry construction is flat 2D from the outset, not a projection of
+3D geometry, so it fits neither. A repo-wide check for "syllabus"/"diploma"/"curriculum" found no
+prior second-track concept: every existing "syllabus" reference (RULES.md §6.21/§6.22, the Module 3
+problem-exclusion ADRs) is a problem-set rule *inside* the single track this repo already ships —
+`Module1/CLAUDE.md` names it explicitly ("Simatrix Engineering Graphics Platform · KTU B.Tech
+Syllabus"). Diploma Engineering Graphics is genuinely new territory, not an extension of that track.
+Reusing the orchestrator *pattern* rather than Module 1's shared-`engine.js` pattern is grounded in
+ADR-007's own text: the orchestrator (one `main.js` owning state/`rebuild()`, leaves that don't
+cross-import) is a structural/organizational discipline, not something ADR-007 or ADR-033 ties to
+Three.js specifically — every existing instance happens to render 3D, but nothing in either ADR
+requires it to.
+**Alternatives rejected:** (a) *Reusing `module_1` unprefixed* — rejected: direct folder-name
+collision with the current syllabus's existing Module 1. (b) *Forking into Case-C-style own root
+docs (a new local `DECISIONS.md` starting at ADR-001, per MODULE-STARTER.md §5.4)* — rejected: the
+explicit choice here is to share root docs and continue this ADR sequence — same discipline
+(Engineering Graphics), a different syllabus track, not a foreign discipline in the Case C sense.
+(c) *Treating this as a lesson-add to the current syllabus's existing Module 1* — rejected: a
+different syllabus entirely, with its own sequencing and numbering, not an extension of the current
+one.
+**Consequences:** Cite ADR-025 as **invoked by** (not superseded) — its Module-1-vs-Module-2
+heuristic is unchanged; this adds a third case alongside it, for a 2D-non-solids subject outside the
+current syllabus. The repeated `<M>` in `graphics_diploma_module_<M>_topic_<M>_<N>_<slug>` is
+**deliberate, not a typo** — it encodes the source syllabus's own decimal module.subtopic numbering
+(e.g. "1.4" → `topic_1_4`); a future contributor must not "fix" it to `topic_<N>` alone. Descriptively
+only: MODULE-STARTER.md's Case A/B/C table (Section 2) has no row for "same discipline, different
+syllabus track, shared root docs" — this ADR is the first instance of that pattern; a future ADR may
+formalize a Case D. Future module numbering for this track, if it grows beyond Module 1, is left
+fully open pending a future ADR if/when that happens. The exact syllabus/issuing-body name remains an
+**open placeholder until confirmed** — see the Decision field.
+**Status:** Active.
+
+---
+
+## ADR-096: "Misc Curves" (Roulettes / Spiral Curves / Helix) is Diploma Module 1 Topic 2, not a new module
+
+**Date:** 2026-07-28
+**Decision:** Misc Curves — roulettes, spiral curves, helix — is **Diploma Module 1, Topic 2**, sitting
+beside Topic 1 ("Geometrical Constructions", ADR-095) inside the same module. Namespaced per ADR-095's
+established `graphics_diploma_module_<M>_topic_<M>_<N>_<slug>` convention:
+`graphics_diploma_module_1_topic_2_1_roulettes`, `graphics_diploma_module_1_topic_2_2_spiral_curves`,
+`graphics_diploma_module_1_topic_2_3_helix`.
+**Why:** These three curve families belong to the same course module as Geometrical Constructions in
+the source syllabus — the module boundary is the syllabus's own, not this repo's to redraw. The topic
+index (`topic_2_*` vs. `topic_1_*`) is sufficient to disambiguate them without minting a new module
+number.
+**Alternatives rejected:** *New Module 2 for this track* — rejected as premature: nothing yet confirms
+the source syllabus actually draws a module boundary here rather than a topic boundary within Module 1;
+inventing a second module number ahead of that confirmation risks the same kind of renumbering churn
+ADR-095 was written to avoid.
+**Consequences:** Invokes ADR-095, does not supersede it — resolves ADR-095's own open note ("future
+module numbering for this track... left fully open pending a future ADR") by settling that this
+particular growth (Misc Curves) stays inside Module 1 as Topic 2, not a new module. ADR-095's provisional
+six-subtopic list for Topic 1 (1.1-1.6) is unaffected. Docs only — no topic folders created yet.
+**Status:** Active.
+
+---
+
+## ADR-097: Helix (Diploma Module 1 Topic 2.3) is drawn as a first-angle top+front two-view construction, not a Three.js 3D orbit view
+
+**Date:** 2026-07-29
+**Decision:** Despite being a genuine 3D space curve, the cylindrical helix, conical helix, and
+helical spring (Topic 2.3) are built on the same 2D SVG orchestrator every other topic in this
+track uses — a linked top-view (circumferential position) + front-view (axial advance) pair,
+first-angle aligned per this platform's own convention (RULES.md §4's citation: "Top/Front/Side
+are cast to the object's top, back, and left respectively (first-angle)"), matching Example
+7.11's own textbook method exactly. The underlying point geometry is genuinely 3D-parametric
+(`x = r·cosθ, y = ±r·sinθ, z = pitch·θ/2π`, with `r` constant for the cylindrical case and
+linearly tapering for the conical case) — only the *rendering* is two orthographic projections of
+that curve, the same relationship every projection-drawing subject already has between a 3D
+object and its 2D sheet; it is not a flattened single-view stand-in.
+**Why:** This tests ADR-095's premise explicitly rather than silently assuming it still holds.
+ADR-095 chose the 2D SVG orchestrator for the whole Module because "none of its subtopics involve
+3D solid geometry" — true of how a helix is *drawn* in this construction, but not fully true of
+what a helix *is* (a genuine 3D space curve), so the premise deserved a real check at the one
+topic that stresses it, not a silent pass-through. The two-view method is not a compromise forced
+by that constraint: it is the source textbook's own correct, standard technique for teaching this
+exact curve, and matches what "Engineering Graphics" as a discipline actually teaches — reading
+and producing linked orthographic views of a 3D form, not orbiting a live 3D model of it.
+**Alternatives rejected:** *A true 3D Three.js orbit-camera view on Module 2's orchestrator* —
+rejected: would be the only Three.js dependency anywhere in the Diploma track (a CDN import map,
+the full disposal-contract/rebuild pipeline, WebGL context management, keyboard-operable orbit
+controls — none of which the other fifteen topics in this track need), requires its own RULES
+§1.11/ADR-025 template-choice ADR, and would likely still need the *same* 2D top+front
+construction built alongside it to actually teach Example 7.11's drawing procedure — an addition
+to the 2D build's scope, not a replacement for it.
+**Consequences:** Invokes ADR-095 (not superseded) — the Module's 2D-orchestrator choice stands,
+now on record as having been re-examined at its hardest test case rather than merely inherited by
+topic-numbering momentum. `constructions.js`'s helix math is shared 3D-parametric geometry
+projected into two SVG panes by one shared layout function, not duplicated per-view logic.
+**Status:** Active.
+
+**Addendum (2026-08-05): Reversed for Diploma Module 2 Topic 1.1 only.** The original decision
+(Diploma track stays 2D-only, no Three.js orbit view) is explicitly overridden for
+`graphics_diploma_module_2_topic_1_1_development_of_surfaces`. Reasoning: Development of Surfaces
+is fundamentally a 3D-solid-unrolled-to-2D subject — unlike the helix case this ADR was written
+for, seeing the actual solid before its flattened pattern is core to the pedagogy, not an optional
+enhancement. This addendum does not reopen this ADR for any other Diploma topic; each future case
+is judged on its own subject matter, per this ADR's own per-topic-ADR requirement. See ADR-112's
+own addendum for the implementation this reversal produced.
+
+---
+
+## ADR-098: Show Method's beat-emptiness test becomes mark-novelty in sheet-local 2D; the per-beat caption moves to a top-of-view title, out of the canvas-caption's own space; the nav pill's corner radius is made concentric with its buttons; the Set-N chip pill is re-anchored to clear the new title row
+
+**Date:** 2026-08-01
+**Decision:** Three defects survived ADR-089/090/094's pass on Show Method (Module 2), found in
+one audit:
+1. **Redundant click-stops.** ADR-090's `methodContentBeats` (`main.js`) asked only "is this
+   beat's own harvested array non-empty" — too weak. A beat can be non-empty and still redraw
+   exactly what an earlier beat already put on the sheet: a Set with no inclination (Set 1,
+   "Simple position") shows its top view's outline beat and visible-face beat tracing the
+   identical square, and its vertical generators flattening to points in that same view. Four
+   clicks, one visible mark. Fixed by replacing the per-array-emptiness test with a mark-novelty
+   one: each beat's segments are flattened with the SAME sheet-local affine map
+   `drawMethodSheet` uses (`methodFlattenHP`/`methodFlattenVP`, `main.js`), quantized at `1e-3`
+   (the same weld tolerance `meshAnalyzer.js` uses), order-normalized (`A→B === B→A`), and
+   plane-prefixed (HP and VP both flatten `u = -z`, so an unprefixed key would false-match a
+   top-view line against a coincidentally-aligned front-view one). A beat is content-bearing iff
+   at least one of its keys was not already in the accumulated set (`methodSegmentKeys`,
+   rewritten `methodContentBeats`, `main.js`). A degenerate segment (both endpoints quantize to
+   the same point — a generator viewed end-on) contributes no key at all, matching what
+   `strokeMethodLines` actually paints. Beats 6 (projectors) and 13 (labels) stay undeduped
+   (dashed construction lines and text, neither ever meaningfully coincides with view geometry);
+   beat 12 (axis) stays undeduped against view geometry — a different colour/dash is a genuine
+   new mark even collinear with a generator — but still reads `false` when truly degenerate in
+   BOTH flattens, so it doesn't reproduce this exact defect at the beat drawn last. ADR-087's
+   deliberate outline/visible-face overlap is unaffected — `drawMethodSheet`'s gates,
+   `strokeMethodLines`, and the ADR-091 reveal animation are untouched; a skipped beat's lines
+   still paint in full within whichever beat absorbed its click. Verified end-to-end: a scripted
+   Next walkthrough on an upright-then-30°-HP-inclined cube produced zero identical
+   before/after canvas frames across all 14 content-bearing clicks (5 skipped of Set 1's 14
+   beats, 5 skipped of Set 2's), and the mirrored Back walk retraced the same beats with zero
+   no-ops in the reverse direction too.
+2. **Caption collision + duplication.** The per-beat step description (`#method-caption`) lived
+   inside `.method-controls`, stacked directly above the nav pill (ADR-094) — at the same screen
+   row `drawMethodSheet` paints each Set's own canvas caption ("Set N — <label>") under its
+   block, so the canvas caption rendered half-behind the pill. Separately, beat 0's step
+   description returned the Set caption verbatim (`Set ${set+1} — ${s.label}`), duplicating it
+   outright. Fixed two ways: (a) `#method-caption` moved out of `.method-controls` to be the
+   first flow child of `#method-view` (a `flex-direction:column` container), styled as a
+   `.method-title` row above `.method-view__stage` — a flow sibling that shrinks the stage,
+   never an absolute overlay, so it cannot structurally collide with the canvas caption or with
+   `.set-chips` at any width; (b) `drawMethodSheet`'s and `setMethodFocus`'s vertical fit
+   (`main.js`) switched from one symmetric `marginPx` to `marginTopPx`/`marginBottomPx`, with
+   `marginBottomPx = 120` clearing the canvas caption's own offset below `blockH` plus the
+   `.method-controls` pill (`bottom: var(--space-5)` = 24px + the pill's own rendered height,
+   measured live at 49.6px — 120px leaves a comfortable margin, not a tight fit); (c)
+   `methodBeatLabel`'s beat-0 branch (`main.js`) now returns `` `Starting Set ${set+1}` ``
+   instead of the Set caption text, so the two captions never repeat each other. Verified live:
+   opened a 2-Set walkthrough, drove it to each Set's final beat, and screenshotted the
+   bottom region — both Set captions render fully legible, clear of the pill both vertically
+   (visible gap above the pill) and horizontally (each caption sits under its own block, the
+   centred pill sits between them), with the top title always a distinct, single-occurrence
+   string.
+3. **Nav pill radius.** `.method-bar` was `border-radius: 999px` (an unrelated stadium shape)
+   wrapping `.btn--small` children at `--radius-sm` (6px) across the bar's own 8px
+   (`--space-2`) vertical padding — non-concentric corners. Changed to
+   `calc(var(--radius-sm) + var(--space-2))` (14px), in both the row layout and the
+   `@media (max-width: 480px)` stacked variant. Verified via computed style: `14px`, exactly 6 +
+   8, matching the button corners visually.
+4. **[Addendum, same day] Set-N chip gap.** Decision 2's `.method-title` row pushed
+   `.method-view__stage`'s top edge down — but `#method-chips` (the top-right Set-focus pill)
+   was `position: absolute` *inside that stage*, so its `top: var(--space-2)` offset was now
+   measured from the shifted stage edge, not the view's actual top, leaving an oversized gap
+   above it. Moved `#method-chips` to be a direct child of `#method-view` (`position: fixed`,
+   a valid containing block for absolutely-positioned descendants) instead of
+   `.method-view__stage` — no CSS values changed, only which box `top`/`right` are measured
+   against. Verified live: `chips.getBoundingClientRect().top - view.getBoundingClientRect().top`
+   reads exactly `8`, and a screenshot shows the pill level with the top title, no overlap.
+**Why:** all four were found across one audit and one same-day addendum, but share a root cause
+category with ADR-089/090/094 — "every click visibly changes the sheet, nothing overlaps or
+repeats" was the intent; these were the parts of that intent still unmet.
+**Alternatives rejected:** *Detect mark-novelty in world/3D space, not sheet-local 2D* —
+rejected: two distinct world edges routinely flatten to the same sheet line (a prism's top face
+over its bottom face in top view when upright), and a vertical generator flattens to a
+zero-length point in that same view; a 3D comparison misses both, which are exactly the cases
+this fix exists to catch. *Dedupe beats 6/12/13 against view geometry too* — rejected for
+projectors/labels (never meaningfully coincide, and are read by a live region regardless); for
+axis, rejected specifically because a learner-visible colour/dash change is a genuine new mark
+even when geometrically collinear with an already-drawn generator — only the fully-degenerate
+(both-flattens-collapse-to-a-point) case is treated as a true no-op. *Collapse the title row to
+zero height when the caption is empty* (`:empty{display:none}`, ADR-094's original behaviour) —
+rejected: would resize the canvas mid-walkthrough as beats come and go; the row now reserves its
+line-height unconditionally.
+**Consequences:** `methodViewSplit` (ADR-091) is now shared by three call sites instead of two —
+`methodContentBeats` no longer keeps its own independent copy of the `firstIsHP` split (that
+independence was ADR-091's deliberate precedent for a second copy; a third was not, ADR-091's own
+header note). `#method-caption` keeps its id and `aria-hidden` (unchanged JS wiring in
+`methodController.js` — only its DOM position and CSS class changed). No beat template, gate, or
+animation logic changed — `METHOD_BEAT_COUNT`/`BEAT_COUNT` stay at 14 and still must move
+together (ADR-087/094).
+**Status:** Active.
+
+---
+
+## ADR-099: Show Method denotes its angles with a drawn arc + degree label, measured off the Set's actual pose rather than declared from the raw slider; the Set 2→Set 3 carry-over gets its own dash and a Set-aware caption
+
+**Date:** 2026-08-01
+**Decision:** Two gaps found in one audit: (1) nothing on the Show Method sheet showed WHERE an
+inclination angle actually was or WHAT it was measured against — Sets named their angles in the
+caption text only ("Axis 30° to the HP"), never on the drawing itself; Module 2 had zero arc
+primitives anywhere. (2) beat 6's cross-Set derivation line (ADR-092) and its within-Set projector
+line were visually identical (same colour, same short dash, same caption), so a learner had no way
+to tell "linking this Set's two views" apart from "carried over from the last Set," or why.
+
+Fixed as one measured-not-declared system, not a labelling patch:
+1. **Audit finding that reframed the whole angle half:** `angleHP` is a plain X-tilt from upright
+   (`iShape.js`), so an "axis 30° to the HP" problem statement actually draws at **60°** off the
+   HP (confirmed live: world axis direction read back via a temporary debug hook against the
+   "Square pyramid, inclined both ways" problem — `asin(|dir.y|) = 60°`, not 30). `angleVP` alone
+   is faithful (a pure Z-roll, upright ⇒ 0° to VP). The both-planes Set 3 case is worse than a
+   simple complement: its VP-inclination is a SEQUENTIAL yaw-after-tilt (ADR-093), which reads
+   14.48° true 3-D VP-angle for a nominal "30°" — no closed-form correction was going to hold up
+   here. **Chosen fix: measure, don't declare.** Every Set's caption and its arc both derive from
+   the Set's actual resolved world axis (`axisInclinations(dir) = { toHP: asin(|dir.y|), toVP:
+   asin(|dir.x|) }`, `main.js`), so they can never disagree with each other or with the drawing.
+   The underlying slider-vs-statement mismatch itself is explicitly OUT of scope — a separate,
+   larger fix (touching defaults, the −90..90 range, and the face-inclination formula) that this
+   change does not attempt.
+2. **`planMethodStages` stops baking angle text into `label`.** It emits a declarative
+   `labelSpec` (`{kind:'literal',text}` | `{kind:'plane',plane}` | `{kind:'both',firstPlane,
+   secondPlane}`) instead; `projectSet` resolves the actual degrees via `formatSetLabel(spec,
+   incl)` once the Set's real pose is known, reusing the `axis` unit vector ADR-087 already
+   computes there (no re-derivation).
+3. **The arc (`strokeAngleArc`, `main.js`) draws in beat 12** (the axis beat — no new beat,
+   `METHOD_BEAT_COUNT`/`BEAT_COUNT` stay 14, ADR-087/094's invariant untouched), in viewA's own
+   flatten (the Set's `trueShape` view) — gated by a numeric guard, NOT trusted by construction.
+   viewA drops Y (top view) when `firstIsHP`, else drops X (front view); a single line's own
+   inclination is a TRUE angle in a view exactly when the axis has zero component along that
+   view's dropped axis. For a `'plane'`-kind Set on the HP branch this is exact — `angleVP` is
+   held at exactly 0 by `planMethodStages`' own override, so `axisDir.x` is exactly 0 and the
+   front view always qualifies. The mirror VP branch is NOT exact: a manually-dialled
+   angleVP-only pose (`angleHP` 0, no shipped problem exercises this — reachable only via
+   free-explore) keeps `axisDir.z` constant instead, which projects as a purely vertical line —
+   always reading 90° — in BOTH available views, because Show Method has no side view (ADR-088)
+   to show this rotation family true in. **Caught live, not anticipated in the original design**:
+   the first version of this fix assumed the 'plane' case was exact "by construction" for both
+   branches and shipped a "90°" arc beside a "40° to the VP" caption on a free-explore VP-only
+   pose — exactly the arc-disagrees-with-caption failure this whole ADR exists to prevent. Fixed
+   by checking `Math.abs(firstIsHP ? axisDir.y : axisDir.x) < ARC_DIR_EPS` (0.02 rad ≈ 1.1°,
+   floating-point slack only) before drawing, for the 'plane' case specifically — the HP branch
+   still always passes, the VP branch now correctly draws no arc rather than a wrong one. A
+   `'both'`-kind Set (both-planes Set 3) draws the same primitive but denotes the TURN, not a
+   3-D inclination — the previous Set's own same-view axis line is provably horizontal in the
+   top view (its other component is the one just zeroed in step 2), so a plain horizontal datum
+   measures the applied yaw exactly, with no cross-block coordinate reuse needed. Guarded
+   separately to `firstIsHP` (i.e. viewA is genuinely the top view): the sequential yaw (ADR-093)
+   is always about world-Y, which is angle-preserving in a projection ONLY when that projection
+   drops Y — true for the top view, not the front. A future VP-first `method.order` entry would
+   put viewA in the front view instead, where the identical sweep would misrepresent the turn;
+   the guard skips the arc there rather than draw a lie (`method.order` currently has zero
+   entries in `problems.js`, so this is dead code today, same status as ADR-093's own
+   sequential-VP-first branch).
+4. **Beat 6 splits its two line families visually** — the within-Set vertical projector keeps its
+   short dash (`[2,2]`); the cross-Set horizontal carry-over gets a long dash (`[8,4]`), same
+   colour/width. Not `--color-accent`: the palette deliberately keeps sheet linework off blue
+   (`--color-hp-line`'s own token comment, `index.html`).
+5. **Captions become Set-aware** for both halves of the transition (`methodBeatLabel`, Sets 2+
+   only — Set 1 keeps its original text unchanged): beat 1 states WHY view A is drawn first
+   ("drawn first because it shows the new angle true" — the same fact step 3's arc placement
+   relies on); beat 6 names what's carried ("Set N's `<view>` view carried across, `<heights|
+   depths>` unchanged") — heights for a carried front view, depths for a carried top view,
+   matching exactly which sheet-coordinate `drawMethodSheet`'s own `prevFlattenUntouched` holds
+   constant. Beat 12's caption gains the same measured value the arc shows, from the same `incl`/
+   `turnDeg` fields — one source, both readouts.
+**Why:** the whole point of adding an angle denotation was to make Show Method more trustworthy,
+not less — a caption or arc that could ever show a different number than the drawing itself would
+be worse than the missing-denotation status quo it replaces. Measuring off the Set's own resolved
+pose (already computed, already trusted by the rest of the pipeline) was the only source that could
+make that guarantee; every other option available (correcting the caption formula by hand,
+labelling with the stated slider value) either couldn't handle the sequential-yaw case or would
+have shipped an arc that measurably disagreed with its own label.
+**Alternatives rejected:** *Fix the pose at the source* (make `angleHP` genuinely mean
+inclination-to-HP) — correct, but touches defaults, the slider range, the face-inclination
+formula, and any topic cloning this pattern; out of scope for an annotation feature, logged as a
+follow-up instead. *Label arcs with the stated slider values as-is* — fastest, but ships a drawn
+arc whose own label contradicts what it visually measures. *Denote every non-zero angle on every
+Set* (including Set 3's now-apparent first-plane angle) — rejected: that angle is no longer a TRUE
+angle in either of Set 3's own views once the solid is turned, and would need its own
+apparent-angle convention and caveat to stay honest; simpler to show only what each Set newly
+introduces. *A dedicated new beat for the carry-over* — rejected, same reasoning ADR-092 already
+used: no beat index change, no `BEAT_COUNT` bump, no `methodController.js` change.
+**Consequences:** the both-planes Set 3 caption text changes from the old declared
+`Axis 30° to the HP and 30° to the VP` to the measured `Axis 60° to the HP and 14° to the VP` —
+intended, not a regression; the numbers now match what a protractor would read off the sheet.
+`src/methodController.js`, `src/vertexLabeler.js`, and `index.html` are untouched — captions flow
+through the existing `sim.method.beatLabel` surface, and the arc introduces no new CSS token.
+**Status:** Superseded in part — `src/vertexLabeler.js` IS touched by ADR-100 below (axis
+overshoot removal); the caption/label-source claims here remain accurate.
+
+---
+
+## ADR-100: Beat 12's animation unit is a whole view-pass, not a chain-line dash; the angle arc animates in instead of popping in; the axis drops its endpoint overshoot
+
+**Date:** 2026-08-01
+**Decision:** Four small, related defects found in one audit of ADR-091's stroke-in and ADR-099's
+arc, all localized to beat 12:
+1. **Wrong animation granularity.** ADR-091's "one unit = one atomic stroked line" convention means
+   every other beat counts a whole EDGE as one unit. The axis is drawn as a chain (centre) line —
+   `chainPositions` (`vertexLabeler.js`) explodes it into ~22 tiny dash segments per view, and
+   `methodBeatUnitCount`'s old `case 12` counted each dash as its own unit, twice (HP pass + VP
+   pass): ≈44 units × 300ms ≈ **13 seconds**, the walkthrough's one glaring outlier against a
+   couple hundred ms to ~2s everywhere else. Fixed by counting **one unit per view pass** (2
+   units, ≈0.6s) instead — the axis is one line, not N dashes; `strokeAxisPass` (`main.js`, was
+   `strokeAxisInto`) now cuts each pass by WORLD distance along the axis, not by dash index, so
+   the reveal fraction still lands correctly regardless of how many dashes the chain pattern
+   happens to produce.
+2. **Arc appeared instantly.** ADR-099's `arcEligible` check required `!reveal` — the arc was
+   unconditionally suppressed for the whole beat-12 reveal and popped in fully formed the instant
+   the reveal ended, jarring against every line beat's progressive stroke-in. Fixed by giving the
+   arc two more animation units of its own (`methodBeatUnitCount` case 12 is now
+   `2 + (methodArcEligible(set) ? 2 : 0)`) and a `phase` param on `strokeAngleArc`
+   (`{datumT, arcT, labelA}`, each defaulting to 1 = fully drawn — same optional-param precedent
+   ADR-091 set for `strokeMethodLines`' `reveal`): unit index 2 grows the datum ray, unit index 3
+   sweeps the arc itself with the degree label cross-fading in (`ctx.globalAlpha`) over the
+   sweep's last 30%, so the number settles just after the arc finishes rather than mid-sweep
+   against a half-drawn angle. The eligibility check itself is unchanged, only relocated to a
+   standalone `methodArcEligible(set)` — `methodBeatUnitCount` (a pre-flight count) and
+   `drawMethodSheet` (the actual draw) are a beat apart in the source and had already drifted once
+   under ADR-099 (its own "caught live" free-explore VP-only-pose incident); one shared function
+   makes that drift structurally impossible now, mirroring the precedent `methodViewSplit` already
+   set for the firstIsHP/viewA/viewB split.
+3. **Arc too big, label too far out.** Radius `E * 0.22 * pxPerUnit` → `E * 0.14`; the degree
+   label's position changed from `rPx * 1.5` (a radius MULTIPLIER — every future radius tweak
+   would drag the label with it) to `rPx + ARC_LABEL_GAP_PX` (`main.js`, a constant 10px gap
+   outside the arc, independent of radius).
+4. **Axis overshot its true endpoints.** `AXIS_OVERSHOOT` (0.12 world units, `vertexLabeler.js`)
+   was added past both ends of the axis "like a real centre line" — but it made the drawn line
+   visibly run past P (base centre) and O (top/apex), the exact points it's labelling. Removed
+   outright (`bottom`/`topAxis` now sit exactly at `minY`/`maxY`). Deleting it alone would leave
+   the line ending short of or mid-gap at the endpoint on all but a lucky span (the old chain
+   pattern just repeated at its authored length and clamped at `total`), so `chainPositions` now
+   fits an integer number of `[gap,dot,gap,long]` cycles to the exact span and uniformly SCALES
+   every dash/gap/dot length to match — built as an explicit leading-long-dash-then-n-cycles
+   sequence (not a cyclic re-index of a 4-step array from position 0, which was tried first and
+   found to end on a GAP, not a dash) so both ends provably terminate on drawn ink. This is the
+   same function the LIVE 3D PANE's own axis calls (`vertexLabeler.js:364`) — the fix lands there
+   too, deliberately: it is the same axis on the same solid, and an overshoot the sheet no longer
+   has but the 3D view still did would be a new, not a fixed, inconsistency.
+**Why:** all four were small, but all four sat in the one beat (12) a learner's eye lands on last
+and lingers on — the axis and its angle are the payoff of the whole construction. A beat that
+visibly outlasted the rest by 6-7x, an annotation that broke the "everything draws on" pattern, an
+oversized arc crowding the solid, and a line that ran past its own labels all read as unfinished
+polish on exactly the mark meant to look most deliberate.
+**Alternatives rejected:** *Lower `METHOD_SEG_DURATION_MS` globally* — rejected, would speed up
+every beat's per-edge stroke-in, not just the one outlier beat, changing timing ADR-091 already
+tuned elsewhere. *Keep chain-dash-count granularity but shorten each dash's duration* — rejected,
+still couples beat-12 pacing to how finely `CHAIN` happens to subdivide a given axis length,
+which is incidental geometry, not pedagogical content. *Scale only `CHAIN.long`/`CHAIN.dot` and
+leave `CHAIN.gap` unscaled* — rejected for the endpoint fit: an unscaled gap can't guarantee an
+exact integer number of cycles fits the span, reintroducing the short/mid-gap ending this exists
+to fix.
+**Consequences:** beat 12 now takes ≈0.6s (no arc) to ≈1.2s (arc drawn) versus ≈13s before —
+correct, not a regression; a learner who was clicking through quickly never noticed the old
+duration anyway (Next was never gated on animation completing, ADR-091). The axis's chain-line
+dash COUNT changes slightly (pattern is now scaled to fit, not clamped) — cosmetic only, the same
+long-dot-long rhythm reads the same. `src/methodController.js` and `index.html` remain untouched;
+`BEAT_COUNT` stays 14.
+**Status:** Active.
+
+---
+
+## ADR-101: Show Method gains a Set-to-Set tilt — a screen-anchored Canvas2D pictorial, not a live 3D viewport; ADR-085's "no anim.js tween" clause is superseded by ADR-091's own private rAF pump
+
+**Date:** 2026-08-02
+**Decision:** Show Method's both-planes tier (Set 2 → Set 3, the ADR-093 sequential yaw) gains a
+"Watch the turn" control that plays the solid physically rotating between the two Sets' poses,
+rather than the learner only ever seeing both drawings fully settled side by side. Landed in two
+parts:
+- **Phase 0 (prerequisite, no user-visible change).** `projectSetPose`/
+  `projectSequentialBothPlanesPose` (`main.js`) now return the orientation quaternion `q` and the
+  `seat` offset alongside the existing `{eff, m}`; `projectSet` retains them on the Set record as
+  `pose: {q, seat}` — previously computed and discarded every time (`m` was local to `projectSet`,
+  last read at its own `res.dispose()` call). `cacheMethodTiltEdges()` additionally snapshots the
+  current solid's unique edges in LOCAL space (`buildEdgeMap(currentMesh.geometry)`, no
+  `matrixWorld` argument — welding is rotation-invariant, meshAnalyzer.js's own doc) into a flat
+  `Float32Array`, once per `method.begin()`, cleared in `teardownShowMethod`. No THREE.js objects
+  retained; nothing to dispose.
+- **Phase 1 (the tilt itself).** `startMethodTilt()` slerps the previous Set's quaternion into the
+  current one's over `METHOD_TILT_DURATION_MS` (900ms, `easeFold`), re-seating via the existing
+  `computeSeating` each frame and transforming the Phase-0 cached local edges by the interpolated
+  pose. The result draws as a bordered, opaque inset in the TOP-LEFT corner of `#method-canvas`
+  (`drawMethodTilt`, painted after `drawMethodSheet`), projected through a fixed 30° axonometric
+  formula (`projectMethodTiltPoint`) — not a THREE.Camera. The inset's `{scale, cx, cy}` is fit
+  ONCE at tilt start across both endpoint poses (`fitMethodTiltProjection`, 6 sampled t-values), not
+  re-centred every frame, so a seat-driven vertical settle between the two Sets stays visible as
+  real motion instead of being cancelled out by a per-frame auto-fit. No hidden-line pass — every
+  edge strokes solid; this is a motion cue between two already-correct, already-dashed Sets, not a
+  construction drawing of its own.
+
+**ADR-085 correction.** That ADR's consequence clause reads: *"No `anim.js` tween may be added to
+this view while the pause contract holds; any future motion here must be CSS or an instant state
+change."* This was already false in shipped code by the time this ADR was written — **ADR-091**
+(the per-line beat stroke-in) stood up exactly such a tween, riding a **private rAF pump**
+(`methodAnimFrame`/`queueMethodRedraw`, `main.js`) that the takeover owns for itself, explicitly
+BECAUSE `window.simAPI.pause()` has cancelled `animate()`'s own loop. ADR-091's own header says so
+("pumped by THIS module's OWN requestAnimationFrame loop... that loop is paused for the entire
+time Show Method is open"), but ADR-085's consequence line was never amended to match. This ADR
+formally supersedes that clause: **a `tween()` may run inside the takeover, provided it rides
+Show Method's own private pump, never the sim's paused `animate()` loop.** The tilt reuses that
+same pump rather than adding a second one — `methodAnimFrame`'s re-arm condition extends from
+`methodAnimBeat !== -1` to `methodAnimBeat !== -1 || methodTiltActive`, and `stopMethodBeatAnim`
+(the single existing chokepoint for "settle whatever Show Method animation is running", called from
+`setMethodProgress`/Next/Back/skip and `teardownShowMethod`/Exit/Escape/reset) is extended to also
+cancel `methodTiltHandle` — so every path that already knew how to interrupt a beat reveal now
+interrupts a tilt too, with no new call sites.
+
+**Why:** a side-by-side Sets 2/3 comparison is the textbook convention (ADR-084), but it cannot
+show the rotation ITSELF — for a both-planes problem, watching the solid tip-then-turn is the part
+of the construction method a static sheet cannot carry. The two prior blockers (rebuild() being a
+full teardown+rebuild pipeline, and the takeover's pause contract) turned out not to be blockers at
+all once audited: rebuild() is never on the path (every Set already shares `currentMesh.geometry`
+untouched, ADR-084's own "no mesh, no geometry allocation" invariant), and the pause contract was
+already bridged by ADR-091's own pump.
+
+**Alternatives rejected:**
+- **A live WebGL viewport inside the takeover, showing the real 3D solid turning.** Rejected as the
+  first phase's approach — it would need either a second `WebGLRenderer`/canvas (ADR-076 is
+  precedent that this is possible) or re-parenting the live canvas, plus `LineMaterial.resolution`
+  resize sync (ADR-006), a CSS2D overlay move, and a new disposal surface to verify against
+  `renderer.info.memory` — a large risk step for a motion the learner reads as "the solid turned"
+  regardless. Left as a possible Phase 3 if the pictorial doesn't read clearly enough in practice.
+- **Rotating the live 3D solid visually (the `applyFoldVisual` idiom) instead of a headless
+  pictorial.** Rejected — `applyFoldVisual` only ever rotates PLANE pivots (`vpFoldGroup`,
+  `ppHingeGroup`), never the solid itself: `shapeGroup`'s mesh and its edge overlay are flat
+  siblings with no pivot between them and `shapeGroup` (main.js's disposal contract requires flat
+  children), and every projection/hidden-line/label/dimension downstream is a baked WORLD-space
+  snapshot taken once at `buildEdgeMap`/`drawProjections` time against fixed world-axis observers
+  (`projectionDrawer.js`) — a live visual rotation of the solid would desync all of it silently.
+  Moot in any case: Show Method never shows the live scene (ADR-085 keeps it paused and covered).
+- **A new beat in the template.** Rejected — would bump `METHOD_BEAT_COUNT` (14 → 15), touching the
+  hand-duplicated twin in `methodController.js`, ADR-094's init assert, and ADR-098's
+  `methodContentBeats` novelty rule for one motion cue that isn't a construction step. The tilt is
+  an on-demand control (`#method-tilt`, shown only when `sim.method.canTilt()`), not a beat.
+- **Anchoring the inset in sheet space** (following `methodPanX/Y`/`methodZoom`, alongside the Sets
+  themselves). Rejected — `drawMethodSheet`'s and `setMethodFocus`'s sheet-layout block (`E`/`GAP`/
+  `scale`/`anchorSX`) is already duplicated once between those two functions; a third copy for the
+  inset was avoidable by anchoring in plain screen space instead, which also means a drag or
+  focus-jump mid-tilt can never strand the inset off-frame.
+
+**Consequences:** new Set-record field `pose: {q, seat}` (Phase 0); new module state
+(`methodTiltEdges`, `methodTiltActive/FromQ/ToQ/Eff/T/Handle/Projection`, `METHOD_TILT_DURATION_MS/
+SIZE/MARGIN/PAD`); new `sim.method.canTilt()`/`playTilt()`; new `#method-tilt` button in
+`.method-bar` (`index.html`), hidden — not merely disabled — whenever `canTilt()` is false, so
+`methodController.js`'s existing `focusables()` (`button` + `offsetParent !== null`) needs no
+change to keep the focus trap correct. Reduced motion is free (`tween()` itself snaps to the end
+value, `src/anim.js`). Scoped to the both-planes tier's Set 3 only (`turnDeg != null`, ADR-093);
+a single-plane Set1→Set2 tilt (whose combined-Euler pose pair has no proven height-preserving
+invariant the way ADR-093's yaw does) is explicitly out of scope, left for a future phase alongside
+replay/scrub controls and a Phase-3 live-viewport escalation if warranted.
+**Status:** Superseded by ADR-104.
+
+---
+
+## ADR-004 correction (2026-08-02): the "returns early while animating" line is stale
+
+ADR-004's consequences paragraph states *"`rebuild()` returns early while animating, so anything
+that should run during an animation needs separate handling."* Audited while scoping ADR-101 above:
+`rebuild()` has exactly one early return, keyed on a null `shapeData` (the empty-start/reset path),
+not on any animation flag — no `isAnimating` module variable exists anywhere in `main.js`. Rebuild
+is instead **fold-aware by re-application**: it calls `applyFoldVisual(foldProgress)` unconditionally
+near its end (main.js) so a mid-fold or fully-folded state is reconstituted onto the freshly-rebuilt
+geometry rather than rebuild() being skipped during one. The actual "don't run rebuild mid-animation"
+guards live OUTSIDE rebuild, keyed on `foldProgress`/`foldTween`/`methodActive` at each call site
+(e.g. `compare.show()`'s `if (foldTween) return`, `methodCanRun()`'s `foldProgress !== 1` check) —
+ADR-004's own text is left as-is above (historical record), corrected here rather than silently
+edited, per this doc's own precedent for amendments-not-rewrites.
+
+---
+
+## ADR-102: Show Method — caption-clearance fix folded into the layout math, Set-chip focus gains a real tween, and a restricted dimension layer (base edge + height) returns to the walkthrough
+
+**Date:** 2026-08-03
+**Decision:** Three related fixes to the Show Method takeover (Module 2), audited and shipped
+together.
+
+**1. Set 2's caption overlapping the nav pill — a genuine bug in ADR-095's fix, not a new
+regression.** ADR-095 reserved a flat `marginBottomPx = 120` below the fitted block, but the Set
+caption's own offset (`captionY = -(blockH/2 + GAP*0.4)`) was never counted in the fit
+(`nomHmm = blockH * WORLD_TO_MM` — the caption's `GAP*0.4` term is absent). On a height-bound fit
+(the normal case for a 3-Set row), the block fills the whole reserved band and the caption hangs
+a further `≈6%` of the band below it, landing ~9px inside the pill's own footprint. Every Set's
+caption sits at the identical screen row (`anchorSY`); only Set 2 is horizontally centred under
+`.method-controls` (`left: 50%`), so it was the only one that visibly collided — Sets 1/3's
+captions clear the pill purely by being ~397px off to the side. **Fix:** a single shared
+`methodSheetLayout(w, h)` (`main.js`) replaces the two hand-duplicated copies of this layout math
+(`drawMethodSheet` and `setMethodFocus` — flagged as a duplication risk in ADR-095 itself) and
+folds the caption's `GAP*0.4` offset into `nomHmm`/`anchorSY`, so the fit now measures the
+block+caption band together, not the block alone. `marginBottomPx` is now a named constant
+(`METHOD_PILL_RESERVE_PX + METHOD_CAPTION_LINE_PX = 100`) instead of the old bare `120`.
+`setMethodFocus`'s own `zFitH` divides by `(blockH + capGapS)` too, so a focused Set clears the
+pill exactly like the unfocused row. **Verified live** (real Chrome tab, both-planes 3-Set
+problem): `.method-bar`'s screenshot rect sits a clear ~27px below "Set 2 — Axis 60° to the HP"'s
+baseline, in both the unfocused row and a focused Set 2.
+
+**2. Set-chip focus now tweens — amends ADR-085's "instant snap, no tween" clause, the same way
+ADR-101 already amended it for the Set-to-Set tilt.** ADR-085 rejected a tween because the sim
+loop is paused while Show Method is open, so nothing would ever drive one. ADR-091 (2026-07-28)
+stood up a private `requestAnimationFrame` pump for the per-beat stroke-in that keeps running
+regardless of the paused main loop; ADR-101 (2026-08-02) reused that same pump for the tilt. This
+ADR reuses it a third time for `setMethodFocus`: `startMethodFocusAnim`/`stopMethodFocusAnim`
+(`main.js`) tween `methodPanX/Y`/`methodZoom` via `anim.js`'s `tween()`, sharing
+`methodAnimFrame`'s pump (now also gated on a new `methodFocusActive` flag) rather than adding a
+fourth loop. **Timing matches the platform's existing Top/Front/Side quick-view chips exactly** —
+`QUICK_VIEW_MS` (1500) + `easeFold` (`cubicBezier(0.83, 0, 0.17, 1)`), the real values `setView`
+passes to `tweenCamera` (`main.js:1711`), not `easeCamera` (that name is only `tweenCamera`'s
+*default* parameter, used by `setFlatView`/the auto-zoom dolly — `anim.js`'s own doc comment
+claiming otherwise for the quick-views was stale and is corrected in the same pass). Chosen over
+the tilt's own `METHOD_TILT_DURATION_MS` (900ms) deliberately, for parity with the quick-view
+chips elsewhere in Module 2 rather than internal consistency with the tilt. `stopMethodBeatAnim`
+(the existing single chokepoint for settling in-flight Show Method animations) now also calls
+`stopMethodFocusAnim(true)` — a Set change (`goNext`/`goBack`'s `clearFocusChip` →
+`setFocus(null)`, which runs *before* `setProgress`) must SNAP the focus tween to its target, not
+freeze it mid-flight, or the sheet would strand on whichever Set was being left. The drag-to-pan
+and scroll-wheel-zoom handlers each call `stopMethodFocusAnim(false)` first (freeze in place —
+user input wins outright). **Verified live**, via a temporary debug hook driving Show Method's own
+rAF pump manually (this MCP browser tab reports `document.hidden === true`, so native
+`requestAnimationFrame` never fires here — the same environment limitation ADR-089/091 already
+documented): `methodPanX`/`methodZoom` interpolate smoothly along an easeFold-shaped curve (slow
+start, fast middle, slow settle) over ~1300-1500ms and then hold flat; clicking Next mid-tween
+snaps both instantly to the same final values the tween would have settled at on its own.
+
+**3. A restricted dimension layer returns to Show Method — base edge + overall height ONLY,
+supersedes ADR-089 Decision 1.** ADR-089 removed dimensioning from the walkthrough entirely,
+reasoning that BIS Type-B dimensioning is a separate concern from drawing *method*, already
+served by the live pane's own "Show dimensions" toggle. That toggle's 5 dims (`projectionDrawer.js`)
+are all **bounding-box extents** (overall height/width/depth, clearance from each plane) — correct
+for Set 1's simple position, but wrong for Sets 2/3: inclining the solid changes its *projected*
+envelope without changing the base edge's *true* length, so a bbox-width dimension on an inclined
+Set would print a foreshortened number, not the real one. This ADR reverses ADR-089 Decision 1
+for exactly two measurements — the true base-edge length and the true overall height — added as a
+new `options.restrictedDims` branch in `drawProjections` (`projectionDrawer.js`), never passed by
+the live pane's own call (its 5-dim toggle is byte-for-byte unchanged). The base edge needs REAL
+geometry, not a reused bbox extent: `findBaseRingEdge` classifies every edge via the existing
+`edgeKindOf` (`base` vs `generator`, ADR-087), separates the base ring from the top/cap ring by
+axial position along the Set's own world axis (provably rotation-invariant — `dot(worldPoint,
+axisDir)` is an affine function of local Y for any rigid transform), and picks the
+least-foreshortened ring edge in the HP flatten to place the dimension line against; a new
+`baseEdgeDimOffset` computes a per-edge perpendicular-in-plane offset (the existing bbox dims can
+hardcode a single world-axis offset because they're always axis-aligned — an arbitrary-pose base
+edge generally isn't). The PRINTED value is always the Set-invariant true value
+(`shapeData.baseLength`/`height` × `WORLD_TO_MM`, read once in `projectSet`) — decoupled from the
+placement geometry exactly the way `pushLinearDim`'s existing `(A, B, off, valueMM)` signature
+already separates the two for every other dim in the file, so this needed no new primitive, only a
+new caller. Curved-base solids (Cone/Cylinder) get the height dim only — `main.js` gates
+`baseMM: null` off `currentShapeData.shape`, since `projectionDrawer.js` stays shape-agnostic by
+design (its own header) and has no concept of "this solid has no single base edge." **Folded into
+the EXISTING beat 13 (labels), per explicit direction, not a new beat 14** — `METHOD_BEAT_COUNT`
+stays 14, the click budget is completely unchanged (28/42 for 2-/3-Set problems), keeping intact
+the exact rationale ADR-089/090/098 already established for minimizing clicks. Reveal granularity
+for the new dims mirrors ADR-100's fix for the axis: one animation unit per DIMENSION (not per
+line segment) — each unit grows its dimension's own line (extensions snap in immediately, the
+`pushLinearDim`-ordered third segment lerps), with the filled arrowheads + numeral appearing once
+that unit settles. **Verified live**: on a 3×5 SquarePrism at 30°/40° (both-planes), every one of
+its 3 Sets — including both inclined ones — labels the base edge "30" and the height "50"
+identically (the true values, `3×10` and `5×10`), while the base-edge dimension's drawn line
+visibly follows the tilted edge itself (a real oblique dimension, not a straight bbox width) in
+Set 2/3's top view. On a Cone, `hpDimLines` is empty on every Set (no base dimension drawn) and
+`vpDimLines` carries the height only; the beat-13 caption text adjusts automatically ("Vertex
+labels and dimensions — overall height", no "base edge" clause).
+
+**Also, independently:** spacebar now works as an alternate Next trigger while Show Method is
+open — bound on `onViewKeydown` (`methodController.js`), which is attached to `#method-view`
+itself (not `document`), the same scoping that ADR-084's original Escape/Tab-trap handler already
+uses. Every slider/input in the app lives outside `#method-view` (`hidden` and covered while the
+takeover is open), so this is a structural, not a checked, guarantee against firing on background
+controls. Space on any OTHER focused button in the pill (Back/Skip/Exit/Tilt/a Set chip) is left
+to native browser activation (the handler returns early without calling `preventDefault()`) —
+Space only triggers `goNext()` when `#method-next` itself is focused, or nothing more specific is.
+`e.repeat` is checked and dropped so holding the key can't machine-gun beats. **Verified live**
+with genuine OS-level key events (not synthetic `dispatchEvent`): Space on a focused Next advances
+exactly one beat; Space on a focused Back goes backward, not forward; Space with a background
+slider focused (Show Method closed) does nothing.
+
+**Alternatives rejected:**
+- *Dimensions as a new beat 14* — rejected per explicit direction: would have reversed
+  ADR-089/090/098's click-budget rationale for a feature that fits cleanly inside the existing
+  labels beat instead.
+- *Base-edge dimension reusing the bbox width/depth shortcut* — rejected: correct only in Set 1's
+  simple position, silently wrong (foreshortened) on every inclined Set, which is precisely the
+  case this feature exists to cover.
+- *A fourth independent rAF loop for the focus tween* — rejected: ADR-091's pump already exists
+  and already tolerates concurrent use (the tilt is the second reuse, this is the third); a new
+  loop would be pure duplication.
+**Consequences:** new shared `methodSheetLayout()` (replaces two hand-duplicated layout blocks);
+new module state (`methodFocusActive/Handle/Target`); `stopMethodBeatAnim` now settles three
+animations, not two; `drawProjections` gains an `options.restrictedDims` parameter (opt-in, no
+effect on existing callers); `projectSet`'s harvested `data` gains
+`hpDimLines/vpDimLines/hpDimTris/vpDimTris/hpDimLabels/vpDimLabels`, restoring the
+`harvestTriGroup`/`harvestLabelGroup` helpers ADR-089 deleted; `methodBeatUnitCount`/
+`methodBeatLabel` both gain a beat-13 case. `METHOD_BEAT_COUNT` is untouched.
+**Status:** Decision 3's "every Set" and "greatest projected length" clauses superseded same-day
+by ADR-103 (base-edge selection was picking a triangulation-seam diagonal, not a real edge — see
+ADR-103 for the audit and fix). Decisions 1 and 2 (caption clearance, focus-chip tween) remain
+Active.
+
+---
+
+## ADR-103: Show Method's restricted dimension layer — real base edge, textbook placement,
+## Set-1-only (fixes ADR-102 Decision 3)
+
+**Date:** 2026-08-03
+**Decision:** Three bugs in ADR-102's restricted dimension layer, found by live-testing a
+30°/30° square pyramid and cross-checking against the textbook (John, *Engineering Graphics for
+Diploma*, the "Axis Inclined to Both Planes" chapter — Figs 12.20/12.21/12.23/12.24/12.25,
+rendered from the project-root PDF via poppler) — audited, then fixed together.
+
+**1. The "base edge" dimension was measuring a triangulation-seam DIAGONAL, not a real edge.**
+`findBaseRingEdge` (`projectionDrawer.js`) walked the welded `edgeMap` and filtered only on
+`edgeKindOf(...) === 'base'`. `meshAnalyzer.buildEdgeMap` records every triangle edge, so a flat
+N-gon base face (triangulated into a fan) contributes its diagonals alongside its real edges; a
+diagonal lies in the base plane (⊥ the axis, same as a real edge) and so also classifies as
+`'base'`. The picker then took the edge with the "greatest projected length in the HP flatten" —
+intended as "least foreshortened" — which a diagonal always wins (√2× a square's side, more on a
+hexagon), so it was selected every time. **Fix:** exclude coplanar seams using this file's own
+existing `classifyEdge`/`EdgeType.COPLANAR` test (the same filter the main draw loop already
+applies to every other edge, `projectionDrawer.js`'s edge-walk) before the 'base' classification
+runs at all.
+
+**2. Once restricted to Set 1 (Decision 3 below), "greatest projected length" no longer
+discriminates anything — every real base edge is already true length there, so a different
+selection metric is needed for PLACEMENT.** The edge is now picked by which direction reads most
+nearly vertical on the method sheet (largest `|world-X component| / length`, since
+`flattenHP`'s `v = -x`) — its in-plane normal is then dominantly sheet-horizontal, landing the
+dimension beside the view (John's own placement: Fig 12.21's edge b–a, Fig 12.25's edge c–d)
+rather than stacked toward the xy line. For a base deliberately turned in plan (e.g. the
+"Orient to Corner" 45° preset), no edge is purely axis-aligned; the same metric still picks a
+definite edge and draws an ALIGNED dimension parallel to it — Fig 12.20's turned-square frustum
+convention (`□32`/`□16`, aligned to the turned edge) — rather than the diagonal's degenerate
+case. (Confirmed with the user: bare numeral, no `□` prefix — the existing `pushLinearDim` label
+format is unchanged.)
+
+**3. The base-edge dimension's placement was landing in the gap between the top and front
+views — a direct CONSEQUENCE of Bug 1, not an independent defect in the offset formula.**
+`baseEdgeDimOffset`'s "away from the solid's bbox centre" sign test is well-defined for any real
+edge (whose midpoint is never the centre) but degenerates for the diagonal (whose midpoint IS
+the centre exactly, `dot ≈ 0`), leaving the offset direction effectively whatever the raw
+perpendicular happened to compute — the diagonal's own far corner, already at the top view's own
+extreme, then got pushed further outward by that unstable direction, past the outline toward the
+xy line. Fixing Bug 1 (a real, off-centre edge) resolves this without changing the offset
+formula itself.
+
+**4. The overall-height dimension's top extension line was a short, disconnected horizontal
+mark floating near the apex — reported as a possible stray/leftover.** It is not a leftover: the
+height dim is built between synthetic bbox points `V(0, min.y, max.z)`/`V(0, max.y, max.z)`
+(`projectionDrawer.js`), and `pushLinearDim`'s extension lines run from THOSE points, not from
+any point actually on the drawing. A prism's top ring reaches the bbox's own Z extent (so this
+was harmless there), but a pyramid/cone's apex is a single point usually nowhere near `max.z` —
+the extension line floated beside the apex instead of touching it. **Fix:** `pushLinearDim`
+gains optional `anchorA`/`anchorB` parameters — the REAL feature point each extension line starts
+from, independent of the point defining the dimension LINE's own screen position — and a new
+`ringZExtentAt(edgeMap, targetY, eps)` helper finds the actual Z reach of the drawing at the
+apex/base height (a no-op for a prism, the fix for a pyramid/cone). Every other existing
+`pushLinearDim` call is unaffected (both params default to `A`/`B`).
+
+**5. Size dimensions were repeating on every Set — the textbook prints them once.** Every worked
+example read this session (Figs 12.21, 12.23, 12.24, 12.25) prints the base-edge and height
+dimensions exactly once, on the simple-position Set; the inclined Sets carry the beat-12 angle
+arc instead, never a repeated size dimension. `projectSet` (`main.js`) now takes a `setIndex`
+parameter (`plans.map((plan, i) => projectSet(plan, i))`) and passes `restrictedDims` only when
+`setIndex === 0`. Getting Sets 2/3 to draw NOTHING (not the live pane's full 5-dim bbox layer)
+needed a second change: `restrictedDims: null` alone is indistinguishable, inside
+`drawProjections`, from the live pane's own call (which also never passes `restrictedDims` and so
+also defaults to `null`) — it was falling through to the `else` branch (the full 5-dim layer)
+instead of drawing nothing. Sets 2/3 now also pass `drawDimensions: setIndex === 0` explicitly,
+suppressing the whole dimensioning block for those Sets. `methodBeatUnitCount`/the beat-13
+caption (`main.js`) already keyed off `hpDimLines.length`/`vpDimLines.length`, so Sets 2/3
+collapse to a bare "Vertex labels" caption and zero extra animation units with no further change.
+
+**Verified live** (real Chrome tab, `php -S 127.0.0.1:8123` serving `Module2/`, a fresh
+30°/30° square pyramid, base 20 mm, height 30 mm): Set 1's top view prints "20" against the real
+edge D–C, offset beside the square, clear of the xy line; the front view's "30" has both
+extension lines landing on real points (base corner and apex `O`) with no floating mark; Sets 2
+and 3 draw the angle arc only, captioned "Vertex labels" (no dimensions). Screenshots taken at
+each Set match the John figures' convention.
+
+**Alternatives rejected:**
+- *Keep dimensioning every Set, just fix the edge* — rejected per direction: the textbook does
+  not repeat size dimensions on inclined Sets, and repeating them compounds the placement problem
+  (an inclined Set's base ring is itself tilted in 3-D, no longer guaranteed to have an edge
+  reading cleanly beside the view).
+- *Square prefix (`□20`) for a turned base* — rejected per direction: keep the existing bare
+  numeral; only the placement geometry (aligned, parallel to a real edge) needed to change.
+- *Length-based edge selection retained, only excluding diagonals* — rejected: once Set-1-only
+  (this ADR) is applied, every real base edge shares one true length, so length is not a useful
+  placement signal; the sheet-orientation metric is needed regardless.
+
+**Consequences:** `findBaseRingEdge` takes `faces` from `edgeMap` (already present on every
+value) and filters `EdgeType.COPLANAR`; its selection metric changed from edge length to sheet
+orientation. `baseEdgeDimOffset` unchanged in formula, re-documented. `pushLinearDim` gains two
+optional trailing parameters (back-compatible). New helper `ringZExtentAt`. `projectSet` gains a
+`setIndex` parameter; its one call site updated. `drawProjections`'s restricted-dims caller now
+also passes `drawDimensions`. No change to `METHOD_BEAT_COUNT`, the live pane's 5-dim toggle, or
+any beat/click budget.
+**Status:** Active.
+
+---
+
+## ADR-104: Show Method's Set-to-Set tilt becomes an on-sheet ghost — a rigid 2D rotate+translate of Set 2's own top view, not a screen-anchored 3D pictorial; supersedes ADR-101
+
+**Date:** 2026-08-04
+**Decision:** ADR-101's "Watch the turn" control played a screen-anchored, fake-axonometric
+pictorial of the solid physically rotating in a fixed 200px inset (`projectMethodTiltPoint`,
+`fitMethodTiltProjection`, `drawMethodTilt`). Read both reference textbooks cover-to-cover on this
+specific transition before redesigning (John, *Engineering Graphics for Diploma* pp.148–153, Figs
+12.20–12.27; Bhatt, *Engineering Drawing* pp.286–300, Figs 13-29–13-47 — 21 Set-1/2/3 figures,
+zero exceptions): **not one uses a pictorial for the Set-2→Set-3 transition.** Every one is a pure
+2D operation on the sheet itself:
+- John, Fig 12.21 step 2 — *"Copy the front view after tilting the axis by 45° to the xy line."*
+- John, Fig 12.21 step 3 — *"turn the top view about point c, the point of turning PT"* — a named
+  pivot lying on the reference line, not a re-derivation from scratch.
+- Bhatt, Fig 13-30(i)–(iv) — the identical outline drawn three times at three tilt angles, the
+  angle marked at the pivot each time.
+- Bhatt, Fig 13-39 — the only separate small diagram in either book, and it is a trig locus-arc
+  construction for the apparent angle β, not a pictorial of the solid — not a precedent for an
+  inset.
+
+The fix is not to restyle the inset — it is to do on the sheet what the books do on the page: the
+view that carried the true angle in Set 2 is bodily copied and turned about its axis foot onto
+Set 3's own position, faded, angle marked during the motion, then removed as Set 3's real
+beat-by-beat construction begins. Show Method already draws every Set side by side in one figure
+(`methodSheetLayout`/`drawMethodSheet`), which already mirrors the textbook page layout — the
+transition just wasn't using it.
+
+**Why this lands pixel-exact, not merely close:** Set 3's pose is Set 2's pose yawed about
+world-Y (ADR-093), and the top view drops Y. So Set 3's top view IS Set 2's top view under a
+rigid 2D motion — a rotation plus a translation, no scaling, no reshaping. `methodArcEligible`
+(ADR-099/100) already encodes the exact guard this depends on (`kind === 'both'` plus
+`firstIsHP`, i.e. view A really is the top view) — `startMethodTilt` now shares that same gate,
+so the ghost is only ever offered when the claim is provably true.
+
+**θ is measured, never declared.** `projectSheet` applies a uniform scale *and a y-flip*, so a
+world rotation reads as the opposite sense on canvas — exactly the ported-sign trap
+`Module2/CLAUDE.md` warns about. The pivot is chosen by ARRAY INDEX (which end of `ann.axis` beat
+12's own "lower on screen" rule already picks for Set 3, reused by index on Set 2 — both Sets
+harvest from one shared geometry with only pose differing, the same cross-Set assumption beat 6's
+projector derivation already relies on for `ann.labels`), then θ is the signed angle, in canvas
+px, between Set 2's own drawn axis direction and Set 3's — sign, y-flip, and handedness all
+cancel out for free. Per Set-2 sheet point `P` (already flattened at Set 2's own `dx`):
+`ghostPx(P, t) = Rot(θ·t)·(Ppx − pivot2px) + pivot2px + t·(pivot3px − pivot2px)`. At `t=0` this is
+Set 2's drawing untouched; at `t=1` it is Set 3's starting position, by construction.
+
+**Net simplification, not just a re-skin.** The old inset needed a 3D pose (quaternion slerp), a
+local-space edge cache re-projected every frame (`methodTiltEdges`, `cacheMethodTiltEdges`), and a
+hand-rolled fake-axonometric trig projection with its own fit pass. All of it is deleted. The
+ghost instead re-flattens the harvested sheet-space line arrays (`data.hp`/`data.hpOutline`) both
+Sets already carry, through one closed-form 2D transform — no buildEdgeMap, no allocation, no
+disposal, and (unlike the inset, which ignored `methodPanX/Y`/`methodZoom` entirely and was
+anchored in screen space specifically to dodge threading that state through) the ghost now tracks
+a pan/zoom mid-tilt correctly because it lives in sheet space, computed fresh each frame from
+`methodSheetLayout` — the same call-it-again precedent `setMethodFocus` already established for
+that single-source layout.
+
+**Reused verbatim, not reinvented:** `strokeMethodLines` draws the ghost body (per-segment hidden
+dashing comes free from `seg.hidden`, so the ghost keeps Set 2's real line types — a copied
+orthographic view, unlike a pictorial, has a meaningful hidden-line pass); `strokeAngleArc`
+(ADR-099/100) draws the angle mark, fed the ghost's own current (rotating) pivot/far points every
+frame, so its label naturally counts up from ~0° (the near-zero sweep at `t=0` hits the existing
+degenerate-input guard, so no stray dot appears) to the full turn — no separate counter, and it
+agrees with beat 12's arc at rest by construction. The private rAF pump (ADR-091/101) and
+`tween()`/`easeFold` are reused unchanged; `stopMethodBeatAnim` still cancels exactly one handle.
+
+Timing: motion (900ms, `easeFold`) → hold (400ms, full alpha — the payoff frame where ghost and
+Set 3 coincide) → fade (350ms, alpha 1→0), one tween mapped internally to the three phases so the
+cancel/handle contract stays a single chokepoint.
+
+Only view A (the top view) is ghosted. View B (not true-shape in Set 2) is left untouched — no
+textbook figure animates the derived view either; beat 6's projector beat already carries that
+derivation.
+
+**Alternatives rejected:**
+- **Keep the pictorial, just move/restyle it onto the sheet.** Rejected outright by the source
+  material — no figure in either book ever draws a pictorial for this transition; restyling the
+  wrong representation is not a fix.
+- **Derive θ from `turnDeg`'s sign directly.** Rejected — `projectSheet`'s y-flip makes this
+  exactly the ported-sign trap the project's own CLAUDE.md calls out; measuring both Sets' drawn
+  directions and taking the signed difference makes handedness cancel automatically instead of
+  needing to be reasoned about by hand.
+- **Also ghost view B, or extend this to Set1→Set2.** Rejected — out of scope by explicit
+  decision (see Scope below); no textbook figure animates the untouched view, and Set1→Set2's
+  combined-Euler pose pair has no proven angle-preserving invariant the way ADR-093's sequential
+  yaw does.
+
+**Scope:** Set 2 → Set 3 (both-planes tier, `turnDeg != null`) only — identical to ADR-101's
+scope. The manual, replayable **"Watch the turn"** button is unchanged in contract; `index.html`
+and `methodController.js` needed no changes at all.
+
+**Consequences:** removed `projectMethodTiltPoint`, `fitMethodTiltProjection`, `drawMethodTilt`,
+`cacheMethodTiltEdges`, module state `methodTiltEdges`/`methodTiltFromQ/ToQ/Eff/Projection`,
+`_tiltScratchQ/VecA/VecB`, `METHOD_TILT_SIZE/MARGIN/PAD`, and the Set-record's `pose: {q, seat}`
+field (nothing else read it). New: `drawMethodGhost` (`main.js`, called from `drawMethodView`
+after `drawMethodSheet`, same paint ordering the inset used); module state `methodGhost`
+(`{fromIndex, vertexIsFirst, turnDeg}`, pose-independent facts solved once at ghost start) and
+`methodTiltMotionT`/`methodTiltAlpha` (replacing the old single `methodTiltT`); new constants
+`METHOD_TILT_HOLD_MS`/`METHOD_TILT_FADE_MS`/`METHOD_TILT_TOTAL_MS`/`GHOST_ALPHA`.
+`startMethodTilt` keeps its exact boolean-return, no-op-on-false shape and its
+`stopMethodBeatAnim()`-first contract; it gains the `methodArcEligible(set)` guard.
+`METHOD_BEAT_COUNT` stays 14 — the ghost remains a motion cue, not a beat.
+**Status:** Active.
+
+---
+
+## ADR-105: Ghost turn — shortest-path rotation, and the trigger merges into Next; amends ADR-104's "methodController.js needed no changes" clause
+
+**Date:** 2026-08-04
+**Decision:** Two fixes to the ADR-104 ghost.
+
+**1. Shortest-path θ.** `drawMethodGhost` (`main.js`) measured the turn as a raw difference of two
+`atan2` calls: `Math.atan2(far3.y-pivot3.y, far3.x-pivot3.x) - Math.atan2(far2.y-pivot2.y,
+far2.x-pivot2.x)`. `atan2` itself returns `(-π, π]`, but a DIFFERENCE of two such values spans
+`(-2π, 2π)` and was never wrapped back down — when Set 2's and Set 3's drawn axis directions
+straddle the ±180° seam (one just under +180°, the other just over −180°), the raw difference
+reads as e.g. +330° for a turn that is really −30°, and the ghost visibly spins the long way
+round. Fixed with the same wrap idiom `strokeAngleArc` already applies to its own `diff` two
+screens up in the same file: `while (theta > Math.PI) theta -= 2*Math.PI; while (theta <= -Math.PI)
+theta += 2*Math.PI;`. This is provably correct here, not merely prettier: `turnDeg` is
+`plan.sequential.secondAngle`, sourced from the `rng-anglehp`/`rng-anglevp` sliders
+(`index.html`), range `[-90, 90]` — so `|true turn| ≤ 90° < 180°`, meaning the shortest-path wrap
+can never pick the wrong rotation, only stop picking the needlessly long one. `t=1` still lands on
+Set 3 exactly (`Rot(θ)` and `Rot(θ ± 2π)` are the same rotation), so ADR-104's landing proof is
+untouched.
+
+**2. Trigger merges into Next.** ADR-104 explicitly left the manual "Watch the turn" button and
+`methodController.js` untouched ("the manual, replayable 'Watch the turn' button is unchanged in
+contract; `index.html` and `methodController.js` needed no changes at all") — that sentence is now
+superseded. The turn is the payoff of the Set 2 → Set 3 transition, so it now plays automatically
+as part of the Next click that crosses that boundary, in `goNext` (`methodController.js`):
+`if (crossedSet && sim.method.canTilt()) sim.method.playTilt();`, called after `syncCaption()` so
+`startMethodTilt`'s own `announce()` ("Turning Set 2's top view N° into Set 3's position", then
+"Now at Set 3 — ‹label›" on completion) is the narration actually read out, not immediately
+overwritten by it. No engine change was needed to make the landing itself safe: Set 3's beat 0 has
+zero animation units (`methodBeatUnitCount`'s `default:` arm) and draws no view geometry, so
+`setMethodProgress`'s own `startMethodBeatAnim` call is already a no-op there — the ghost cannot
+collide with a beat reveal. `playTilt()`'s existing idempotent, self-gating, `stopMethodBeatAnim()`
+-first contract (ADR-104) needed no change either.
+
+Deliberately **not** wired into `goSkipSet` — Skip exists to cut click cost on the 15-beat/Set
+template (ADR-087 Decision 2); firing a 1.65s animation on the "get me past this" control fights
+its own purpose. `goBack` is likewise untouched, matching `setMethodProgress`'s pre-existing "only
+a genuine forward step animates in" rule.
+
+**Replay control.** The old `#method-tilt` pill is repurposed rather than deleted: renamed
+`#method-replay-turn`, moved out of `.method-bar` into a new `.method-corner` wrapper beside
+`#method-chips` (top-right, `index.html`), restyled from a full-width text pill to a small
+circular icon button (↻, `aria-label="Replay the turn"`) matching `.set-chip`'s own token
+language and 28px footprint. Its wiring is unchanged — same `sim.method.playTilt()` call,
+`renderProgress`'s same `hidden = !sim.method.canTilt()` gate, same idempotent-replay contract.
+Rejected the alternative of overloading the Set 3 chip's re-click to trigger replay: ADR-084
+Decision 7 ("chips only ever focus/zoom, never move the sequence") is easiest to keep intact by
+construction when the replay trigger is a different element entirely, not a second meaning
+layered onto a chip click; a chip-click-count-based exception would also be undiscoverable.
+`.method-corner` takes over `.set-chips`' old `position: absolute; top; right` so the replay
+button can be `chipRow`'s sibling rather than its child — `renderChips()` still does
+`chipRow.innerHTML = ''` on every `start()`, which would otherwise wipe a static button nested
+inside it.
+
+**`canTilt()` tightened.** It previously tested only `turnDeg != null`; `startMethodTilt` itself
+also requires `methodArcEligible(set)` (Set 3's true-shape view must genuinely be the top view —
+the same guard the rigid-2D-motion claim depends on). A Set could theoretically satisfy the first
+but not the second, showing/enabling a control `startMethodTilt` would then silently no-op. Folded
+`methodArcEligible` into `canTilt()` itself (`main.js`), so one predicate now backs the auto-play
+gate in `goNext`, the replay button's visibility, and the engine's own guard.
+
+**Alternatives rejected:**
+- **Derive θ from `turnDeg`'s own sign instead of wrapping the measured difference.** Rejected —
+  ADR-104 already rejected this once for the un-wrapped case (the `projectSheet` y-flip makes
+  declaring the sign from `turnDeg` the exact ported-sign trap `Module2/CLAUDE.md` warns about);
+  wrapping the MEASURED value preserves ADR-104's "measured, never declared" property while fixing
+  the range bug, rather than reopening a rejected approach.
+- **Block Next/disable input while the ghost plays.** Rejected — every other Show Method animation
+  (beat stroke-in, focus pan/zoom) is already interruptible by Next (`setMethodProgress`'s
+  `stopMethodBeatAnim()`), and special-casing the ghost to block input would be the one
+  inconsistent animation on the platform.
+- **Auto-play on `goSkipSet` too, since it also can cross into Set 3.** Rejected — see Decision
+  above; contradicts Skip's own click-cost-mitigation purpose (ADR-087 Decision 2).
+
+**Consequences:** `drawMethodGhost`'s `theta` computation (`main.js`) gains a wrap loop.
+`stopMethodBeatAnim` now also clears `methodGhost = null` (was previously left stale on a
+cancelled-mid-flight tilt; harmless since `drawMethodView` gates on `methodTiltActive`, but no
+longer left dangling). `sim.method.canTilt()` (`main.js`) now also checks `methodArcEligible`.
+`methodController.js`'s `goNext` gains one guarded `playTilt()` call; its local `tiltBtn` is
+renamed `replayBtn` (`#method-tilt` → `#method-replay-turn`). `index.html` gains `.method-corner`
+and `.method-replay`; `.set-chips` drops its own `position/top/right/z-index` (now inherited from
+the wrapper). `METHOD_BEAT_COUNT` (14) and the ghost's timing constants are unchanged.
+**Status:** Active. Amends ADR-104's Scope clause; ADR-104 itself stays Active.
+
+---
+
+## ADR-106: Module 2's Profile Plane folds INTO the VP about the VP∩PP line, not down onto the HP — the Side view lands beside the FRONT view, not the Top view
+
+**Date:** 2026-08-04
+**Decision:** A 2026-08-04 faculty review flagged that Module 2 — the platform's master/reference
+implementation for orthographic-view layout (`Module2/CLAUDE.md`) — laid the Side view out
+against the wrong anchor. Standard first-angle projection: **Front is the anchor**; Top sits
+directly below it (shared vertical projectors, same width band); **Side sits directly to the
+RIGHT of Front, at the same height** (shared horizontal projectors, same height band). Side has
+no direct projection relationship with Top. Module 2 instead folded the Profile Plane DOWN onto
+the HP (`PP_FOLD_TARGET = −π/2` about `ppHingeGroup`'s local X, the hinge a world-space SIBLING
+of `vpFoldGroup`), landing the Side view beside the **Top** view — a bottom-right "4th-quadrant"
+block sharing Top's row instead of Front's.
+
+Fixed in `Module2/` only (scope: this session; the clone, Glass Box, and Sections carry the same
+bug and are follow-up work — see Consequences):
+- `ppHingeGroup` is now **nested inside `vpFoldGroup`** (was a scene-level sibling), positioned at
+  local `(0, 0, z0)` — the VP∩PP line now lives IN the VP's own local frame, at the z0 slice.
+- `PP_FOLD_TARGET` flips to `+π/2`, applied about `ppHingeGroup`'s **local Y** (was local X). This
+  folds the PP sideways INTO the VP plane about the VP∩PP line; `vpFoldGroup`'s own existing
+  `+π/2`-about-Z fold then carries it down WITH the front view, same `foldProgress` driving both.
+- Full derivation (local PP point `(x,y,0)` → world): `R_y(+90°)` → `(0,y,−x)` → `+hinge(0,0,z0)`
+  → `(0,y,z0−x)` in `vpFoldGroup`'s frame → `vpFoldGroup`'s own `R_z(+90°)` → `(−y,0,z0−x)` in
+  world → answer-sheet camera `(sheetX,sheetY)=(−worldZ,−worldX)` → sheet `(x−z0, y)`. `sheetY=y`
+  is now **identical to the Front view's own `sheetVP.y=worldY`** (was `sheetY=−x`, identical to
+  Top's `sheetHP.y=−worldX`) — Side now shares Front's height band.
+- `projectionDrawer.js`'s flat-connector builder ties the folded Side point to the folded FRONT
+  point (`foldedFront = (-vertex.y, 0, vertex.z)`, `foldedSide = (-vertex.y, 0, z0-vertex.x)` —
+  both share world x, giving a horizontal projector), not to `projectHP(vertex)`.
+- `drawCompare()`'s X1-Y1 reference line is now identified as the VP∩PP hinge (was HP∩PP) and its
+  length spans the Front+Side block (`vpBox`), not Top+Side (`hpBox`) — see the ADR-056 amendment.
+  Its position formula, `x1X = −z0`, is numerically unchanged (the hinge's sheetX is the same
+  either way).
+- `Module2/src/stepper.js:49`'s Step-6 tutorial caption ("the side view beside the front") needed
+  **no change** — the copy was already correct; only the code contradicted it.
+
+**Why:** `Module2/CLAUDE.md` designates this module the design-system's master/reference
+implementation (echoed in the platform root `RULES.md`), so its layout bug propagated by
+citation rather than staying contained: ADR-049 explicitly ported Module 2's fold to
+`graphics_module_1_topic_4_understanding_orthographic_views` for "parity," **overturning that
+topic's own correct fold** (ADR-044, which had it right — Side right of Front — hours earlier the
+same day). The bug is deliberate-looking (`PP_FOLD_TARGET`'s own doc comment asserted the
+Top-relative placement as intended, "the 4th-quadrant layout"), not an oversight, so a straight
+faculty audit was needed to catch it. Root cause was almost certainly a literal Unity-prototype
+port that was never re-checked against first-angle convention — exactly the risk
+`Module2/CLAUDE.md`'s "re-derive every ported sign visually" rule exists to catch, and the rule
+was not applied to this fold's hinge axis/nesting when it was first written.
+**Alternatives rejected:**
+- **Keep the HP-fold hinge, fix only `drawCompare()`'s sheet formula.** Rejected — the 2D sheet
+  and the 3D pane's own live fold must show the SAME layout (`drawCompare`'s header comment: sheet
+  points are read "exactly where the 3D pane's own fold puts them"); patching only the 2D sheet
+  would silently diverge the two surfaces, the same anti-pattern ADR-044 explicitly rejected for
+  Glass Box ("mirror the 2D Compare sheet layout instead... papering over it").
+- **Keep `ppHingeGroup` a world-space sibling, fold it about a different axis to fake landing
+  beside Front.** Rejected — Front's own view MOVES (it's parented to `vpFoldGroup`, which
+  animates); a sibling pivot cannot track a moving target without duplicating `vpFoldGroup`'s
+  rotation by hand every frame. Nesting is the only construction where "ride the VP fold down" is
+  automatic and stays correct through the fold animation, not just at `foldProgress=1`.
+**Consequences:** `Module2/src/projectionDrawer.js`'s `visibleInPP`/`projectPP`/`options.z0`
+doc comments updated to name the VP∩PP hinge; the `worldNormal.z > 0` visibility test itself is
+UNCHANGED (observer direction is independent of the fold). `answerSheetBox()`'s Z-range formula
+updates from `z0 − y` to `z0 − x`. `positionRefLabels()` places `sideViewLabel` in the Front
+caption's X-band instead of the Top caption's. `simAPI.reset()`'s `ppHingeGroup.rotation` reset
+moves from `.x` to `.y`. Verified live (PHP dev server, foreground Chrome tab — MCP tabs run
+`document.hidden=false` here so no rAF-pump workaround was needed): Compare 2D sheet shows Side
+right of Front at matching height with nothing beside Top; the 3D pane's flattened answer-sheet
+view shows the same; dragging **Distance from HP** moves Front+Side together with Top fixed;
+dragging **Distance from VP** moves Top down and Side right with Front fixed; cycling shapes
+(cube/pyramid/cylinder/prism ×5) produced no console errors. **Known pre-existing, unrelated
+issue found during verification and left untouched (out of scope):** `positionRefLabels`'s shared
+`M = 2.0` world-unit caption overshoot is disproportionately large relative to a small solid's
+own bounding box (e.g. a 20mm-base pyramid is ~2 world units per `WORLD_TO_MM=10`), which pushes
+the "Top View"/"Front View" captions (not "Side View," whose overshoot direction happens to stay
+on-canvas) far outside the Compare sheet's auto-fit frame for small solids. Pre-dates this ADR;
+worth its own ticket.
+**Follow-up (separate sessions, not fixed here):** `graphics_module_3_topic_1_sections_of_solids`
+(`src/projectionDrawer.js` ported the same Top-relative connector logic; this module has no 2D
+Compare sheet of its own, so only its live-3D projector geometry is affected) carried the bug —
+now fixed, see ADR-109.
+`graphics_module_2_topic_2_simple_positions` (Module 2 clone) carried the same byte-identical
+pre-fix code but is now fixed — see ADR-107, which backports this ADR to that clone.
+`graphics_module_1_topic_4_understanding_orthographic_views` (Glass Box) also carried the bug
+(ported here by ADR-049's citation) but is now fixed too — see ADR-108, which restores that topic's
+own pre-existing correct fix (ADR-044) rather than porting this ADR's nested-hinge construction,
+since Glass Box's VP does not fold (unlike Module 2's).
+**Status:** Active. Supersedes ADR-049's fold clause for Module 2 (ADR-049 itself, scoped to
+Glass Box, is separately marked Superseded above pending that topic's own fix). Amends ADR-056
+(X1-Y1 identity/length only; its position formula is unchanged).
+
+---
+
+## ADR-107: ADR-106 backported to the Module 2 clone (`graphics_module_2_topic_2_simple_positions`) — Side view now lands beside Front, not Top
+
+**Date:** 2026-08-04
+**Decision:** Per ADR-009 (copy-paste-clone architecture, no automatic sync), ADR-106's Side-view
+fold fix was hand-transplanted from `Module2/` into its "simple positions" clone, which carried
+the identical bug byte-for-byte in every affected hunk of `main.js` and `src/projectionDrawer.js`
+(`ppHingeGroup` a world-space sibling of `vpFoldGroup` folding `−90°` about local X onto the HP;
+`sheetPP`, `answerSheetBox()`, `positionRefLabels()`, the X1-Y1 reference line, and the flat
+side-view connector all keyed off the same Top-relative placement). The fix and its full
+derivation are ADR-106's, cited rather than re-derived here: `ppHingeGroup` now nests inside
+`vpFoldGroup` at local `(0, 0, z0)`, `PP_FOLD_TARGET` flips to `+π/2` about local Y, and every
+consumer of the fold (`applyFoldVisual`, `answerSheetBox`, `positionRefLabels`, `drawCompare`'s
+`sheetPP`/X1-Y1 block, `simAPI.reset`, and `projectionDrawer.js`'s `visibleInPP`/`projectPP`/flat
+connector) was updated in lockstep, exactly mirroring ADR-106's own hunks.
+**Clone-specific notes (where this session diverged from a literal copy):**
+- This clone has no `methodController.js` / Show Method feature (`sim.method.*` calls were
+  surgically removed in an earlier session — "simple positions" never tilts), so the ADR-105
+  hunks bundled into the same Module2 commit (`c288974`) that also carried ADR-106 — the ghost-turn
+  angle wrap, `canTilt`'s `methodArcEligible` gate, `stopMethodBeatAnim`'s `methodGhost` reset —
+  do not apply and were skipped entirely.
+- The clone's `ppPlaneLabel` sits at local `(0, 4, 0)` (Module2 uses `(4, 4, 0)`) — left as-is,
+  only the surrounding comment was updated to flag it for re-verification against the new
+  composed fold, per Module2's own equivalent comment.
+- A handful of this clone's comments (`main.js`'s `ppHingeGroup` doc, the `rebuild()` PP-standoff
+  comment, `refreshProjections()`'s parent comment, and the `buildScene()` block comment above the
+  PP grid) already described the nested/VP∩PP design in prose — stale drift written ahead of code
+  that was never actually updated to match. Those comments needed no further edit; the code has
+  now caught up to what they already claimed. Every other comment in both files still described
+  the old HP∩PP/Top-relative fold and was rewritten to match Module2's corresponding fixed comment.
+- `src/stepper.js:49`'s Step-5 copy already read "the side view beside the front" — like Module2's
+  own stepper caption, it needed no change; only the code disagreed with it.
+**Why:** Same as ADR-106 — first-angle convention requires Side to share Front's height band, not
+Top's. This is a straight backport, not an independent re-derivation; the geometry/signs are
+proven in ADR-106 and were not re-litigated here.
+**Consequences:** `DECISIONS.md`'s ADR-106 Follow-up list amended to strike this clone (see above).
+`graphics_module_1_topic_4_understanding_orthographic_views` (Glass Box) and
+`graphics_module_3_topic_1_sections_of_solids` still carry the bug — unaffected by this session.
+Verified live (foreground Chrome tab, XAMPP-served — MCP tabs run `document.hidden=false` here so
+no rAF-pump workaround was needed) against ADR-106's own pass criteria: 2D Compare sheet shows
+Side right of Front at matching height with nothing beside Top; the 3D pane's flattened answer
+sheet agrees; dragging Distance from HP moves Front+Side together with Top fixed; dragging
+Distance from VP moves Top down and Side right with Front fixed; the X1-Y1 reference line stays
+pinned under both sliders; shape cycling (cube/pyramid/cylinder/prism ×5) produced no console
+errors; `renderer.info.memory` geometry/texture counts stayed flat across rapid rebuilds.
+**Status:** Active.
+
+---
+
+## ADR-108: Glass Box's Profile Plane folds sideways into the VP about the VP∩PP line — restoring ADR-044, superseding ADR-049's fold clause
+
+**Date:** 2026-08-04
+**Decision:** In `graphics_module_1_topic_4_understanding_orthographic_views`, the PP fold reverts
+to ADR-044's original design: `foldPivotPP` becomes a scene-level SIBLING of `foldPivotHP` (both
+children of `foldRoot`, alongside the fixed `vpRoot`) instead of nested inside the HP hinge's inner
+group. Its pivot moves from `(D,−D,0)` (the HP∩PP line, along Z) to `(D,0,−D)` (the **VP∩PP** line,
+along Y); `PP_FOLD_ANGLE` flips from `−π/2` to `+π/2`; `applyFoldPose()` drives it via
+`foldPivotPP.rotation.y` (was `.rotation.z`). This lands the Side view **beside the Front view, at
+the same height** (shared horizontal projectors), not beside the Top view. `drawCompare()`'s 2D
+sheet is rewritten in lockstep: `sideC` moves from the bottom-right (beside Top) to the right of
+Front at Front's own centre-Y, the second fold-reference line moves from between Top/Side to
+between Front/Side, and the Side view's own drawing is re-authored with its axes swapped
+(`u = +worldZ` horizontal, `v = −worldY` vertical, matching Front's height convention) — since this
+topic's Compare sheet is hand-authored directly from the dimension table (ADR-050), not derived
+from the 3D fold geometry, so it cannot simply be "moved," only redrawn rotated.
+**Why:** ADR-044 (2026-07-13) had this right the same day it was written — PP hinges directly onto
+the fixed VP about their shared edge, swinging Side to the right of Front. Hours later, ADR-049
+reverted just this fold clause to instead nest the PP hinge inside the HP hinge and fold it down
+onto the HP, explicitly citing "Module 2 parity" (`PP_FOLD_TARGET`) as the reason. That citation was
+the bug: Module 2 itself had the wrong layout at the time (Side beside Top, a "4th-quadrant"
+misreading of first-angle projection), not fixed until ADR-106 that same faculty-review session
+(2026-08-04). ADR-106's Status note and Follow-up list already flagged that this topic inherited
+the mistake via citation and would need its own pass. **Module 2's own fix (ADR-106) does not
+transplant here.** ADR-106 nests Module 2's `ppHingeGroup` inside `vpFoldGroup` because Module 2's
+VP is not fixed — it folds along with the rest of the box (`vpFoldGroup`'s own `+π/2`-about-Z), so a
+free-standing PP pivot could never track a moving Front view; nesting is what lets "PP into VP, VP
+into the fold" compose automatically at every frame of the animation. Glass Box's VP (`vpRoot`) is a
+plain group at identity — it never moves — so nothing needs to ride along with it, and the pivot can
+sit directly on the VP∩PP line as a scene sibling, exactly as ADR-044 originally built it. This ADR
+is therefore a **restoration** of Glass Box's own prior, independently-correct fix, not a port of
+Module 2's construction, and the geometry was re-verified by hand rather than copied from either
+ADR-044 (whose literal code no longer exists — the whole 2026-07-13 build landed in one squashed
+commit, `6f7376f`, with no finer git history to restore from) or Module 2's ADR-106 (wrong topology
+for this module): a PP pane point `(D,y,z)` rotated `+π/2` about local Y at pivot `(D,0,−D)` lands
+at world `(2D+z, y, −D)` — height `y` passes through unchanged (same band as Front's own
+`(x,y,−D)`), and the horizontal coordinate `2D+z` places it to the right of the fixed VP with the
+explode gap preserved between panes.
+**Alternatives rejected:**
+- **Port Module 2's ADR-106 nested-hinge construction as-is.** Rejected — see Why: it solves a
+  problem (a moving VP) that does not exist in this topic. Copying it would nest PP inside a HP
+  hinge that has no reason to carry it, adding indirection for no benefit and leaving the topic's
+  own architecture inconsistent with its own "VP is fixed" invariant (documented in this topic's
+  fold-overview comment since ADR-044).
+- **Patch only `drawCompare()`'s 2D layout, leave the 3D fold alone.** Rejected for the same reason
+  ADR-106 rejected it for Module 2: the 2D sheet and the live 3D fold must show the same layout, or
+  the two surfaces silently diverge — the exact anti-pattern ADR-044 itself flagged when it rejected
+  "mirror the 2D Compare sheet instead" as papering over a 3D bug.
+**Consequences:** `main.js`'s fold-overview comment block, the `foldPivotPP` state doc, and
+`assembleScene()`'s HINGE TOPOLOGY doc are rewritten to describe the sibling topology and the
+VP-is-fixed rationale, so a future session doesn't reach for Module 2's nested pattern again without
+re-checking this module's own architecture first. `src/glassBox.js`'s header comment and
+`createGlassBox()` docstring (prose only — no code there depends on fold direction; the pane
+geometry is authored in world space at rest and the hinge alone determines its folded position) are
+updated to match. Verified live (XAMPP `:8080`, foreground Chrome tab — this environment runs
+`document.hidden=false`, so no rAF-pump workaround needed, per ADR-106/107's own verification note):
+driving Step 1→5, the 2D Compare sheet shows Side right of Front at matching height with nothing
+beside Top; the 3D pane's flattened fold agrees; the Fold/Unfold rail toggle replays correctly both
+directions mid-tween; `renderer.info.memory` geometry/texture counts stay flat across repeated
+`simAPI.reset()` cycles; zero console errors. This topic has no HP/VP distance sliders (unlike
+Module 2), so ADR-106's drag-behaviour check has no analogue here; substituted with orbit-drag and
+fold-replay checks instead.
+**Status:** Active. Supersedes ADR-049's fold clause (its other three clauses — exploded planes,
+CSS2D plane pills, CSS2D Observer icon — are unaffected and stand). Restores ADR-044's original fold
+design. Strikes `graphics_module_1_topic_4_understanding_orthographic_views` from ADR-106's
+Follow-up list — `graphics_module_3_topic_1_sections_of_solids` was the only item remaining and is
+now fixed too, see ADR-109; ADR-106's Follow-up list is fully closed.
+
+---
+
+## ADR-109: Sections of Solids' flattened side-view connector now ties to the FRONT view, not the Top view — closing ADR-106's Follow-up list
+
+**Date:** 2026-08-04
+**Decision:** `graphics_module_3_topic_1_sections_of_solids` was the last module named in ADR-106's
+Follow-up list. `src/projectionDrawer.js`'s `flatConnectors` batch (`drawProjections()`) computed
+its folded side-view point as `foldedSide = (vertex.x, 0, z0 − vertex.y)` and drew the segment from
+`projectHP(vertex)` (the TOP view) to `foldedSide` — sharing world X with the Top view, the same
+Top-relative construction ADR-106/107/108 all fixed elsewhere. Corrected to match those ADRs
+exactly, cited rather than re-derived here: `foldedSide = (−vertex.y, 0, z0 − vertex.x)`, drawn
+from `foldedFront` (not `projectHP(vertex)`) to `foldedSide` — Front and Side now share world X
+(`−vertex.y`), giving a horizontal projector, and the segment ties Side to Front as first-angle
+projection requires.
+
+Two things distinguish this module from the other three fixes and are worth recording:
+- **This module has no fold pivot at all.** `main.js` has no `vpFoldGroup`, `ppHingeGroup`, or
+  `PP_FOLD_TARGET` — the fold-to-flat-sheet animation is explicitly unbuilt (`CLAUDE.md`'s own
+  "Build status" line, `main.js`'s file-header comment). The profile plane is carried by a plain,
+  unrotated `ppHolder` translated to `z0` (`main.js:611-616`). So unlike Module 2/its
+  clone/Glass Box, there was never a wrong *fold* to fix here — only the wrong *connector* math,
+  copy-pasted from the pre-fix Module2 source (ADR-060/061 note this file was copied
+  byte-identical at the time). This is the scope the task brief predicted and the audit confirmed.
+- **The buggy geometry was never actually rendering.** `main.js:619-622` builds
+  `flatConnectorGroup` and immediately parks it `visible = false`, with a comment noting the
+  group is held for "a later (fold) phase." The fix is therefore a **latent-bug** fix: no visual
+  regression existed to observe before or after, because the group has never been shown. Chose to
+  fix it now anyway rather than leave it for whoever builds the fold phase, since the wrong
+  formula would otherwise ship silently the day that phase lands and the group's `visible` flag
+  flips to `true`.
+
+Also corrected in the same pass: four doc comments in `projectionDrawer.js` (`visibleInPP`'s SIGN
+note, `projectPP`'s hinge description, `flatConnectorGroup`'s JSDoc, and the `options.z0` JSDoc)
+that described the old HP∩PP/beside-Top construction — two of them (`projectPP`'s doc citing a
+rotation on `ppHingeGroup`, and `options.z0`'s doc citing `ppHingeGroup.position.z`) also named
+state objects (`ppHingeGroup`, a rotated hinge) that do not exist anywhere in this module's
+`main.js`, i.e. they were already inaccurate independent of the Top-vs-Front bug. Reworded to
+describe the actual current state (a static `ppHolder`, no rotation) plus the contract a future
+fold-phase implementation must satisfy (VP∩PP hinge, nested pivot per ADR-106's reasoning, since
+this module's own VP will presumably fold like Module 2's rather than staying fixed like Glass
+Box's — left as an open call for whoever builds that phase, not decided here).
+
+**Why:** Same first-angle rationale as ADR-106/107/108 — Side has no direct projection
+relationship with Top; it shares Front's height band. Not re-litigated here.
+**Alternatives rejected:**
+- **Re-copy `Module2/src/projectionDrawer.js` verbatim, per this module's own `CLAUDE.md:11-13`
+  ("BYTE-IDENTICAL Module2 copy... fix drift in Module2/ and re-copy, never patch here").**
+  Rejected — measured drift between the two files is 504 changed lines across 18 diff hunks
+  (`diff --strip-trailing-cr`). Module2's copy has since grown ADR-087's base/generator edge
+  batches, ADR-102/103's restricted dimension layer, and other features this pruned module
+  neither has nor wants. A re-copy would be a large, unreviewed behavior change disguised as a
+  sync. Hand-patched instead, and `CLAUDE.md:11-13` is corrected in this same session to record
+  the drift and retire the "never patch here" instruction — see Consequences.
+**Consequences:** `graphics_module_3_topic_1_sections_of_solids/src/projectionDrawer.js`'s
+`foldedSide` math and its four surrounding doc comments are updated (see Decision). This module's
+own `CLAUDE.md:11-13` is corrected to stop claiming byte-identical parity with Module2 and to
+record that targeted, ADR-cited patches are the route for this file going forward. ADR-106's
+Follow-up list is now fully closed (see that ADR's amended Status note above).
+
+Verification could not follow ADR-106/107/108's own live-3D-pane pattern, because the connector
+group in question is never shown (`main.js:619-622`, see Decision). Verified instead by
+temporarily forcing `flatConnectorGroup.visible = true` at runtime in a foreground Chrome tab
+(XAMPP-served, no rAF-pump workaround needed — this environment runs `document.hidden = false`
+per ADR-106/107/108's own note) and reading the rendered `LineSegments2`'s
+`instanceStart`/`instanceEnd` attributes directly: every side-view projector's two endpoints now
+share world X (the horizontal, Front-aligned signature the fix predicts), where before the fix
+they did not. Screenshot confirmed the same visually — side projectors run horizontally out of
+the front view rather than along Z out of the top view. Reverted the runtime override via reload;
+confirmed zero console errors and flat `renderer.info.memory` geometry/texture counts across
+repeated `simAPI.reset()` cycles.
+
+Two things were noticed during the audit but are explicitly **out of scope** for this ADR:
+- This module carries dormant 2D-Compare-sheet scaffolding (`index.html`'s `.compare-card` CSS
+  and a `hidden` card, `projectionDrawer.js`'s vestigial `segments.userData.hidden` tag) with
+  comments naming a `drawCompare()` that is never wired into `main.js`. Confirms ADR-106's own
+  note that this module has no 2D sheet. Whoever wires it must use the Front-anchored layout
+  fixed here, and must build any fold pivot nested (ADR-106's construction), not as a scene
+  sibling (ADR-108's construction) — this module's VP is not obviously fixed the way Glass Box's
+  is, so that choice needs its own re-derivation, not a default copy of either prior fix.
+- `graphics_module_2_topic_2_simple_positions/src/projectionDrawer.js` no longer sets
+  `segments.userData.hidden`, but its `main.js:2689-2690` still reads that tag to choose dash
+  pattern/line width for its 2D Compare sheet — so that sheet now draws every line solid. Checked
+  against `git show HEAD` and confirmed this predates ADR-107's uncommitted work, i.e. it is a
+  pre-existing, unrelated drift bug, not a regression from any session in this ADR chain. Left
+  untouched; worth its own ticket.
+**Status:** Active. Closes ADR-106's Follow-up list (all four modules now fixed: Module2 itself
+by ADR-106, the clone by ADR-107, Glass Box by ADR-108, Sections of Solids here).
+
+---
+
+## ADR-110: Projection of Straight Lines — Art 10-8 Method II added; traces fixed for θ+φ=90°
+
+**Date:** 2026-08-04
+**Decision:** `graphics_module_1_topic_6_projection_of_straight_lines/src/sheet2DLayout.js`'s
+`computeTraces()` implemented only Art 10-10 Method I (extend a view to xy, drop a projector,
+extend the other view to meet it). When both projections are perpendicular to xy — θ+φ=90°, Art
+10-7's profile-plane case, reachable from the sliders and not merely a boundary curiosity — Method
+I's `xAtY`/`yAtX` helpers return `null` (the view has no finite slope), and the code silently fell
+back to the endpoint's OWN coordinate as the trace. That fallback is *correct* for the true
+point-view cases (line ⟂ HP or ⟂ VP, Art 10-9 fig. 10-21 — the trace really does coincide with the
+point view) but *wrong* for θ+φ=90°: Traces.pdf p.212 Art 10-11 states outright that "it is not
+possible to find the traces by the first method" there and requires Method II. A 45°/45°, 18mm/18mm
+line (both traces analytically ON xy) was rendering HT and VT 18mm off — a silent, plausible-looking
+wrong answer, exactly the failure mode §2.19a (added by ADR-105, same session block) now names.
+
+Added `trapezoid()` and `methodII()` (Art 10-8 Method II — True Length.pdf figs. 10-18/10-19: erect
+perpendiculars on one view equal to the OTHER view's signed offset from xy, join the far ends; that
+join is the True Length, at the plane inclination the other view lies on) as pure exports on
+`sheet2DLayout.js`. `computeTraces()` now branches three ways: point-view → trace coincides with
+the projection (unchanged, made explicit rather than an accidental null-fallback); θ+φ=90° →
+Method II, each trapezoid produced against its own view locates that view's trace (Art 10-10 Method
+II / fig. 10-25, fig. 10-26); otherwise → Method I, unchanged. `traces.js` gained a matching Method
+II animation branch (perpendiculars → hypotenuse → produced-to-trace, in place of Method I's
+extend-to-xy choreography, since there is no h/v foot to find here). `trueLength.js`'s
+`createTrueLength()` gained a `method: 'I'|'II'` parameter, defaulting to 'I' (the existing
+12-phase rotating-line construction, unchanged); `main.js`'s True-Length launcher now auto-selects
+`'II'` from `computeTraces(layout2D(r)).method`, so the Traces and True-Length launchers never
+disagree about which method a given line requires.
+
+Offsets in `trapezoid()` are signed (not `Math.abs`), so problem 10-7 / fig. 10-30's
+opposite-sides-of-xy case falls out with no extra branch. Verified algebraically before writing
+any construction code (§2.19a): `trapezoid(...).tl` reduces to `√(len²+Δoff²)` which is exactly
+`TL` by the Pythagorean relation `lineData.js` already uses to derive `fvLen`/`tvLen` from `TL`,
+`θ`, `φ`; `.angle` reduces to the same `atan2` expression `lineData.js` uses for `theta`/`phi`; and
+reflecting the trapezoid (`side: -1`) provably cannot move where it meets its view, since a
+reflection fixes every point of the view line pointwise. All three claims, plus the traced
+θ+φ=90° regression case (asserting the new HT/VT are NOT at the old wrong position) and all 12
+shipped Problem Library entries, are asserted by a scratch analytic Node script importing the
+shipped `lineData.js`/`sheet2DLayout.js` directly (ADR-019: verify the real artifact) — 59/59
+passed, plus a 16-assertion pass proving the True-Length Method II angle ARC itself sweeps the
+exact `resolved.theta`/`resolved.phi`, not merely that `trapezoid()` computed the right number.
+Runtime-smoke-tested (stubbed THREE/DOM) that `createTraces()`/`createTrueLength()` build and
+`animate(0..1)` without throwing across the full case matrix (both perpXY configurations, both
+point-view cases, ordinary Method I, the θ=φ=0 default). Headless-verified per ADR-019 (Chrome via
+CDP, no puppeteer): sim boots clean, zero console errors/exceptions, both construction launchers
+click through the θ+φ=90° case without throwing, and `renderer.info.memory.{geometries,textures}`
+stays flat (`16/0`) across 50 real-slider-driven rebuilds cycling five cases including two
+perpXY configurations — confirming the new Method II geometry is disposed by the existing
+`compareSheet.clearConstruction()` contract (ADR-004) with no added leak. (First attempt at this
+memory check read `renderer.info.memory` synchronously inside a tight 50-iteration loop with no
+`requestAnimationFrame` yield, so Three's WebGLGeometries bookkeeping — which only updates inside
+an actual `render()` call — never ran; every sample silently read pre-loop state. Caught by cross-
+checking against a separate sanity pass showing genuine non-zero geometry/render-call counts, and
+fixed by awaiting two rAF ticks between commits — a concrete instance of §2.19a's own warning
+about a check that looks like it passed for the wrong reason.)
+**Why:** Correctness against the cited textbook (N.D. Bhatt, *Engineering Drawing*, Ch. 10) is this
+module's whole contract (CLAUDE.md's opening line). θ+φ=90° is a named, examinable case (Art 10-7),
+not an edge case to leave broken.
+**Alternatives rejected:** Guard-and-suppress (detect θ+φ≈90° and simply hide the trace with a "not
+computable" note) — rejected; the textbook gives a real method, and hiding a required construction
+teaches an omission the source material doesn't have. Extending `sheet2DLayout.js`'s existing
+null-fallback with a manual epsilon-nudge to avoid the `NaN`/coincidence-with-endpoint case —
+rejected; it would still be Method I algebra applied where Art 10-11 says Method I algebra does not
+apply, producing a different but equally fabricated number.
+**Consequences:** Easier: `trueLength.js` and `traces.js` now share one geometric primitive
+(`methodII()`) for both the True-Length recovery and the trace construction, so a future fix to one
+automatically benefits the other. Harder: `sheet2DLayout.js`'s public surface grew
+(`trapezoid`/`methodII`/`meet` now exported); RULES.md §3.6 named only `genericSolid.js` as the
+cross-topic shared-pure exception and did not name `sheet2DLayout.js` at all even though three
+Lines leaves already imported it before this change — noted, not newly created, by this ADR; a
+RULES.md update naming the Lines-family exception explicitly is a good follow-up but out of scope
+here (this ADR only adds functions to an already-shared file, it doesn't create the sharing
+pattern). F3 (a line lying wholly IN the HP or VP reports "no trace" instead of Art 10-9's
+"trace coincides with the line," reachable by the shipped `ln-incl-vp-2` problem) and F4 (no
+on-screen "NO TRACE" callout matching figs. 10-20/10-21, where Method I legitimately has none) were
+identified in the same audit but are explicitly OUT of this ADR's scope — real audit findings F1/F2/F5
+only. Not implemented.
+**Status:** Active
+
+---
+
+## ADR-111: Show Method's on-sheet ghost extends to Set1→Set2 (a TILT, front view) — ADR-101/104's exclusion was over-broad, not wrong about the risk
+
+**Date:** 2026-08-04
+**Decision:** Audited whether ADR-104's ghost (currently Set2→Set3 only, both-planes tier) could
+safely extend to Set1→Set2, which ADR-101/104 had left out of scope on the grounds that its
+"combined-Euler pose pair has no proven angle-preserving invariant the way ADR-093's yaw does."
+Proved a class of Set1→Set2 (and, as a corollary, the both-planes tier's OWN Set1→Set2) IS
+provably a rigid 2D motion — riding the **front** view, not the top view ADR-104 uses — and
+extended the ghost to cover it. **Correction to the premise this audit started from:** ADR-093
+does not prove the combined-Euler Set2→Set3 is single-axis; it proves the opposite — ADR-093
+*replaced* that pose with a constructed sequential yaw precisely because the combined-Euler
+version was not height-preserving.
+
+**The proof.** Every Set's rotation is `R = Rz(-V)·Rx(H)·Ry(θ)` (`iShape.js` `applyShapeTransform`,
+order `'ZXY'`). Set 1 always has every mode forced off (`planMethodStages`), so `R_from = Ry(θ_from)`
+— not the identity, but exactly the right-hand factor of `R_to`. So `ΔR = R_to · R_from⁻¹ =
+Rz(-V_to)·Rx(H_to)·Ry(θ_to - θ_from)`, which collapses to a pure world-**X** rotation (a TILT) iff
+`V_to ≈ 0` **and** `θ_to ≈ θ_from` — both required, since a product of rotations about two distinct
+world axes has no single axis. (The premise "Set 1 is untilted so only one angle changes" is not
+what actually makes this work — it's that `R_from` cancels as a factor of `R_to`, which a mode
+that rewrites `rotationY` between the two Sets would break even though the learner still only sees
+one slider move.)
+
+`drawMethodSheet`'s front-view flatten is `(u,v) = (-z, y)`. Under `Rx(A)`: `y' = y·cosA - z·sinA`,
+`z' = y·sinA + z·cosA`; substituting `z=-u, y=v` gives `u' = u·cosA - v·sinA`, `v' = u·sinA +
+v·cosA` — exact SO(2), no scale/shear. The top view drops `y`, the very coordinate `Rx` mixes into
+`z`, so it foreshortens instead — the front view is *forced*, and it's the opposite view from
+ADR-104's turn. Seating adds a pure translation (`m`'s translation has `z=0` identically, and the
+front view's `u` reads `z`). The drawn line SET is unchanged too, not just its shape:
+`visibleInVP`/`onOutlineVP` (`projectionDrawer.js`) key off `worldNormal.x`, and `edgeKindOf` keys
+off a dot product with `axisDir` — both untouched by a rotation about that same world-X axis, by
+construction. This is the exact dual of ADR-093 with X and Y swapped, and stronger: ADR-093 had to
+construct a new pose to get its invariant; here the invariant falls out of the existing
+`projectSetPose` algebra unmodified.
+
+**Where it stays unsafe** (audited, not merely assumed): a VP-inclination 2-Set problem gives
+`ΔR = Rz(-V)`, rigid only in the side view — which `METHOD_SHOW_SIDE_VIEW` hard-disables (ADR-088)
+— unfixable by picking a different view, since the top view's `v'` would depend on `y`, the very
+coordinate the top view drops. `orientToCorner` combined with a tilt gives `Rx(H)·Ry(Δθ)` (two
+axes) since Set 1 forces the mode off while Set 2's live mode overwrites `rotationY` — reachable
+only in free-explore, no shipped problem hits it. `restingPlane:'VP'` is *itself* a pure `Rx`, but
+is independently excluded: its axis then points along world-X (⟂ VP), projecting to a POINT in the
+front view — `methodArcEligible`'s existing `|axisDir.x| < ARC_DIR_EPS` guard already rejects it.
+Explicitly **not** relying on `methodArcEligible` alone as the safety gate: `axisDir.x = cos(H)·sin(V)`
+is also ≈0 at `H≈±90°` for arbitrary `V`, a combination that can't arise inside the 2-Set tier's own
+data but would be an unrelated coincidence if that predicate were reused as the rigidity test
+itself, hence the new `methodStepIsXTilt` states the rigidity condition explicitly instead of
+inferring it from a view-degeneracy check built for something else.
+
+**Shipped-data check.** Of the `one-plane` tier's three problems, both `faceInclinationHP` ones
+(`Pyramid` 45°, `Cone` 30°) resolve to `V=0, Δθ=0` — eligible. The third
+(`TriangularPyramid`/`faceInclinationVP`) resolves to BOTH `H` and `V` non-zero, so
+`inclinationStageCount` returns 3 for it — it was never a 2-Set problem and was already excluded by
+every existing gate (`turnDeg` stays null on its Sets). **Bonus:** the both-planes tier's own
+Set1→Set2 (`{angleHP: eff.angleHP, angleVP: 0}` for the default HP-first `method.order`,
+`orientToCorner:false`) also satisfies the tilt condition — both shipped both-planes problems omit
+`method.order` and so both qualify, gaining a full "tilt then turn" walkthrough matching the
+textbook's own two-step narration. A `VP`-first `method.order` would instead give `ΔR = Rz(-V)`
+(the unsafe case above) and is rejected by the same guard automatically — no tier-specific
+carve-out needed.
+
+**Implementation.** New `methodStepIsXTilt(fromSet, toSet)` (`main.js`, beside `methodArcEligible`)
+states the rigidity condition directly against `eff.angleVP`/`eff.rotationY`, gated by
+`toSet.turnDeg == null` — the both-planes Set 3's `eff` is deliberately a COPY of Set 2's own
+(ADR-093, for labelling only) and would otherwise satisfy the same numeric test despite its actual
+motion being a yaw, not a tilt; `turnDeg` is the one field that tells the two cases apart.
+`startMethodTilt` now resolves `isTurn`/`isTilt` and stores `methodGhost.kind`; the pivot rule
+flips with the view (`flattenHP`'s canvas-y increases with world-x, `flattenVP`'s canvas-y
+*decreases* with world-y, so "lower on screen" — the existing deterministic pivot convention —
+picks the opposite raw comparison). `drawMethodGhost` picks `flattenHPAt`/`flattenVPAt` and
+`.hp`/`.vp` (+ outline, + line colour) off `methodGhost.kind`, and skips the angle arc entirely for
+a tilt: `strokeAngleArc`'s datum is horizontal, but a tilt's axis starts near-vertical in the front
+view, so the datum would flip sides mid-flight if reused unmodified — the destination Set's own
+beat-12 arc marks the settled angle a moment later instead. `canTilt()` widens to accept either
+case behind one predicate, same as ADR-105's own "one predicate backs everything" precedent.
+`goNext`'s trigger (`methodController.js`) needed no change — `crossedSet && sim.method.canTilt()`
+already fires on any forward crossing into a ghost-eligible Set, tilt or turn. The replay button's
+static label is generalized ("Replay the Set-to-Set motion") since which case applies now varies
+by Set; `startMethodTilt`'s own `announce()` still narrates the specific motion and Set numbers.
+
+**Alternatives rejected:**
+- **Ghost the angle arc too, sourced from a fixed datum captured at ghost start (shrinking
+  90°→settled) or swept from the ghost's own start direction (growing 0°→applied tilt).** Both
+  considered and rejected in favor of no arc during the tilt: either would show a DIFFERENT number
+  than the destination Set's own beat-12 caption at the moment they're both on screen together
+  (the face-inclination angle named in the problem statement vs. the derived axis angle
+  `axisInclinations` actually measures — a pre-existing, inherited caption mismatch this ADR does
+  not fix), and a mismatched number mid-animation is worse than no number.
+- **Reuse `methodArcEligible` as the sole gate for the tilt case, the same way it gates the turn
+  case.** Rejected — it is a view-degeneracy test (does the axis project at full length in this
+  view), not a rigidity test (is the pose delta actually a single-axis rotation); the two happen to
+  coincide for the turn case (ADR-093's construction guarantees both) but do not for an arbitrary
+  step, so stating the rigidity condition explicitly in `methodStepIsXTilt` is not redundant.
+**Status:** Active. Narrows ADR-101's and ADR-104's "no proven invariant, out of scope" scope
+clauses to the cases in this ADR's "where it stays unsafe" section; both ADRs stay Active
+otherwise (their own TURN mechanics are unchanged).
+
+---
+
+## ADR-112: "Development of Surfaces" (Diploma, prism/cylinder/two-piece elbow) is Diploma **Module 2**, Topic 1.1 — first module beyond ADR-096's Module 1 — and its single construction plate is Canvas2D, not this track's usual SVG
+
+**Date:** 2026-08-05
+**Decision:** A new Diploma Engineering Graphics topic, scoped to **rectangular prism, cylinder, and
+a symmetric two-piece 90° elbow only** (no pyramid, cone, sphere, or general truncation), is
+namespaced `graphics_diploma_module_2_topic_1_1_development_of_surfaces` — **Diploma Module 2**,
+Topic 1 (subtopic 1.1), per ADR-095's `graphics_diploma_module_<M>_topic_<M>_<N>_<slug>` decimal
+convention (the repeated `<M>` is deliberate, per that ADR — not collapsed to a bare `topic_1`).
+This is the first topic to grow this track past ADR-096's Module 1 ("Geometrical Constructions" +
+"Misc Curves"), settling ADR-095's own open note ("future module numbering... left fully open
+pending a future ADR") for this specific growth: Development of Surfaces is its own course module
+in the source syllabus, not a third topic bolted onto Module 1.
+
+Two further sub-decisions ride along:
+
+1. **Canvas2D single plate, not SVG.** Every other Diploma topic renders one inline SVG viewport
+   (`renderConstruction.js` emitting DOM nodes, ADR-095's inherited pattern). This topic instead
+   renders to one `<canvas>` (`#construction-canvas`) carrying the front view, the top-view
+   semicircle, the stretch-out development, and the horizontal transfer/projector lines connecting
+   them, as ONE continuous plate — matching how the source textbooks (Bhatt Fig. 15-8/15-10, K.C.
+   John Fig. 15.4–15.12) actually draw this subject: transfer lines cross freely between views on
+   one sheet, which an SVG-viewport-plus-separate-canvas split cannot do (an SVG `<line>` cannot
+   terminate inside a different DOM subtree's coordinate space without a second synced transform).
+   This is a **deliberate, on-record deviation** — a future contributor must not "fix" this topic
+   back onto the SVG pattern citing ADR-095/097 consistency; those ADRs chose SVG because their
+   subjects had no multi-view single-plate transfer-line requirement, not because SVG is mandatory
+   track-wide. `viewTransform.js` and `renderConstruction.js` are reimplemented against
+   `CanvasRenderingContext2D` (pan/zoom via a `{vx,vy,vw,vh}` view-state + redraw, draw-on animation
+   via partial-path progress instead of `stroke-dashoffset`) but keep the **same external contract**
+   (`initViewTransform() → {resetView, ensureVisible, dispose}`; `renderConstruction`'s
+   `clear/computeBounds/renderStatic/playSteps`) and the **same step-list data shape**
+   (`{kind, role, ...}` from `constructions.js`) — only the rendering backend changes, not the
+   authoring contract every other topic's `constructions.js` already uses.
+2. **`developmentEngine.js` (the KTU-track engine, `graphics_module_3_topic_2_development_of_surfaces/src/`)
+   is reused for its LAYOUT MATH only, copied into this topic's own `src/developmentEngine.js`.**
+   `parallelLayout()` (cylinder branch) and `computeCutDistances()` (parallel/cylinder branch) are
+   called from `constructions.js` as pure geometry calculators to produce step-list coordinates;
+   its own `drawDevelopment()`/`drawParallelDevelopment()`/`drawStringPath()` paint functions are
+   NOT called — they paint directly and non-animated, incompatible with this track's step-based
+   draw-on pedagogy (ruler-bar/compass-sweep reveal per role). They ship in the copied file as dead
+   code rather than being deleted, since the file is copied whole (simplest audit trail back to the
+   source engine) and may earn a use if this topic later grows a "final assembled pattern" snapshot
+   view. Radial-line math (`radialConeLayout`/`radialPyramidLayout`) and the string-path/"ant"
+   geodesic functions are likewise unused — out of this topic's scope (no pyramid/cone/shortest-path
+   problems). The rectangular prism (unequal base sides, unlike the KTU engine's equal-side
+   `PRISM_SIDES` table) gets its OWN stretch-out calc in this topic's `constructions.js`, not a
+   literal call into the copied `parallelLayout()`.
+
+**Elbow scope — a named simplification, not a textbook figure.** Neither reference PDF
+(`Development.pdf`, N.D. Bhatt Ch. 15; `KC-Development.pdf`, K.C. John Ch. 15) contains a worked
+TWO-piece 90° elbow example — both books' only worked pipe-bend example is a THREE-piece bend
+(Bhatt Problem 15-13/Fig. 15-15; K.C. John Example 15.18/Fig. 15-20–21, general form
+`θ = 90°/(n+1)` for `n` middle pieces). A two-piece elbow is confirmed audit-2026-08-05 to be a
+correct degenerate case: each half is a plain cylinder truncated ONCE at 45° (mitred, then
+mirrored) — exactly Bhatt Problem 15-8/Fig. 15-10 and K.C. John Example 15.9/Fig. 15.12's
+single-truncation cylinder construction, which `computeCutDistances()`'s existing parallel/cylinder
+branch already covers with zero new math (one `localPlane`, called twice — once mirrored). This
+topic's ADR/CLAUDE.md must cite that single-truncation math as the source, not a numbered elbow
+figure, since none exists at two-piece scope.
+
+**Why:** RULES.md §1.11/ADR-025's template-choice discipline applies to the module-number question
+the same way ADR-096 applied it; ADR-095's own placeholder note requires a real ADR before this
+track's first Module-2 topic, not silent folder creation. The Canvas2D call is a genuine
+architectural fork (this track's first) so it gets recorded rather than discovered later as an
+unexplained outlier against ADR-095/097/098's SVG precedent.
+
+**Alternatives rejected:**
+- *Fold this into Diploma Module 1 as a further Topic 3* — rejected: the source syllabus draws its
+  own module boundary here (a distinct course module, "Development of Surfaces"), the same
+  reasoning ADR-096 used in the other direction to keep Misc Curves inside Module 1.
+- *Keep the SVG viewport, fake cross-surface transfer lines with per-view stub ticks* — rejected
+  before this ADR (see the earlier Phase-A audit): breaks the textbook's actual single-plate
+  reading and would need its own future un-fix once a real transfer-line requirement showed up.
+- *Rewrite `developmentEngine.js`'s draw functions to emit SVG step nodes, keep the whole plate in
+  one SVG* — rejected: throws away the one part of the KTU engine that already works
+  (`computeCutDistances`) for no gain, since this topic needs the step-list contract either way to
+  get animated draw-on; Canvas2D is the more direct realization of "one continuous plate" as several
+  existing views on this platform (the Module 2 Compare sheet, ADR-066) already prove out.
+- *Build the Bhatt/K.C. John three-piece elbow verbatim* — rejected for THIS topic's stated scope
+  (two-piece symmetric only); left as a documented future-phase seam (this topic's
+  `computeCutDistances` call is structured to accept a middle double-truncated piece later without
+  an engine rework, since that piece is just two `localPlane` cuts on one cylinder instead of one).
+
+**Consequences:** Establishes Diploma Module 2 as a real, numbered thing — the next Diploma topic
+that is NOT Development of Surfaces stays in Module 1 unless it has its own equally genuine
+syllabus-module boundary (do not default new Diploma topics to Module 2 by proximity). Establishes
+that this track's SVG orchestrator is a strong default, not an absolute rule — citing THIS ADR's
+Canvas2D reasoning (multi-view single-plate transfer lines) is the bar for any future topic wanting
+the same deviation, not "SVG felt harder." `src/developmentEngine.js` in this topic's folder is an
+**independent copy**, not a byte-identical shared file under RULES §1.3/§1.4 — the KTU-track engine
+and this copy are permitted to drift (different `ShapeType` tables, different scope), so no
+cross-file sync obligation is created by this ADR.
+**Status:** Active.
+
+**Addendum (2026-08-05): 3D View step added.** A new wizard step, 3D View, is inserted between
+Choose and Given (Choose → 3D View → Given → Construct → Verify). This is the track's first
+Three.js dependency, using Module 2's boot/disposal contract and `cube.js`/`cylinder.js`
+generators — copied fresh, not shared via the byte-identical family guarantee (RULES §7.2 doesn't
+extend to this track), matching the precedent already set for `developmentEngine.js`. The
+two-piece elbow requires a bespoke `elbowHalf.js` generator (no existing platform elbow mesh); it
+reuses the 2D construction's `cutHeight()` mitre-plane math, not shared geometry code. The
+existing Canvas2D development plate (front view + top view + development + transfer lines, one
+sheet) is unchanged — 3D is additive, not a replacement. See ADR-097's own addendum for the
+override this step required. **Superseded the next revision pass, before any of this was
+committed — see the 2026-08-06 addendum immediately below.**
+
+**Addendum (2026-08-06): the 3D View STEP above is replaced by a Compare card — nothing from the
+2026-08-05 addendum above had been committed yet, so this is a same-arc revision, not a rollback.**
+Two things surfaced this revision, stated plainly rather than silently reworked: (1) an unrelated
+audit of this topic's elbow drawing (front view pinned top-left instead of centered — a routine
+`constructions.js` `planPlate()` bug fix, logged in this topic's own CHANGELOG.md, not here)
+prompted re-reading Bhatt's actual page layout for this chapter
+(Fig. 15-1, 15-3 through 15-15) — **every** figure puts the small isometric pictorial and the
+front/top+development plate **side by side in one figure**, never sequentially (view the solid,
+leave it, then draw). The 3D View step contradicted the source material's own presentation.
+(2) Checking the platform's own Compare precedent surfaced ADR-080 (below): the floating/compact
+Compare card is fixed and removed everywhere, platform-wide — Compare has exactly one shape, the
+docked ADR-037 50/50 split. A "3D View step" was never going to reconcile with that; a Compare
+card is the shape the platform has already standardized on for "peek at a second view without
+losing the main one."
+**Decision:** the wizard reverts to the platform's standard four-step shape (Choose → Given →
+Construct → Verify, `stepper.js`). The 3D solid moves into a docked Compare split
+(ADR-012/037/080), **roles reversed from every other Compare topic on the platform**: this topic's
+Canvas2D construction plate (`#sim-viewport`) is already the primary pane (ADR-112 §1), so Compare
+docks the 3D solid (`view3d.js`, unchanged) as the SECOND pane instead of a 2D drawing — the usual
+direction is 3D-primary/2D-secondary (Points, Lines, the KTU
+`graphics_module_3_topic_2_development_of_surfaces` sibling); this is the first Compare-card topic
+built the other way around. `#given-fields` (the Given step's dimension sliders) docks into the
+split's `#workbench-rail` — unlike the sibling topics' rail (which docks a solid/cutting-plane
+*picker*), this rail exists so dimensions stay LIVE-adjustable while comparing solid against
+pattern, which the old sequential step structurally could not offer (Given and 3D View were
+different steps, never both on screen). `main.js`'s `rebuild()` now calls `view3d.js`'s
+`rebuild3D()` directly whenever Compare is open, closing that gap. `view3d.js`/`cube.js`/
+`cylinder.js`/`elbowHalf.js` are UNCHANGED — the lifecycle API (`show3D`/`hide3D`/`rebuild3D`/
+`resumeLoop3D`/`clear3D`) was already caller-agnostic, so only the caller (`main.js`, `stepper.js`,
+`index.html`) needed rewiring.
+**Files touched:** `stepper.js` (5→4 steps), `main.js` (compare state machine replacing
+`onEnter3DStep`/`onLeave3DStep`), `index.html` (Compare chip/card/workbench-rail/rail-toggle
+markup + CSS, ported from the KTU sibling topic), `view3d.js` (comment wording only — "Step 2" →
+"Compare open/close" throughout, no behavior change). `cube.js`/`cylinder.js`/`elbowHalf.js`
+untouched. `constructions.js` got the unrelated `planPlate()` centering fix noted above, same
+pass, logged in CHANGELOG.md rather than here (routine bug fix, not a decision).
+**Status:** Active. The 2026-08-05 addendum above is superseded by this one.
+
+**Addendum (2026-08-06): pane order swapped to 3D-left/2D-right, and the 3D solid gains corner
+numerals — the thing that makes Compare pedagogical, not just decorative.** This addendum's own
+"roles reversed" language above ("Compare docks the 3D solid as the SECOND pane") was read too
+literally into pane *position* as well as pane *role* — re-reading Bhatt Fig. 15-1/15-3…15-15
+confirms every figure puts the isometric pictorial and the construction plate side by side with
+the pictorial FIRST (left), never the plate first; every other Compare-card topic on the platform
+(Points, Lines, the KTU sibling) also puts 3D left. The Canvas2D plate stays this topic's primary
+pane in role (ADR-112 §1 — it's still what Choose/Given/Construct/Verify drive), but its screen
+position moves right. Pure CSS: `index.html`'s `grid-template-areas` string order flipped at all
+four split/rail-collapsed/mobile sites; DOM order and `main.js`'s `enterWorkbench()`/
+`exitWorkbench()` re-parenting are untouched, since grid position is expressed entirely by
+`grid-area` names, not DOM order or an `order:` property.
+
+Separately, and this is the change that actually closes the loop Compare was built to provide: the
+3D prism's corners are now numbered `1,2,3,4` (unprimed on both the base and top ring), matching
+`constructions.js`'s own top-view/development station numerals exactly (DESIGN.md §6) — until now
+the 3D solid carried no labels at all, so a student comparing panes had no way to trace a specific
+corner across them. New leaf `src/labels3d.js`, adapted from `Module2/src/vertexLabeler.js`
+(CSS2DObject DOM pills; independent copy, not byte-identical-shared, same precedent as this
+topic's own `cube.js`/`developmentEngine.js` — RULES §7.2's guarantee doesn't reach this track).
+Unlike `vertexLabeler.js`'s generic `uniqueLocalVertices`/`orderRing` atan2 inference (built for
+arbitrary n-gon solids), the prism's 8 corners are read directly off `BoxGeometry`'s own bounding
+box against an explicit, auditable station table — exact for a box, not inferred. `view3d.js`
+gained a `CSS2DRenderer` overlay (mounted/resized/rendered alongside the existing
+`WebGLRenderer`, same `z-index:1`-traps-the-label-stacking-context fix `Module2/CHANGELOG.md`
+already recorded once); no new dependency, `three/addons/` was already import-mapped. Numerals
+are Prism-only this phase — `rebuild3D()` clears them for cylinder/elbow — matching the
+solid-by-solid rebuild already underway for the 2D plate (ADR-113/114).
+
+**A discrepancy surfaced, not fixed:** deriving the 3D↔2D corner mapping required reading
+`constructions.js`'s own first-angle convention (`toTop`'s `y=0` is nearest the fold line, i.e.
+nearest the VP/rear) against `edges = [Lf, Wd, Lf, Wd]`'s comment, which labels that same walk
+"front → right → back → left". The two disagree on which wall is "front". Nothing renders wrong —
+a plain rectangular box's top view is symmetric, so the edge walk is a valid closed circuit either
+way and every on-screen measurement is unaffected — but the comment's prose is inconsistent with
+the file's own first-angle derivation elsewhere. Left as-is pending confirmation; flagged here
+rather than silently reworded.
+**Status:** Active.
+
+---
+
+## ADR-113: Development of Surfaces (Diploma) 2D plate — Phase 1 rendering rebuild (screen-space paint, Module2-parity ink hierarchy, textbook annotation) — Prism only, solid-by-solid
+
+**Date:** 2026-08-06
+**Decision:** Two prior same-day patches to this topic's `renderConstruction.js` (aliasing
+`given`→`--color-ink`, adding paper-knockout text — both logged in the topic's own `DESIGN.md` §3)
+did not close the visual gap against Module2's Show Method sheet, the cited quality bar. Rather than
+patch further, `Module2/main.js`'s entire Show Method drawing section (`drawMethodSheet` + every
+helper) was read in full, alongside both source chapters (`Development.pdf` — K.C. John Fig. 15.4/
+15.7; `KC-Development.pdf` — Bhatt Fig. 15-3/15-10/15-15 — filenames are swapped from their title
+pages, verified by content: `Development.pdf`'s Ktunotes-watermarked pages are K.C. John's "Engineering
+Graphics for Diploma"; `KC-Development.pdf`'s Charotar-Cognifront-marked pages are N.D. Bhatt's
+"Engineering Drawing"). Four structural defects were found, none of them a colour token:
+
+1. **Geometry was painted under a baked-in `ctx.scale()`.** `main.js`'s `paint()` set
+   `ctx.setTransform(dpr*scale, …)` from the live pan/zoom, so every `lineWidth`/font size in
+   `renderConstruction.js` (authored as plain numbers, e.g. `1.8`) meant that many WORLD units —
+   1.8px only at one particular zoom. The outline/fold thick/thin convention (K.C. John Ch.15 note
+   #4) silently broke at every other zoom level. Module2 never does this: `drawMethodSheet` builds a
+   `projectSheet(p)->{x,y}` and every stroke width is a literal, constant canvas-px number.
+2. **No auxiliary tier.** Three saturated hues (ink / a violet `move` / green `result`) sat at
+   near-equal visual weight — nothing read as scaffolding. Module2 drops every purely-auxiliary
+   construction mark (a projector, a reference line) to `--color-ink-secondary` and carries the
+   mark's MEANING in dash pattern instead (`Module2/main.js`'s within-Set-projector `[2,2]` vs.
+   carried-from-previous-Set `[8,4]` split).
+3. **Near-zero textbook annotation.** Every cited figure in both chapters numbers every corner/
+   generator on both the views AND the development (top and bottom row), and carries `Seam`/
+   `Fold line`/`Inside pattern` leader callouts plus a region caption under each block. The prism
+   drew zero numerals before this pass.
+4. **The fit budget excluded its own annotation.** `constructions.js`'s `planPlate()` fit the views
+   + development inside a flat margin with no allowance for the dims/captions/numerals living
+   OUTSIDE that geometric bbox — the exact bug class Module2 fixed in ADR-102 (a Set's own caption
+   offset left out of its fit, overlapping its nav pill).
+
+**Scope: Prism only, this pass.** The rebuild plan is explicitly solid-by-solid (Prism → Cylinder →
+Elbow, each shown for approval before the next); this ADR covers Prism. Cylinder/Elbow keep their
+pre-rebuild step CONTENT (no numerals/notes/captions yet) but render correctly through the rebuilt
+`renderConstruction.js` unchanged — verified live, no console errors, `constructions.js`'s own
+`verifyCutHeightAgainstGeneralSolver()` self-check stayed silent.
+
+**What changed:**
+- `main.js`'s `paint()` — `ctx` stays DPR-only for the whole paint; builds a `sheet` object
+  (`{ project, pxPerUnit, given, move, result, ink, inkSecondary, paper, fontSans, fontMono }`,
+  Module2's `projectSheet`/`pxPerUnit` shape) and hands it to `renderConstruction.js` instead of
+  setting a scaled transform.
+- `renderConstruction.js` — every `paint*` helper now projects its own points via `sheet.project()`
+  and draws in literal canvas px for anything that is UI chrome, not geometry (stroke width, font
+  size, point-dot radius, arrowhead size, dash lengths, the ruler/compass tool overlay — real
+  geometry like a circle/arc radius is still scaled, by `sheet.pxPerUnit`). Weights: `OUTLINE_PX
+  1.6`, `FOLD_PX 0.9`, `AUX_PX 0.75` (previously `1.8`/`0.6` WORLD units). Three new step kinds —
+  `'numeral'` (station identifier, always `ink`), `'note'` (leader callout, always `inkSecondary`),
+  `'caption'` (region caption, plain text) — all sharing one `drawKnockoutText` helper (ported
+  technique from Module2's `drawMethodLabels`/`strokeAngleArc`, not the file). Four named dashes —
+  `DASH_DATUM [1]`, `DASH_HIDDEN [5,4]`, `DASH_PROJECT [2,2]`, `DASH_CARRY [8,4]` — a `dash: 'carry'`
+  tag on a step opts a 'move'-role line into the cross-region pattern; every other 'move'-role line
+  defaults to `DASH_PROJECT`.
+- `constructions.js` — `OUTLINE_W`/`FOLD_W` updated to the new px values; `planPlate()` gained
+  `RESERVE_TOP/BOTTOM/LEFT/RIGHT` bands (fixed constants, subtracted before `scale` is derived —
+  ADR-053/054's intrinsic-only law, never a measured bbox); `buildPrism` fully rebuilt against K.C.
+  John Example 15.1/Fig. 15.4 — top-view corners numbered 1-4 clockwise from the seam, the SAME
+  numbers reused on the development's top AND bottom edge rows (the actual pedagogical thread the
+  figure teaches); `Seam`/`Fold line`/`Inside pattern` leader callouts; region captions; the single
+  projector (which only reached ONE of the two coincident corners it should have) replaced with two
+  projectors, each running the FULL depth of its x-column so it legitimately touches both real
+  corners a front-view edge collapses. A genuine content bug fixed in the same pass: the projector
+  was tagged `role: 'given'` (primary ink) — scaffolding, not stated geometry, so it is `'move'`
+  (auxiliary) like every other projector.
+- `index.html` — `--color-construct-move` now aliases `var(--color-ink-secondary)`; the retired
+  violet value (`#7b4fb5`) is recorded in a comment, not silently dropped.
+
+**Front-view corner numerals are a named scope decision, not an oversight:** depth collapses in the
+front view, so each of its 4 drawn points is a coincidence of two real solid corners (the prism's
+corners 1 and 4 both land on the front view's left edge) — labelling that coincidence correctly
+needs a disambiguating convention this topic doesn't otherwise use. The two projectors (each
+spanning a full x-column's depth) already carry that correspondence visually; the top view's own
+corners are genuinely unambiguous (only height collapses there) and carry the numerals instead.
+
+**End-cap faces (base/top rectangles) were considered and deferred, not silently decided.** K.C.
+John Example 15.1 step 2 explicitly attaches the base+top face rectangles to the pattern
+("draw the two rectangles 5,6,7,8 and 1,2,3,4..."); Bhatt omits ends by stated policy ("the ends or
+bases have been omitted"). This pass kept the existing lateral-surface-only scope (matching Bhatt's
+explicit policy and this topic's pre-rebuild behaviour) rather than widen scope mid-rewrite; flagged
+for the user rather than assumed.
+
+**A regression caught by verification, not assumed fixed:** a live check at the elbow's slider
+extremes (`legLength=100`) showed "100 mm (short leg)" clipping its leading digit at the canvas
+edge — a direct side-effect of point (1) above: dim TEXT is now a fixed px width regardless of a
+construction's own intrinsic `scale`, so a construction with a small intrinsic scale (the elbow's
+wide-legs-but-tall-bbox front view, `planPlate`'s own long-standing comment) can no longer rely on
+text shrinking to fit the way it did under the old baked-in `ctx.scale()`. Fixed by widening
+`RESERVE_LEFT`/`RESERVE_RIGHT` from `16`/`20` to `30`/`30` — re-verified clean at the elbow's own
+slider max and the prism's own min/max on every given. The reserve bands remain generous fixed
+constants, not a measured bbox (per point (4) above) — a future construction with an even longer dim
+string at an even tighter intrinsic scale could still need this revisited; flagged in
+`constructions.js`'s own comment, not treated as permanently solved.
+
+**Why:** RULES.md §2.19a (verify the underlying mechanism before shipping, not visual plausibility)
+applies here directly — the prior two patches looked locally reasonable (a token alias, a knockout
+rect) but never addressed why the sheet still didn't read as an engineering drawing. Reading the
+actual reference implementation and the actual source chapters, rather than iterating on guesses,
+is what surfaced the real (structural, not cosmetic) causes.
+**Alternatives rejected:** *Keep patching the existing colour/knockout layer* — this is the
+approach that already failed twice; rejected as the same failure mode a third time. *Build all three
+solids in one pass* — rejected per the user's own explicit instruction: solid-by-solid, Prism shown
+and approved before Cylinder/Elbow.
+**Consequences:** `renderConstruction.js`'s `paintLayer(ctx, layer, sheet)` third argument is no
+longer a flat colour `palette` — any future direct caller must build the `sheet` shape `main.js`'s
+`paint()` now constructs. Cylinder/Elbow render correctly today but read visually inconsistent with
+the now-rebuilt Prism (no numerals/notes/captions) until their own phases land — expected, not a
+defect, per the solid-by-solid plan.
+**Status:** Active. Cylinder and Elbow phases pending user approval of this Prism pass.
+
+## ADR-113 correction (2026-08-06): the PDF↔author mapping was backwards
+
+ADR-113 states `Development.pdf` is K.C. John's *Engineering Graphics for Diploma* (Ktunotes
+watermark) and `KC-Development.pdf` is N.D. Bhatt's *Engineering Drawing* (Charotar-Cognifront
+watermark) — i.e. the filenames are "swapped" from their content. Re-verified directly against
+both files' actual pages while sourcing citations for ADR-114 below: it's the other way round.
+`KC-Development.pdf` carries the Ktunotes watermark, the "Engineering Graphics for Diploma"
+running header, and K.C. John's own dotted figure numbering (`Fig. 15.4`, `Example 15.1` — its
+p.174 Example 15.1 is base 24×30mm, axis 40mm, the exact numbers this topic's `buildPrism()`
+defaults to). `Development.pdf` carries the Charotar-Cognifront watermark, the "Engineering
+Drawing" running header (pp.352-356), and Bhatt's hyphenated numbering (`Fig. 15-1`, `Problem
+15-1`) — its own §15-2 states the lateral-surface-only policy ADR-113 quoted ("The ends or bases
+have been omitted. They can be easily incorporated if required."), just filed under the wrong
+filename. Net effect: the filenames actually match their obvious reading (`KC-Development.pdf` =
+K.C. John, `Development.pdf` = Bhatt) — no swap. ADR-114 below cites both correctly.
+
+## ADR-114: Development of Surfaces (Diploma) Prism — dimension-offset sign fix, fit-to-frame→fixed-scale switch, and end-cap faces (K.C. John Fig. 15.4)
+
+**Date:** 2026-08-06
+**Decision:** Two bugs and a scope gap flagged in live review of ADR-113's Prism pass, fixed in
+one coherent follow-up (Prism only, per that same pass's solid-by-solid plan):
+
+1. **Given-step dimension lines rendered inside the outline.** `buildPrism()`'s base-length and
+   base-width `dim()` calls (`constructions.js`) carried a negative `offset` where the sign
+   convention (`renderConstruction.js`'s `paintDim()`: `perpx=-uy, perpy=ux`, `off`'s sign picks
+   the side) needed positive to land outside the shape — a leftover from before the Construct-
+   step development dim got this same fix; the height dim and the stretch-out dim were already
+   correctly signed. NOT a second code path: Given-step and Construct-step dims share one
+   `paintDim()` and one data source, filtered by `role` in `main.js`'s `rebuild()`/`play()`.
+   Confirmed by direct computation (offset -12 landed the width dim ~12 drawing-units inside an
+   ~85-unit-tall box at default params) and reproduced live in-browser before the fix.
+2. **The plate did not scale proportionally to its own mm dimensions.** `planPlate()`'s `scale`
+   was `Math.min(scaleX, scaleY, 4)`, both ratios derived from the CURRENT render's own
+   `frontW+devW`/`frontH+topDepth` — genuine fit-to-frame, so a 16mm and a 32mm base width could
+   render at nearly the same on-screen width (halving `baseWidth` raised `scaleY` and re-inflated
+   everything else). Root-caused as SEPARATE from (1) — a sign error breaks outside/inside
+   placement independent of what `scale`'s actual value is; the two only interact in that a small
+   `scale` could occasionally shrink the box enough to mask the sign bug by coincidence.
+3. **Lateral-surface-only, not the full pattern.** K.C. John Example 15.1 (Fig. 15.4, p.174 —
+   this topic's own cited source, see the correction above) explicitly attaches the base and top
+   rectangles to the strip ("draw the two rectangles 5,6,7,8 and 1,2,3,4..."), turning the
+   pattern into a cross, not a straight strip — ADR-113 flagged this and deliberately deferred it
+   rather than widen scope mid-rewrite. This ADR resolves that deferral.
+
+**What changed:**
+- `constructions.js` `buildPrism()` — the base-length dim's offset flipped `-12`→`+12`; the
+  base-width dim's offset flipped `-12`→`+12`. Both now point the same outward direction as the
+  height dim (`+14`) and the result-role stretch-out dim (`+16`).
+- `constructions.js` `planPlate()` gained an optional 6th param, `fixedScale` (default `null`,
+  every existing call site untouched — Cylinder/Elbow don't pass it, still fit-to-frame, out of
+  this pass's scope per ADR-113's own plan). When given, it overrides the derived `scale`
+  entirely; `extraX`/`extraY` (the existing even-split centering fix) then letterbox around
+  whatever room is left, instead of the scale itself flexing to fill the frame. `buildPrism()`
+  passes a new module constant, `PRISM_SCALE = 1.24`, derived ONCE from this construction's own
+  slider worst-case (every `given` range at its max simultaneously: `baseLength≤40`,
+  `baseWidth≤32`, `height≤60`) through the SAME two fit-budget ratios `planPlate()` itself
+  computes (`scaleX_worst = 294/(40+2×(40+32)) ≈ 1.598`, `scaleY_worst = 154/(60+2×32) ≈ 1.242`),
+  floored to 2dp — provably small enough to fit at every reachable slider combination, not just
+  the default. Verified: identical `1.24` px/mm computed independently for the base-length AND
+  base-width dims, at both `baseWidth=24` and `baseWidth=16` — and the worst-case combo plus 6
+  other corner-cases all fit inside the 420×260 canvas via `renderConstruction.js`'s own
+  `computeBounds()`.
+- `constructions.js` `planPlate()` also gained a 5th param, `devExtra` (default `0`, same
+  no-op-for-Cylinder/Elbow contract) — extra mm the DEVELOPMENT column alone needs above AND
+  below the front view's own `[0,frontH]` z-range for a face that folds out past the strip's own
+  top/bottom edge. `scaleY`'s fit-budget became `Math.max(frontH+topDepth, frontH+2×devExtra)`
+  (whichever column is actually taller binds); `front.y0` gained `+ devExtra*scale` unconditional
+  headroom. Worked through by hand for the prism's own case (`devExtra = Wd`, the same value as
+  `topDepth` there): in the scaleY-bound worst case, the top cap's outer edge lands exactly on
+  `RESERVE_TOP` and the front+top-view column's own bottom edge lands exactly on the canvas's
+  bottom margin too — no overflow on either column, no unclaimed slack when `devExtra` is `0`.
+- `constructions.js` `buildPrism()` — `devOutline` rebuilt from a 4-vertex rectangle into the
+  true 10-vertex cross-boundary polygon Fig. 15.4 draws: both end-cap rectangles hinge on the
+  FIRST (seam-side) panel only (x:0→Lf) — top cap folds up from z=H, base cap folds down from
+  z=0 — matching the source figure exactly (confirmed against a 600dpi crop of the actual page,
+  not the thumbnail scan). Two new fold-line segments (thin, `FOLD_W`) mark the cap hinges — the
+  exact two segments `devOutline`'s new path routes around instead of through. Four new station
+  numerals (`NUM`) on the caps' far corners reuse `3`/`4` — the SAME identifiers the top-view's
+  own corners already carry (folding the top-view's own 1-2-3-4 rectangle about its 1-2 edge
+  carries corner 4 to directly above/below corner 1, corner 3 above/below corner 2) — matching
+  this file's existing reuse-across-regions convention, not a new letter/number alphabet the way
+  K.C. John's own 1-4/5-8 split would need.
+
+**Why:** RULES.md §2.19a again (per ADR-113) — root-caused via direct arithmetic on the shipped
+`paintDim()`/`planPlate()` formulas and a 600dpi crop of the actual cited page, not visual
+plausibility. The end-cap placement specifically was re-derived from the source figure rather
+than guessed, since a wrong hinge/orientation would have shipped a pattern that folds into the
+wrong shape.
+**Alternatives rejected:** *Fix `planPlate()`'s fit-to-frame scale for all three solids at once*
+— rejected, same solid-by-solid discipline ADR-113 already committed to; Cylinder/Elbow have the
+same latent bug but are out of scope until their own phase. *Give the end caps their own fresh
+corner alphabet (K.C. John's literal 5-8 split)* — rejected in favour of reusing 1-4, since this
+file's `constructions.js` already established that convention for the SAME physical corners
+across the top view and both development rows, and a fifth-through-eighth label would be new
+decoration with no reader benefit over the existing reuse rule.
+**Consequences:** `planPlate()`'s signature grew two optional trailing params; any future direct
+caller (there are none outside `constructions.js` today) inherits fit-to-frame-by-default
+behaviour unless it opts in. A live position-drift issue was found investigating this pass (the
+front+top view group's on-canvas position now visibly shifts as sliders change, a latent
+consequence of `PRISM_SCALE` making the existing centering slack — `extraX`/`extraY`, previously
+near-zero under fit-to-frame — large and content-size-dependent) — reported separately, fix
+pending approval, not folded into this ADR.
+**Status:** Active. Cylinder and Elbow inherit the same fit-to-frame scale and lateral-surface-
+only scope pending their own phases (ADR-113's plan, unchanged).
+
+**Addendum (2026-08-06): the position-drift Consequence above is fixed, approved same day.**
+Root-caused before touching code, per RULES.md §2.19a: NOT the centering fix (`extraX`/`extraY`
+even-split, this same file's earlier ADR) computing the wrong answer — it was computing the
+right answer to a question that stopped mattering once `fixedScale` existed. That split exists
+to redistribute LEFTOVER space evenly; under fit-to-frame, leftover is ≈0 by construction (scale
+flexes to consume it), so the split was a no-op in practice. Under `PRISM_SCALE`, leftover
+becomes real and CONTENT-SIZE-DEPENDENT — so `front.x0`/`y0` (and everything anchored off them,
+including the Given step's front+top view, which never even draws the dev block that leftover is
+nominally shared with) started moving every time a slider moved. Confirmed by direct computation
+before fixing: shrinking `baseLength`+`baseWidth` moved `front.x0` `109.44→137.96`; shrinking
+`height` moved `front.y0` `101.08→113.48` — and `uiManager.js`'s slider-commit path
+(`main.js`'s `commit()`) never calls `viewTransform`'s `resetView()`/`ensureVisible()`, so nothing
+in the outer pan/zoom layer masks or re-frames that shift — it renders 1:1 on screen.
+
+**Fix:** `planPlate()`'s `extraX`/`extraY` are now pinned to `0` whenever `fixedScale` is passed
+— `front.x0`/`y0` collapse to the plate's fixed top-left corner (`MARGIN+RESERVE_LEFT`,
+`MARGIN+RESERVE_TOP+devExtra*scale`), identical at every slider value; only the drawn shapes'
+own size changes, the way a real drafting sheet is anchored to its corner rather than
+auto-centered. Cylinder/Elbow (`fixedScale` null) are byte-for-byte unaffected — `extraX`/`extraY`
+still compute the original way there, and the elbow's own ~35%-dead-space centering fix still
+applies untouched. A second, smaller fix was needed alongside it: `buildPrism()` was passing the
+LIVE `baseWidth` as `planPlate()`'s `devExtra` (the end-cap headroom reserved above `front.y0`) —
+live meant `front.y0` was STILL a function of the `baseWidth` slider even with `extraY` pinned to
+0. Replaced with a new constant, `PRISM_CAP_RESERVE_MM = 32` (the same `baseWidth` slider MAX
+`PRISM_SCALE` was already derived from), so the reserved headroom — and therefore `front.y0` — is
+now a true constant too; every `baseWidth` below the max just gets more (never less) headroom
+above the cap than it strictly needs, the deliberate trade for a stable origin.
+**Verified:** `front.x0,y0` computed identical (`48, 73.68`) across 7 param combinations including
+both slider-range extremes — confirmed by direct computation AND by a live in-browser render
+(a fixed reference crosshair painted at that exact drawing-space point lands on the front view's
+own top-left corner at `baseLength/baseWidth/height` = default, min, and max simultaneously).
+Bug-1 (dim-offset sign) and Bug-2 (`PRISM_SCALE` proportionality) both re-verified unregressed;
+Cylinder/Elbow step counts and `resultText` unchanged.
+**Status:** Resolved.
+
+---
+
+## ADR-115: Development of Surfaces (Diploma) Cylinder — Phase 2 of the solid-by-solid rebuild (fixed-scale rendering, corrected generator direction, no end caps, textbook annotation)
+
+**Date:** 2026-08-06
+**Decision:** Apply the identical rendering bar ADR-113/114 established for the Prism to the
+Cylinder (`buildCylinder()` in `constructions.js`, plus its own 3D generator gaining vertex
+numerals in `labels3d.js`/`view3d.js`) — the second step of the explicitly solid-by-solid plan
+(Prism → Cylinder → Elbow, each shown for approval before the next).
+
+**Source verification, done against the actual pages, not assumed:**
+1. **No end caps.** K.C. John Fig. 15.7 (p.175, this construction's own cited source, Example
+   15.4) is titled *"Lateral surface of a cylinder"* and its development is a plain rectangle
+   with no circles attached — unlike Example 15.1's prism, which explicitly attaches base/top
+   rectangles. Bhatt Fig. 15-10/15-11 agree (§15-2's stated lateral-surface-only policy, the
+   same one ADR-113 quoted for the prism before its own end-cap addendum). **The cylinder stays
+   lateral-surface-only — `devExtra` is 0, no `PRISM_CAP_RESERVE_MM`-equivalent needed.** This
+   settles the question the rebuild brief asked to verify rather than assume.
+2. **Generator direction was shipped backwards against K.C. John's own text.** Example 15.4 step
+   1: *"Locate the seam (joint) of the development on left side and name the 12 generators
+   clockwise from this point"* — Fig. 15.7's circle reads 1 (left) → 2 (upper-left) → …
+   clockwise. The shipped `a = π − 2πk/12` walked the OPPOSITE direction (Bhatt Fig. 15-10's own
+   convention, not this construction's cited K.C. John source). Fixed to `a = π + 2πk/12`
+   (verified by hand: with `toTop`'s y-down screen convention, increasing θ in `(cosθ, sinθ)`
+   traces clockwise on screen).
+3. **One numbered development row, not two.** K.C. John numbers the top edge; Bhatt numbers the
+   bottom edge (and thins the station count). The cylinder's 13 stations across ~152mm at the
+   new `CYL_SCALE` sit closer together than a two-digit knockout box is wide — both-rows would
+   visibly collide (unlike the prism's 5 stations across ~108mm, where both-rows was correct).
+   Resolved with the user: **all 13 stations (1..12,1) on the BOTTOM edge only.** The top-view
+   circle itself still gets all 12 numerals — no density problem there, they sit radially
+   outside the circle rather than packed along one straight edge.
+4. **3D numerals: base ring only, not both rings.** `cylinder.js`'s mesh is a smooth 24-segment
+   round shell with no true corners; 24 pills (12×2 rings) would crowd the silhouette and CSS2D
+   pills do not depth-test (a far-side label on a round mesh shows straight through it — the
+   prism's flat box faces don't have this problem). Resolved with the user: base ring only,
+   matching the top-view circle's own numerals (both derive from the same 12 station angles).
+
+**What changed:**
+- `constructions.js` `buildCylinder()` — `CYL_SCALE = 1.10` (Bug-2-class fixed-scale override,
+  derived the same way as `PRISM_SCALE`: `scaleX_worst = 294/(60+π×60) ≈ 1.183`,
+  `scaleY_worst = 154/(80+60) = 1.100` from this construction's own `diameter≤60`/`height≤80`
+  slider worst case; min, floored to 2dp). `devExtra` stays 0 throughout (point 1 above), so
+  `planPlate()`'s existing `extraX`/`extraY` pin-to-0 branch keeps the origin stable with no
+  second reserve constant needed (unlike the prism's `PRISM_CAP_RESERVE_MM`).
+- The `⌀ D` dim's offset flipped `-12`→`+12` (same inverted-sign class as ADR-114 bug 1 — it
+  was landing inside the front view instead of in the `GAP_TOP` band beside it).
+- The stretch-out dim gained its formula text (`Stretch out = π×⌀${D} = … mm`), matching the
+  prism's own formula-bearing dim and Fig. 15.7's own *"Stretch out length, πd = 138.2"*.
+- The seam projector's role flipped `'given'`→`'move'` — scaffolding, not stated geometry, the
+  exact fix ADR-113 applied to the prism's projectors.
+- The two transfer lines (front view → development) gained `dash: 'carry'` — a cross-region
+  transfer, not the projectors' `DASH_PROJECT` — shipped untagged before this pass.
+- Front-view generator verticals de-duplicated: depth collapses there, so the 12 stations land
+  on only 7 distinct x's (two coincide with the outline's own left/right edges); the pre-rebuild
+  loop drew 11 lines where only 5 are geometrically distinct, silently overdrawing 6.
+- New annotation layer (all new, mirroring `buildPrism()`'s structure): 12 `numeral` steps
+  around the top-view circle (placed by quadrant so they sit outside the circle), 13 `numeral`
+  steps on the development's bottom edge, `Seam`/`Fold line`/`Inside pattern` leader callouts,
+  and a shared-row `(i)`/`(ii)` caption pair using the same `captionRowY` max-of-both-blocks rule
+  the prism's caption fix established.
+- `labels3d.js` — new `planCylinderStations()` beside `planPrismStations()`, dispatched by
+  `mesh.name` (`'cylinder'` vs `'prism'`) in `generate()`. Reads the mesh's own bounding box for
+  radius/base-Y (never a guessed offset, same discipline as the prism's planner), with the
+  2D→3D angle mapping derived directly from `buildCylinder()`'s own `a(k)` formula and
+  `cube.js`'s established front-face-is-+Z convention.
+- `view3d.js` — `rebuild3D()`'s numeral gate widened from `shapeId === 'prism'` to
+  `shapeId === 'prism' || shapeId === 'cylinder'`; Elbow still clears (`labeler?.clear()`),
+  pending its own phase.
+
+**Front-view station numerals stay OUT, same scope decision as the prism (DESIGN.md §6):** the
+cylinder's front view has the identical depth-collapse ambiguity at a larger scale (12 stations
+onto 7 distinct x's) and is scoped out for the identical reason — no disambiguating convention
+this topic otherwise uses, and the projectors already carry the correspondence visually.
+
+**Why:** RULES.md §2.19a (verify the underlying mechanism before shipping) applies directly —
+the generator-direction error was only caught by reading K.C. John's own step-by-step text
+against the shipped formula, not by visual plausibility (a mirrored circle numbering looks
+entirely reasonable at a glance). The end-cap and numeral-density questions were resolved by
+reading the actual cited page and asking the user, respectively, rather than silently choosing
+either the prism's own precedent or a guess.
+**Alternatives rejected:** *Both development rows, thinned to match the prism's density* —
+rejected in favour of one full row (all 13 stations), since Bhatt's own thinned convention
+(1,2,3,4,7,10,12,1) would silently drop 5 of 12 generators from the visible numbering, a bigger
+pedagogical loss than one unlabelled edge. *24 3D pills on both rings* — rejected per point 4
+above (silhouette crowding, no depth-testing on a round mesh with no true corners to anchor to).
+**Consequences:** Cylinder now renders through the same rebuilt pipeline the Prism already
+proved out, with zero changes to `renderConstruction.js`/`main.js`/`viewTransform.js` — this
+phase is scoped entirely to `constructions.js`/`labels3d.js`/`view3d.js`, confirming the Phase 1
+rendering layer needed no further changes to serve a second solid. Elbow keeps fit-to-frame
+scale, its own inverted dim signs, and no annotation until its own phase (unchanged, per the
+solid-by-solid plan).
+
+**A regression caught by live verification, not assumed fixed:** the ⌀ dim's first draft kept
+ADR-114's bottom-edge convention (z=0, offset+12) — correct in isolation, but a real
+foreground-browser check showed its text colliding with the top-view circle's own 'above'-placed
+numerals (stations 3/4/5): both wanted the same narrow `GAP_TOP` band. Moved to the front view's
+TOP edge (z=H, offset −14) instead, into the otherwise-empty `RESERVE_TOP` margin — re-verified
+by direct computation (bbox `minY=20` at every slider combination, never clipping the canvas)
+and live in-browser at default/min/max.
+**Status:** Active. Elbow phase pending user approval of this Cylinder pass.
+
+---
+
+## ADR-116: Development of Surfaces (Diploma) Elbow — Phase 3 (final) of the solid-by-solid rebuild (one development pattern, ELBOW_SCALE, left-seam renumbering, transfer lines, 3D numerals)
+
+**Date:** 2026-08-07
+**Decision:** Apply the rendering bar ADR-113/114/115 established for the Prism and Cylinder to
+the Elbow (`buildElbow()` in `constructions.js`, plus its own 3D generator gaining vertex numerals
+in `labels3d.js`/`view3d.js`) — the third and final step of the solid-by-solid plan.
+
+**Source verification, done against the actual pages, not assumed — and one citation was wrong:**
+`ADR-112`, the topic's own `CLAUDE.md`, and `buildElbow()`'s own comments cited *K.C. John Fig.
+15.12 / Example 15.9* as the single-truncation cylinder source for one elbow half. Read directly
+(`KC-Development.pdf` p.179): Example 15.9 is a **doubly**-truncated tube (a 45° cut at the top, a
+30° cut the opposite way lower down) — two cut curves, not one. It is not this topic's source. The
+genuine single-truncation sources, read directly and confirmed: **Bhatt Problem 15-8 / Fig. 15-10**
+(`Development.pdf` p.356–357, a 30°-cut cylinder) and, closer still, **Bhatt Problem 15-9 / Fig.
+15-11** (p.357, a **45°** cut — exactly one elbow half). Fig. 15-10's development is numbered on
+its bottom edge with a thinned set; Fig. 15-11 thins further to `1,2,4,7,10,12,1`. Bhatt Fig.
+15-15 (p.359, the actual three-piece elbow this topic simplifies away from, per ADR-112) states
+outright that its two end pieces "are similar" — the mirror-image relationship this phase's single
+drawn pattern relies on. Every citation of K.C. John Fig. 15.12 for this construction (ADR-112,
+topic `CLAUDE.md`, `constructions.js`'s own comments/`resultText`) is corrected to Bhatt Fig.
+15-10/15-11 in this same pass.
+
+**The elbow cannot carry annotation at its pre-rebuild (two-pattern) layout.** Two side-by-side πD
+development patterns plus a `D+legShort`-wide front view total up to 557mm of worst-case content —
+driving a fixed scale of just 0.52 px/mm (Prism 1.24, Cylinder 1.10). At 0.52 the auxiliary circle
+is 13px in radius and development stations sit 5.7px apart: no numeral fits at any density. This
+is a genuine new edge case (the rebuild brief's own item 1) — a *layout* limit, not a `paintDim()`
+or reserve-band defect. Resolved with the user: draw **ONE** development pattern; the second piece
+is noted as its mirror image (folded into the region caption's own text, see below) rather than
+drawn a second time. This alone recovers a workable scale.
+
+**What changed:**
+- `constructions.js` — new `ELBOW_SCALE = 0.70`, the Bug-2-class fixed-scale override, derived the
+  same documented way as `PRISM_SCALE`/`CYL_SCALE`, from this construction's own slider worst case
+  (`diameter≤60`, `legLength≤100`) with the ONE-pattern `devW`:
+  `scaleX_worst = 294/(160+188.5) ≈ 0.844`, `scaleY_worst = 154/(160+60) = 0.700` (binds). Floored
+  to 2dp. `devExtra` stays 0 (no end caps — Bhatt §15-2's lateral-surface-only policy, and neither
+  Fig. 15-10 nor 15-11 shows one), so `planPlate()`'s existing `extraX`/`extraY` pin-to-0 branch
+  keeps the origin stable with no cap-reserve-equivalent constant, exactly as the Cylinder needed
+  none.
+- **Left-seam renumbering.** `buildElbow()`'s station angle changed from `θ = 2πk/12` (0 at the
+  long/right wall) to `a(k) = π + 2πk/12` — `buildCylinder()`'s own formula, verbatim. Station 1 is
+  now the LEFT/short wall, station 7 the RIGHT/long wall, matching both K.C. John's stated
+  clockwise-from-left rule (Example 15.4 step 1, already Cylinder's own convention, ADR-115) and
+  fixing a real inconsistency: the seam projector was always drawn at the left wall while the old
+  numbering started at the right. `cutHeight()` itself is unchanged — `cos(a(0)) = −1` still yields
+  `legShort`, `cos(a(6)) = +1` still yields `legLong`.
+- **The development's z-datum was off by `r` from the front view's own.** `devZBase` was
+  `legLong + r`; `frontH` (the front view's own z-extent) is `D + legShort`, which **equals**
+  `legLong` exactly. So every development cut point sat `r` below its true front-view counterpart —
+  this construction never had a working transfer line despite ADR-112's whole single-plate
+  Canvas2D architecture existing for exactly that (K.C. John Ch.15 note #1: every development line
+  must be a TRUE length, genuinely horizontal here). Fixed: `devZBase = frontH`. Verified
+  independently (`frontH === legLong` at every param combination, by construction) and confirmed
+  the fix makes a front-view mitre point and its development counterpart land at the identical
+  drawing-space y.
+- **New transfer lines.** 7 distinct `role:'move'`, `dash:'carry'` lines (front-view mitre point →
+  development cut point), one per distinct cut height (`k=0..6`; `k` and `12−k` share a height by
+  the mitre's own 45° symmetry, the same depth-collapse this construction's front-view generators
+  already have) — the actual Parallel-Line-method content Bhatt Fig. 15-10 draws, and this
+  construction's own missing piece until the datum fix above made it possible.
+- **Seam projector role fixed** `'given'` → `'move'` — scaffolding, not stated geometry, the same
+  fix ADR-113/115 applied to the prism's and cylinder's own projectors (this one shipped still
+  `'given'`).
+- **De-duplicated collapsed front-view generators.** Both pieces' wall/mitre generator lines at
+  `k=0` and `k=6` coincide exactly with the front-view outline's own edges (`A-E`/`B-C` for the
+  vertical piece, `G-E`/`C-F` for the horizontal piece) — confirmed by direct substitution, not
+  assumed. Only `k=1..5` draw a new line per piece (5 each), the identical dedup class ADR-115 fixed
+  for the cylinder's front view (there: 11 drawn where 5 were distinct).
+- **Numerals.** Auxiliary circle: all 12, placed radially by quadrant (`buildCylinder()`'s own
+  `place` rule, reused verbatim). Development bottom edge: **thinned to Bhatt Fig. 15-11's own set,
+  `1,2,4,7,10,12,1`** — at `ELBOW_SCALE` the full 13 sit ≈9.2px apart against a ≈14px two-digit
+  knockout box (the same density problem ADR-115 solved for the cylinder, worse here since
+  `ELBOW_SCALE < CYL_SCALE`). Horizontal piece's own front-view mitre points keep a **numbered
+  correspondence** (this topic's own documented "no genuine third view" simplification, `CLAUDE.md`
+  "Elbow scope" — NOT removed by this phase) — thinned to the 4 stations `{1,2,4,7}` that remain
+  positionally distinct within this piece's own dedup half (`k=0..6`; stations 10/12 would coincide
+  with 4/2's own drawn positions, an artifact of the SAME depth-collapse dedup, not a fresh
+  omission).
+- **Dimension signs — audited against `paintDim()`'s `perp = (−uy, ux)` rule directly, not
+  assumed, since this shape's non-convex L-footprint (the two pieces' footprints meet at a reflex
+  vertex, C) makes "outward" genuinely direction-dependent per edge, unlike the prism's/cylinder's
+  simple rectangles (RULES §2.19a) — AND since `paintDim()` computes that perpendicular from `a`/`b`
+  in their OWN already-y-flipped `toFront`-space (screen convention: larger y = further down), not
+  the local mm frame those points came from, a sign derived by reasoning in the local frame lands
+  backwards. Verified by literally replicating `paintDim()`'s own `oa`/`ob`/mid formula in a script
+  and ray-casting each result against the real `frontOutline` polygon — not re-guessed by hand a
+  second time after the first manual pass shipped backwards signs for both leg dims:**
+  - `legShort` (A–E, the vertical piece's own leftmost wall for its full length): pre-rebuild
+    `offset −14` is confirmed outside at both extension ticks AND the text midpoint — this one was
+    already correct; no change shipped.
+  - `legLong` (B–C): pre-rebuild `offset +14` is confirmed outside at the B-end tick and the text
+    midpoint; only the C-end tick lands inside — this edge's exterior side is genuinely mixed along
+    its length (interior for the stretch nearest the reflex vertex C, where the horizontal piece's
+    own body overhangs; exterior for the rest), so no single perpendicular offset clears it
+    entirely. Already correct pre-rebuild for the achievable majority; no change shipped. The
+    residual C-end overlap is a genuine, flagged limitation, not silently claimed solved.
+  - `⌀ D`: the one REAL bug. Pre-rebuild `offset −12` landed inside the front view (the same
+    inverted-sign bug class ADR-114/115 fixed elsewhere) — confirmed by the same polygon
+    replication. Rather than a same-line sign flip (checked directly: `+12` on A–B still clips the
+    circle's own footprint at part of its length, and a placement on the auxiliary circle itself has
+    no slack in that band's exact-height budget), moved to a **horizontal** dim below the front
+    view's own A–B bottom edge, `offset +14` (`RESERVE_BOTTOM`, universally clear at every slider
+    value, since nothing is ever drawn below `yBottom`) — confirmed outside at both ticks and the
+    midpoint.
+  - Stretch-out dim gained its formula text (`Stretch out = π×⌀D = … mm`), matching the prism's and
+    cylinder's own formula-bearing dims and Bhatt's own *"π × D = 141.3"* annotation.
+- **3D numerals (Compare pane).** `elbowHalf.js`'s `createElbow()` returns TWO meshes
+  (`elbow-vertical`, `elbow-horizontal` — confirmed by reading the file, NOT the single-mesh
+  `'prism'`/`'cylinder'` convention `labels3d.js` previously assumed). New
+  `planElbowStations(mesh)` in `labels3d.js`, dispatched on `mesh.name === 'elbow-vertical'`,
+  numbers the vertical leg's **flat-end ring only** (12 stations, `a(k)` reused verbatim) — the
+  same reasoning as the cylinder's base-ring-only decision (ADR-115): a round mesh has no true
+  corners, CSS2D pills do not depth-test, and the flat end is where the 2D plate's own development
+  `z=0` line ties in. The horizontal leg mesh is simply never passed to the labeler — unlabelled,
+  matching the 2D plate's own single-pattern scope this phase. `view3d.js`'s numeral gate widened to
+  include `'elbow'`. The stale `labels3d.js` group name (`'Prism Corner Labels'`, inherited from
+  when the file only served one solid) is corrected to `'Solid Station Labels'`.
+
+**Why:** RULES.md §2.19a (verify the underlying mechanism, not visual plausibility) — the wrong
+K.C. John citation, the datum-offset bug, and both dim-sign bugs were each only caught by direct
+arithmetic/page-reading, not by how the pre-rebuild elbow looked on screen (a plausible-looking
+elbow front view gave no visual hint that its own development had never been able to draw a
+transfer line, or that a dim was 100% inside the shape rather than merely close to it).
+**Alternatives rejected:**
+- *Keep both development patterns, ship without numerals* — rejected: defeats this phase's own
+  stated goal (making the horizontal piece's numbered correspondence readable), the exact thing the
+  Prism/Cylinder numeral system exists to provide.
+- *Keep both patterns, shrink the `legLength` slider max to buy scale* — computed and rejected:
+  even at `legLength` max lowered to 80mm, two patterns still bind `scaleX` at ≈0.55 — does not
+  actually solve the problem, and silently narrows the construction's stated range.
+- *Number all 13 development stations, thinned or not* — rejected per the density arithmetic above,
+  same reasoning ADR-115 already used for the cylinder.
+- *Give the ⌀ dim a second circle-based placement attempt with a larger offset* — rejected after
+  direct computation showed no offset within the available band clears the circle's own footprint
+  at every diameter; the front-view-bottom placement has no such constraint.
+**Consequences:** All three solids in this topic now share one rendering bar (fixed scale, dash
+tiers, textbook annotation, 3D numerals). The `legLong` dim's residual near-`C` overlap (flagged
+above) is the one open cosmetic item carried forward, tied to this shape's own non-convex geometry
+rather than anything `paintDim()`/`planPlate()` can fix generically — noted for a future pass, not
+silently treated as solved.
+**Status:** Active, pending the live foreground-browser Play watch-through (this construction's own
+long-outstanding, never-before-completed check — see this topic's own session notes) and final
+user approval closing out the solid-by-solid rebuild.
 
 ---
 
@@ -4939,6 +8224,1619 @@ failing. Verified at 1920 × 1200, 1440 × 900 and 1100 × 800: all six steps ag
 
 ---
 
+## ADR-142: Merging Vishnu's `feat/mod4` — an independent-numbering collision, an unrecoverable gitlink, and 45 orphaned ADR references discovered in his own docs
+
+**Date:** 2026-08-07
+**Decision:** `feat/mod4` (Vishnu, 4 commits, tip `c61e783`) added three complete topics —
+`graphics_module_1_topic_1_1_dimensioning`, `graphics_module_2_topic_0_introduction_to_orthographic_projection`,
+`graphics_module_3_topic_2_2_conic_sections` — merged into `main` with four adjustments recorded here
+so a future reader does not have to re-derive this investigation from scratch.
+
+**1. ADR/RULES numbering collision (why his real decisions are ADR-133–141, not ADR-078–086).**
+The merge-base (`92b9f82`) topped out at ADR-077. Both branches then numbered forward from 078
+independently: this repo's own ADR-078…116 (the Show Method / Development-of-Surfaces / font-CDN
+work) and Vishnu's ADR-078…086 (his 9 real decisions for the three topics above) are **entirely
+different decisions sharing the same 9 numbers**. Same collision in `RULES.md`: his `§5.16a` and
+`§6.23–§6.28` collided with this repo's own `§5.16a`/`§6.21–§6.26`. His nine are renumbered
+ADR-133…141 here (see below); his RULES sections renumbered `§5.16a→§5.16b`, `§6.23→§6.27`,
+`§6.24→§6.28`, `§6.25→§6.29`, `§6.26→§6.30`, `§6.27→§6.31`, `§6.28→§6.32`. All 133 references
+across his three topic directories and this repo's root docs were updated to match; his own
+internal cross-reference ("ADR-081 supersedes ADR-078 point 2") now reads "ADR-136 supersedes
+ADR-133 point 2".
+
+The renumber target is 133, not 117 (the first number clear of this repo's own ADR-001–116) —
+see the next point for why.
+
+**2. Forty-five orphaned ADR references in Vishnu's own docs — pre-existing, NOT fixed here.**
+Across his three topics, 413 sites in 25 files (concentrated in `graphics_module_3_topic_2_2_conic_sections`:
+`main.js`, `index.html`, `conicEngine.js`, `CHANGELOG.md`, `CLAUDE.md`) cite 45 distinct ADR ids,
+**ADR-087 through ADR-132, that have no body anywhere** — not in his own pushed `DECISIONS.md`
+(which stops at his real ADR-086), not in this repo's. The pattern is visible in his own
+`CHANGELOG.md`: entries like *"ADR-125, supersedes ADR-120"* describe him consolidating roughly
+45 granular local-iteration decisions down into the 9 he actually pushed, without updating the
+prose and code comments that still cite the old, superseded numbers.
+
+**This is why the renumber target is 133, not 117**: the range 117–132 is already claimed by his
+own orphaned citations, and landing his real decisions there would have created a *second*
+collision inside his own documentation.
+
+Two kinds of orphan, and the second is the dangerous one:
+- 15 ids (117–132) resolve to nothing — a dead reference, easy to notice.
+- **30 ids (087–116) now silently resolve to this repo's own unrelated real decisions**, since
+  this repo's ADR-087…116 exist only on this side of the merge. Example: his conic
+  `CLAUDE.md` cites `ADR-115` for *"the hyperbola is a SECTION here, never a construction"*;
+  this repo's real `ADR-115` is the Development-of-Surfaces cylinder rebuild (2026-08-06). A
+  reader who follows that citation lands on the wrong decision without any signal that anything
+  is wrong.
+
+**These 45 references were deliberately left untouched** — not renumbered, not annotated inline.
+This is Vishnu's own pre-existing documentation debt from before he pushed, it is cosmetic (stale
+comment/prose citations, not a functional defect), and the old-number → new-number mapping is
+known only to him. Editing 413 sites in code this repo does not own, to guess at a mapping only
+he has, was judged the wrong trade — reconcile directly with him when he is reachable.
+
+**3. Two Module 4 topics excluded — a real, unresolved ADR-039 violation.**
+`graphics_module_4_topic_1_introduction_to_isometric_drawing` and
+`graphics_module_4_topic_2_isometric_construction` exist on `feat/mod4` only as gitlinks
+(git tree mode `160000`) pointing at commits `9359d52` and `b2b9f9b` respectively. Both commits
+are unreachable (`git cat-file -e` fails against every fetched remote) and there is no
+`.gitmodules` on the branch, so these are not registered submodules — the content was simply
+never pushed and exists only on Vishnu's machine. He is travelling with no laptop access, so it
+cannot be recovered now. Both paths are excluded from this merge entirely, deliberately, rather
+than landed as broken links or empty directories, so they are absent from `main`'s tree — not
+present-and-broken. To be merged once he can push the real commits. This is a known, temporary
+gap, not an oversight; the only in-repo trace of it is this note and the matching `CHANGELOG.md`
+entry.
+
+**4. Font policy and root-PDF exclusions — routine, noted for completeness.** His three topics
+bundled local `woff2` fonts, which this repo's `ADR-086` had already retired in favour of the
+shared Supabase font host (`RULES.md §2.12/§2.15`); repointed to match, 9 local files dropped.
+`Conic Sections.pdf` and `Dimensions.pdf` were excluded per this repo's own `*.pdf` `.gitignore`
+rule (commit `6478322`).
+
+**Consequences:** `main`'s ADR sequence now runs 001…141 with no duplicate id. A reader who hits
+any of `ADR-087`…`ADR-132` inside the three merged topics' own files should treat it as broken —
+check this entry before assuming the number resolves correctly, especially for `087`–`116`, which
+silently point at real but unrelated entries in this same log.
+**Status:** Active — pending Vishnu reconciling the 45 orphaned references and pushing the two
+Module 4 topics as real commits.
+
+**Note (2026-08-09):** the first live collateral of these orphans surfaced. `f8771ab` (2026-08-07,
+the Finish-button rollout) deleted the fix that CONIC's own `CHANGELOG.md` records under its local
+`ADR-121` — one of the 45 references this entry documents as having no body anywhere — while adding
+`#btn-finish` as a new primary button its terminal step had no accent rule for. The fix and the
+re-decided accent rule are recorded in `graphics_module_3_topic_2_2_conic_sections/CHANGELOG.md`
+(2026-08-09 entry), not as a new root `ADR-121`, precisely to avoid creating the 46th orphan/collision
+this entry warns about — this repo's decision record for that topic's local ADR ids is its own
+`CHANGELOG.md`, until Vishnu's reconciliation gives them real root bodies.
+
+---
+
+## ADR-143: Regular Polygons' perpendicular-bisector method places its extrapolated centre points at the TRUE apothem, not the book's equal-interval step
+
+**Date:** 2026-08-08
+**Decision:** In `graphics_diploma_module_1_topic_1_4_regular_polygons`, the `ngon` construction's
+"Perpendicular Bisector" method (`src/constructions.js`, `buildPerpendicularBisector()`) rebuilds
+*Regular Polygons.pdf*'s Fig 5.24 sequence faithfully — the perpendicular bisector of AB, point 4
+(arc centred on the AB-midpoint, radius to A), point 6 (arc centred on B, radius AB), and point 5
+(the literal midpoint of 4 and 6) — but departs from the book for points **7 and beyond**: instead
+of continuing the book's *equal interval* (the 4-to-5 spacing, stepped repeatedly up the bisector),
+each point k ≥ 7 is placed at its true apothem, `s / (2·tan(π/k))`. Point 5 keeps the book's own
+midpoint approximation unchanged (it is the book's own worked value, not an extrapolation of it).
+For n = 3, which the book's ladder doesn't cover at all (Fig 5.24 starts at 4), a single point at
+apothem(3) stands in directly.
+**Why:** Phase A audit (this session) found the method as it shipped drew four short compass-arc
+marks and a "calibration arc" whose radius was read directly off the closed-form circumcentre —
+i.e. an arc drawn *through* the answer, not one that derived it, with no bisector line, no marked
+intersection points, and no points 4–8 at all. Rebuilding Fig 5.24 literally (equal intervals
+included) was considered and rejected: the equal-interval step is only exact for n = 4 and n = 6;
+by n = 8 (the book's own example) it is 2.1% off the true apothem, which subtends 44.17° per side
+instead of 45° — an octagon that visibly fails to close by 6.6°, worse for n up to the sim's max of
+12. Shipping that literal sequence would mean animating a construction that visibly doesn't
+complete the shape it claims to build, which RULES.md's on-screen-claims bar (ADR-090, ADR-099,
+ADR-103, ADR-104, ADR-105 — every prior real bug in this project rendered plausibly while its math
+was never checked) rules out. The true-apothem substitution keeps every point on-screen exactly
+where the book's own instructions would place it for n ≤ 6 (points 4 and 6 are already exact by
+construction — real compass arcs, not formula), changes only the *unconstructible-by-the-book's-
+own-method* points 7 and up, and the resulting polygon always closes exactly because the actual
+drawn vertices come from the shared closed-form ground truth (`regularPolygonVertices`) regardless
+of the ladder's own point — only the overlay circle drawn from the final ladder point can be
+imperceptibly (≤0.75%, at n = 5 only, from the book's own point-5 midpoint approximation) off the
+polygon's true circumcircle, and never at n = 4, 6, or 7–12, where the ladder point is exact by
+construction.
+**Alternatives rejected:**
+- *Ship the book's literal equal-interval ladder, gap and all* — rejected: a construction that
+  visibly fails to close is a worse teaching artifact than a construction that silently smooths
+  over a textbook approximation the audit already flagged as a stated limitation, not a claimed
+  guarantee (the book itself never claims the interval step is exact for n > 6).
+- *Draw the ladder as pure decoration and always drive the circle from the closed-form circumcentre
+  (as the pre-fix code effectively did)* — rejected: this was the exact defect the audit reported
+  (a calibration arc "drawn through the answer, not deriving it"); it would restore the same
+  complaint under a longer ladder.
+- *Re-derive every remaining vertex independently for the semicircle-division method too, via a
+  ray-from-A/cut-by-arc technique* — this bullet originally claimed the technique was numerically
+  DISPROVED for n ≥ 7. **That claim was wrong and has been corrected** (see Update below): the
+  ray-cut technique is inscribed-angle exact for every n, and the original failure was a ray-origin
+  bug (rays drawn from B, not A — the source's own diagram, `polygon.pdf`, draws them from A), not
+  a geometric limit.
+**Consequences:** Easier: the sim can show the book's own ladder-building technique for any n from
+3 to 12 without ever animating a polygon that fails to close. Harder: a reader comparing the sim
+frame-by-frame against Fig 5.24 for n = 7 or 8 will see points 7 and 8 sit very slightly off where
+a literal equal-interval read of the book's figure would place them (imperceptible in the drawing,
+documented in `buildPerpendicularBisector()`'s header comment) — worth calling out explicitly if
+this sim is ever used to grade a student's manual equal-interval construction, which it is not
+designed to do. Same session also fixed a dimension-label placement bug in
+`graphics_module_1_topic_1_foundations` (`src/annotations.js`, `src/labelLayer.js`) and renamed the
+n-gon's Step 1 picker label from "General Regular Polygon" to "N-Sided Regular Polygon"
+(`index.html`, `src/constructions.js`) — both unrelated to this ADR, recorded together in
+CHANGELOG.md for the same hotfix pass.
+**Update (2026-08-08, same-day follow-up):** A Phase A audit of this ADR's own rejected-alternative
+bullet found it factually wrong — polygon.pdf (the authoritative source, not previously checked
+against for this method) draws the semicircle-division method's rays from **A**, not B, and every
+such ray is inscribed-angle exact for any n (the angle a ray through division `j` makes at A is
+always `j` division-steps, the same inscribed angle vertex `j+1` subtends there, so the arc-cut
+always exists). `buildSemicircleDivision()` was rebuilt to match: centred on A (not B), extension
+point C on the far side of A (not P past B), a ray from A through every division, each cut by a
+radius-AB arc centred on the previously-found vertex — every vertex past B is now independently
+derived and illustrated this way, not just C, verified exact for n=3–12. This ADR's SCOPE now
+covers that rebuild too, not only the perpendicular-bisector ladder in its title. A second,
+unrelated defect was fixed in the same pass: `renderConstruction.js`'s point-label placement had no
+collision avoidance at all (a fixed `+4/-4` offset, unconditionally) — crowded further by the new
+rays' extra points — replaced with a greedy candidate-search placement pass plus radial-outward
+label hints from `constructions.js`, run once per recipe before either static or animated
+rendering. See the module's own `CHANGELOG.md` (new this pass) for the itemised change list.
+**Status:** Active
+
+---
+
+## ADR-144: Development of Surfaces (Diploma) Elbow — ADR-116's development-plate numeral thinning is overridden by faculty requirement; the full 13-station set ships, the collision risk it was thinned to avoid is real and stays open
+
+**Date:** 2026-08-08
+**Decision:** In `graphics_diploma_module_2_topic_1_1_development_of_surfaces`, `buildElbow()`'s
+development-plate `THIN_K` (`src/constructions.js`) reverts from ADR-116's thinned
+`[0, 1, 3, 6, 9, 11, 12]` (printed labels `1,2,4,7,10,12,1`) to the full `[0..12]` (printed
+`1,2,3,4,5,6,7,8,9,10,11,12,1`), permanently. Per RULES §8.4 this supersedes ADR-116's numeral-count
+clause by explicit new ADR, not a silent code change — ADR-116 itself is otherwise unchanged and its
+other decisions (ONE development pattern, `ELBOW_SCALE = 0.70`, left-seam renumbering, transfer
+lines, the front-view horizontal-piece `1,2,4,7` thinning, all Bhatt/K.C. John citations) all stand.
+**This is a requirements override, not a correction — ADR-116's density math was never wrong.**
+Driven by direct faculty feedback (domain expert, teaches Engineering Graphics): all 13 stations are
+pedagogically required on the development plate, full stop, independent of whether they fit cleanly.
+**Bhatt Fig. 15-11 is no longer the followed numbering convention for this one element** — its own
+thinned set was the ADR-116 rationale being overridden here; every other citation in ADR-116/the
+topic `CLAUDE.md` for the elbow construction itself (Bhatt Fig. 15-10/15-11 as the single-truncation
+source, Fig. 15-15(v) for the mirror-image simplification) is untouched and still followed.
+**Verification, done twice, because the first pass was misleading:**
+1. First pass (comfortable desktop browser window, default zoom): D=50 (the report's own value,
+   157.1mm stretch-out) and D=30 (slider minimum, 94.2mm, the worst-case density) both showed all 13
+   numerals rendering legibly with clear gaps, zero console errors. Read in isolation this looked
+   like it overturned ADR-116's arithmetic outright.
+2. That reading doesn't survive a second pass. `renderConstruction.js`'s own header states numeral
+   font size is a literal, zoom-invariant canvas-px constant (`NUMERAL_PX = 9`) while station
+   *positions* are geometry that scales with `viewTransform`'s pan/zoom. The app auto-fits the plate
+   to its viewport on load, and a comfortable desktop window auto-fits to a zoom well past
+   `ELBOW_SCALE`'s raw 1:1 — stretching station spacing while the font stays fixed, giving more
+   headroom than ADR-116's math assumed. That headroom is a function of window width, not a property
+   of the fix. Re-tested at realistic embed widths via a same-origin `<iframe>` harness (a truer
+   model of "this sim embedded in a host page" than resizing the outer browser chrome, and this
+   session's `resize_window` tool did not reliably resize the actual rendered viewport anyway —
+   confirmed via `window.innerWidth` staying pinned across repeated calls with different targets):
+   - 600px width, D=50: numerals `1`–`9` stay legible; `10, 11, 12, 1` collide into an unreadable
+     jammed cluster.
+   - 600px width, D=30 (worse, as ADR-116's own arithmetic predicts): the jam starts one station
+     earlier — `9, 10, 11, 12, 1` all collide.
+   - 400px width: not attributable to this numeral set specifically — the entire plate (front view,
+     top view, development, both region captions) overlaps at that width regardless of `D`, a
+     pre-existing general layout limit of the fixed two-pane design, unrelated to `THIN_K` and out of
+     scope for this ADR. Flagged below, not fixed here.
+   - Console stayed clean (zero errors) through every width/D combination in both passes, including
+     the fully-overlapping 400px states — this is a legibility defect, not a functional break.
+   - `buildCylinder()` (unaffected by this change, still ships all 13 numerals at `CYL_SCALE = 1.10`)
+     re-checked as a regression control and found unchanged — its own headroom over the 14px knockout
+     box is real and structural (`CYL_SCALE > ELBOW_SCALE`), not an artifact of viewport width.
+**This is recorded as a KNOWN, ACCEPTED, OPEN risk — not resolved, not mitigated.** The full-13 set
+ships as-is with no zoom-aware fallback, no responsive knockout-box sizing, and no second-row
+stagger. A future fix along any of those lines was considered and explicitly deferred, not rejected:
+a reader must not take "kept" as "solved." Anyone revisiting this: the collision is real at ~600px
+embed widths and below, worse at smaller `D`, and is currently unmitigated.
+**Why:** Pedagogical completeness, per the domain expert who teaches this subject, outranks
+textbook-literal numbering fidelity and this construction's own display-density limit at narrow
+embed widths — the numerals exist to teach station correspondence, and a teacher's judgment that all
+12 stations (13 with the closing repeat) must be visible for that to work is a requirement this
+project takes at face value, not a claim that the density problem stopped existing.
+**Alternatives rejected:**
+- *Two-row stagger (odd stations below the flat edge, even stations above)* — considered, not
+  implemented. Would very likely clear the 14px collision (roughly doubles effective per-row
+  spacing) but changes the plate's own drawing convention away from every cited source figure and
+  needs its own layout work; deferred, not ruled out for a future pass.
+- *Zoom-aware/responsive thinning (fall back to ADR-116's 7-station set below some viewport-width or
+  computed-spacing threshold)* — considered, not implemented. Same reasoning: real fix, real scope,
+  deferred rather than done under this pass's docs-only mandate.
+- *Keep ADR-116's thinned set and decline the faculty request* — rejected outright: this override
+  exists because the requirement, not the arithmetic, changed. The unthinned math was never disputed.
+**Consequences:** Easier: matches direct domain-expert teaching requirements; the development plate
+always shows the same station count as the top-view circle, closing a visible asymmetry a reader
+could otherwise question. Harder: the plate is confirmed to become illegible at realistic small
+embed widths (≤600px) at every diameter tested, worst at the slider minimum — a real, open,
+documented UX regression risk for any host page narrower than a comfortable desktop window, left for
+a future pass to actually fix.
+**Status:** Active — supersedes ADR-116's numeral-count clause only; ADR-116 otherwise stands.
+
+---
+
+## ADR-145: Regular Polygons' Construct step gets a calibrated-once fixed scale (replacing three per-shape clamps) and a unified, collision-aware label pass (replacing point-only, dot-only placement)
+
+**Date:** 2026-08-09
+**Decision:** In `graphics_diploma_module_1_topic_1_4_regular_polygons`, Phase A of this session's
+audit found five reported drawing defects (not centered, inconsistent label placement, construction
+lines never de-emphasizing, overlapping angle labels, and a scaling bug) traced to three root
+causes, fixed together as Phase B:
+
+1. **Framing (`src/constructions.js`).** Each construction's `build()` previously hard-coded its own
+   fixed anchor plus a per-shape scale ceiling (`Math.min(1, K / side)`), so past that ceiling the
+   drawing silently stopped growing while its own "N mm" dimension label kept climbing, and every
+   construction sat off-centre in the 200×140 viewBox at every param value that wasn't the one the
+   anchor happened to be tuned for. Replaced with `pentagonRaw()`/`hexagonRaw()`/`ngonRaw()` — each
+   construction now builds its geometry in local mm-space at true side length, no clamp — plus two
+   new pure helpers: `calibratedScale(id, rawFn, given, methods)`, which fixes ONE on-screen scale
+   per construction, lazily computed once and cached, from the worst-case natural extent across
+   every one of that construction's methods at max(side)[, max(n)]; and `centerAt(steps, scale)`,
+   which recentres THAT call's own current bounds at the frame centre, redone on every `build()`.
+   Scale is fixed; position is not.
+2. **Labels (`src/renderConstruction.js`).** `assignLabelPositions()` previously resolved only
+   `'point'`-kind labels, searched against marker dots only. Extended to also resolve `'dim'`/
+   `'angledim'` labels (a radial-push search, `'angledim'` additionally searching a small angular
+   shift since two angle marks whose bisectors converge toward each other don't separate at any
+   radius alone), and widened the shared obstacle set to include sampled line/arc/circle ink, not
+   just dots. Paired with a new `applyOutwardHints()` pass in `constructions.js` that fills in a
+   real outward-from-circumcentre hint for every labelled point that didn't already carry one (the
+   given A/B points, every `walkVerticesByCompass()` vertex letter, the bisector ladder numbers) —
+   previously those fell back to a fixed up-right default, which reads as "inward" for any point on
+   the wrong side of centre.
+3. **De-emphasis + a11y.** `buildStepNode()` now stamps `data-role` on every ink node; `main.js`
+   toggles `.is-complete` on `#dynamic-layer` once the full construction (or the last Step Through
+   slide) is on screen, and `index.html` fades every `[data-role="move"]` element via CSS
+   `!important` (several step kinds drive their own reveal-animation opacity inline on the same
+   element, which would otherwise outrank a plain class rule). The move-role auxiliary circle
+   (`circleStep`'s animated sweep/final circle) was also missing the DESIGN.md-mandated dashed
+   second cue that lines/arcs already had — added. Labels moved into a dedicated
+   `[data-layer="labels"]` sub-`<g>` that always paints above `[data-layer="ink"]`, with a
+   paper-coloured `paint-order: stroke` halo, so a later step's ink can never paint over an earlier
+   label. `#construction-svg` gained `tabindex="0"`/`role="img"`/a live `aria-label`
+   (`main.js`'s `rebuild()` keeps it in sync with `resultText`), and `viewTransform.js` gained
+   arrow-key pan / `+`/`-` zoom / `0` reset — previously the drawing was reachable by mouse only.
+
+**Why:** RULES §2.19a — never ship a visual fix on assumed geometry. Every claim above was proved
+with a headless sweep (`constructions.js` imports nothing, so it runs directly under Node) over all
+3 constructions × every method × {min, default, max} side × representative n, replaying
+`computeBounds()`/`assignLabelPositions()` verbatim: pre-fix, centre offset ranged up to 47.2 units
+on a 200×140 frame (never zero) with 4/39 configs clipped at rest, and drawn side length tracked
+requested `side` only up to a knee then froze (`unitsPerMm` swung 1.47× across the param space with
+byte-identical bounds above the knee); post-fix, 0/39 configs clip and `unitsPerMm` is now CONSTANT
+per construction (0.856 pentagon / 0.915 hexagon / 0.575 n-gon) — the drawn side length now tracks
+`side` linearly by construction, which is what "the drawing should scale with the dimension" means.
+Point labels placed inward-of-centre dropped from 355/576 (62%) to 157/576 (27%), the residual being
+mostly the deliberately-unhinted circumcentre `O` label and a few tight small-side/large-apex
+configs. Live-verified against the shipped module (RULES §2.19, §2.7 hard-reload) in Chrome: the
+default pentagon "54° Angle + Circle" construction renders centred, its circumcircle and rays
+visibly dash, both 54° marks and the 108° result angle are legible with clear halos, and every
+`move`-role element visibly fades once the polygon completes.
+
+**A live bug found and fixed mid-implementation, worth recording:** the first framing design
+recomputed scale from each config's OWN current bounds every `build()` call (a live per-config
+fit-to-frame). This is wrong for this topic specifically — every one of these three constructions is
+a literal Euclidean similarity construction, so the raw (pre-fit) bounding box scales EXACTLY
+linearly with `side`; fitting to a constant frame fraction on every call would have made the fit
+scale shrink in exact lockstep with `side` growing, so the on-screen drawing would never visibly
+change size at all — defeating defect 5's fix while appearing to solve defect 1. Caught by re-running
+the bounds sweep and noticing `unitsPerMm` was constant ACROSS every side value tested (the live-fit
+version's actual bug) rather than constant only within one fixed-scale construction (the correct,
+now-shipped behaviour). This is the same distinction RULES §5.19 already draws for Module 2's 2D
+sheet (intrinsic size, recomputed only when the modelled object's own size changes vs. a live/
+positional auto-fit) — applied here for the first time to a topic where EVERY parameter (side, n)
+is a true size parameter, with no positional/view slider to guard against.
+
+A second, subtler bug from the same implementation pass: `assignLabelPositions()`'s obstacle set
+already included every point's own marker-dot box (unconditionally, since before this session too),
+which the OLD fixed +4/-4 default always happened to clear by construction. Once `applyOutwardHints`
+gave real, geometry-derived hints to more points, a hint with a small vertical/horizontal component
+could self-collide with its OWN dot and fall through to an oddly-rotated fallback (reproduced live:
+the given point A's hint was rejected this way, landing back near its pre-fix position while B,
+whose hint pointed away from the line entirely, was unaffected — an asymmetry that would have shipped
+undetected without the live Chrome check). Fixed by tagging each obstacle box with its owning step
+and excluding a point's own box from its own candidate search (`renderConstruction.js`).
+
+**Alternatives rejected:**
+- *Ship the live per-config fit-to-frame framing* — rejected once its self-defeating interaction
+  with these constructions' pure-similarity geometry was caught (see above).
+- *A literal Cache-Control/Apache config change to avoid the stale-module hard-reload gotcha* —
+  out of scope for this session; RULES §2.7 already documents the workaround (hard-reload after
+  every edit), which is what this verification pass used.
+
+**Consequences:** Easier: any construction now visibly, proportionally grows/shrinks with its own
+size parameters, always centred, with labels sitting outward-of-centre and legible over a fading
+construction scaffold, keyboard-reachable. Harder / open: `Topic 1.1`, `Topic 1.2`, and `Topic 1.3`
+were the source this topic was duplicated from (per this topic's own CLAUDE.md) and share the SAME
+`renderConstruction.js`/`viewTransform.js` lineage — they were **not** audited or touched this
+session, but plausibly carry the identical per-shape-clamp framing defect and the same point-only
+label search; worth a follow-up audit, not assumed fixed by this ADR. A handful of extreme
+min-side/large-n or min-side/small-side configs (documented in the audit's label sweep — e.g.
+`hexagon`/`compass` at its own default) still have angle-label overlaps the collision search cannot
+clear within its current candidate range; these are a genuine, narrower residual, not a regression
+(the pre-fix code never attempted to move them at all).
+
+---
+
+## ADR-146: Regular Polygons' fixed drawing frame widened 200×140 → 200×200
+
+**Date:** 2026-08-09
+**Decision:** In `graphics_diploma_module_1_topic_1_4_regular_polygons`, widen the construction
+SVG's fixed viewBox from 200×140 to 200×200 (`index.html`), and the two framing constants that
+mirror it — `calibratedScale()`/`centerAt()`'s `height` default (`src/constructions.js`) and
+`viewTransform.js`'s `BASE_H`.
+
+**Why:** A follow-up audit of a screenshot (N-Gon / Semicircle Division, n=6, side=32, still
+reading small/off-centre despite ADR-145) found ADR-145's scale/centre math correctly wired and
+computing correctly — `unitsPerMm` constant per construction, 0/39 swept configs clipped,
+live-measured centre offset only 5.33 units (≈15 px) — but backing out each construction's
+worst-case RAW bounding box (the box `calibratedScale()` fits to the frame) showed all three are
+square-to-tall: pentagon 150.0×140.2 (aspect 1.070), hexagon 116.4×131.2 (0.887), n-gon
+188.9×208.8 (0.905). Fit against a 1.429-aspect landscape frame, **height was the binding
+constraint for every construction, every time** — width was never the limit, capping n-gon's
+scale worst (its own worst case, n=12, is far larger than pentagon/hexagon's, and that fixed
+scale is what n=6 then inherits). Squaring the frame to 200×200 lets width stop being spare
+capacity: recomputing the same worst-case fit gives scale ×1.40 (pentagon), ×1.50 (hexagon),
+×1.50 (n-gon) versus today. Re-ran the ADR-145 bounds sweep (3 constructions × every method ×
+{min, default, max} side × representative n for the n-gon) against the new frame: 0/39 configs
+clip, `unitsPerMm` still constant per construction (1.2000 pentagon / 1.3723 hexagon / 0.8620
+n-gon) — the ADR-145 invariant holds, this is a scale change, not a re-introduction of the
+live-fit bug ADR-145's own postmortem warns against. Live-verified in Chrome (RULES §2.7
+hard-reload): n=6/side=32 grows from 190×176 px to 256×238 px on screen, frame fill 32.7%W/43.5%H
+→ 44.2%W/41.0%H, not clipped; pentagon/hexagon defaults re-checked at 58–81% fill, none clipped;
+arrow-key pan and double-click reset re-verified against the new `BASE_H` (`viewTransform.js`'s
+pan-clamp and `zoomAt()`/`resetView()` are already expressed purely in terms of `BASE_W`/
+`BASE_H`, so no separate code change was needed there).
+
+Considered widening further to 200×240 to squeeze out more: rejected because the platform-typical
+`#sim-viewport` pane (measured 580×778, portrait) is width-bound at 200×200 already, so the full
+scale gain reaches the screen; 200×240 only pays off once the pane itself turns landscape
+(`innerWidth ≳ innerHeight + 340`), and *loses* a small amount (net ×0.97 vs. today) below that —
+200×200 is the only frame size tested that is never worse than the ADR-145 baseline at any window
+size.
+
+**Consequences:** Easier: the n-gon in particular reads as a real, appreciably-sized drawing at
+its default n=6 instead of floating small in the frame; pentagon and hexagon also gained
+headroom. Harder / open: this only changes the fixed calibration frame, not
+`assignLabelPositions()`/`applyOutwardHints()` — the pre-existing residual label-collision cases
+ADR-145 already documents (e.g. the division-number labels near a polygon's top vertex at small
+n) are unchanged by this ADR and remain a separate, not-yet-scheduled follow-up. Reducing the
+10-unit margin further (an independent, smaller additional gain) was considered and deliberately
+deferred rather than bundled in, to keep this change measurable in isolation.
+
+---
+
+## ADR-147: Regular Polygons' calibration-frame margin narrowed 10 → 6 units — amends ADR-146
+
+**Date:** 2026-08-09
+**Decision:** In `graphics_diploma_module_1_topic_1_4_regular_polygons`, narrow `calibratedScale()`'s
+`margin` default from 10 to 6 units (`src/constructions.js`), the one remaining growth lever ADR-146
+identified and deliberately deferred ("Reducing the 10-unit margin further ... was considered and
+deliberately deferred rather than bundled in, to keep this change measurable in isolation").
+
+**Why:** Since `calibratedScale()` subtracts the margin from BOTH the 200-wide and 200-tall frame
+dimensions equally (`width = height = 200`), the resulting scale ratio — `(200 - 2·6) / (200 - 2·10)
+= 188/180 = 1.0444` — is identical regardless of which dimension (width or height) binds for a given
+construction/method, so the gain is uniform across all three constructions with no narrow-pane
+downside: +4.44% linear, +9.08% area, for every one of the 39 swept configs. Verified no other code
+depends on the margin=10 literal before changing it: `renderConstruction.js`'s dim/angledim label-push
+"reach" constant and `viewTransform.js`'s own `ensureVisible(bounds, margin = 10)` (zoom-to-fit pan/zoom
+padding) each hardcode their own independent `10`, unrelated to `calibratedScale()`'s frame margin —
+narrowing one does not affect the others. Re-ran the ADR-145 bounds sweep (3 constructions × every
+method × {min, default, max} side × representative n for the n-gon, 39 configs) against the new margin:
+0/39 clip, `unitsPerMm` still constant per construction, and each construction's `unitsPerMm` scaled by
+the exact predicted ×1.0444 (pentagon 1.2000 → 1.2533, hexagon 1.3723 → 1.4333, n-gon 0.8620 → 0.9003).
+Live-verified in Chrome (RULES §2.7 hard-reload, foreground tab per the rAF-stall gotcha — automated
+tabs report `document.hidden`, which stalls `anim.js`'s rAF-driven tween queue; drained it with a
+manual `tick(2000)` pump before measuring/screenshotting): pentagon (default 45 mm) and hexagon
+(default 35 mm) at their own default method render centred, un-clipped, both angle-pair labels and the
+result angle legible; N-Gon Semicircle Division at n=6/side=32 (the ADR-146 follow-up's own reported
+case) renders centred and un-clipped, `#dynamic-layer` `getBBox()` measuring 91.5×67.0 of the 200×200
+viewBox, no dimension exceeding frame bounds.
+
+**Alternatives rejected:** none — this was the single lever ADR-146 left open, applied as scoped.
+
+**Consequences:** Easier: all three constructions read slightly larger at every param value, for free,
+with no clipping or aspect-ratio regression. Harder / open: the residual label-collision cases ADR-145
+already documents (e.g. hexagon/compass at its own default) are unchanged by this ADR — a narrower
+margin does not touch `assignLabelPositions()`'s search radius — and remain a separate, not-yet-scheduled
+follow-up, same as ADR-146 left them. No further margin reduction is planned; ADR-146's own frame-size
+reasoning (200×200 is the only size tested that is never worse than the ADR-145 baseline at any window
+size) is unaffected by this change.
+
+---
+
+## ADR-148: Regular Polygons' N-Gon Semicircle Division method separates labels for coincident division-point/vertex pairs, instead of leaving them to fight over one dot
+
+**Date:** 2026-08-09
+**Decision:** In `graphics_diploma_module_1_topic_1_4_regular_polygons`, a Phase A audit (full sweep:
+3 constructions × every method × {min,default,max} side × n∈{3,5,6,7,9,12}, 51 configs) found 38/51
+configs carry ≥1 label collision, from three independent causes. This ADR fixes only the first:
+`buildSemicircleDivision()`'s division point `(n-2)` and polygon vertex `(n-1)` are the exact same
+coordinate (float noise only, <5e-14) at **every n from 3 to 12** — proved algebraically (the
+interior angle at A, `(n-2)·180/n`, is exactly division point `(n-2)`'s own angle from A, and both
+points sit at radius `s` from A) and numerically (n=3..12 swept). Two different labels — a division
+number and a vertex letter (`"4"`/`"G"` at n=6, `"3"`/`"F"` at n=5, etc.) — were being stamped on one
+literal dot. `applyOutwardHints()` (ADR-145) gives each an independent hint (division points
+away-from-A, vertex letters away-from-O) too close in angle to reliably clear two ~7-unit label boxes
+anchored at the same point; `renderConstruction.js`'s `candidateOffsets()` ring-widening search
+(ADR-145) cannot fix a genuinely same-point conflict no matter how far it widens.
+
+Added `separateCoincidentLabels(steps, O)` in `src/constructions.js`, run after `applyOutwardHints()`
+and wired into all three raw builders (`pentagonRaw`/`hexagonRaw`/`ngonRaw`) even though only the
+n-gon's semicircle method hits the case today, so the invariant is construction-wide rather than
+method-specific. For each group of labelled points sharing one coordinate (excluding groups that
+share one identical label — nothing to separate — and points coincident with O itself, no direction
+to derive from, same guard `applyOutwardHints()` uses): computes the tangent-to-O direction at that
+point, splits the group's k members evenly around it (`θ + i·360°/k`), and grows a shared radius
+(starting at `awayFrom()`'s own default of 6, +2 per attempt, up to 20 attempts) until every pair of
+members' label boxes — checked with a duplicated copy of `renderConstruction.js`'s own `labelBox()`/
+`boxesOverlap()`, same duplication discipline as `rawBounds()` mirroring `computeBounds()` — actually
+clears. A first version used a fixed radius of 6 (angle split only) and left one live residual: at
+n=12, `"10"` (two digits, wider box) and `"M"` grazed by ~0.02 units even at opposite angles, because
+`labelBox()` is left/top-anchored, not centred, so opposite ANGLES alone don't guarantee clearance for
+boxes of different widths — the DISTANCE has to be sized to the actual label, not guessed.
+
+Tangential (not radial) split, not each member's own outward hint as one pole: taking a member's own
+`awayFrom()` hint as θ would send its +180° partner straight back toward the crowded interior.
+
+**Why keep both labels (not suppress the redundant one):** the task's own instruction was to check
+`polygon.pdf` (the method's literal slide-deck source) before assuming suppression is cleaner.
+`polygon.pdf` slides 8-9 (its own n=5 pentagon worked example) print BOTH `F` and `3` at the shared
+point, side by side, split along the arc's tangent — the source itself keeps both, so this ADR mirrors
+that layout rather than dropping either label.
+
+**Why:** RULES §2.19a — proved with the same headless-sweep method ADR-145 established
+(`constructions.js` imports nothing, runs directly under Node). Re-ran the 51-config sweep:
+digit-vs-letter identity-class collisions dropped from 14 to 0 (one apparent remaining digit-vs-letter
+pair at n=12, `"C"` vs `"11"`, checked and confirmed NOT coincident — 7.5 units apart, ordinary high-n
+crowding, correctly untouched, in scope of the two causes this ADR explicitly does not fix). No
+regression in the other two causes: point-vs-angledim held at 38, angledim-vs-angledim held at 9,
+label-vs-ink improved 101→99 (side effect of less congestion at the now-separated points). Added a
+standalone coincidence check (n=3..12, both n-gon methods): every coincident-point label group now
+resolves to distinct, non-overlapping boxes — PASS. Live-verified in Chrome (RULES §2.7 hard-reload):
+n=6/side=32/Semicircle Division's `"4"`/`"G"` pair measured via real `getBBox()` on the rendered
+`<text>` nodes, not just the headless box-estimate model — boxes no longer overlap (previously grazed
+by ~0.02-1.8 units depending on config). Reused the [[project_chrome_automation_raf_stall]] gotcha's
+own workaround for measuring: an automated tab is backgrounded, which stalls `anim.js`'s rAF tween
+queue — forced a full static render via a direct `renderConstruction.js`/`constructions.js` dynamic
+`import()` in the page instead of waiting out Play All's animation.
+
+**Alternatives rejected:**
+- *Suppress the redundant division-number label* — the task's own fallback if `polygon.pdf` never
+  double-labels the point. It does (see above), so rejected.
+- *Fixed separation radius (6, angle split only)* — tried first; left a live residual at n=12 where a
+  2-digit division number's wider box still grazed its letter partner at the same fixed distance. A
+  radius search against the actual box model replaced it.
+
+**Consequences:** Easier: every division-number/vertex-letter pair this method produces (10 pairs,
+one per n from 3 to 12) is now guaranteed visually distinct, matching `polygon.pdf`'s own layout.
+Harder / open: this ADR fixes only the coincident-point cause. Two others remain, deliberately
+deferred (not in this ADR's scope): label-vs-ink collisions concentrated at min-side configs (labels
+are fixed-size, geometry is calibrated from max-side, so min-side draws smallest — 99 residual pairs),
+and digit-vs-digit crowding at high n (9, 12) where many division numbers pack a fixed-radius
+semicircle (15 residual pairs, e.g. the `"C"`/`"11"` case found and confirmed out-of-scope above).
+Topics 1.1-1.3 untouched (separate follow-up, see [[project_regular_polygons_adr145_followup]]).
+
+---
+
+## ADR-149: Diploma track grows a Module 3 ("Projection Systems"), skipping Module 2 — the module-numbering ADR ADR-095 left open
+
+**Date:** 2026-08-06
+**Decision:** The Diploma Engineering Graphics track gains a **Module 3**, "Projection Systems,"
+whose first topic — `graphics_diploma_module_3_topic_1_1_first_third_angle` (First and Third Angle
+Projection) — compares first-angle and third-angle orthographic projection on one solid: a shared
+HP/VP/PP glass-box setup, one rabatment fold reused identically by both systems, the resulting view
+layout, and the BIS title-block symbol for each. **Module 2 is deliberately skipped, not filled**:
+the module number was set explicitly to 3 by the requester, not derived from a "next available"
+rule; ADR-095 does not require sequential, no-gap module numbering, only that the track's own
+docs/ADR sequence stay shared. Namespaced `graphics_diploma_module_3_topic_1_1_first_third_angle`
+— `M=3` (module), `K=1` (first topic in that module), `N=1` (first subtopic under that topic,
+leaving `_1_2`/`_1_3` open for the CONTENT SPEC's explicitly out-of-scope future work: the full
+six-view glass box and surface-type/inclined-plane behavior) — per ADR-095's own
+`module_<M>_topic_<K>_<N>_<slug>` convention.
+**Why:** ADR-095's own Consequences field states plainly: *"Future module numbering for this track,
+if it grows beyond Module 1, is left fully open pending a future ADR if/when that happens."* This
+is that ADR — a new module was not silently assumed permissible; the gap was surfaced explicitly
+during planning (Phase A of this build) before any file was touched, and confirmed by the requester
+before Phase B began. The module boundary itself (not a third Topic inside Module 1) is justified
+independently of the numbering question: Module 1 is architecturally committed to a 2D SVG/Canvas
+orchestrator specifically *because* "none of these subtopics involve 3D solid geometry" (ADR-095);
+first-vs-third-angle projection is a genuine 3D projection-system comparison (glass box, rabatment
+fold, an object literally re-positioned between Quadrant I and Quadrant III) — the opposite premise.
+Forcing it into Module 1 would have repeated, in the wrong direction, the exact architecture-fit
+question ADR-097 already resolved once for Helix.
+**Alternatives rejected:** *A third Topic inside Module 1* — rejected for the architecture-mismatch
+reason above (Module 1's 2D-only premise). *Deriving the module number as "next available" (i.e.
+Module 2)* — not chosen; the requester set it to 3 explicitly after the numbering gap was surfaced,
+and ADR-095 places no sequential constraint on this track's module numbers. *Cutting this topic from
+an existing Diploma Module 1 sibling's 2D SVG skeleton* — rejected: this topic needs a real Three.js
+scene (glass box, fold, camera), so per MODULE-STARTER.md's Case A/B decision table it is
+structurally a Case-A build (cut from `template_starter/`) regardless of which curriculum track it
+belongs to; patterns were ported from `graphics_module_1_topic_2_spatial_framework` (the
+pivot-hinged fold, the CSS2D label layer, the BIS symbol badge) and
+`graphics_module_1_topic_3_points` (the generic Problem Library contract) as **technical reference
+only**, explicitly not curriculum lineage — this track's own root-doc-sharing model (ADR-095) is
+unrelated to those two topics' original-syllabus content.
+**Consequences:** Invokes ADR-095 (not superseded) — the shared-root-docs model is unchanged, this
+ADR only exercises the module-numbering decision ADR-095 deferred. `template_starter/`'s copied
+`src/uiManager.js` turned out to be leftover Module-2-specific slider code (not the emptied stub
+MODULE-STARTER.md's own text claims ships) and was deleted rather than adapted, along with the
+unused `src/onboarding.js`; the Reset two-state confirm normally living in `uiManager.js` was ported
+inline into `main.js` instead (RULES §2.9/§4.19 still holds — one reset path, guarded). The fold
+geometry's key claim — that a single constant fold rotation per plane reproduces both systems'
+correct flattened layout, with only the object's quadrant and PP's hinge-offset side differing by
+system — was verified numerically (a standalone Node script replicating THREE's rotation matrices)
+*before* any Three.js code was written, not asserted from visual inspection alone.
+**Status:** Active.
+
+---
+
+## ADR-150: Involute of a circle/polygon splits out of Roulettes into its own Topic 2.4 — Misc Curves grows from three subtopics to four
+
+**Date:** 2026-08-07
+**Decision:** Involute of a circle and involute of a regular polygon move out of
+`graphics_diploma_module_1_topic_2_1_roulettes` into a new **Topic 2.4**,
+`graphics_diploma_module_1_topic_2_4_involutes`. Misc Curves (ADR-096) now has four subtopics —
+2.1 Roulettes, 2.2 Spiral Curves, 2.3 Helix, 2.4 Involutes — appended rather than renumbering
+2.2/2.3, avoiding cascading folder/ADR renames on two already-shipped topics.
+**Why:** Every other Topic 2.1 curve (cycloid, superior/inferior trochoid, epicycloid, superior/
+inferior epitrochoid, hypocycloid, superior/inferior hypotrochoid) is generated by a circle rolling
+without slipping — one equation family, `rollingCurvePoint()`/`contactPoint()` (Topic 2.1's own
+CLAUDE.md calls this "Generator A"). An involute is generated by a taut string/line unwinding — a
+structurally different mechanism (`involuteCirclePoint()`/`involutePolygonArcs()`, called "Generator
+B" and deliberately never unified with Generator A when Topic 2.1 was first built — the polygon case
+isn't even a smooth parametric, it's a chain of compass arcs). Two genuinely different generator
+families sharing one topic muddied "what is this topic teaching"; Topic 2.1's own prior CLAUDE.md
+already flagged the A/B split as deliberate — this completes that separation at the topic level.
+**Alternatives rejected:** *Leave involute in 2.1* — rejected for the reason above. *Renumber 2.2/
+2.3 to make room* — rejected as unnecessary churn on two already-shipped, already-referenced topics
+for a purely additive change. *Generalize the 3 involute picker entries (circle/triangle/square)
+into one construction with an arbitrary-n-gon base-shape selector* — considered per the build
+brief's own "if you want to generalize" note, not taken: kept the existing 3-entry structure
+(unchanged from what Topic 2.1 already shipped), matching the source textbook's exact two worked
+examples (7.6 circle, 7.7 triangle+square) with no speculative n-gon UI ahead of a stated need.
+**Consequences:** Invokes ADR-096 (does not supersede it) — amends its documented three-topic count
+to four; Topic 2.1's own subtopic-count language (CLAUDE.md, meta.json, index.html copy) updates
+from twelve curves to nine. Every primitive Generator A and Generator B share (`tangentNormalSteps()`,
+`P/L/CIRC/CURVE/arcMark/dim` step builders, `boundsOfPoints/fitTransform`, `sampleCircle`, `deg2rad/
+dist/angleOf/pointAt`) gets duplicated into 2.4 per RULES §1.4 (no shared library between topic
+folders), not imported — Topic 2.1 keeps its own copies, untouched. Topic 2.4 uses the family-default
+`200×140` canvas, not Topic 2.1's enlarged `240×190` — that enlargement was sized for the roulette
+family's epi/hypo base circles (up to 100mm radius), a need involute geometry never had (its own
+`INVOLUTE_BUDGET` sub-rect only ever used `200×140` worth of space inside the larger canvas).
+**Status:** Active.
+
+---
+
+## ADR-151: Merging Abhiram's `feat/diplomaMod2` — two ADR-numbering collisions, and a rejected label-pill hunk found to collide live
+
+**Date:** 2026-08-09
+**Decision:** `feat/diplomaMod2` (abhiramkunnath, 6 commits, tip `a041229`) merged into `main`.
+Built in parallel with this session's Regular Polygons (Topic 1.4) work: label/dimension-overlap
+fixes across 9 of the 10 shipped Diploma topics, plus two new topics —
+`graphics_diploma_module_1_topic_2_4_involutes` (Involute of a circle/polygon, split out of
+Roulettes) and `graphics_diploma_module_3_topic_1_1_first_third_angle` (first topic of a new
+Diploma Module 3, "Projection Systems"). Three things recorded here so a future reader does not
+have to re-derive them.
+
+**1. ADR-numbering collision — their ADR-098 vs. this repo's own ADR-098.**
+The merge-base (`90c3e53`) topped out at ADR-097. Both branches then numbered forward from 098
+independently: this repo's own ADR-098 (Show Method's beat-emptiness/mark-novelty rewrite) and
+their ADR-098 ("Diploma track grows a Module 3, skipping Module 2") are unrelated decisions
+sharing one number. Unlike ADR-142's Vishnu merge, this repo's ceiling (ADR-148) has no orphaned-
+citation range to dodge, so the renumber target is simply the next free id: **their ADR-098 →
+ADR-149**. 7 sites updated: the `DECISIONS.md` heading, `CHANGELOG.md`'s First/Third Angle entry,
+and `graphics_diploma_module_3_topic_1_1_first_third_angle/CLAUDE.md` (×5). Their body's own
+citations of ADR-095/096/097 are real, shared decisions on both branches — left untouched.
+
+**2. A second collision INSIDE their own `DECISIONS.md` — a duplicate ADR-080.**
+Their branch's `DECISIONS.md` carried two `## ADR-080` headings: the real, shared one ("Compare
+platform-wide is collapsed to a single docked shape," present on both branches, cited in ~140
+places repo-wide) and a new, unrelated one ("Involute of a circle/polygon splits out of Roulettes
+into its own Topic 2.4") — almost certainly a typo for the next free number on their side, never
+caught because their own branch never diverged from a copy carrying the real ADR-080's citations
+to collide against. **Their duplicate → ADR-150.** This was the dangerous kind of collision to fix
+by a blanket find-and-replace: the literal string `ADR-080` appears on both branches with two
+different meanings, so the renumber was scoped file-by-file, not repo-wide — 16 sites (by line
+count) across exactly `graphics_diploma_module_1_topic_2_1_roulettes/CLAUDE.md` (×3),
+`src/constructions.js` (×1), `graphics_diploma_module_1_topic_2_4_involutes/CLAUDE.md` (×6),
+`index.html` (×2), `src/constructions.js`/`src/problems.js`/`src/renderConstruction.js`/
+`src/viewTransform.js` (×1 each), plus the `DECISIONS.md` heading and one `CHANGELOG.md` line —
+18 sites total. Verified after the edit: every real Compare-collapse ADR-080 citation elsewhere
+in the repo (`Module2/`, topics 5/6, `simple_positions`, `development_of_surfaces`,
+`template_starter`, the new `first_third_angle` topic) is untouched — confirmed by an exact
+before/after count, not spot-checking.
+
+**3. Topic 1.4's label-pill hunk rejected — a real defect found live, not a style call.**
+Their branch also touched `renderConstruction.js`/`index.html` in Topic 1.4 (Regular Polygons),
+this session's own concurrent work. `index.html`'s two hunks (`.vp-hint` repositioned bottom-
+right, `.problem-library__header` regridded to centre the title) don't overlap this session's own
+edits and are kept. `renderConstruction.js`'s hunk adds an opaque paper-coloured `<rect>` "pill"
+behind every vertex/dimension/angle label in `buildStepNode()` — reintroducing, by a different
+mechanism, the `paint-order: stroke` label halo this session's own ADR-145 deliberately removed
+("the halo reads as clutter" — Topic 1.4's `CHANGELOG.md`) once labels became collision-aware.
+Rejected outright rather than partially adopted, on evidence, not preference: live in Chrome
+(pentagon, "54° Angle + Circle" method, finished construction), the left "54°" angle-dimension
+label lands directly on top of vertex label A — the pill's `opacity: 0.88` isn't opaque enough to
+fully hide what's underneath, so "A" ghosts through behind the "5" of "54°", both partially
+legible rather than either being clearly placed. Their pills are a translucency band-aid for
+whatever lands underneath; ADR-145/148's collision-aware pass repositions labels using a real
+obstacle set (line/arc/circle ink plus, as of ADR-148, other labels) so nothing needs to land
+underneath in the first place. Kept ADR-145/148's placement in full — `renderConstruction.js`
+resolved to this session's `17516bc`/`2e255fb` version unchanged, no partial cherry-pick of the
+pill mechanism onto our placement pass.
+
+**Consequences:** `main`'s ADR sequence now runs 001…151 with no duplicate id (`ADR-149`/`ADR-150`
+are this merge's two renumbered decisions). Topic 1.4 keeps its ADR-145/148 label treatment
+unmodified by this merge; the other 8 modified Diploma topics and both new topics land as pushed.
+`ARCHITECTURE.md`'s Diploma topic count bumped 9 → 11 in the same commit as this ADR.
+**Status:** Active.
+
+---
+
+## ADR-152: Regular Polygons' Perpendicular Bisector method extends its drawn bisector line to actually carry its own ladder, and label fade now applies to text as well as ink
+
+**Date:** 2026-08-10
+**Decision:** In `graphics_diploma_module_1_topic_1_4_regular_polygons`, the N-Gon construction's
+Perpendicular Bisector method (`buildPerpendicularBisector()`, `src/constructions.js`) drew its
+division-number labels (`4`, `5`, `6`, … up to `n`) floating in blank space, disconnected from any
+visible line or dot. A Phase A audit (read-only) found **two independent, compounding causes**,
+neither of which is a label-collision case (so ADR-148's `separateCoincidentLabels()` machinery
+doesn't apply here):
+
+**Cause 1 (geometric):** the bisector was drawn only between the two compass-arc crossings —
+`L(upper, lower, 'move')`, spanning `sqrt(r² − (s/2)²) ≈ 0.366·s` off the AB midpoint. The ladder's
+own points sit at `apothem(k) = s / (2·tan(π/k))`: point 4 at `0.5·s`, point 5 (book's midpoint of
+4/6) at `0.683·s`, point 6 at `0.866·s`, up to point 12 at `1.866·s` — every one of them, at every
+`n ≥ 4`, past the end of the drawn segment (proved algebraically: every ratio is linear in `s`, so
+this holds at any side length; verified numerically for `n=3..12`). Only the `n===3` special case
+(a single point at `0.289·s`) happened to land on it. The coordinates were always correct; the line
+meant to carry them was too short. Fig 5.24 (the method's book source) draws one long centre line
+through the whole ladder — this build never extended it past the arc crossings.
+
+**Cause 2 (render-side):** `index.html`'s post-construction de-emphasis
+(`#dynamic-layer.is-complete [data-role="move"]{opacity:0.32}`, added by ADR-145, explicitly
+naming "ladder/division points" in its own comment) only ever reached ink — `buildStepNode()`
+(`src/renderConstruction.js`) stamped `data-role` on marker dots, `dim` groups, and `angledim`
+groups, but never on the `<text>` label nodes themselves, which live in a separate always-on-top
+`[data-layer="labels"]` sublayer untouched by that selector. Once a construction finished, its
+move-role dots and lines faded to 32% while their numbers stayed at 100% — visually detaching the
+label from its (now nearly invisible) point. This is a bug against the CSS comment's own stated
+intent and affects every construction, not just this method: Semicircle Division's division numbers
+(genuinely on their drawn arc — cause 1 doesn't apply there) and Pentagon/Hexagon's own move-role
+labels all had the same detachment once complete.
+
+**Fix:**
+- `src/constructions.js`: `buildPerpendicularBisector()` now draws
+  `L(lower, along(apothem(topK) + s*0.08), 'move')` instead of `L(upper, lower, 'move')`, where
+  `topK` is the highest-numbered rung actually plotted below (`nn===3` → 3, `nn===4` → 4, else
+  `max(nn, 6)` — `nn===5` still plots point 6 as an intermediate rung before taking point 5's
+  midpoint, so 6 can exceed `nn` itself). `upper`/`lower` keep their own point markers (the book
+  shows both crossings); only the line's far endpoint moves. Margin (`s*0.08`) is proportional to
+  side length, matching every other length in this file — never a raw literal.
+- `src/renderConstruction.js`: `buildStepNode()` now stamps `'data-role': step.role` on the label
+  `<text>` node in the `'point'`, `'dim'`, and `'angledim'` branches (the standalone `'label'` kind
+  — used elsewhere in this repo, e.g. `graphics_diploma_module_2_topic_1_1_development_of_surfaces`
+  — carries no `role` field at all in this topic's own step schema, so left unstamped rather than
+  writing a meaningless `data-role="undefined"`).
+
+**Why:** proved with the same headless-sweep method ADR-145/148 established (`constructions.js`
+imports nothing, runs directly under Node). Swept `n=3..12` × `{min, default, max}` side × both
+n-gon methods (336 labelled-point checks): every numeric ladder/division label now lies exactly on
+its drawn ink (`onLine && within` its line's own span, or exactly radius-`s` from the semicircle's
+centre) — 0 failures, down from the pre-fix state where every `n≥4` bisector config failed. Re-ran
+ADR-148's own coincident-label sweep (30 coincident-point groups across the same domain): 0
+unresolved — no regression. Checked the framing side-effect explicitly rather than assuming it:
+`unitsPerMm` at the worst-case config (max side, max n) measured identical before/after (0.9003,
+matching the ADR-147 changelog baseline) — the ladder's topmost point was already inside
+`calibratedScale()`'s bounds from other geometry, so the added margin didn't move the shared
+n-gon scale at all.
+
+Live-verified in Chrome (hard-reload; the automated tab's rAF is suspended — same
+`project_chrome_automation_raf_stall` gotcha ADR-148 hit — worked around by forcing a static render
+via a direct `renderConstruction.js`/`constructions.js` dynamic `import()` in-page rather than
+waiting out the animation): n=6 and n=12, Perpendicular Bisector — dodecagon's ladder now runs
+labelled `4` through `12` continuously up the extended line; `getComputedStyle()` on every numeric
+move-role label confirms `opacity: 0.32`, exactly matching its dot, post-completion, while
+`given`/`result` labels stay at `opacity: 1`. Cross-checked Semicircle Division at n=6/n=12 the same
+way — its division numbers now fade with their arc too, previously stuck at full opacity.
+
+**Consequences:** Easier: every Perpendicular Bisector ladder point (any n, any side) now reads as
+what it is — a mark on a real centre line — instead of a stray number; every construction's
+move-role labels now genuinely de-emphasize with their ink post-completion, closing a gap ADR-145
+itself only half-closed. Harder / open: none identified — this fix is additive (a longer line, a
+DOM attribute) with no removed capability. Pentagon/Hexagon were not independently live-clicked
+through the wizard this session, but they call the exact same `buildStepNode()`/CSS mechanism the
+live n-gon checks exercised, so no separate verification path exists for them to diverge on.
+**Status:** Active.
+
+---
+
+## ADR-153: Regular Polygons' point-label offset hints now scale with the construction's frozen viewBox scale, closing a scale-space mismatch `applyTransform()` left open
+
+**Date:** 2026-08-10
+**Decision:** Follow-up to ADR-152. With ADR-152's fix landed, the N-Gon Perpendicular Bisector
+method's ladder numbers (`4`, `5`, `6`, …) sat on their correct ink but still rendered visibly
+farther from their marker dot than other point labels (e.g. vertex letters `A`-`F`), per
+user-marked reference screenshots. A Phase A audit (read-only) traced both label kinds through the
+SAME code path — `awayFrom()`/`applyOutwardHints()` (`src/constructions.js`) sets a `'point'`
+step's `dx`/`dy` label-offset hint, `candidateOffsets()`/`assignLabelPositions()`
+(`src/renderConstruction.js`) resolves it against collision obstacles — not two paths, and not a
+larger constant on the ladder's side.
+
+The actual defect: `applyTransform()` (`src/constructions.js`), which converts every step from raw
+unscaled geometry to the construction's frozen on-screen scale, scales `p`, line endpoints, circle/
+arc radii, and `dim`'s own `offset` (via its `tm()` magnitude helper) — but spread a `'point'`
+step's `dx`/`dy` through untouched:
+```js
+if (step.kind === 'point' || step.kind === 'label') return { ...step, p: tp(step.p) };
+```
+`renderConstruction.js` then uses `step.p.x + step.dx` directly as a final-space SVG offset
+(`buildStepNode()`'s `'point'` branch) — but `p` had just been scaled and `dx` hadn't, a
+scale-space mismatch between two halves of the same coordinate.
+
+**Why the letters looked fine and the ladder didn't**, at the same nominal hint magnitude (6 raw
+units, `awayFrom()`'s default): `n`-gon's frozen scale (`calibratedScale()`, cached per
+construction id) measured **0.9003** — close to 1, so the raw-vs-scaled gap is only ~10% by itself
+here, not the dominant effect. The bigger factor is a second, structural property of
+`awayFrom(O, p, dist)`: it points from the true circumcentre `O` through the labelled point `p`.
+Every ladder point lies, by construction, on the SAME line through `O` (the perpendicular bisector
+itself) — so `awayFrom()`'s "away from O" direction for an interior ladder point (e.g. point `5`,
+sitting between `4` and `6`) points straight at its own neighbour, guaranteeing a first-ring
+collision and forcing `candidateOffsets()`'s widening-ring search (ring 2 = ×1.5, ring 3 = ×2.2) to
+escalate. Confirmed by direct measurement: post-fix, point `5`'s resolved offset lands at ring 3
+(magnitude 11.88) at every `n` checked (6, 8, 10), while vertex letters mostly resolve at ring 1
+(5.40). Vertex letters don't hit this because they're spread circumferentially around `O`, so
+"away from `O`" is close to perpendicular to their neighbour spacing, not parallel to it.
+
+**Fix (this ADR):** `applyTransform()`'s `'point'`/`'label'` branch now scales `dx`/`dy` the same
+way `tm()` already scales `dim`'s `offset`:
+```js
+if (step.kind === 'point' || step.kind === 'label') {
+  return {
+    ...step, p: tp(step.p),
+    dx: step.dx != null ? tm(step.dx) : step.dx,
+    dy: step.dy != null ? tm(step.dy) : step.dy,
+  };
+}
+```
+Single choke point — covers every `'point'` step's hint regardless of source (`applyOutwardHints()`
+fill-in, `separateCoincidentLabels()`'s override, or an explicit `away` passed to `P()` at
+construction time), no change needed in `renderConstruction.js`: `candidateOffsets()`'s ring
+multipliers automatically scale correctly once their input is already final-space.
+
+**Why:** a Node smoke test (module has no browser dependency) built every construction × every
+method × `n=3..12` (where applicable) post-fix — 0 crashes, 0 non-finite offsets. Directly measured
+`applyTransform()`'s frozen scale for `ngon` (0.9003, matching ADR-152's own recorded baseline —
+confirms this fix touches offset scaling only, not the shared geometry scale ADR-152 already
+verified unchanged) and compared resolved `dx`/`dy` magnitudes before/after: every value shrank by
+exactly that scale factor (e.g. ring-1 6→5.40, ring-2 9→8.10, ring-3 13.2→11.88), matching the fix
+exactly rather than an approximation.
+
+**Consequences:** Easier: point-label offset hints are now dimensionally consistent with every
+other magnitude `applyTransform()` handles (matches `dim`'s `offset` treatment); the ~10% inflation
+this bug added on top of the ladder's escalation is gone, platform-wide (every construction using
+`'point'` labels benefits, not just this one). **Open, not fixed by this ADR:** the ladder's ring-3
+escalation itself is structural, not this bug — `awayFrom(O, p, dist)`'s radial-from-`O` hint is
+the wrong FIRST candidate for any point collinear with `O` (it points at its own neighbour by
+construction), the same class of problem ADR-148's `separateCoincidentLabels()` already solved for
+same-point label pairs by switching to a tangential hint instead of a radial one. Point `5`
+(prototypically) still resolves at ring 3 post-fix. Flagged for the user; a targeted fix (an
+explicit lateral `away` hint for ladder points in `buildPerpendicularBisector()`, bypassing
+`applyOutwardHints()`'s self-colliding default for this one call site) was scoped but not applied —
+awaiting go-ahead, kept as a separate change from this ADR's scale-consistency fix.
+**Status:** Active.
+
+**Addendum (2026-08-10, same day): the open item above, resolved — and the obvious fix was
+wrong.** A Phase C audit tested the scoped idea (swap `awayFrom()`'s radial hint for a tangential
+one, direction only) empirically before implementing it: built a probe against the REAL
+`assignLabelPositions()` (no source edit), swept n=3-12 × 3 side values (141 ladder-label checks),
+radial vs. fixed-right vs. fixed-left vs. alternating-by-parity vs. a vertical control. Result:
+**direction alone barely moved the needle** — 89-110 of 141 still escalated across every scheme
+tried, fixed-left (91) only marginally better than the current radial default (110). Traced the
+real cause one level deeper: `assignLabelPositions()` (`renderConstruction.js`) resolves labels
+*sequentially* in step-push order, adding each resolved label's own box to the shared `occupied`
+set before the next point's search runs. The ladder's push order is `4, 6, 5, [7..nn]` — by the
+time point `5` resolves, `4` and `6` have already claimed nearby real estate in a genuinely tight
+~10-15-unit vertical corridor. Three-plus labels competing for one corridor is not something a
+hint's ANGLE can fix, only where in the ring-search it happens to succeed.
+
+What the same sweep showed DID work: the hint's base MAGNITUDE. Halving it (6 → 3) roughly halved
+both how often escalation triggers (89→58/141) and, more importantly, its worst case (13.2→6.6 —
+`candidateOffsets()`'s ring multipliers are relative, so shrinking the base shrinks every ring).
+Checked for side-effects before implementing: vertex-letter escalation measured identically
+(78/255) whether the ladder's base was 6, 3.0, or 2.5 — confirmed against the unmodified,
+zero-override production path first, then re-confirmed post-fix at a wider sweep (129/425, same
+~30% rate) — the two label groups don't interact enough for one's magnitude to move the other's
+outcome.
+
+**Fix implemented:** `buildPerpendicularBisector()` now defines one `ladderHint = { dx: -3, dy: 0 }`
+(sideways — tangential to the vertical bisector, so it can never point AT another ladder point,
+same reasoning as ADR-148's tangential coincident-point split — AND a smaller base magnitude, the
+part that actually mattered) and passes it as `P()`'s 4th arg on every ladder point: `3`/`4`/`6`/
+`5`/each `7..nn` rung. This also incidentally fixes a related staleness: point `6` coincides
+exactly with the true circumcentre `O` whenever `nn===6` (proved in this file's own header
+comment), which previously made `applyOutwardHints()` skip it entirely (its "skip if hint already
+present" guard didn't apply, but its "skip if colocated with O" guard did) and fall back to
+`renderConstruction.js`'s bare +4/-4 default — point `6` now gets the same intentional hint as
+every other rung instead of that incidental fallback.
+
+**Verified:** full smoke test (every construction × every method × n=3-12 × 3 side values) — 0
+crashes. Targeted sweep (n=3-12 × 5 side values, 235 ladder-label checks, run against the real
+`assignLabelPositions()`): worst-case final offset **13.20 → 5.94** — tighter than the very
+scenario this whole audit started from (`n=6, side=32`: point `5` went 11.88→2.70, point `4`
+8.10→5.94, point `6` 5.66 [stale fallback]→4.05). Letter-label escalation unchanged (baseline
+78/255, confirmed identical pre/post). Live-verified in Chrome (hard-reload past the stale-module
+cache gotcha; rAF patched to `setTimeout` to defeat the hidden-tab suspension gotcha, both per
+established session workarounds) at `n=6, side=32`, Perpendicular Bisector, Play All: `4`/`5`/`6`
+render visibly tight against their dots, matching the fix's own numbers.
+**Status:** Active.
+
+**Second addendum (2026-08-10, same day): point `4` was still visibly separated from its dot next
+to now-tight `5`/`6` — a real, different defect, not yet covered above.** Probed the exact
+scenario (n=6, side=32) with the real `assignLabelPositions()`: point `5` ring1 (2.70), point `6`
+ring2 (4.05), point `4` ring3 (5.94) — a gradient, not equal siblings. Traced point 4's blocked
+ring1/ring2 candidates (24 of 24, exhaustively): every one blocked by `arc` or `line` ink, never by
+a label or another point. Root cause: `arcMark(M, dist(M,A), pt4, 40)` — the compass arc drawn TO
+CONSTRUCT point 4 — sits with point 4 dead-centre on its own curve (that's the whole purpose of
+the arc), and `geometryObstacles()` samples that curve into obstacle boxes with no exemption for
+"this is the ink that placed me," unlike a point's own DOT, which already gets that exemption
+(`owner: step`). Point 5 has no such collision because it has no own-arc (built via plain
+`midpoint()`); point 6 has one too (`arcMark(B, s, pt6, 40)`) but at the full side length `s`
+instead of point 4's `s/2` — a flatter curve, more give, hence only ring2 instead of ring3.
+
+**Revised the originally-scoped fix — simpler than planned.** The prior plan (thread an `owner`
+reference from `arcMark()`'s return value into the `P()` call it feeds, mirroring dot-exclusion)
+turned out to need no `constructions.js` call-site changes at all: a purely GEOMETRIC test — does
+this point's own coordinate lie on this arc's curve / this line's segment — gets the identical
+result from a single `renderConstruction.js` change, and generalizes to every `arcMark()`→`P()`
+site at once (`walkVerticesByCompass()`'s vertex letters, `buildSemicircleDivision()`'s division
+numbers, `pentagonRaw()`'s apex) without enumerating them individually.
+
+**But geometric self-exclusion alone did NOT move point 4 — verified before implementing, not
+after:** simulated excluding point 4's own arc (its own line too) and re-ran the resolver — point
+4 stayed at ring3, mag 5.94, completely unchanged. Its actual remaining blockers (traced via the
+same exhaustive per-candidate method) were the FOUR wide compass arcs
+(`arcMark(A/B, r, upper/lower, 55)`) that locate the bisector line itself — unowned (`upper`/
+`lower` carry no label), 55° sweep, radius ~17.9 in this scaled scenario, geometrically passing
+near point 4's whole neighbourhood without point 4 ever sitting ON them — so the geometric "am I
+on this ink" test correctly does NOT exempt them (it shouldn't; they're real, if incidental,
+scaffolding ink). Confirmed by exempting them too (simulation only, at this stage): point 4 dropped
+to ring2 (mag 4.05) — its floor, capped there by genuinely nearby DOTS (point 5, `upper`, `lower`),
+which no ink exemption can or should remove.
+
+**Fix implemented, two pieces:**
+1. `renderConstruction.js`: new `onOwnArc()`/`onOwnSegment()` geometric tests; `geometryObstacles()`
+   now tags each arc/line obstacle box with its source geometry (`arcCenter`/`arcRadius`/`arcStart`/
+   `arcEnd` or `lineA`/`lineB`); `assignLabelPositions()`'s point-label branch excludes any obstacle
+   the point's own coordinates lie on, alongside the pre-existing own-dot exclusion.
+2. `constructions.js`: the four `arcMark(A/B, r, upper/lower, 55)` calls in
+   `buildPerpendicularBisector()` now spread `unobtrusive: true` onto their returned step;
+   `geometryObstacles()` skips any `unobtrusive`-flagged arc/line entirely, for every label, not
+   just a specific point's search — these are pure scaffolding, not any one point's ink.
+
+**Verified:** full smoke test (every construction × method × n=3-12 × 3 side values) — 0 crashes.
+Direct re-check of the target scenario against the real (now-patched) `assignLabelPositions()`:
+point `4` 5.94→**4.05**, point `6` 4.05→**2.70**, point `5` 2.70→4.05 (a real but small knock-on —
+resolving 6 into 5's old ring-1 slot first nudges 5 out one ring; all three now sit within a tight
+2.70-4.05 band instead of one visibly standing out). `O`'s own label improved too, 8.10→5.40
+(unplanned but welcome — it sits near the same neighbourhood). Regression-swept generically
+(`onOwnArc`/`onOwnSegment` apply platform-wide, not ladder-only) across ngon (both methods) +
+pentagon (all 3 methods) + hexagon (both methods), n=3-12 × 5 side values, 1512 labels: 378
+improved, 1095 unchanged, 39 marginally worse (same greedy-sequential knock-on mechanism, not a
+new failure mode — worst-case magnitude across the whole sweep unchanged at 15.85 both before and
+after, so nothing newly blows up). That 15.85 outlier traced separately (Semicircle Division,
+n=12/side=28, division number `10`) and confirmed PRE-EXISTING and unrelated to this fix — checked
+against a clean `git stash` baseline: 17.60 pre-fix, 15.85 post-fix, i.e. this change improves it
+slightly as a side effect rather than causing it; the underlying Semicircle Division high-n
+crowding is a separate, out-of-scope defect, not touched here. Live-verified in Chrome (same
+hard-reload + rAF-patch workaround as the first addendum): n=6/side=32, Perpendicular Bisector,
+Play All — `4`/`5`/`6` all sit tight against their dots, no longer one visible outlier; Semicircle
+Division spot-checked too (division numbers 1-5), no regression.
+**Status:** Active.
+
+---
+
+## ADR-154: Regular Polygons gets a short concept blurb per wizard phase (Given/Construct only), method-aware, chapter-level citation only
+
+**Date:** 2026-08-10
+**Decision:** Added `notes: { given, construct }` to each of the three `ConstructionDef`s in
+`src/constructions.js` — one-to-three-sentence plain-language blurbs rendered into a new
+`#step-note` block (`index.html`, between `#step-lead` and the step panels), wired by a
+`renderNote()` in `src/stepper.js` called from `goToStep()` and `sync()`. Scope was narrowed
+during a read-only audit (this session) from the initial ask ("a blurb per step,
+Choose/Given/Construct/Verify") to **Given and Construct only**:
+- **Choose** already has concept copy — the Step-1 static prose with its three `.term` popovers
+  (`index.html`) — and `goToStep(1)` runs before any construction is picked, so a
+  per-construction blurb has nothing to key off yet.
+- **Verify** already has concept copy in the exact same register — `principle(method)` under the
+  "Why it works" eyebrow. A second block there would duplicate it, not add to it.
+
+`notes.construct` is **method-aware** (`(method) => string`, same shape as the shipped
+`principle(method)`), because the Construct phase's method switcher changes which derivation is
+on screen; `notes.given` is not, since the given value is the same regardless of method.
+`renderNote()` reads `sim.getActiveConstruction()`/`sim.getParams()` — both already existed on
+`simController` (added for `uiManager.js`'s own use) — so this required no new `simController`
+surface and no leaf-to-leaf import (RULES §3.6).
+
+**Placement, not a new accent-wash box:** `.step-through__caption` was *just* promoted
+(same day, this topic's own DESIGN.md §4) to a `--color-accent-soft` hint-callout so it would read
+as the Construct panel's primary content. Giving the new blurb the same treatment would have
+undone that by stacking two accent-washed boxes in the same panel. Instead `#step-note` reuses
+Verify's own `.result-block__eyebrow` + `.result-principle` recipe verbatim (quiet
+`--color-ink-secondary` grey, `--text-sm`) — zero new tokens (RULES §4.1/§4.16), and it visually
+subordinates to the accent-washed caption below it rather than competing with it.
+
+**Textbook grounding and citation form — the load-bearing finding of this ADR.** The two source
+PDFs at the repo root are *K.C. John, Engineering Graphics for Diploma*, Ch. 5 §5.6 "Construction
+of Regular Polygons" (`Regular Polygons.pdf`, pp. 48-51 — Ex. 5.9 Pentagon, Ex. 5.10 Hexagon,
+Ex. 5.11 general n-gon) and a 43-slide Pandalam Polytechnic deck (`polygon.pdf`, semicircle
+division only, already the documented source for `buildSemicircleDivision()`'s captions). There is
+**no N.D. Bhatt polygon PDF in this repo** — Bhatt cannot be cited for this topic.
+
+Reading every `*Raw()` builder against K.C. John's own numbered methods (not trusting the sim's
+method labels) found **the sim's Pentagon "Two Circles + Arc" and "Three Arcs" methods do not
+match John's Method-II/Method-III constructions** — the sim reaches the same equilateral apex both
+times via a different route than the book's D→C→E→K/L or perpendicular-at-B/Q sequence. Hexagon's
+two methods are simplified/adapted from John's Fig 5.21/5.22, not literal ports. Only Pentagon's
+"54° Angle + Circle" and N-Gon's two methods (already documented in this topic's CLAUDE.md as
+literal-match / designed-analogue respectively) are faithful ports. **Consequence: no blurb cites a
+figure or "Method-N" number** — four of seven would be false, and RULES §2.19a (caption text on
+assumed correctness) plus the ADR-116 precedent (a shipped wrong citation, corrected) make that a
+real defect class, not a style nitpick. Every blurb instead carries a **chapter-level citation
+only** — `(K.C. John Ch. 5)` — true for all seven methods and matching the shipped precedent in
+`development_of_surfaces/src/terms.js` (`"…(K.C. John Ch.15)"`).
+
+**Consequences:** Easier: a learner sees the idea before the mechanics on the two phases that
+previously had only imperative instruction text, closing the gap `RULES.md` §6.31 (ADR-141,
+"plain words BEFORE naming it") describes; `principle()` in Verify keeps its existing "why the
+result is correct" role instead of being asked to also carry "what am I about to watch". Harder /
+accepted cost: `notes` is a second per-construction, per-method copy surface alongside
+`principle()` — a future added method must supply both or `notes.construct` silently falls back to
+hiding the block for that method (the `if (!fn)` guard degrades gracefully, it does not warn).
+Screen-reader note: `#step-note-body` carries its own `aria-live="polite"`, independent of
+`goToStep()`'s existing phase-change announcement, so a method switch announces the new blurb
+without the phase announcement doubling it — same pattern `.step-through__caption` already uses
+for the identical problem (this topic's DESIGN.md §4).
+**Status:** Active.
+
+---
+
+## ADR-155: Regular Polygons' default view fits the construction's content, capped, instead of a fixed 200×200 viewBox
+
+**Date:** 2026-08-10
+**Decision:** `graphics_diploma_module_1_topic_1_4_regular_polygons` opens (and re-frames on every
+`side`/`n` slider change, unless the student has manually zoomed/panned) on a view fitted to the
+active construction's own drawn bounds, capped at **1.6×**, instead of the fixed `200×200`
+`BASE_W×BASE_H` viewBox at zoom 1.0 every other SVG topic in this track (1.1, 1.2, 1.3, 1.5, 1.6,
+2.1, 2.2, 2.3, 2.4) still opens on.
+
+**Root cause (Phase A audit).** The fixed default interacts badly with `calibratedScale()`
+(`src/constructions.js`, ADR-145), which freezes ONE scale per construction from the *worst-case*
+param combo across every method — deliberate, so the drawing visibly grows with `side`/`n`. Every
+config below that worst case then under-fills a 200×200 frame that never compensates. Measured:
+Pentagon/Hexagon defaults filled 61-75% of the frame; the N-Gon default (side 32, n 6) filled only
+43-48%, worst at small `side`/small `n` (down to ~30% at side 25, n 3) — compounded there because
+`chromeScaleFor()`'s `CHROME_SCALE_FLOOR = 0.5` was also pinned, drawing half-size labels over an
+already-undersized construction.
+
+**Precedent reused, with two required divergences.**
+`graphics_diploma_module_2_topic_1_1_development_of_surfaces` already solved this same complaint
+for its own (Canvas2D, not SVG) topic — `viewTransform.js`'s `fitToBounds(bounds, margin)` plus a
+`defaultFit()`/`resetFit()` pair in `main.js`, called on select/reset/problem-load, with
+`ensureVisible()` demoted to a "does it already fit?" guard that delegates to it. Ported that
+shape into this topic's `src/viewTransform.js`/`src/main.js` verbatim in spirit, but:
+1. **Capped the fit at 1.6×**, not uncapped. Module 2's `fitToBounds()` has no ceiling; applied
+   uncapped here, n=3 and n=12 would render at near-identical on-screen size and erase ADR-145's
+   whole point. 1.6 was picked by measuring monotonicity: at that cap the N-Gon default fills
+   ~76% of the 200×200 viewBox, and the smallest N-Gon config (side 25, n 3) still reads visibly
+   smaller (~63%) than the largest (~92%) — screen size stays monotonic in both `side` and `n`,
+   verified across every construction × method, at every cap tested from 1.3 to 1.8. **Phase A
+   verify (2026-08-11):** these figures are fill of the square viewBox, not of the rendered
+   `#sim-viewport` — `preserveAspectRatio="xMidYMid meet"` letterboxes that square into whatever
+   aspect the wizard layout leaves (measured 0.75–1.5, never the ~2:1 "wide desktop" a first read
+   of this ADR suggests), so true on-screen fill is lower on whichever axis gutters (e.g. ~57%
+   vertically at the N-Gon default with the wizard panel open). `fitToBounds()`/`clampPan()`/
+   `ensureVisible()` all reason in viewBox space and `meet` scales both axes equally, so this
+   changes what the percentages measure, not the cap's monotonicity argument itself.
+2. **Fits the FULL step bounds** (`computeBounds(lastRecipe.steps)`, every role), not
+   `given`-only. Module 2 fits given-only because its given block *is* the modelled object; here
+   `given` is just the A–B baseline, far smaller than the finished polygon — fitting to it alone
+   would over-zoom drastically.
+
+**Mechanics.** `viewTransform.js` gained `fitToBounds(bounds, {margin, maxZoom})` (the
+unconditional zoom-in-or-out core, lifted out of what was `ensureVisible()`'s tail — that function
+now just delegates to it, unchanged behaviourally, always at the uncapped `MAX_ZOOM`), a
+`userAdjusted` flag (set by any manual wheel/pinch/drag/arrow-key action, read-only via
+`hasUserAdjusted()`, cleared only via `clearUserAdjusted()`), and an `onResetRequest` constructor
+param so dblclick/`0` route through the caller's own content-aware reset instead of snapping back
+to the raw box. `main.js` added `defaultFit()`/`resetFit()` (mirroring module 2's own names) and
+calls `defaultFit()` at the tail of `rebuild()` whenever `!hasUserAdjusted()` — this is what keeps
+a growing `n`/`side` from ever outgrowing a frame fitted for a smaller prior value, while a
+deliberate manual zoom is left alone, the same rule `ensureVisible()` already applies at Play time.
+
+**Consequences.** Easier: the Construct-step drawing reads at a comfortable size on load across
+all three constructions, no scroll-to-zoom required, closing the reported defect. Harder /
+accepted cost: this topic's `viewTransform.js` is now further diverged from Topic 1.2's original
+byte-copy (already noted as a prior divergence point, ADR-145's arrow-key/`+`/`-`/`0` addition) —
+a future audit comparing the two files must expect `fitToBounds`/`userAdjusted`/`onResetRequest`
+as topic-1.4-only. Not ported to the other 8 SVG diploma topics still on a fixed default — each
+would need its own fill-percentage measurement first (this topic's numbers do not generalize;
+Ogee curves, roulettes, etc. have different worst-case-vs-typical spreads).
+**Status:** Active.
+
+---
+
+## ADR-156: Regular Polygons' angle-dimension marks require their own legs to already be drawn ink, not just implied geometry
+
+**Date:** 2026-08-10
+**Decision:** `angleDim()` (`constructions.js`) is a pure annotation — its renderer
+(`renderConstruction.js`'s `'angledim'` branch) draws only the small arc between two rays plus the
+degree text, never the rays themselves. It has always silently assumed the emitting branch already
+pushed a `line` step along each leg. A read-only audit (reported: Pentagon "Three Arcs" showing two
+60° arcs with nothing visibly between them) found this held for every method **except** the three
+"compass-only" branches, which by design skip drawing rays: Pentagon `circles` and `arcs` (60° at A
+and B, missing leg `A→apex`/`B→apex`) and Hexagon `compass` (60° at A and B, missing leg `A→O`/
+`B→O`). Confirmed pre-existing since the topic's first commit, not a fade/opacity regression (not
+ADR-152) and not caused by the session's other in-flight WIP.
+
+**Fix:** each of the three branches now pushes `L(A, target, 'move')`/`L(B, target, 'move')`
+immediately before its `angleDim(...)` calls — mirroring the already-correct Pentagon `angle` and
+Hexagon `angle` branches' own `L(...)`-then-`angleDim(...)` order. Hexagon `compass`'s
+`notes.construct` blurb ("No rays at all this time...") was reworded to stop claiming rays never
+appear, keeping its `(K.C. John Ch. 5)` chapter-level citation (ADR-154) intact. Separately, N-Gon
+Semicircle Division's `180/n°` mark was moved from the "Divide the semicircle" slide into the
+following "Draw a line connecting A and the first division" slide — Play All was unaffected, but
+Step Through briefly showed the mark one slide before its own ray existed.
+
+**Verified with a node oracle** (kept in the session scratchpad, not committed — repo has no test
+harness for this topic): for every construction × method, every `angledim` step must have, among
+the `line` steps at or before its own index in the same array, one collinear with `center→rayA` and
+one with `center→rayB`. Confirmed the oracle fails on exactly the three predicted branches (plus
+the N-Gon ordering case) against the pre-fix code, and passes all 7 methods post-fix. Live-verified
+in-browser (`php -S localhost:8123`) for Pentagon Three Arcs, Hexagon Compass + Circle, and N-Gon
+Semicircle Division's Step Through slide 3.
+
+---
+
+## ADR-157: "O" is reserved topic-wide for the circumcentre — Perpendicular Bisector's AB midpoint stays unlabelled
+
+**Date:** 2026-08-10
+**Decision:** `buildPerpendicularBisector()` (`constructions.js`, N-Gon's second method) labelled
+the midpoint of AB **"O"** (`P(M, 'move', 'O')`), while every other emitter of an `'O'` label in
+this topic — `drawCircumcircle()`, called by Pentagon, Hexagon, and N-Gon's Semicircle Division —
+uses it exclusively for the true circumcentre. Step 1's own copy ("every method finds the same
+circumcentre O by a different route"), `terms.js`'s circumcentre glossary entry, and both other
+n-gon-adjacent `principle()` strings all assume that identity. One of seven methods silently broke
+it: AB's midpoint is the circumcentre for no value of n, so a student comparing methods saw two
+different points both called O. Found by a read-only design audit (`E1`), not a bug report.
+
+**Fix:** `P(M, 'move', 'O')` → `P(M, 'move')` — the midpoint keeps its dot (still a real obstacle
+for the label-placement pass, still visible ink) but loses the label rather than being renamed.
+Considered and rejected: relabelling it "M" — no other point in the topic carries that symbol,
+`terms.js` has no midpoint entry to back it, and n=12 already has a genuine "M"/"10" coincident
+label pair (`separateCoincidentLabels()`'s own header comment) the system was tuned against;
+introducing a second "M" meaning would confuse audits of that pair later. The real circumcentre
+this method reaches (the ladder rung at `ptFinal`, numbered "4"/"6"/"8"/…) stays labelled only by
+its rung number, not additionally "O" — that number IS the pedagogical point of the ladder, and a
+second coincident label there would trigger `separateCoincidentLabels()`'s tangential split on the
+single busiest point in the drawing for no benefit.
+
+Three slide captions referencing "O" as this method's centre were reworded to name it in words
+instead: "Construct the perpendicular bisector of AB[ at O]." → "…of AB."; "With centre O and the
+true apothem radius, mark point 3…" → "With AB's midpoint as centre, mark point 3…"; "With centre
+O and radius OA, draw an arc to point 4." → "With AB's midpoint as centre and radius to A, draw an
+arc to point 4." `principle('bisector')` and `notes.construct('bisector')` already said "AB's
+midpoint" / carried no "O" — not touched.
+
+**Verified no knock-on** to the label-placement pipeline: `applyOutwardHints()` and
+`separateCoincidentLabels()` both guard on `!step.label` and skip an unlabelled point outright, so
+dropping the label removes M from their input entirely rather than changing what they compute.
+`geometryObstacles()` pushes a point's box regardless of label, so M's dot remains an obstacle
+unchanged. The only real effect is in `assignLabelPositions()`: M's label box (previously ~6 units
+below M, per its `awayFrom(O, M, 6)` hint) no longer enters the shared `occupied` set — removing an
+obstacle can only relax the greedy ladder-label search ADR-153 tuned, never tighten it, so that
+sweep's magnitude findings still hold. Live-verified in-browser (`php -S localhost:8123`) for N-Gon
+Perpendicular Bisector at n=3, 6, 8, 12 (covering all three branch splits) and cross-checked
+Pentagon/Hexagon/Semicircle Division still draw and label the real "O".
+
+**Not fixed here (separate, out of scope):** an unrelated n=3-only defect found during the same
+audit — `arcMark(M, dist(M, A), ptFinal, 40)` draws the point-3 arc at radius `0.5·s`, but
+`ptFinal` (`along(apothem(3))`) sits at `0.2887·s`, so the arc drawn does not pass through the
+point it is aiming at, despite the (now-reworded) caption's "true apothem radius" claim. Flagged
+for its own pass — it changes drawn geometry, not just a label, and needs its own visual check.
+**Status:** Active.
+
+**Consequences:** Easier: every angle mark in this topic is now anchored by visible ink the moment
+it appears — the equilateral triangle Pentagon's `circles`/`arcs` `principle()` text already
+describes in words is now also drawn. Harder / accepted cost: `calibratedScale()` was re-checked,
+not just assumed safe — both new line pairs terminate at points already inside each construction's
+existing raw bounds (`apex` and `O` already had their own `P()` steps), so the frozen per-construction
+scale and ADR-155's 1.6× default-fit cap do not need re-measuring. A future new method that emits an
+`angleDim()` must remember to draw its own legs first — the renderer still does not enforce or warn
+if a leg is missing; this ADR is the one place that rule is written down.
+**Status:** Active.
+
+---
+
+## ADR-158: A Problem Library target must differ from its construction's defaults by more than the tolerance
+
+**Date:** 2026-08-10
+**Decision:** `graphics_diploma_module_1_topic_1_4_regular_polygons/src/problems.js`'s 8 problems
+are re-authored to the source textbook's own numbers (`Regular Polygons.pdf` §5.6: pentagon side
+40, hexagon side 30, n-gon side 25) instead of the previously shipped 45/35/30 — which, for 6 of
+the 8 problems, exactly matched `defaultsFor()`'s slider defaults. `loadProblem()` resets params
+to defaults before the student touches anything (RULES §6.2); when a target equals the default,
+`matches()` passes on load, `onProblemSolved()` fires immediately, and the practice tier teaches
+nothing. Restoring textbook fidelity (RULES §6.7) fixed the collision as a side effect — it was
+not a code bug, it was six problems whose authored numbers had drifted onto the defaults.
+**Why:** Rejected fixing this by moving the construction's own defaults instead: ADR-155's
+default-fit zoom cap (1.6×) is calibrated and documented in prose against these exact default
+values (`main.js`, DESIGN.md §7); changing them to dodge one topic's problem set would invalidate
+a separately-verified measurement to patch a data-authoring bug, and would not stop the next
+problem from being authored onto whatever the new defaults are. Also rejected an explicit
+"submit" action decoupled from live parameter matching — every topic in this family shares one
+self-check pattern (§6.3, ADR-015); a second interaction model for one topic's Problem Library
+was the larger, less-targeted change for a data problem.
+**Consequences:** Easier: authoring stays a plain data file, no engine/UI change, matches every
+sibling topic's problem-authoring shape (ADR-083 §6.24). Harder / accepted cost: this doesn't fix
+the Problem Library's separate inability to distinguish which METHOD a problem asks for (three
+pentagon and two hexagon cards still target the same side length across methods) — `matches()`
+only compares numbers, tracked as its own finding, not addressed here. Also: the same
+target-equals-default collision was found in three sibling Diploma topics
+(`topic_1_3_tangent_lines`, `topic_1_6_ogee_curves`, `topic_2_4_involutes`) during this audit —
+not fixed here, flagged as a follow-up sweep. No RULES.md rule currently requires a target to
+differ from its construction's defaults; this ADR records the reasoning so a future rule addition
+(and the audit script that would enforce it) has a citation.
+**Status:** Active.
+
+---
+
+## ADR-159: Regular Polygons' Play/Play All animation gets a whole-call time budget and a "Skip to end" control
+
+**Date:** 2026-08-11
+**Decision:** `graphics_diploma_module_1_topic_1_4_regular_polygons/src/renderConstruction.js`'s
+`playSteps()` sums `durationFor()` across whatever step list it was handed and, if the total
+exceeds `PLAY_BUDGET_MS` (20000ms), scales every step's duration down by the same factor (floored
+at `MIN_STEP_MS = 200`). Measured against the real geometry, every construction's own default
+already ran 22–37s of unskippable animation before this change, and N-Gon/Semicircle Division at
+`n=12` ran 75.6s (Phase A audit finding E5). The budget is applied identically to every
+`playSteps()` call — `main.js`'s `play()` (Play/Play All, the whole recipe) and `revealSlide()`
+(Step Through, one slide) are not special-cased against each other.
+
+`main.js`'s `play()` now accepts `{ onComplete }`, mirroring `revealSlide()`'s existing shape, and
+`simController` gains `skipToEnd()` — a one-line wrapper over the already-existing
+`showStepsUpTo(fullLength)` (no new render path). `uiManager.js`'s `#btn-play-construction` and
+`#btn-play-all` relabel to "Skip to end" while their animation is in flight and call `skipToEnd()`
+instead of silently cancel-and-restarting, which is what a second click did before this change
+with no signal on screen that anything had happened.
+
+Separately fixes Phase A finding E15's Play-All half: `uiManager.js` previously set
+`stepIdx = slideCount() - 1` synchronously in Play All's click handler, so Step Through's own
+caption/counter/Back-Next state claimed "fully drawn" while the animation was still running. That
+write now happens only in `sim.play()`'s `onComplete`; `renderStepThrough()` gained a
+`playAllInFlight` branch to render the true in-between state (caption "Playing all steps…",
+Back and Next both disabled) instead of leaving the previous slide's stale state on screen.
+
+**Why:** Rejected lowering `durationFor()`'s flat per-kind constants instead (e.g. 1800→1100ms) —
+a flat cut only takes the `n=12` worst case to ~46s, it does not solve the actual "no ceiling on a
+whole call" problem, and it slows down every short construction (pentagon, hexagon, N-Gon at low
+`n`) that never had a complaint against it. A whole-call budget scales exactly the calls that need
+it and leaves the rest at `durationFor()`'s literal, already-tuned pace.
+
+Rejected exempting Step Through's `revealSlide()` calls from the budget entirely (i.e., applying
+it only when `play()`'s full-recipe call is the caller). Verifying every `(method, n)` combination
+the N-Gon slider allows (3–12), not just eyeballing `n=12`, found two individual slides — Semicircle
+Division's final "Join every side" slide at `n=12` (11 lines, 20.4s raw) and Perpendicular
+Bisector's "cut every vertex" slide at `n≥11` (up to 12 arcs grouped into one `mark()` call, 24s
+raw) — that exceed the 20s budget entirely on their own, independent of Play All. A caller-based
+exemption would have let those two slides keep running unbounded, which is the exact defect this
+ADR exists to close. Applying the budget uniformly means the two slides get the same mild
+compression (7–17%, not perceptible as a stopwatch difference) Play All gets; every other slide —
+the large majority — is already under budget and renders unaffected, so "Step Through's pacing is
+effectively untouched" still holds as a practical claim, just not as an absolute one caller-based
+exemption would have made true by construction. See DESIGN.md §8 for the full numeric verification.
+
+Rejected a dedicated `#btn-skip` element alongside the existing Play buttons — the audit's own
+U10/U11 findings already flag the Construct step as five undifferentiated stacked blocks at one
+spacing rhythm; a relabel-in-place needed no new markup, no new CSS rule, and no new colour token,
+where a second button would have added a sixth block to a stack already flagged as too flat.
+
+**Consequences:** Easier: a student who has seen enough of a construction (or who accidentally
+re-clicked Play) has an actual way out, on every construction, not just the two with Step Through.
+No construction's Play animation now exceeds ~21s. Harder / accepted cost: `durationFor()` itself
+is still purely kind-based, not proportional to an arc's actual sweep angle or a line's actual
+length — two constructions with the same step COUNT but very different visual complexity still
+play at the same nominal pace before budget-scaling; that is a separate, larger question this ADR
+does not address. Also: Perpendicular Bisector's "cut every vertex" slide grouping every large-`n`
+vertex-cut into one slide (rather than one-per-vertex, the way Semicircle Division does it) is what
+produces its 24s worst-case single-slide duration — a slide-granularity question, not a pacing one,
+flagged here but not changed.
+**Status:** Active.
+
+---
+
+## ADR-160: Regular Polygons' Construct step gets a three-tier spacing rhythm, replacing one flat 12px gap used for everything
+
+**Date:** 2026-08-11
+**Decision:** A standalone design audit (Phase A, source-only, no live page inspected at review
+time) flagged the Construct step's recent additions — the method switcher, step note (ADR-154),
+Step Through/Play All (ADR-159 and earlier this session), replay hint — as individually well-documented
+but collectively flat: `.construct-actions` and `.step-through` both used `gap: var(--space-3)`
+(12px) for every relationship, whether it was Back/Next's own row, Play All under that row, or
+unrelated widgets like the method switcher and Step Through. Fixed as one pass across
+`index.html`'s CSS and `uiManager.js`'s `renderStepThrough()`, not five separate patches:
+
+- **Three spacing tiers, zero new tokens** (RULES §4.1/§4.16 — reused `--space-2`/`-3`/`-4`):
+  `--space-2` for same-control pairs (Back/Next, and now the Step Through caption to its row),
+  `--space-3` for an alternate action inside one widget (Play All under Back/Next — demotes it
+  from reading as a third navigation step to reading as a second reveal mode), `--space-4`
+  between genuinely distinct widgets (`.construct-actions`' own gap). Net height change: +4px on
+  the whole Construct-step stack.
+- **`#step-lead` promoted** to `--text-base`/`--color-ink` (an id-level override, `.card__lead`
+  itself untouched) so it outranks `#step-note-body` immediately below it — both were
+  `--text-sm`/ink-secondary with nothing but a small mono eyebrow between them, reading as one
+  grey wall.
+- **`.construct-actions { align-items: center }` deleted.** Every child is already `width: 100%`
+  by its own rule except `#construct-replay-hint`, so `center` had exactly one effect: wrongly
+  centring the one line of the group that should read as left-aligned card prose (and making its
+  own `max-width: 60ch` a dead rule in the process). Default `stretch` fixes both.
+- **`.step-through__caption` gains an `.is-idle` state**, toggled in `renderStepThrough()`. At
+  rest its accent-soft "primary content" treatment (ADR from the caption's own promotion, §4 of
+  this topic's `DESIGN.md`) was being spent on copy that just restated the button 40px below it
+  ("Press Step Through to begin." / "Step Through"). Idle drops to the same quiet chrome as the
+  rest of the panel; the wash returns once a real slide caption (or "Playing all steps…") is
+  actually there to promote. Copy unchanged — a visual-weight fix, not a rewrite.
+
+**Why:** Rejected fixing each of the five findings as independent one-line patches (e.g. just
+deleting `align-items: center`, just bumping `#step-lead`'s color). The audit's own framing was
+that the flatness was the defect — five locally-correct additions that never agreed on a shared
+rhythm — so patching them independently would have left the same "everything is `--space-3`"
+baseline underneath four unrelated exceptions, no more coherent than before. A single three-tier
+scheme, chosen once and applied everywhere in the Construct step, is what makes tight/medium/loose
+*mean* something (same control / same widget / different widgets) rather than being incidental.
+
+Rejected new copy for the idle caption (e.g. previewing the slide count) as the fix for U12 —
+considered, but it turns a layout pass into a content/pedagogy decision (what's actually useful to
+tell a student before they've clicked anything), which this audit wasn't scoped to make. Demoting
+the box's visual weight at rest is a mechanical, reversible fix that resolves the actual complaint
+(a promoted box with nothing to say) without answering a question nobody asked yet.
+
+**Consequences:** Easier: the Construct step now has a real, inspectable hierarchy — a student's
+eye can tell "these two buttons are one thing, that one is different, this is a separate control"
+from spacing alone, which RULES' 44px/token discipline never addressed on its own. Harder /
+accepted cost: three spacing tiers is one more rule for future additions to this step to follow
+correctly (the exact failure mode that produced U10 in the first place — reused `--space-3`
+because it was already there, not because it was the right relationship); no enforcement beyond
+this ADR and the inline comments at each rule. Not addressed by this pass, flagged as open:
+U13 (Step Through's caption is byte-identical to `#result-warning`'s recipe — a platform-level
+gap, root DESIGN.md only defines one accent-wash callout) and Step 1's own two-consecutive-
+`.card__lead` stack (a different pairing than `#step-lead`/`#step-note-body`, doesn't reproduce on
+Construct, not touched here).
+**Status:** Active.
+
+---
+
+## ADR-161: Module 2 renamed to "Solids Inclined to Both Planes"; Inclinations split into its own step; the two view-drawing steps merged
+
+**Date:** 2026-08-11
+**Decision:** Three related changes to Module 2 (the master Engineering Graphics sim), landed as
+one decision because each is a consequence of naming the topic honestly:
+
+1. **`meta.json` renamed.** `title` was "Orthographic Projection of Solids" — generic enough to
+   overlap its own clone, `graphics_module_2_topic_2_simple_positions` ("Simple Positions"), even
+   though Module 2 is the only build that enables the `both-planes` problem tier (`problems.js`
+   `ENABLED_TIERS`). Retitled to **"Solids Inclined to Both Planes"**, description and tags
+   rewritten to match. `index.html`'s `<title>` updated in the same commit — RULES.md §1.12 /
+   ADR-026 forbid a sim shipping with `<title>` disagreeing with `meta.json.title` (this exact
+   defect was already on record once, in the clone, fixed 2026-06-28).
+2. **Inclination split out of the old Step 2 ("Position & incline") into a new Step 3
+   ("Inclinations").** The old step bundled three unrelated questions — where does it sit
+   (distance from HP/VP), how is it turned (base orientation), how is it tilted (the angle
+   sliders and face-inclination toggles) — under one panel. RULES.md §6.30: a control belongs in
+   the ONE guided step whose question it answers. For a topic now named after inclination, "how
+   is it tilted" earns its own step.
+3. **The old Step 4 (top + front views) and Step 5 (side view) merged into one Step 5 ("Draw the
+   views").** Casting the solid onto HP, VP, and PP is one idea — the three views that together
+   fix the solid — not two lessons. Top & front keeps its one-shot primary-button behaviour and
+   still gates the step (RULES §6.30 still applies: this step's one question is "draw the views");
+   Side view becomes a true Show/Hide toggle (the `#btn-dimensions` idiom, Step 6) that no longer
+   gates advancement — a learner who has drawn top+front may proceed without ever revealing the
+   side view, since the pedagogy of *drawing* it doesn't require leaving it visible.
+   **⚠ SUPERSEDED 2026-08-11 by ADR-162, filed the same day** — see below: the two-button shape
+   this decision landed lasted less than a day before the side view was made mandatory instead.
+
+Net step count is unchanged at 6 (`Add & rest → Position → Inclinations → Label → Draw the views →
+Flatten`). `stepper.js`'s `STEPS`/`isComplete`/`canAdvance` were updated accordingly, with a new
+`state.visited3` exploratory gate mirroring `visited2` (a solid with zero inclination is a
+legitimate simple-position answer — Step 3 must never trap a learner who wants to leave it at
+0°). The `reflowFrom` edit-listener guard (`if (step > 2) continue`) was widened to `step > 3` —
+the inclination sliders are now a geometry driver living past that boundary, and without the
+widen, nudging an inclination angle while the sheet is flattened would silently leave the drawing
+stale instead of unfolding it back to 3D.
+
+**Consequences:** A cross-step UX cost, mitigated but not eliminated: `#tgl-orient` (Step 2) can
+padlock `#tgl-fihp`/`#tgl-fivp` (now Step 3) via the existing rotation-priority hierarchy
+(CLAUDE.md), and a learner landing on Inclinations may see both toggles locked with the cause on a
+step they've already left. Mitigated with a conditional `.dock__note` (`uiManager.js`
+`syncToggles()`, `#incl-lock-hint`) that names Step 2's orient-to-corner preset as the cause,
+shown only when that is genuinely why the toggles are disabled (not the same-panel non-pyramid
+case, which the shape dropdown already explains). Not addressed: the padlock note is text-only,
+one more thing a future edit to the rotation hierarchy must remember to keep in sync with. The
+clone (`graphics_module_2_topic_2_simple_positions`) was **not** backported this session — it has
+no inclination controls at all (its own CLAUDE.md: "no tilt … `angleHP`/`angleVP` are removed"),
+so only the Step 4/5 view-merge would apply there, and that backport is deliberately deferred
+(flagged in its own CHANGELOG).
+**Status:** Active for decisions 1–2. Decision 3 (the two-button Step 5 shape) superseded by
+ADR-162.
+
+---
+
+## ADR-162: Step 5's two view-drawing buttons collapse into one; all three views become mandatory
+
+**Date:** 2026-08-11
+**Supersedes:** ADR-161 decision 3 (filed the same day).
+**Decision:** Module 2's Step 5 ("Draw the views") shipped ADR-161's merge as TWO buttons —
+`#btn-project` (one-shot "Draw top & front views", gated the step) and `#btn-sideview` (a
+Show/Hide toggle, "Add side view" / "Hide side view", that did not gate). That shape is replaced
+with **one** primary button, `#btn-draw-views` ("Draw the three views"), whose single click plays
+a sequential reveal — **Front → Top → Side**, in that order — and Next now unlocks only once all
+three have landed (`stepper.js` `isComplete(5)`: `state.viewsDrawn === 3`, replacing the old
+`state.projections`/`state.sideView` pair).
+
+**Why reopen a decision filed the same day:** ADR-161's own text named the tradeoff it was
+accepting — "a learner who has drawn top+front may proceed without ever revealing the side view."
+On reflection that tradeoff undercuts the topic's own pedagogy: front, top, and side together are
+what *fix* the solid (RULES §6.30's "one question" for this step is "draw the views", not "draw
+two of the views"), so a drawing a learner can complete without the third view is an incomplete
+drawing the wizard nonetheless calls done. A single mandatory action also brings the step back
+into DESIGN.md §5.1 ("the one loud action per step") — the two-button shape had briefly regressed
+that, shipping two `.btn--block` actions on one panel.
+
+**Implementation:**
+- **Reveal idiom reused, not invented.** `main.js` `revealViewsSequence` copies Show Method's own
+  beat-reveal shape (`startMethodBeatAnim`): one `tween()` whose value is a fractional unit index —
+  `floor(v)` counts units fully drawn, `v − floor(v)` (re-eased by `easeDraw`) is the current
+  unit's own 0→1 draw-on. Total duration `3 × DRAW_DURATION_MS` (3000ms), linear across units.
+  Reduced motion needed **no** special-casing: `tween()` (`src/anim.js`) already resolves
+  synchronously to its end value under `prefers-reduced-motion` and still walks the same
+  announce-loop, so all three views land instantly and the gate still opens correctly.
+- **Ordering is load-bearing, not cosmetic.** `setProjectionsVisible` must run before
+  `setSideViewVisible` — `refreshProjections()` early-returns on `!showProjectionsFlag`, so calling
+  the side-view setter first would leave `activeProjection` null and the PP linework would never
+  build. Both setters gained a `{ sequenced: true }` option so the sequence can flip their flags
+  and build geometry without triggering their own solo draw-on tween or their spotlight/Compare
+  side-effects a second time.
+- **Cancel-and-snap, not freeze.** `stopViewReveal()` (mirrors `stopMethodBeatAnim`'s contract)
+  snaps every view group to full opacity and, critically, force-fires whatever `onViewDrawn`/
+  `onDone` callbacks the cancelled tween hadn't yet announced — because `tween.cancel()` by
+  contract never fires `onComplete`. Without this, an edit mid-reveal (a Step 2/3 slider nudge,
+  which triggers a `rebuild()` → `disposeActiveProjection()` → `stopViewReveal()`) would strand
+  the wizard: the button stays hidden (`state.viewsDrawing` never clears) and Next stays disabled
+  forever, even though the views are now visibly, fully drawn. `window.simAPI.reset()` reaches the
+  same chokepoint via `rebuild(null)`.
+- **Compare chip and spotlight queue deferred to completion.** Both used to fire off the Front-only
+  solo tween (`setProjectionsVisible`'s old unconditional path); now deferred to
+  `revealViewsSequence`'s `onComplete` so the Compare chip doesn't pop mid-sequence and the
+  spotlight queue plays in the correct Front→Top→Side order. A third spotlight entry, `side-view`
+  (tone `pp`, reading `--color-pp-line`), was added — previously the PP reveal got no spotlight at
+  all. Queuing three chips at the existing 4500ms hold would read as ~14s of chip traffic on one
+  click (a Quiet Chrome violation), so `onboarding.js` gained `HINT_HOLD_QUEUED` (2600ms): any chip
+  with another already queued behind it gets the shorter hold, so three in a row read in ~8.5s. A
+  lone chip (Step 6's `connectors` hint) is unaffected — nothing is queued behind it.
+- **Badges:** the mismatched hide-on-done / label-swap-toggle idioms collapse to one — three
+  independent badges (`#done-front`/`#done-top`/`#done-side`), each lighting as its own view lands,
+  giving a legible progress readout across the reveal instead of one badge appearing at the end.
+  The button itself is one-shot (the `#btn-label` idiom): it hides the instant it's clicked
+  (`state.viewsDrawing`), not merely once the reveal finishes, so it can't be re-triggered mid-flight.
+
+**Rejected alternatives:**
+- *Unlock Next on click, before the reveal finishes.* Snappier, but a learner could click Next
+  before the side view ever visibly draws — directly undercuts "mandatory."
+- *Keep the button as a Hide-all toggle after completion.* Re-opens the very question this ADR
+  closes (a hideable "mandatory" view isn't mandatory) for no pedagogical gain — nothing in the
+  topic asks the learner to hide a drawn view.
+
+**Consequences:** `graphics_module_2_topic_2_simple_positions` (the clone) is still on the
+*pre*-ADR-161 two-separate-steps shape and is now two revisions behind Module 2's Step 5; its
+backport was already deferred by ADR-161 and stays deferred here.
+**Status:** Active.
+
+---
+
+## ADR-163: Show Method gains a second container — a live 30/70 3D-pose-visualizer split, alongside the ADR-085 full-sheet takeover
+
+**Date:** 2026-08-11
+**Amends:** ADR-085 (adds a second container; the sheet-only takeover ADR-085 shipped is unchanged
+and remains the default/only container a learner starts in).
+**Decision:** Show Method's `#method-view` takeover gains a live toggle, in `.method-bar`
+(`#method-3d`, "3D view" / "Sheet only"), between today's plain full-viewport sheet and a
+`body.method-split` 30/70 grid — a live, orbitable 3D pane (`#sim-viewport`, 30%) showing the
+solid on the HP/VP reference planes, beside the unchanged n-Set sheet (`#method-view`, 70%). The
+solid's pose tweens to match whichever Set the walkthrough is currently drawing, so a learner
+watches the textbook's own "tip, then turn" construction as a physical rotation, not just a
+changing drawing. Toggleable live, mid-walkthrough, in either direction, without losing
+`curSet`/`curBeat`/`focusSet`.
+
+**Implementation, in order of how a request flows:**
+- **The pose was already computed and thrown away.** `projectSetPose()` (`main.js`) has always
+  returned `{ eff, m, q, seat }` for every Set — `projectSet()` destructured only `{ eff, m }`. `q`
+  (the exact world quaternion, including the ADR-093 sequential yaw composition for a both-planes
+  Set 3) and `seat` (the matching x/y placement) are now kept on each Set object. No new pose math
+  anywhere — this is the SAME derivation the 2D sheet's own harvest already depends on.
+- **Container: CSS grid-area only, no re-parenting.** `#method-view` and `#sim-viewport` are both
+  already direct `<body>` children (unlike Compare, whose `#compare-card` `enterWorkbench()` must
+  move out of `#sim-viewport` first) — `body.method-split` just assigns `grid-area: view` /
+  `grid-area: method` and drops `#method-view`'s own `position: fixed; inset: 0` for a plain grid
+  cell while the class is on. `handleResize()` already had a `methodViewOpen` branch
+  (`queueMethodRedraw()`) since ADR-085; the existing `#sim-viewport` `ResizeObserver` fires on the
+  grid reflow with no code change.
+- **`enterWorkbench()`/`exitWorkbench()`/`#workbench-rail` are NOT reused.** `enterWorkbench()`
+  force-unflattens (`if (foldProgress > 0) simController.unflatten()`), which would destroy
+  `methodCanRun()`'s own `foldProgress === 1` precondition, and re-parents the 7
+  `WORKBENCH_CONTROLS` drivers into a live rail beside a walkthrough one slider nudge invalidates —
+  the exact two of ADR-085's four original grievances that moved Show Method OUT of Compare in the
+  first place. This mode has no rail; the wizard is hidden, same as it already is for the plain
+  takeover.
+- **The sim loop does NOT pause in this mode** — `enterMethodPose()` calls `window.simAPI.resume()`
+  (undoing `beginShowMethod()`'s own `pause()`), since a live 3D pane needs `animate()`'s render +
+  `tickTweens` running. This reopens the exact precondition ADR-085's own pause clause depended on
+  ("no `anim.js` tween may be added to this view while the pause contract holds") — voided for THIS
+  mode only; the sheet-only takeover keeps the pause contract verbatim. Consequently the private
+  `methodAnimFrame` rAF pump (ADR-091, stood up because `animate()` was paused) must NOT also start
+  while pose mode is active — `startMethodBeatAnim`/`startMethodFocusAnim`/`startMethodTilt` each
+  gate their pump-start on `!methodPoseMode`, or every Show Method tween would tick twice per frame
+  (once from `animate()`, once from the private pump) once both are live.
+- **Fold state: a display-only override, not a real unfold.** `applyFoldVisual(p)` is a pure
+  display function that also happens to write the module `foldProgress` var. `enterMethodPose()`
+  snapshots it and calls `applyFoldVisual(0)` (stands the VP/PP back up, fades the solid back in);
+  `exitMethodPose()` restores it with `applyFoldVisual(savedFold)`. `stepper.setFlattened()` is
+  never touched, so the wizard's own flatten latch (`#btn-unfold` label) survives untouched.
+- **Pose write is quaternion SLERP + linear lerp on seat.x/y — never Euler-lerp.** A both-planes
+  Set 3's pose is a composed quaternion (`yaw · q1`, `projectSequentialBothPlanesPose`), not a
+  single Euler at all; component-lerping Euler angles would produce a visibly wrong intermediate
+  pose even for the simpler Set 1→2 case. Duration `METHOD_POSE_MS = 2000` (slower than
+  `QUICK_VIEW_MS`'s 1500 — the rotation is the whole point here, not a means to an end), eased with
+  `easeFold` (the same "physical hinge" curve the fold and the ADR-105 ghost already use).
+- **Trigger lives ENGINE-side (`setMethodProgress`/`setMethodFocus`, `main.js`), not in
+  `methodController.js`.** `setMethodProgress` already computes the previous flat index; comparing
+  `Math.floor(prevFlat / METHOD_BEAT_COUNT)` against the new `methodSet` catches a Set crossing for
+  Next/Back/Skip uniformly with zero `methodController.js` changes to the trigger. Unlike the
+  ADR-105 ghost (a one-way forward-only flourish), a stale 3D pose is a genuine state
+  inconsistency — Back re-poses too, unlike the ghost. `setMethodFocus` fires the same way on a
+  genuine chip focus (never on the re-click-to-defocus zoom-out, which has no "whole row" pose to
+  revert to).
+- **Live pose/dimension/label layers are hidden, not the whole projection pipeline.**
+  `setMethodPoseVisible(on)` toggles `activeProjection.group`/`vpGroup`/`ppConnectorGroup`
+  directly (nothing else already gates them at `foldProgress === 0`), and routes the dimension
+  layer and the PP/side view through the EXISTING `applyDimensionVisibility`/
+  `applyProfilePlaneVisibility` helpers rather than a second, incomplete `.visible` toggle — both
+  already handle the r160 CSS2D-ignores-ancestor-visibility gotcha (PP pill, dimension labels) that
+  a naive group-hide would miss. Vertex labels fade via `labeler.setOpacity(0)`: they were planned
+  against the live pose and are not re-planned per Set, so they would read as detached from the
+  moving solid if left visible. PP/side view is unconditionally hidden while posing — ADR-088
+  already excludes the side view from the replay for the same "no budget for a third view" reason.
+- **`currentEdgeOverlay` is a sibling, not a child — every pose write hits both.** It copies the
+  mesh's transform once at `rebuild()` time (`main.js:942-945`) and never follows it automatically;
+  missing this would leave a phantom edge overlay frozen at the live pose while the shaded mesh
+  rotated under it.
+- **Exit is identity-guarded against a mid-edit abort.** `stepper.js`'s `reflowFrom` runs
+  `sim.method.abort()` (→ `teardownShowMethod()` → `exitMethodPose()`) AFTER uiManager's own commit
+  has already called `rebuild()` — so `currentMesh` may already be a brand-new object by the time
+  the pose-restore runs. `exitMethodPose()` snapshots `currentMesh`'s identity at entry and only
+  writes the saved quaternion/position back if that identity is unchanged; otherwise the fresh
+  mesh's own (correct) live pose is left alone.
+- **Camera: `restorePerspective()` on entry (free perspective orbit, §5.18 morph — never a hard
+  swap), preserved verbatim across Set changes (pose writes touch mesh transforms only, never the
+  camera), and a reset-view affordance (`#method-pose-reset`, a `<body>` sibling styled and gated
+  exactly like `#rail-toggle`) reuses `simController.unflatten()`'s own orbit-angle-preserving
+  `frameToSolid(dir.normalize())` idiom rather than a hard snap to `DEFAULT_CAMERA_POSITION`.**
+  **Caught live, fixed same pass:** `enterMethodPose()`'s `restorePerspective()` call switches
+  `activeCamera` away from the answer-sheet ortho camera `flatten()`/`swoopToAnswerSheet()` had
+  established — without an explicit hand-back, exiting Show Method left the wizard's Step 6 panel
+  showing the live viewport on a free-orbit perspective camera instead of the clean top-down
+  drawing read, reading as "flatten broke" even though `foldProgress`/state were correct
+  underneath. Fixed by re-calling `swoopToAnswerSheet()` in `exitMethodPose()` (guarded on
+  `methodPoseSavedFold === 1`, which `methodCanRun()`'s own precondition makes the only value ever
+  seen) BEFORE `window.simAPI.pause()` — the swoop is a real `anim.js` tween needing `animate()`'s
+  own `tickTweens` to advance, and pausing first would strand it. A mid-walkthrough "Sheet only"
+  toggle (not a full exit) that freezes the swoop mid-flight this way is harmless: nothing renders
+  the covered `#sim-viewport` while the plain takeover is up, and `teardownShowMethod()`'s own
+  unconditional `window.simAPI.resume()` (reached whenever Show Method fully closes) resumes and
+  completes it from wherever it was frozen, never stuck.
+- **§5.16a checked, not engaged; new §5.16c governs instead.** §5.16a forbids exactly one thing —
+  Compare being demoted from its docked 50/50 split to a floating/compact card, the specific
+  resize-stranding bug ADR-080 fixed. This feature adds no second Compare shape and never touches
+  `compare.show()`/`enterWorkbench()`; `enterMethodPose()` calls `compare.hide()` up front purely
+  because the two docked grids (`body.compare-split`, `body.method-split`) would otherwise compete
+  for the same layout — a one-directional exclusion, not a demotion. The 30/70 ratio itself is
+  new, not borrowed from ADR-037's "true 50/50" (which is about Compare's own pane balance) — see
+  RULES.md §5.16c, added by this ADR, for the narrower rule this establishes: a non-Compare docked
+  split may set its own ratio, but must still be a docked grid (never floating/compact, never a
+  second Compare shape) and must restack to a single column below 768px, mirroring
+  `body.compare-split`'s own restack.
+
+**Why:** Inclination only means anything measured against a reference plane. The sheet-only
+takeover shows the CONSTRUCTION changing between Sets but never the solid physically turning from
+simple position → inclined to one plane → inclined to both — the exact motion the textbook's own
+"tip, then turn" method describes. A live 3D pane beside the sheet lets a learner watch that
+rotation directly, with the same all-Sets sheet still doing the construction bookkeeping.
+**Alternatives rejected:** (a) *Reuse `enterWorkbench()`/Compare's split* — rejected, reopens two
+of ADR-085's own four founding grievances (forced unflatten, live drivers beside an invalidatable
+walkthrough). (b) *Re-parent the renderer into `#method-view`* — rejected, moves a live WebGL
+canvas's host element and needs bespoke resize wiring for no benefit over grid-area assignment,
+which needs none. (c) *A permanent second rAF pump, so pose tweens don't need the main loop live* —
+rejected (mirrors ADR-085's own rejection of a second pump for Set-focus zoom); the main loop is
+cheap to keep running for the one mode that actually needs live rendering, and running two pumps at
+once is exactly the double-tick bug this ADR's own private-pump guard exists to prevent.
+**Consequences:** ADR-085's pause-contract clause is amended a third time (ADR-101 for the tilt,
+ADR-102 for chip focus, this ADR for the whole pose-visualizer mode) — the sheet-only container it
+governs is otherwise untouched. `swoopToAnswerSheet()` gains a caller outside the wizard's own
+`flatten()` path; it was already idempotent/safe to re-invoke. No `METHOD_BEAT_COUNT`/`BEAT_COUNT`
+change — the pose is a Set-boundary event, not a beat, the same shape as the ADR-105 ghost.
+
+**Follow-up fixes (same day, caught in a design/code audit before ship):** three scoping misses,
+none reversing anything decided above. (1) `body.method-split #method-view` inherited
+`.method-view`'s base-rule `box-shadow` (the takeover shape's own §4.9 Flat-Ink exception for a
+transient full-viewport overlay) with nothing resetting it for the docked pane — added
+`box-shadow: none` to the split rule, scoped so the takeover container is untouched. (2) The same
+rule already set `border-radius` but nothing clipped the sheet's canvas into it — added
+`overflow: hidden`, the same clip `#sim-viewport`'s own split rule already carries. Both land in
+the one existing `body.method-split #method-view` block — see RULES.md §5.16c's new clause. (3)
+The 3D pane read as over-zoomed: `enterMethodPose()` called no framing helper at all, so the
+camera kept the distance `fitPerspectiveDistance()` chose for the prior full-width viewport — the
+framing math itself is aspect-correct (it already derives horizontal half-FOV from
+`camera.aspect`), it simply never re-ran after the pane narrowed to 30%. Fixed by having
+`remeasureAfterReflow()` accept an optional post-resize callback and passing it
+`resetMethodPoseCamera` — the same helper `#method-pose-reset` already calls — so entry framing
+and Reset view now agree by construction, no new constant. `exitMethodPose()` had the mirror bug
+on the way out (`swoopToAnswerSheet()` fitting against the still-30% pane before the class was
+removed); fixed by removing `body.method-split` and forcing the resize before the swoop runs.
+
+**Second follow-up (2026-08-12, design/code audit of the shipped mode):** the pane still read as
+over-zoomed on FIRST entry, and "Reset view" did nothing there yet worked correctly once a Set
+had advanced — one bug with two symptoms, not two bugs. Diagnosed with a temp `window.__dbg`
+hook rather than assumed: on first entry `cameraAspect` (0.5806) already matched the pane's own
+aspect (0.5814) to well within rounding, and `activeCamera === camera` with `projectionMorphK ===
+null` throughout — so the prior follow-up's timing fix (above) was working correctly, and the
+mode's own `restorePerspective()` call (no args, `enterMethodPose()`) is genuinely the plain
+instant hand-off, never the animated §5.18 morph (that branch is unreachable from this call site
+— worth flagging since this ADR's own Camera bullet above reads as if it always morphs). The
+real cause: `resetMethodPoseCamera` → `frameToSolid` → `fitPerspectiveDistance` was correctly
+computing a fit, just to the platform's default `FRAME_PADDING` (10%, tuned for the full-width
+viewport) around the solid ALONE — cropping the HP/VP reference planes right at its silhouette in
+a narrow 30% pane, which is exactly the context the mode exists to show. "Reset view" being a true
+no-op on an un-rotated Set (idempotent — the fit is self-consistent, just too tight) and a real
+zoom-out once a Set's rotation grew the bounding box (a legitimately larger required distance for
+different content) was the tell. Fixed with a new `METHOD_POSE_FRAME_PADDING` (60% margin —
+matching the platform's existing "not too tight" capped content-fit precedent, ADR-155) threaded
+through a new optional `padding` param on `frameToSolid`, used only by
+`resetMethodPoseCamera` — every other caller keeps the unchanged default. Same pass:
+`resetMethodPoseCamera` un-latches an active quick view first (`restorePerspective()`) before
+fitting — Top/Front/Side swap the live camera to `orthoCamera`, which the fit was silently
+computing against the (untouched, stale) perspective camera otherwise. Also hid `.vp-cluster`'s
+Compare chip (force-unflattens, destroying `methodCanRun()`'s own precondition) and Connector
+lines (provably inert once `setMethodPoseVisible(true)` runs) inside `body.method-split` —
+`display: none`, not the DESIGN.md §5.4 padlock, since this is a container swap exposing
+`#sim-viewport` for the first time, not a control hierarchy within one panel (RULES.md §5.16c
+gains a clause for this). The quick-view chips stay, now pose-mode-safe. `#method-pose-reset`
+renamed "Reset view" → "Reset camera" with the platform's existing four-corner frame glyph (reused
+from "Expand compare view" in two sibling topics), replacing a headless circular-arrow that read
+as the module's destructive, confirm-guarded `#btn-reset`.
+**Status:** Active.
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*
@@ -5879,3 +10777,119 @@ horizontal last leg; exactly one value sits one lift above each shelf and none i
 even-odd ray cast proves no elbow and no shelf lands on the object; and the arrowheads on the paper
 are COUNTED against the authored set, because a second head drawn by one guarded line would go
 missing silently. Twelve assertions across three objects, on top of the symbol audit.
+
+---
+
+## ADR-219: Merging `feat/mod4` a second time — the numbering collision ADR-142 predicted, now with the bodies in hand, and the 45 orphans resolved
+
+**Date:** 2026-08-17
+**Status:** Active. Supersedes nothing; completes ADR-142 points 1, 2 and 3.
+
+**Context.** ADR-142 recorded merging `feat/mod4` (tip `c61e783`) into `main` on 2026-08-07, and
+left three things open: his nine real decisions were renumbered ADR-133–141, **45 ADR ids cited
+across his topics had no body anywhere**, and two Module 4 topics existed only as unreachable
+gitlinks so were excluded from `main` entirely. `c61e783` is exactly the merge-base of this merge,
+so this is the same branch arriving a second time, five commits later.
+
+Those five commits (`aa8f0c1`, `945e894`, `37993eb`, `90d3a70`, `dcb4224`) kept the **pre-ADR-142**
+numbering — the branch never saw the renumber — and numbered forward from it independently, adding
+ADR-087…141 and RULES §3.36–§3.72, §4.5a, §5.21–§5.23, §6.29–§6.32. `main` had meanwhile numbered
+its own ADR-087…163. The two sets are entirely different decisions sharing 55 ids.
+
+The first merge attempt was aborted. Resolving it in place was not possible: git had already
+text-merged both schemes into one `DECISIONS.md` of 203 headings with 43 duplicate ids, at which
+point no rule can tell which `ADR-113` is which. **The renumber was therefore done on the branch
+first, before the merge, while provenance was still unambiguous** (`aea7285`), and the merge re-run
+against the result.
+
+**1. The mapping.** One single-pass rewrite, so no id was ever remapped twice:
+
+| from (local) | to | why |
+|---|---|---|
+| ADR-078…086 | ADR-133…141 | ADR-142's existing map, applied to the branch this time |
+| ADR-087…141 | ADR-164…218 | `main`'s own ids top out at ADR-163 |
+| RULES §6.23…§6.32 | §6.27…§6.36 | ADR-142's map (+4), extended over the four new ones |
+| RULES §5.16a | §5.16b | ADR-142's map |
+
+781 ADR and 59 rule citation sites across 36 files; 765 insertions against 765 deletions, i.e.
+substitution only, nothing added or dropped. Scope was limited to files this branch actually
+changed since `c61e783` — files it left alone still merge cleanly from `main`, which renumbered
+them in ADR-142 already.
+
+**2. ADR-142's 45 orphans are resolved — the bodies were in `dcb4224` all along.** The ids ADR-087–132
+that ADR-142 found cited with "no body anywhere" were never lost; they were sitting in Vishnu's
+unpushed local work, which `dcb4224` ("WIP: save local changes before sync") carries. They now land
+with bodies, renumbered ADR-164–209. ADR-142's dangerous case — the 30 ids ADR-087…116 that
+"silently resolve to this repo's own unrelated real decisions" — is closed: every such citation in
+the three topics now points at its own decision again. Its worked example checks out. His conic
+`CLAUDE.md` cited `ADR-115` for *"the hyperbola is a SECTION here, never a construction"*; that is
+now **ADR-192**, and it says exactly that.
+
+The reconciliation runs in both directions. `main`'s own conic `CHANGELOG.md` entry of 2026-08-09
+cited `ADR-121` nine times for a fix it was auditing — an id that had no body on `main` either.
+It now reads **ADR-198**, *"One loud action per step, and no message outlives the step that raised
+it"*, which is the decision it was describing. This is the reconciliation ADR-142 deferred as
+"known only to him".
+
+**3. The two Module 4 topics are real content now, not gitlinks.** `aa8f0c1` ("re-add isometric
+topics after removing nested git repos") replaced the unreachable `160000` entries with actual
+trees: `graphics_module_4_topic_1_introduction_to_isometric_drawing` (15 files) and
+`graphics_module_4_topic_2_isometric_construction` (30 files). ADR-142 point 3's "known, temporary
+gap" is closed.
+
+**4. Three rules `main` had dropped are restored.** `main` carries no body for RULES §1.15, §1.16 or
+§3.6a — they were the branch's, and did not survive ADR-142's merge. The aborted first attempt
+deleted all three again *silently*, with no conflict marker, because only `main` had touched those
+lines. Every `RULES.md` conflict in the re-run was a one-sided insertion, so all eleven were
+resolved as a union, which restores them. `RULES.md` now holds 220 definitions.
+
+**5. `.wizard-toggle` resolved AGAINST the branch, deliberately.**
+`graphics_module_2_topic_0_introduction_to_orthographic_projection/index.html` conflicted on
+`.wizard-toggle` and `.vp-controls` positioning. The branch had moved both to
+`calc(44px + var(--space-5))` with a 2 mm inboard nudge; `main` has `var(--space-3)` /
+`calc(44px + var(--space-3))`. DESIGN.md §5.12 names the branch's value a shipped regression in as
+many words — *"Do not copy the `.vp-cluster` offset onto this control"* — and the compact Compare
+card's own top is derived assuming the shallow inset. Both hunks were resolved to `main`. This is
+the one place local work was deliberately discarded rather than preserved; it was raised and the
+call was made explicitly.
+
+**Consequences.** `DECISIONS.md` runs 001…218 across 202 entries with one known duplicate
+(see ADR-220). A citation to ADR-087…132 anywhere in the tree is now stale by definition — those
+ids belong to `main`'s Show Method / Development-of-Surfaces work, and the decisions that used to
+carry those numbers are at +77. ADR-142's closing warning no longer applies to the three topics,
+and its **Status** should be read as discharged on points 1–3.
+
+---
+
+## ADR-220: Three defects carried in from `feat/mod4` unchanged, recorded rather than fixed
+
+**Date:** 2026-08-17
+**Status:** Open. Not introduced by the ADR-219 merge; each predates it and survives the mapping
+unchanged. Recorded here deliberately instead of being fixed inside a merge.
+
+**Decision:** the ADR-219 renumber is a pure substitution, so three pre-existing defects on the
+branch arrive intact. Fixing them inside the merge would have mixed real edits into a rewrite whose
+whole value is that it changes nothing but ids, so they are logged instead.
+
+**1. ADR-214 is cited but has no body.** The branch cited its local `ADR-137` in seven files
+(`CHANGELOG.md`, `DECISIONS.md`, `RULES.md`, and the conic topic's `CHANGELOG.md`, `CLAUDE.md`,
+`src/conicEngine.js`, `verify/conic-math.mjs`) while never writing the entry. Under the +77 map that
+is now **ADR-214**, and `DECISIONS.md` jumps 213 → 215. Cited for the tangent method's frame and
+label behaviour. Either write the entry or repoint the seven sites at the decision that actually
+covers it.
+
+**2. ADR-200 is two different decisions.** The branch defined its local `ADR-123` twice —
+*"On a phone the sheet is the other VIEW, not a window on this one"* and *"A comparison sheet is a
+(layout, method) PAIR, and the method is allowed to show nothing"*. Both are now **ADR-200**, at
+`DECISIONS.md` lines 7989 and 8065. This is the only duplicate id in the log. One needs a fresh
+number (219+ are taken; use 221) and its citations split, which requires knowing which callers meant
+which — a question for the author.
+
+**3. Eight RULES ids are defined twice.** §3.51, §3.52, §3.53, §3.54, §3.55, §6.35, §6.36 each carry
+two different rules (the last two were the branch's §6.31/§6.32 before the +4 map), and §5.18 has
+been duplicated since before the merge-base, on both sides. Count verified identical before and
+after the merge: eight then, eight now, so the merge introduced none.
+
+**Why not fixed here:** all three need an authoring decision, not a mechanical one — what ADR-214
+should say, which ADR-200 keeps the number, and which of each duplicated rule pair is current. The
+merge deliberately does not guess.

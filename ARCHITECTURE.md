@@ -59,7 +59,8 @@ C:\xampp\htdocs\Simatrix\
 │                                              stylesheet (src/shell.css).
 │
 ├── Module2\                                   >>> THE MASTER CODEBASE <<<
-│                                              "Orthographic Projection of Solids".
+│                                              "Solids Inclined to Both Planes" (ADR-161;
+│                                              formerly "Orthographic Projection of Solids").
 │                                              A single-page sim: index.html + main.js
 │                                              orchestrator + a folder of small,
 │                                              single-purpose modules in src/.
@@ -475,9 +476,10 @@ into the orchestrator directly.
   + the injected controller). **Provides:** `initUIManager(sim)` → `{ sync, dispose }`.
 
 - **`stepper.js`** — The Guided Stepper controller: sequences the six steps
-  (1 Add & rest → 2 Position & incline → 3 Label vertices → 4 Top & front views →
-  5 Side view → 6 Flatten to 2D), gates each step behind the previous, and drives the
-  step card + numbered rail. **Imports:** none (injected controller). **Provides:**
+  (1 Add & rest → 2 Position → 3 Inclinations → 4 Label vertices → 5 Draw the views
+  [one click, Front → Top → Side, all three mandatory; ADR-162, supersedes ADR-161's
+  two-button merge] → 6 Flatten to 2D), gates each step behind the previous, and drives
+  the step card + numbered rail. **Imports:** none (injected controller). **Provides:**
   `initStepper(sim)` → `{ sync, reset, dispose }`.
 
 - **`problemLibrary.js`** — The textbook Problem Library: a focus-trapped modal of
@@ -485,6 +487,27 @@ into the orchestrator directly.
   the student's dialed-in values against a target (it never auto-fills). The check is
   driven by `main.js`'s state-change notifications. **Imports:** `problems.js` + the
   injected controller. **Provides:** `initProblemLibrary(sim)`.
+
+- **`methodController.js`** (ADR-139 pedagogy, ADR-140 container) — "Show Method": a
+  Step-6 walkthrough that replays the loaded problem's construction as 2-3 side-by-side
+  Sets (simple position → one axis resolved → both), one construction beat at a time
+  via Next/Back, plus Set-N focus chips. It draws into its OWN independent, focus-
+  trapped, full-viewport takeover (`#method-view`/`#method-canvas` in `index.html`) —
+  mirroring `problemLibrary.js`'s own overlay shell — NOT the Compare card; the sim
+  loop pauses while it's open, same contract as the Problem Library. Back/Next/Exit
+  float bottom-centre and the Set-N chips float top-right, overlaying the drawing
+  directly; there is no title bar. **Second container (ADR-163):** a live `#method-3d`
+  toggle in the button bar swaps between that plain takeover and a `body.method-split`
+  30/70 grid — `#sim-viewport` (30%, live orbitable 3D: the solid on the HP/VP planes,
+  tweening to each Set's own pose via quaternion slerp as the walkthrough crosses a Set
+  boundary) beside the unchanged sheet (70%). Toggling does NOT pause the sim loop (the
+  3D pane needs `animate()` running) and does not lose `curSet`/`curBeat`/`focusSet`.
+  The pose-drive itself (`applyMethodPose`/`enterMethodPose`/`exitMethodPose`) lives in
+  `main.js`, beside the rest of Show Method's engine half — see ADR-163. **Imports:**
+  nothing (injected controller only — the headless per-Set projection pipeline itself
+  lives in `main.js`, reusing `meshAnalyzer.js`/`projectionDrawer.js`/
+  `vertexLabeler.js`'s exports). **Provides:** `initMethodController(sim)` →
+  `{ sync, dispose }`.
 
 - **`terms.js`** — The inline glossary popovers (dotted-underline terms like "HP",
   "VP" that explain themselves on hover/focus/tap). **Imports:** nothing. **Provides:**
@@ -518,9 +541,46 @@ into the orchestrator directly.
 
 - **`index.html`** (~102 KB) — The single page. It holds the **import map** pinning
   `three@0.160.0`, a small inline boot-watchdog script (shows an on-brand fallback if
-  the module fails to load), the bundled `@font-face` declarations, **all of the CSS
-  and design tokens inline in one big `<style>` block**, the complete wizard/viewport
-  markup (step card, rail, sliders, toggles, mobile notice), and finally loads
+  the module fails to load, via `__simBootTimer`), the CDN-hosted `@font-face`
+  declarations (ADR-141), **all of the CSS and design tokens inline in one big `<style>`
+  block**, the complete wizard/viewport markup (step card, rail, sliders, toggles,
+  mobile notice), and finally loads
+
+  **Mandatory boot sequence (every topic, ADR-133):** `index.html`'s inline script
+  arms `window.__simBooted = false` and a 15 s `__simBootTimer` watchdog before
+  anything else runs. `main.js` must call `markBooted()` **last**, and only on a
+  fully successful boot, which (1) flips `__simBooted = true` and clears the
+  watchdog, (2) hides the `#sim-fallback` UI, and (3) once `document.fonts.ready`
+  resolves, posts `{ type: 'sim:ready' }` to `window.parent` — the signal the host
+  loading screen waits on. A new topic that skips this step leaves the host loader
+  guessing; cloning `template_starter/main.js`'s `markBooted()` verbatim is the
+  required starting point.
+
+  **Completion signal (ADR-133 addendum, revised 2026-07-31):** a sibling
+  `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` so the host can
+  surface its "next topic / stay" overlay. Every shipped topic — Module 2, all 9 KTU
+  stepper topics (including the last 2 stragglers, `graphics_module_1_topic_1_foundations`
+  and `graphics_module_1_topic_4_understanding_orthographic_views`, migrated 2026-07-31),
+  and all 12 Diploma Engineering Graphics topics — is now on the **button-driven,
+  latchless** shape: a `#btn-finish` (taking over the footer nav's primary slot once a
+  stepper's terminal step is reached) calls `markComplete()` on every click, no latch,
+  so a replayed lesson re-fires the signal each time. Most topics gate `#btn-finish` on
+  a domain milestone rather than mere step-arrival — `graphics_module_1_topic_1_foundations`
+  on `state.dimensions` (the Step-4 dimensions reveal), the Diploma topics on a solved
+  Problem Library problem (their terminal step is cheap to reach on its own). A minority
+  are deliberately ungated where the terminal step's own arrival already is the payoff —
+  `graphics_module_1_topic_4_understanding_orthographic_views` is one, and additionally
+  **deviates on placement**: its `#btn-finish` lives in `#workbench-rail` beside the
+  Fold/Unfold toggle, not the footer, because the footer (`#wizard`) is CSS-hidden for
+  the whole of its Step 5 Compare split. `template_starter` migrated too (2026-07-31,
+  closing out the rollout): its own copy is deliberately **ungated** (no domain state
+  to gate on in a bare scaffold), matching `understanding_orthographic_views`'
+  ungated precedent rather than the gated forms — see `MODULE-STARTER.md` §3.11 for
+  the guidance a new topic cut from the template should follow to pick its own gate.
+  There is no remaining topic on the old auto-triggered/latched shape.
+  One topic, `graphics_module_2_topic_1_introduction`, omits `markComplete()` entirely —
+  it is a free-browse anatomy gallery with no steps and no "finished" state to hook (a
+  deliberate exclusion, not an oversight; see the ADR-133 addendum).
   `main.js` as an ES module. (Note: Module 2 keeps its CSS *inline* here, unlike
   Module 1 — see §8.)
 
@@ -552,9 +612,9 @@ frame, so the seven pages cannot drift apart.
   (`alb`/`albBox`/`acr`) rather than a separate `vertexLabeler.js`.
 
 - **`src/shell.css`** (~53 KB) — The shared stylesheet: the `:root` design tokens,
-  bundled `@font-face`, the wizard/viewport shell, all control styling, and the CSS
-  for the chrome that `chrome.js` injects. (Module 2 has no equivalent file — it keeps
-  this same material inline in `index.html`.)
+  CDN-hosted `@font-face` (ADR-141), the wizard/viewport shell, all control styling,
+  and the CSS for the chrome that `chrome.js` injects. (Module 2 has no equivalent
+  file — it keeps this same material inline in `index.html`.)
 
 ### Leaf modules (analogous to Module 2's)
 
@@ -681,7 +741,8 @@ renderer as an argument, so it was renderer-agnostic before this change too.
 ## 6. The iframe Boundary
 
 Each Simatrix sim runs inside a sandboxed `iframe` on the host website. The contract
-between the two sides is **a global JavaScript API object, not message passing.**
+is mostly **a global JavaScript API object, not message passing** — with one
+deliberate, narrow exception: a single outbound boot-ready signal (ADR-133).
 
 **Confirmed from the code:**
 
@@ -694,19 +755,43 @@ between the two sides is **a global JavaScript API object, not message passing.*
 - The sim ships a **`meta.json`** at its root (`title`, `description`, `difficulty`,
   `tags`) that the platform reads to catalog the sim. All four fields are present in
   every module/topic.
+- **The sim announces its own boot completion.** `markBooted()` — called once, last,
+  only on a fully successful boot — fires
+  `window.parent.postMessage({ type: 'sim:ready' }, '*')` after `document.fonts.ready`
+  resolves, so the host's loading screen can close exactly when the scene is
+  displayable rather than guessing from the iframe's `load` event (ADR-133).
+- **The sim announces its own lesson completion.** `markComplete()` posts
+  `window.parent.postMessage({ type: 'sim:complete' }, '*')`, so the host can surface
+  its "next topic / stay" overlay (ADR-133 addendum, revised 2026-07-31). Every shipped
+  topic fires it from a `#btn-finish` click, latchless (re-fires every click) — the
+  footer nav for most, `#workbench-rail` for
+  `graphics_module_1_topic_4_understanding_orthographic_views` (its footer is CSS-hidden
+  at the terminal step); 11 of the 12 Diploma topics additionally gate that button on a
+  solved Problem Library problem. `template_starter` migrated too (2026-07-31), ungated
+  like `understanding_orthographic_views` —
+  `graphics_diploma_module_3_topic_1_1_first_third_angle` joins that same ungated group
+  (its terminal step's own arrival is already the payoff, matching the KTU precedent) —
+  no topic remains on the old auto-fired, latched shape.
+  These are the sim's **only two** outbound messages; it never listens for inbound
+  `message` events. One topic (`graphics_module_2_topic_1_introduction`, a free-browse
+  gallery with no "finished" state) emits `sim:ready` only.
 - The sim makes **no runtime network calls** beyond the initial Three.js CDN fetch,
   assumes **no same-origin access**, and uses only **relative asset paths**, so it can
   be served from any URL prefix the host chooses.
 
 **What crosses the boundary:** control signals from host → sim (`pause`/`resume`/
-`reset` calls into the iframe's `window.simAPI`) and the static `meta.json` metadata
-the host reads. That is the entire surface.
+`reset` calls into the iframe's `window.simAPI`), the static `meta.json` metadata the
+host reads, and the two sim → host signals, `sim:ready` (boot) and `sim:complete`
+(lesson finish). That is the entire surface.
 
-**What is NOT in this codebase:** there is **no `postMessage` and no `window.parent`/
-`window.top` usage anywhere in the repository** (verified by search across all
-folders). So the actual host-side code that reaches into the iframe and calls
-`simAPI.*` lives in the separate host website, which is not part of this repository.
-The exact wiring of *how* the host invokes these methods (e.g.
+**What is NOT in this codebase:** beyond the two sanctioned emits (`sim:ready`,
+`sim:complete`), there is **no other `postMessage` and no `window.parent`/`window.top`
+usage anywhere in the repository** (verified by search across all folders; ADR-002,
+narrowed by ADR-133). So
+the actual host-side code that reaches into the iframe and calls `simAPI.*`, and the
+code that listens for `sim:ready`/`sim:complete` to drive the loading screen and the
+next-topic overlay, lives in the separate host website, which is not part of this
+repository. The exact wiring of *how* the host invokes `simAPI.*` (e.g.
 `iframe.contentWindow.simAPI.pause()`) **could not be confirmed from code — needs
 review** against the host project.
 
@@ -732,7 +817,8 @@ Confirmed identical or common by reading the files:
 - **The build/runtime contract is identical everywhere:** no build step, no
   `package.json`; ES modules loaded via an import map pinned to **`three@0.160.0`**
   from jsDelivr; `.js` extensions required on imports; all paths relative; fonts
-  bundled as local `woff2` (Atkinson Hyperlegible + IBM Plex Mono) — no Google Fonts.
+  served from the Supabase Storage CDN (Atkinson Hyperlegible + IBM Plex Mono),
+  never a Google-Fonts CDN (ADR-141, reverses the prior bundled-local-woff2 rule).
 - **Platform dependencies (pinned CDN ES modules).** The only runtime library every
   sim loads is **`three@0.160.0`** (plus `three/addons/`). One topic adds a **second**
   pinned dependency in the *same* import map: **`three-mesh-bvh`** — used by

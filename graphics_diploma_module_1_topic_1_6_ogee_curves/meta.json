@@ -1,0 +1,6 @@
+{
+  "title": "Ogee Curves",
+  "description": "Construct an ogee (reverse) curve joining two parallel lines, then two non-parallel lines — drag the reversal point directly in the drawing (or use arrow keys) and watch both curve radii resize live, animated step by step, then set up as a textbook problem to verify.",
+  "difficulty": "intermediate",
+  "tags": ["diploma-engineering-graphics", "geometrical-constructions", "ogee-curve", "reverse-curve", "draggable", "guided-stepper", "2d-svg"]
+}

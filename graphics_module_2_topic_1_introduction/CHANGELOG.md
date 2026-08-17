@@ -2,6 +2,12 @@
 
 All notable changes to Module 2 · Topic 1 (Introduction).
 
+## 2026-07-30
+- Added: top-left host-chrome clearance (52px, `calc(44px + var(--space-3))`) to `#shape-rail`'s top padding, previously flush at `var(--space-5)`/24px — this topic has no `.vp-cluster`/wizard, so the platform-standard clearance (DESIGN.md §5.12) was applied directly. (`index.html`.)
+
+## 2026-07-24
+- Added: `markBooted()` now posts `{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` resolves — the host loading screen's boot-ready signal (ADR-078, narrows ADR-002). (`main.js`.)
+
 ## 2026-07-20
 - Changed: `--color-vp-line` darkened `#bc5d1e → #b25718` (platform-wide AA promotion, ~4.92:1 on paper) — `index.html` `:root`.
 

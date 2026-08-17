@@ -1,0 +1,6 @@
+{
+  "title": "Roulettes",
+  "description": "Nine curves traced by a circle rolling without slipping — cycloids, trochoids, epicycloids, hypocycloids — each built from one shared rolling-curve mechanism, with a scrubbable roll angle and a tangent/normal construction at the end.",
+  "difficulty": "intermediate",
+  "tags": ["diploma-engineering-graphics", "roulettes", "cycloid", "guided-stepper", "2d-svg"]
+}

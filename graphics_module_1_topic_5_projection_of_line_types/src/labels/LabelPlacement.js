@@ -17,14 +17,18 @@
 // ── CONSTANTS ────────────────────────────────────────────────────────────────
 /** How far past its own tip a vertex/projected chip (A/B, a/b, a′/b′) sits, along the rod axis. */
 export const ENDPOINT_OFFSET = 0.7;
-/** HP plane callout anchor — on the floor, front-left, inside the default camera frame. */
-export const PLANE_HP_ANCHOR = [-9, 0.1, 9];
-/** VP plane callout anchor — high on the wall, left, inside the default frame. */
-export const PLANE_VP_ANCHOR = [-9, 9, 0.05];
-/** 'x' end mark — just past the LEFT end of the visible XY fold line. */
-export const AXIS_X_ANCHOR = [-12, 0.5, 0];
-/** 'y' end mark — just past the RIGHT end of the visible XY fold line. */
-export const AXIS_Y_ANCHOR = [12, 0.5, 0];
+/** HP plane callout anchor — on the floor, front-left, inside the default camera frame.
+ *  Must track lineTypeRig.js's SHEET (32) / SHEET_LIFT (38) / PLANE_LIFT (7): HP spans
+ *  z ∈ [-12, +26] (ADR-079, rectangle addendum). */
+export const PLANE_HP_ANCHOR = [-12, 0.1, 19];
+/** VP plane callout anchor — high on the wall, left, inside the default frame.
+ *  Must track lineTypeRig.js's SHEET (32) / SHEET_LIFT (38) / PLANE_LIFT (7): VP spans
+ *  y ∈ [-12, +26] (ADR-079, rectangle addendum). */
+export const PLANE_VP_ANCHOR = [-12, 19, 0.05];
+/** 'x' end mark — just past the LEFT end of the visible XY fold line (±SHEET/2, SHEET=32). */
+export const AXIS_X_ANCHOR = [-16, 0.5, 0];
+/** 'y' end mark — just past the RIGHT end of the visible XY fold line (±SHEET/2, SHEET=32). */
+export const AXIS_Y_ANCHOR = [16, 0.5, 0];
 /** θ/φ standoff off the rod mid-point: `lateral` mirrored ±x (θ toward HP, φ toward VP), `lift` up. */
 export const ANGLE_OFFSET = { lateral: 0.7, lift: 0.3 };
 /** TL dimension-line perpendicular standoff off the rod (passed to the untouched dimensions.js). */

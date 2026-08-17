@@ -1,5 +1,25 @@
 # Changelog — Projection of Points
 
+## 2026-08-08
+- Fixed: the Step 5 "Animate Unfolding"/"Fold back to 3D" rabatment could play far shorter than its designed 1600 ms if triggered while the opposite-direction fold was still mid-swing (e.g. unfold, then re-fold before the reverse settled) — `driveFold()`'s duration is `FOLD_MS * (remaining arc / FOLD_ANGLE)`, so a swing caught 300 ms into its reverse left `foldAngle` only slightly off the folded rest position, computing an arc of ~2% and a ~35 ms duration — a near-instant snap that read as a broken/too-fast fold. Confirmed via live foreground-browser timing (console-instrumented `performance.now()` around the tween) that a fresh reset+fold plays a consistent ~1580–1590 ms across all 4 quadrants, and that the interrupted-tween repro reliably reproduced the ~35 ms snap pre-fix. `driveFold(toAngle, { snap })` now lands `foldAngle` (and every leaf riding it) at the clean rest state opposite `toAngle` before computing arc when `snap: true`, guaranteeing the full `FOLD_MS` on every deliberately-watched fold. Scoped to the two explicit `simController.fold()`/`unfold()` entry points only (covers the wizard buttons, the Front quick-view chip's re-click reversal, and `enterWorkbench()`'s return-to-3D) — `applyView()`'s own silent step-navigation reverse-sync keeps the unsnapped proportional resume, since that path isn't a watched animation and forcing a full 1600 ms there would stall ordinary back/forward step navigation. Not quadrant-specific: the bug is triggered by fold-interrupt timing, not by which quadrant is selected. (`main.js`.)
+
+## 2026-07-31
+- Added: "Finish lesson" button (Module 2 Finish-button pilot rollout) — `#btn-finish` takes over the footer's primary slot at the terminal Step 5 "Unfold" exactly when `#btn-next` vacates it, enabled once folded. Click posts `sim:complete` and announces "Lesson marked complete." (`main.js`, `src/stepper.js`, `index.html`.)
+- Changed: `sim:complete` (`markComplete()`) drops its one-shot `window.__simComplete` latch — fires on every "Finish lesson" click now, replacing the old auto-fire on first fold (the fold's own toast is unchanged, still one-shot). (`main.js`, `src/stepper.js`.)
+- Changed: `#btn-complete-next` demoted off "Complete & next problem"/"Pick a problem" wording to a single "Try another problem" label — Finish lesson now owns the completion signal, so this stays the repeatable practice-loop action only, same label in both problem and free-play modes. (`src/stepper.js`, `index.html`.)
+
+## 2026-07-28
+- Added: a new `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` once, fired on the first fold alongside the existing "Projection of Points completed!" toast — the host's second sanctioned signal, for a "next topic / stay" overlay (ADR-078 addendum). (`main.js`, `src/stepper.js`.)
+
+## 2026-07-27
+- Changed: the Problem Library overlay's title now centers in its header row (was hard-left) — a 44px spacer counterweights the close button so it stays corner-anchored (ADR-082). (`index.html`.)
+
+## 2026-07-25
+- Fixed: the Compare split's floating "compact" card (its own title bar + expand/close buttons) could get stuck stranded at full window width after the viewport narrowed below 768px and then widened back — a one-way `matchMedia` listener demoted the split but never restored it. Removed the compact card entirely: Compare now has exactly one shape (the docked 50/50 split) at every viewport width, and below 768px the same grid restacks to a single column via CSS instead of switching UI (ADR-080, platform-wide). The wizard-toggle chevron's split-exit branch now calls `compare.hide()` instead of demoting to compact. (`main.js`, `index.html`.)
+
+## 2026-07-24
+- Added: `markBooted()` now posts `{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` resolves — the host loading screen's boot-ready signal (ADR-078, narrows ADR-002). (`main.js`.)
+
 ## 2026-07-20
 - Changed: `--color-vp-line` darkened `#bc5d1e → #b25718` (platform-wide AA promotion, ~4.92:1 on paper) — `index.html` `:root`.
 - Changed: `.step-body p` gained `color: var(--color-ink-secondary)` so the multi-paragraph step prose reads grey like the rest of the step card instead of near-black `--color-ink` — part of a platform-wide step-card typography pass matching Module 2 (ADR-073).

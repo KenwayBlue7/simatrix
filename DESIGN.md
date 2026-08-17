@@ -170,24 +170,24 @@ reduced opacity plus a lock icon**.
 ## 3. Typography
 
 **Body / UI font:** **Atkinson Hyperlegible** (fallback `system-ui, -apple-system, BlinkMacSystemFont,
-"Segoe UI", Roboto, sans-serif`), bundled as subset `woff2`.
+"Segoe UI", Roboto, sans-serif`), served as subset `woff2` from the Supabase Storage CDN (ADR-086).
 **Numeric font:** **IBM Plex Mono** (fallback `ui-monospace, "SF Mono", "Cascadia Mono", "Segoe UI Mono",
-Consolas, "Liberation Mono", monospace`), bundled alongside.
+Consolas, "Liberation Mono", monospace`), served alongside.
 
-These two are the **only** fonts loaded anywhere. **No external font CDN** (Google Fonts, Typekit, etc.) is
-referenced in any module — confirmed by audit.
+These two are the **only** fonts loaded anywhere. Both are served from Supabase Storage — a
+single shared CDN location, not a third-party font service (ADR-086).
 
 ### 3.1 Where the fonts are hosted
 
-Bundled `woff2`, loaded via `@font-face` with `font-display: swap`. Three faces only:
-Atkinson Hyperlegible 400, Atkinson Hyperlegible 700, IBM Plex Mono 400. The files
-(`atkinson-hyperlegible-latin-400-normal.woff2`, `…-700-normal.woff2`,
-`ibm-plex-mono-latin-400-normal.woff2`) live in each module's **`assets/fonts/`** and are present in both.
+Served from Supabase Storage CDN, loaded via `@font-face` with `font-display: swap` (ADR-086 —
+reverses the prior bundled-local-woff2/no-CDN rule). Three faces only: Atkinson Hyperlegible 400,
+Atkinson Hyperlegible 700, IBM Plex Mono 400, all under one path:
+`https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/…`.
 
-- **Module 2:** `@font-face` is declared in `index.html`; URLs are `./assets/fonts/…` (the HTML is at the
-  module root).
-- **Module 1:** `@font-face` is declared in `src/shell.css`; because the stylesheet lives one level down in
-  `src/`, its URLs are **`../assets/fonts/…`**. *(Module-specific path detail, §7 — not a violation.)*
+Every module and topic declares the identical `@font-face` block in place — 12 in `index.html`
+(module/topic root) and one in `Module1/src/shell.css`. Because the URLs are absolute, there is no
+longer a `./` vs `../` path distinction between them (the old per-module path detail this section
+used to document no longer applies — all 13 blocks are now byte-identical).
 
 ### 3.2 When each font is used (hierarchy)
 
@@ -486,13 +486,18 @@ SELECTOR::-webkit-scrollbar-thumb {
 collapsing the whole wizard column out of the layout so the viewport can go full-width.
 
 - **Position (load-bearing):** `top: var(--space-3); right: var(--space-3)` — the standard
-  top-corner inset, **not** the `.vp-cluster` top-left clearance (`calc(44px + var(--space-5))`).
+  top-corner inset, **not** the `.vp-cluster` top-left clearance (`calc(44px + var(--space-3))`,
+  52px — updated 2026-07-30, was `calc(44px + var(--space-5))`/68px).
   The two look similar but solve different problems: `.vp-cluster` sits one button-height down
   because it stacks *below* the top-left quick-view chips; `.wizard-toggle` has no button above it
   on the top-right, so it belongs at the plain `--space-3` inset. **Do not copy the `.vp-cluster`
   offset onto this control** — that was a shipped regression (fixed 2026-07-16) that also silently
   collided with the compact Compare card, whose own top (`calc(var(--space-3) + 44px +
   var(--space-2))`) is derived *assuming* the toggle sits at the shallow `--space-3` inset.
+- **Topics with no `.vp-cluster`/wizard:** `graphics_module_2_topic_1_introduction` (anatomy
+  gallery, no button cluster to sit below) applies the same `calc(44px + var(--space-3))`/52px
+  top clearance directly as its `#shape-rail` sidebar's top padding, for the same host-chrome
+  reason — added 2026-07-30.
 - **Shape:** 44px square, `--color-panel` fill, hairline border, `--radius-sm` corners, a centred
   20px chevron icon.
 - **Press/hover/focus:** `scale(0.97)` on `:active` (§5.1's shared press language); hover deepens to
@@ -537,6 +542,28 @@ that offers a 2D/3D or before/after comparison, not a per-module style choice.
 - **Exit:** while split, the 2D pane's own head chrome and `.wizard-toggle` are redundant
   (`display:none`) — the still-visible, pressed Compare chip in the 3D pane is the single way back
   out of the split.
+
+### 5.14 Problem Library overlay (`.problem-library`, ADR-032, ADR-082)
+
+*(New section — this component previously had no §5 spec; its rules were scattered across §4.2,
+§4.3, and §5.11. Consolidated here 2026-07-27, ADR-082.)* A full-viewport, focus-trapped modal
+dialog (`role="dialog"`) that opens from the `.library-entry` ghost action in the step card's
+eyebrow row. Token-only; flat ink-on-paper; it is one of the few surfaces that earns the overlay
+shadow (the Flat-Ink exception, §4.2), since it is a transient surface leaving the normal page flow.
+
+- **Surface:** pure-white content surface (`--color-paper`), `--shadow-md`, `--z-overlay` (120).
+  Enters with a calm slide-and-fade (`libraryIn`, collapses to instant under reduced motion).
+- **Header (`.problem-library__header`):** a flex row, `space-between` structurally, but the title
+  reads **centered** — a `44px` `::before` spacer on the header counterweights the `44px`
+  `.problem-library__close` button on the opposite side, and the title itself is `flex: 1 1 auto;
+  text-align: center`. This keeps the close button corner-anchored (matching the platform's other
+  44px corner chips, §5.12) while the title sits on true header-width center rather than reading
+  hard-left. Title type is the **Title** role (§3.2) — Atkinson 700, `--text-title`.
+- **Close button:** the standard 44px target, hairline border, `--radius-sm`, `scale(0.97)` on
+  `:active`, `--ring-focus` on `:focus-visible` — no exception from the platform button/press rules.
+- **Body (`.problem-library__body`):** scrollable, carries the floating padded scrollbar pill
+  (§5.11) — matches `#step-card`'s pattern.
+- **Cards:** `.problem-card` sits on `--color-paper` (§4.2's Host-Integration White Exception list).
 
 ---
 
@@ -593,7 +620,9 @@ module appendix conflicts on a token or named rule, this file wins.**
 
 A module adds its own domain encodings and viewport behaviour **here**, never by re-defining a shared token.
 
-### 7.1 Module 2 — Orthographic Projection of Solids (the master / reference implementation)
+### 7.1 Module 2 — Solids Inclined to Both Planes (the master / reference implementation)
+
+*(Renamed from "Orthographic Projection of Solids" — ADR-161, 2026-08-11.)*
 
 - **Adds PP Violet** (`--color-pp-line #7a5ea6`) as a fully-used third projection plane (side view).
 - Defines only the two z-index rungs it uses (`--z-notice`, `--z-overlay`).
@@ -604,8 +633,8 @@ A module adds its own domain encodings and viewport behaviour **here**, never by
   formerly `--color-host-white` — retired, §4.2) applies to `#step-card`, `#active-problem`,
   `.problem-card`, and the `.problem-library` backdrop; the `.vp-hint`/spotlight chips sit on the
   grey `--color-panel` chrome surface.
-- `@font-face` URLs are `./assets/fonts/…` (HTML at module root). UI DOM ownership: `uiManager.js` owns the
-  parameter dock.
+- `@font-face` URLs point at the Supabase Storage CDN (ADR-086 — no more local `./assets/fonts/…`).
+  UI DOM ownership: `uiManager.js` owns the parameter dock.
 - Pressable chips/toggles all use `scale(0.97)` (`.wizard-toggle:active`, `.quick-view:active`,
   `.connector-toggle:active`, `.btn:active`, etc.).
 
@@ -629,8 +658,10 @@ A module adds its own domain encodings and viewport behaviour **here**, never by
   card is addressed by **class** (`.step-card`), and the surface applies to `.step-card`, `#active-problem`,
   `.problem-card`, the `.problem-library` backdrop, and the `.compare-card` frame; `.vp-hint`/spotlight
   chips sit on the grey `--color-panel` chrome surface.
-- `@font-face` is declared in `src/shell.css`, so font URLs are **`../assets/fonts/…`** (stylesheet one level
-  down). UI DOM ownership: the engine + `chrome.js` own the chrome; `src/uiManager.js` is a vestigial stub.
+- `@font-face` is declared in `src/shell.css`; its URLs now point at the same Supabase Storage CDN
+  as every other module (ADR-086) — the old `../assets/fonts/…` one-level-down path distinction no
+  longer applies. UI DOM ownership: the engine + `chrome.js` own the chrome; `src/uiManager.js` is
+  a vestigial stub.
 - **The no-transform invariant** (§4.4) is required by the Compare card's `position:fixed` placement.
 
 ### 7.3 Module 3 Topic 1 — Sections of Solids

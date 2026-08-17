@@ -288,6 +288,21 @@ function markBooted() {
   }
   const fallback = document.getElementById('sim-fallback');
   if (fallback) fallback.hidden = true;
+  // Platform iframe contract (ADR-078): announce a displayable sim to the host loader.
+  // Gated on document.fonts.ready so the host never reveals us mid-FOUT.
+  document.fonts.ready.then(() => {
+    window.parent.postMessage({ type: 'sim:ready' }, '*');
+  });
+}
+
+/**
+ * Signal lesson completion to the host (ADR-078 addendum, revised): the learner
+ * clicked "Finish lesson" at the terminal step. Fires on every call, no latch —
+ * the host confirmed it supports repeated sim:complete triggers, so replaying the
+ * signal is expected, not a bug.
+ */
+function markComplete() {
+  window.parent.postMessage({ type: 'sim:complete' }, '*');
 }
 
 // ============================================================================
@@ -3362,6 +3377,10 @@ const simController = {
   /** Whether a textbook problem is loaded — drives the terminal-step CTA (stepper.js). */
   isProblemActive() { return problemLibrary?.isActive() ?? false; },
 
+  /** Re-render the wizard nav; the terminal-step accent follows problem state (ADR-121
+   *  addendum, 2026-08-09) and loadProblem()'s own sim.reset() doesn't cover exitProblem(). */
+  syncNav() { stepper?.sync(); },
+
   /**
    * Terminal-step "Complete & next problem": close out the finished construction and
    * send the learner back to the library for the next one. Celebrate (calm toast), clear
@@ -3379,6 +3398,8 @@ const simController = {
     problemLibrary?.open();     // pick the next problem (pauses the loop while open)
     announce(message);          // last write wins in the live region — the win narrates
   },
+
+  markComplete,
 
   announce,
   flowNote,

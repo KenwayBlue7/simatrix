@@ -1,0 +1,82 @@
+{
+  "meta.json": {
+    "mtime": 1785486975.443302,
+    "ast_hash": "7483d43889db7f0ed02b51f0eba8fa6d",
+    "semantic_hash": ""
+  },
+  "src/anim.js": {
+    "mtime": 1785486975.443302,
+    "ast_hash": "c12d27374f8205f2088684d34c938214",
+    "semantic_hash": ""
+  },
+  "src/constructions.js": {
+    "mtime": 1786383224.05059,
+    "ast_hash": "261a6a36d98fa866f66a77a98fd1e0af",
+    "semantic_hash": ""
+  },
+  "src/main.js": {
+    "mtime": 1786353821.9191813,
+    "ast_hash": "afc960a9b622c65eed7f909a537a8354",
+    "semantic_hash": ""
+  },
+  "src/onboarding.js": {
+    "mtime": 1785486975.4483676,
+    "ast_hash": "4168ec894fddf4fde802f3773073cf9d",
+    "semantic_hash": ""
+  },
+  "src/problemLibrary.js": {
+    "mtime": 1785502855.926078,
+    "ast_hash": "05512b452c0c974a253f490890b7324e",
+    "semantic_hash": ""
+  },
+  "src/problems.js": {
+    "mtime": 1785488362.552361,
+    "ast_hash": "a4636bbd73444be9888162933e613170",
+    "semantic_hash": ""
+  },
+  "src/renderConstruction.js": {
+    "mtime": 1786353656.3642063,
+    "ast_hash": "c531c085db8ca115601534d8ee58c58e",
+    "semantic_hash": ""
+  },
+  "src/stepper.js": {
+    "mtime": 1786353656.3642063,
+    "ast_hash": "9f61a8376f0acfe3e903635260bfc84a",
+    "semantic_hash": ""
+  },
+  "src/terms.js": {
+    "mtime": 1785486975.453565,
+    "ast_hash": "634e90632324ec51aafe7d8a7a237ef3",
+    "semantic_hash": ""
+  },
+  "src/uiManager.js": {
+    "mtime": 1786353656.3642063,
+    "ast_hash": "1d63fbc83dcd6f667931e666da0e88a5",
+    "semantic_hash": ""
+  },
+  "src/viewTransform.js": {
+    "mtime": 1786353821.9399006,
+    "ast_hash": "9d2ebd65b94c9ef9cee9f87399111fcc",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1786354157.7550313,
+    "ast_hash": "0a6607fd1a18db588b2c059bb2e46d11",
+    "semantic_hash": ""
+  },
+  "DESIGN.md": {
+    "mtime": 1786354185.7778404,
+    "ast_hash": "f9fef705142e85258ebeab04747b69df",
+    "semantic_hash": ""
+  },
+  "index.html": {
+    "mtime": 1786353656.3642063,
+    "ast_hash": "da7f92b2af9e6c4049cf74c083aa3281",
+    "semantic_hash": ""
+  },
+  "CHANGELOG.md": {
+    "mtime": 1786383256.0391738,
+    "ast_hash": "23babafe7143510915bcc80f0a00e17b",
+    "semantic_hash": ""
+  }
+}

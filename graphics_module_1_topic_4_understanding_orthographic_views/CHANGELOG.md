@@ -5,6 +5,20 @@ Notable changes to this Engineering Graphics Module 1 topic (folder
 2026-07-13 as "Glass Box Visualizer"; renamed 2026-07-13, ADR-048). History before the scaffold
 below is the starter template's, carried over from the duplication.
 
+## 2026-08-04
+- Fixed: the Profile Plane's fold hinge is restored to ADR-044's original design — PP hinges directly onto the fixed VP about the VP∩PP line (`PP_FOLD_ANGLE = +π/2` about local Y), as a scene sibling of the HP hinge rather than nested inside it. The Side view now lands **beside the Front view, at the same height** (shared horizontal projectors), not beside the Top view. This un-reverts ADR-049, which had overturned ADR-044 hours after it shipped by citing "Module 2 parity" — Module 2 itself carried the identical bug at the time, fixed separately the same day this fix landed (see root `CHANGELOG.md`/`DECISIONS.md` ADR-106). Module 2's own fix nests its PP hinge inside its VP fold group because Module 2's VP folds too; that construction does not apply here since this topic's VP is fixed, so the correct fix is a direct restoration of ADR-044, not a port of Module 2's ADR-106. `drawCompare()`'s 2D Compare sheet was rewritten in lockstep — new layout position beside Front, and the Side view's own drawing re-authored with its axes rotated (depth horizontal, height vertical) since it's hand-authored from the dimension table, not derived from the 3D fold. Verified live on XAMPP `:8080` in a foreground Chrome tab: Side right of Front at matching height, nothing beside Top, Fold/Unfold toggle replays correctly both directions, `renderer.info.memory` flat across repeated resets, zero console errors. See `DECISIONS.md` ADR-108 (supersedes ADR-049's fold clause; restores ADR-044).
+
+## 2026-07-31
+- Added: "Finish lesson" button (Module 2 Finish-button pilot rollout) — deliberately placed in `#workbench-rail` beside "Back to Step 4" and the fold toggle, NOT the footer nav (the footer/`#wizard` is CSS-hidden for the whole of Step 5's Compare split, so the rail is the only reachable surface there). Ungated — Step 5's own arrival already auto-drives the box-unfold, the topic's real payoff, and this stepper's Next has no per-step gate to hook. Click posts `sim:complete` and announces "Lesson marked complete." (`main.js`, `index.html`.)
+- Changed: `sim:complete` (`markComplete()`) drops its one-shot `window.__simComplete` latch — fires on every "Finish lesson" click now, replacing the old auto-fire on first arrival at Step 5. The arrival toast ("Lesson complete") and its `lessonCompleteShown` re-arm-on-step-back latch are removed entirely — the host signal is now solely the button's job, matching Module 2 (no separate arrival celebration). (`main.js`.)
+- Changed: `#unfold-toggle` ("Fold/Unfold Glass Box") loses its accent-fill-when-pressed styling — stays plain paper/bordered in both states now that "Finish lesson" is the rail's one accent-filled action. Toggle behaviour and label-swap logic were already correct pre-existing code; only the CSS changed. (`index.html`.)
+
+## 2026-07-28
+- Added: a new `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` once, fired on reaching Step 5 alongside the existing "Lesson complete" toast — the host's second sanctioned signal, for a "next topic / stay" overlay (ADR-078 addendum). (`main.js`.)
+
+## 2026-07-24
+- Added: `markBooted()` now posts `{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` resolves — the host loading screen's boot-ready signal (ADR-078, narrows ADR-002). (`main.js`.)
+
 ## 2026-07-20
 - Changed: `--color-vp-line` darkened `#bc5d1e → #b25718` (platform-wide AA promotion, ~4.92:1 on paper) — `index.html` `:root`.
 

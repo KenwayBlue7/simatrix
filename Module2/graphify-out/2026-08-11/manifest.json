@@ -1,0 +1,152 @@
+{
+  ".impeccable/design.json": {
+    "mtime": 1780043177.1524293,
+    "ast_hash": "52b302b1ab801c3901a81bcaf4346a98",
+    "semantic_hash": ""
+  },
+  "main.js": {
+    "mtime": 1786467965.8713367,
+    "ast_hash": "9051781d62f6b74613a2ca3ebc3e3e13",
+    "semantic_hash": ""
+  },
+  "meta.json": {
+    "mtime": 1786438870.4892468,
+    "ast_hash": "b79789b8f2b12dde7f8f152327478663",
+    "semantic_hash": ""
+  },
+  "src/anim.js": {
+    "mtime": 1786446884.0083609,
+    "ast_hash": "31d2b4dfb3e062f7fdbc700ff799d176",
+    "semantic_hash": ""
+  },
+  "src/cone.js": {
+    "mtime": 1779610136.986771,
+    "ast_hash": "8fb5c5e0a05a073e21179f990d7e5608",
+    "semantic_hash": ""
+  },
+  "src/cube.js": {
+    "mtime": 1779610151.55413,
+    "ast_hash": "3a8f1af21752cc4941c4fc78cfe487de",
+    "semantic_hash": ""
+  },
+  "src/cylinder.js": {
+    "mtime": 1779610116.0249338,
+    "ast_hash": "13391cb8d90072e9348b910d5e4f5326",
+    "semantic_hash": ""
+  },
+  "src/genericPrism.js": {
+    "mtime": 1779610091.4597423,
+    "ast_hash": "00024d1547266d1a91adfddf0ea68f90",
+    "semantic_hash": ""
+  },
+  "src/genericPyramid.js": {
+    "mtime": 1779527597.956779,
+    "ast_hash": "fdd1b92c7b0f8f66a978d33fcde57302",
+    "semantic_hash": ""
+  },
+  "src/genericSolid.js": {
+    "mtime": 1779527588.7653184,
+    "ast_hash": "e1806d3ff7085de6cdc0fea77f580542",
+    "semantic_hash": ""
+  },
+  "src/iShape.js": {
+    "mtime": 1780642080.397203,
+    "ast_hash": "a5e6c662584cf53649c8ac81af57823e",
+    "semantic_hash": ""
+  },
+  "src/meshAnalyzer.js": {
+    "mtime": 1782795737.2169766,
+    "ast_hash": "5f5e6ff26940574f8ddc5c9c6f21f55e",
+    "semantic_hash": ""
+  },
+  "src/onboarding.js": {
+    "mtime": 1786446793.520402,
+    "ast_hash": "c5bd9ef4ad05035cfbc2f3faf1c817ba",
+    "semantic_hash": ""
+  },
+  "src/problemLibrary.js": {
+    "mtime": 1781211111.675722,
+    "ast_hash": "15013850a253b02c4dd509fa5bdfe556",
+    "semantic_hash": ""
+  },
+  "src/problems.js": {
+    "mtime": 1785395890.8424866,
+    "ast_hash": "2c6558d3135d50bea9bf77096b5d674a",
+    "semantic_hash": ""
+  },
+  "src/projectionDrawer.js": {
+    "mtime": 1786446874.7896545,
+    "ast_hash": "dc28d6606d440b8bccf6accd38bc287b",
+    "semantic_hash": ""
+  },
+  "src/shapeData.js": {
+    "mtime": 1780641882.3078413,
+    "ast_hash": "ae8b76f2a15f26a043521f362b9bd4a4",
+    "semantic_hash": ""
+  },
+  "src/stepper.js": {
+    "mtime": 1786446658.1214166,
+    "ast_hash": "9f1dd78f9e1b94ab4596c08269f27e64",
+    "semantic_hash": ""
+  },
+  "src/terms.js": {
+    "mtime": 1781122819.90017,
+    "ast_hash": "05acc0edfbdf2b7ac0c637bdbafc12ce",
+    "semantic_hash": ""
+  },
+  "src/uiManager.js": {
+    "mtime": 1786439111.3528488,
+    "ast_hash": "ef3d70de395ac0ca30ccf68fd537ae3b",
+    "semantic_hash": ""
+  },
+  "src/vertexLabeler.js": {
+    "mtime": 1786292925.5036154,
+    "ast_hash": "2f2a09e8fc4d6367846a29e53994b146",
+    "semantic_hash": ""
+  },
+  ".impeccable/critique/2026-05-29T05-17-54Z__index-html.md": {
+    "mtime": 1780031874.3281555,
+    "ast_hash": "8045a89f02aa8d5df267f9dbd43021a3",
+    "semantic_hash": ""
+  },
+  ".impeccable/critique/2026-05-29T08-30-33Z__index-html.md": {
+    "mtime": 1780043433.3934095,
+    "ast_hash": "020157377044806170b5fa9199874980",
+    "semantic_hash": ""
+  },
+  ".impeccable/critique/2026-06-01T14-57-13Z__index-html.md": {
+    "mtime": 1780325833.5782812,
+    "ast_hash": "2ced34caed7e25f4e769de6cf3e99adb",
+    "semantic_hash": ""
+  },
+  ".impeccable/critique/2026-06-03T13-12-43Z__index-html.md": {
+    "mtime": 1780492363.0868902,
+    "ast_hash": "bb31292f7690fe96f93b0d6514d3b186",
+    "semantic_hash": ""
+  },
+  "CHANGELOG.md": {
+    "mtime": 1786468460.0269532,
+    "ast_hash": "a36503007c0ff425d7cf3060af0021c8",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1782641557.092548,
+    "ast_hash": "55a28d586423dd0fa154893370603cee",
+    "semantic_hash": ""
+  },
+  "DESIGN.md": {
+    "mtime": 1785395890.829448,
+    "ast_hash": "77f855802eb52a22a331d19be3c0a1e9",
+    "semantic_hash": ""
+  },
+  "index.html": {
+    "mtime": 1786467035.810441,
+    "ast_hash": "f3e68f5161f7a3fb98ab1830d3600fdb",
+    "semantic_hash": ""
+  },
+  "src/methodController.js": {
+    "mtime": 1786467088.7100227,
+    "ast_hash": "d22e16f905a9984b58295536ccca9059",
+    "semantic_hash": ""
+  }
+}

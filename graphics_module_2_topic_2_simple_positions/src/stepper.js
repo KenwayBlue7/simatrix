@@ -86,6 +86,7 @@ export function initStepper(sim) {
 
   const btnBack = $('btn-back');
   const btnNext = $('btn-next');
+  const btnFinish = $('btn-finish');
 
   const btnAdd = $('btn-add');
   const btnLabel = $('btn-label');
@@ -194,6 +195,14 @@ export function initStepper(sim) {
     if (btnNext) {
       btnNext.hidden = currentStep >= TOTAL; // terminal step: no Next
       btnNext.disabled = !canAdvance(currentStep);
+    }
+    // Finish lesson: takes over the footer's primary nav slot exactly when Next
+    // vacates it (terminal step), same mutual-exclusivity idiom as #btn-flatten/
+    // #btn-unfold. Enabled on state.flattened — the same signal isComplete(6)
+    // already uses, no new completion concept invented.
+    if (btnFinish) {
+      btnFinish.hidden = currentStep < TOTAL;
+      btnFinish.disabled = !state.flattened;
     }
   }
 
@@ -331,6 +340,15 @@ export function initStepper(sim) {
   // problem, resets through the single path, and opens the Problem Library. The reset
   // re-renders this chrome via reset()→goToStep(1), so no manual re-render is needed here.
   btnCompleteNext?.addEventListener('click', () => sim.completeAndNext(), listen);
+
+  // Finish lesson: posts sim:complete to the host (no latch — every click reposts,
+  // ADR-078 addendum revised). Button stays as-is afterward (no disable/relabel,
+  // locked decision) — announce() is the only feedback, same pattern as the
+  // Problem Library's exit flow.
+  btnFinish?.addEventListener('click', () => {
+    sim.markComplete?.();
+    sim.announce?.('Lesson marked complete.');
+  }, listen);
 
   // Navigation.
   btnNext?.addEventListener('click', () => { if (canAdvance(currentStep)) goToStep(currentStep + 1); }, listen);

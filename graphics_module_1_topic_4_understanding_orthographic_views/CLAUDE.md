@@ -80,6 +80,9 @@ platform-level UI inside the sim's iframe.
   any field are rejected. The `index.html` `<title>` must equal `meta.json.title` (ADR-026).
 - **`window.simAPI`** exposed in `main.js` with exactly `pause()`, `resume()`, `reset()`; the in-sim
   Reset routes through `simAPI.reset()` — no second reset path.
+- **`sim:ready` boot signal** (ADR-078, narrows ADR-002): `markBooted()` posts
+  `{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` — the one
+  sanctioned outbound `postMessage`. Do not add any other `postMessage`/inbound listener.
 - **Mobile notice.** At `< 768px`, a dismissible "Best experienced on desktop" banner only — never
   block, redirect, or disable the sim.
 

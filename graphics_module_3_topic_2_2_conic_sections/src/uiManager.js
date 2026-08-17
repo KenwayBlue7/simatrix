@@ -1,7 +1,7 @@
 // Parameter dock controller — Conic Sections.
 //
 // One group per guided step, and NOTHING in a group that does not serve that step's own
-// question (ADR-086). The dock is deliberately smaller than the topic's state:
+// question (ADR-141). The dock is deliberately smaller than the topic's state:
 //
 //   Step 1  the cone — how wide, how tall, and whether the second half is shown.
 //   Step 2  the cut — the tilt, and nothing else. The plane is switched on by the step
@@ -72,7 +72,7 @@ import { methodById, methodInfo, methodsByTier, defaultMethodFor, defaultEccentr
  * Slider descriptors. `key` names the field in its own state bag. `min`/`max` are in the
  * DISPLAYED unit; `scale` maps display → stored (display = stored × scale), so the cone's
  * world units (1 unit = 10 mm) show as millimetres while the sheet's own millimetres pass
- * straight through at scale 1 (ADR-083).
+ * straight through at scale 1 (ADR-138).
  */
 const CONE_SLIDERS = [
   { key: 'baseLength', range: 'rng-base',   num: 'num-base',   min: 20, max: 60, decimals: 0, unitWord: 'millimetres', scale: 10 },
@@ -626,7 +626,7 @@ export function initUIManager(sim) {
     }
 
     // --- The readouts. Each one says what is on screen in everyday words; the textbook
-    //     statement arrives with the name, and never before it (ADR-086). ---
+    //     statement arrives with the name, and never before it (ADR-141). ---
     if (coneReadout) {
       coneReadout.textContent = `Its sloping side sits ${info.generatorDeg.toFixed(0)}° from the table.`;
     }
@@ -741,7 +741,7 @@ export function initUIManager(sim) {
     }
 
     // Step 4's staged answer: which piece is on the sheet, and the terminology held back
-    // until every piece it names is there (RULES.md §6.27).
+    // until every piece it names is there (RULES.md §6.31).
     // Step 4's proof: where the learner is, what just happened, and whether they may move on.
     {
       const stages = sim.proofStages();

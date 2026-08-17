@@ -2,6 +2,103 @@
 
 All notable changes to this topic. Format loosely follows Keep a Changelog.
 
+## [0.1.24] — 2026-07-31 — Finish lesson button (Module 2 pilot rollout)
+- Added: `#btn-finish` takes over the footer's primary slot at the terminal step exactly when `#btn-next` vacates it (no gate — this topic's terminal step has none of its own). Click posts `sim:complete` and announces "Lesson marked complete." (`main.js`, `src/stepper.js`, `index.html`.)
+- Changed: `sim:complete` (`markComplete()`) drops its one-shot `window.__simComplete` latch — fires on every "Finish lesson" click now, replacing the old auto-fire on first terminal-step arrival. (`main.js`, `src/stepper.js`.)
+
+## [0.1.23] — 2026-07-28 — Host lesson-complete signal
+
+### Added
+- A new `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` once, fired on first
+  arrival at the terminal step (step 6) — the host's second sanctioned outbound signal, for a
+  "next topic / stay" overlay (ADR-078 addendum). This topic is a conceptual tour with no answer
+  gates, so there is no in-sim payoff moment to ride alongside; the hook is a plain first-arrival
+  guard, the same `highestVisited` idiom the sibling Spatial Framework topic already used for its
+  own toast. (`main.js`, `src/stepper.js`.)
+
+## [0.1.22] — 2026-07-25 — Tighter default 3D camera framing
+
+### Changed
+- The free-orbit perspective camera's default boot pose — both the transient `CAMERA_POSITION`
+  (main.js) and Step 1's `cam` vantage it settles on (`STEPS[0].cam`, lineTypesData.js) — is pulled
+  in by the same ~6/7 distance factor as the sibling
+  `graphics_module_1_topic_6_projection_of_straight_lines` topic (same direction/target, just
+  closer), fixing a line that looked small against a lot of empty HP/VP plane at boot. This topic
+  has no aHP/aVP controls, so Step 1's only lever is Length; verified TL never clips at its 200 mm
+  typed-field ceiling even at the new closer distance (needs ~24 of the ~28 units available), so
+  the clip-aware auto-zoom (ADR-014) has no ordinary-vs-worst-case tension to check here — Steps
+  2–6 keep their own already-tuned `cam` vantages, out of scope for this boot-framing fix.
+
+## [0.1.21] — 2026-07-25 — 3D BIS dimension now rolls to face the camera in every view (ADR-081)
+
+### Fixed
+- The True-Length dimension's extension/tick marks and filled arrowheads read correctly only in
+  the Top quick-view; Front and Side showed a skewed parallelogram with edge-on (near-invisible)
+  arrowheads — worse here than in the sibling topic, since this topic dimensions the projections
+  (not the space rod), so the Front-view dimension collapsed flat onto the front view entirely.
+  Root cause: the dimension's standoff direction was computed once from a fixed world-up vector
+  (`cross(rod, worldUp)`), only screen-perpendicular to the rod from directly overhead. Same fix as
+  `graphics_module_1_topic_6_projection_of_straight_lines`: `dimensions.js` gained
+  `addOrientedDimension`/`orientDimension` — the Type-B geometry is built once in a dedicated
+  group's own local frame and that group's rotation is re-driven every render frame to face
+  whichever camera is live (free-orbit, Top/Front/Side, or this topic's own reversible fold —
+  including the top-view dimension, which rides the folding `hpGroup`). Verified across Steps 1–6,
+  the fold, and free orbit; Top is an exact fixed point of the new formula. The flat 2D Compare
+  sheet (a fixed square-on ortho camera) was unaffected and left untouched.
+
+## [0.1.20] — 2026-07-25 — Floating Compare card removed; split is now the only shape (ADR-080)
+
+### Fixed
+- Resizing the browser while the Compare split was open could strand the 2D drawing panel as a
+  small floating "picture-in-picture" window (its own title bar, expand button, close button)
+  instead of the docked 50/50 split. Root cause was a one-way narrow-viewport listener (added
+  2026-07-19) that demoted the split to the compact floating card below 768px but never re-entered
+  the split on widening back past it.
+
+### Removed
+- The compact floating Compare card entirely — `applyCompareSize`, `compareSize`,
+  `isWorkbenchViewport`, the card's head chrome (tab + expand + close buttons), and the breakpoint
+  listener are gone. Compare is now always the docked split, at every viewport width; below 768px
+  the same split restacks to a single column instead of switching to a different Compare UI.
+
+## [0.1.19] — 2026-07-25 — Clip-aware 3D camera auto-zoom (ADR-014)
+
+### Added
+- The free-orbit perspective camera now dollies back automatically when typed-field values push
+  the line past the default frame (the case ADR-079 flagged but didn't fix — grid sizing can't fix
+  a fixed camera pose). Ported from Module 2 / Module 1's `reframeIfClipped`, sequenced against
+  this topic's per-step `frameStep()` vantage glide so the two movers never race (`main.js`).
+
+## [0.1.18] — 2026-07-25 — 3D reference-plane overrun fixed (ADR-079)
+
+### Fixed
+- At high True Length + the ⟂HP/⟂VP steps, the line's endpoint, its view, and labels could run
+  off the edge of the 3D HP/VP reference-plane grid. Root cause was two compounding mis-sizings:
+  the planes were origin-centred (`PlaneGeometry` at `0,0`) while the drawing only ever occupies
+  the first quadrant (end A fixed at `aHP=18, aVP=18`; the resolver's `dy`/`dz` are ≥0), so half
+  of every plane's `SHEET=24` extent was permanently dead (real ceiling was 120 mm, not 240 mm);
+  and the sizing was measured against the `r-tl` slider max (150) rather than the wider typed
+  `n-tl` field ceiling (`uiManager.js` `inputMax` 200) a learner can type directly. `lineTypeRig.js`
+  `SHEET` 24 → 32 with a new `PLANE_LIFT = 10` world-space offset (planes now span `[-6, +26]`
+  instead of `[-12, +12]`), `GRID.divs` 24 → 32 to keep the 1.0u = 10 mm cell; `referencePlane()`
+  gained an `offset` parameter. `labels/LabelPlacement.js`'s `PLANE_HP/VP_ANCHOR` and
+  `AXIS_X/Y_ANCHOR` updated to track the new plane edges. `main.js` `SHEET_HALF` 12 → 16 (verified
+  unreferenced; kept as a documented constant only). Same fix applied to the sibling
+  `graphics_module_1_topic_6_projection_of_straight_lines` topic with its own numbers (SHEET
+  24 → 44, `PLANE_LIFT = 16`). `contentBoxWorld()`/`flatSheetBox()` (camera framing) and
+  `sheet2DLayout.js` (the separate 2D Compare sheet, ADR-075) were confirmed out of scope and
+  untouched.
+
+### Fixed
+- The plane-offset fix above left VP/HP flush at the fold line instead of visibly crossing through each other (the tail past the fold line shrank from the pre-fix 12u to 6u); planes are now rectangular (fold-line width unchanged, lift axis grown to `PLANE_REACH + PLANE_OVERHANG`) so they overhang the fold line by 12u again, matching the original look, without reducing the overrun fix's reach (ADR-079 addendum).
+
+## [0.1.17] — 2026-07-24 — sim:ready boot signal
+
+### Added
+- `markBooted()` now posts `{ type: 'sim:ready' }` to `window.parent` once, after
+  `document.fonts.ready` resolves — the host loading screen's boot-ready signal (ADR-078, narrows
+  ADR-002). (`main.js`.)
+
 ## [0.1.16] — 2026-07-23 — Compare 2D panel gains drag-to-pan + scroll-wheel zoom
 
 ### Added

@@ -166,6 +166,20 @@ function markBooted() {
   }
   const fallback = document.getElementById('sim-fallback');
   if (fallback) fallback.hidden = true;
+  // Platform iframe contract (ADR-078): announce a displayable sim to the host loader.
+  // Gated on document.fonts.ready so the host never reveals us mid-FOUT.
+  document.fonts.ready.then(() => {
+    window.parent.postMessage({ type: 'sim:ready' }, '*');
+  });
+}
+
+/**
+ * Signal lesson completion to the host (ADR-078 addendum, revised): fired by the
+ * "Finish lesson" button (see stepper.js). Latchless — every click reposts, no
+ * per-page-load ceiling, since the host is confirmed to support repeated triggers.
+ */
+function markComplete() {
+  window.parent.postMessage({ type: 'sim:complete' }, '*');
 }
 
 // ============================================================================
@@ -407,6 +421,9 @@ const simController = {
 
   /** Flash an ad-hoc contextual chip over the viewport (the onboarding cue system). */
   cueHint(text) { onboarding?.cue?.(text, 'ink'); },
+
+  /** Fire the once-per-load host completion signal (ADR-078 addendum). */
+  markComplete,
 
   /** Register a callback fired at the end of every rebuild(). Returns an unsubscribe fn. */
   onStateChange(cb) { stateChangeSubs.add(cb); return () => stateChangeSubs.delete(cb); },

@@ -3,7 +3,7 @@
 // COPIED, essentially unchanged, from the sibling ../graphics_module_1_topic_1_foundations.
 // That topic's whole lesson is the visible-vs-hidden edge, so its classifier is the
 // reviewed reference implementation; this topic reuses it rather than inventing a second
-// one (ADR-081). The only edits are this header and the group name.
+// one (ADR-136). The only edits are this header and the group name.
 //
 // WHERE IT IS USED HERE — the 3-D INSPECTION only. The FRONT ELEVATION keeps its
 // authored linework: a drawing is a fixed, agreed projection, and its dashed lines are a

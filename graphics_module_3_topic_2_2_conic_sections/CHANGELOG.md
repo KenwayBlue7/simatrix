@@ -3,6 +3,38 @@
 Notable changes to this topic. (The sibling topic's history was intentionally not carried over —
 this changelog starts fresh at the build, per MODULE-STARTER §3.2.)
 
+## 2026-08-09 — Step 6's three-primary regression (ADR-198 addendum)
+
+- Fixed: **Step 6 was back to stacking three loud primaries** — `#btn-deal-cut`, `#btn-complete-next`
+  ("Try another problem"), and `#btn-finish` ("Finish lesson") — the exact defect ADR-198
+  (2026-08-04) fixed once already. Root cause: the root repo's `f8771ab` ("Roll out Finish button
+  across Vishnu's 3 merged topics", 2026-08-07) added `#btn-finish` to this topic's terminal step
+  and, in the same edit, deleted `renderNav()`'s own `btnCompleteNext.classList.toggle('btn--primary',
+  solving)` line — the ADR-198 fix itself — while leaving `btn--primary` hardcoded on
+  `#btn-complete-next` in `index.html`. The class went from state-driven to permanently on, and the
+  new Finish button (also hardcoded `btn--primary`) added a third. Caught by this repo's own
+  `verify/interaction.mjs` (§8, ADR-198's oracle) once re-run, and reproduced live: 3 primaries at
+  Step 6 in free play.
+- Fixed: restoring the deleted toggle alone was not enough — `#btn-finish` is a genuinely new
+  primary ADR-198 never accounted for, so putting the old line back verbatim still leaves 2 loud
+  buttons idle and 3 while solving. The accent had to be re-decided across all three controls, not
+  reverted. **Decided:** the accent follows the learner's real payoff — `#btn-finish` in free play,
+  `#btn-complete-next` while a problem is loaded (mid-problem or already solved, matching ADR-198's
+  own "loud only when it completes something" reasoning). `#btn-deal-cut` is never the loud one at
+  Step 6 under either state. None of the three carries `btn--primary` in `index.html` any more;
+  `src/stepper.js`'s `renderNav()` is the single assigner, reading `sim.isProblemActive()`.
+- Fixed: a second, smaller gap this surfaced — `exitProblem()` (`src/problemLibrary.js`) clears the
+  active problem without routing through `sim.reset()` ("your drawing is kept" is the whole point),
+  so nothing re-ran `renderNav()` on exit and the accent could go stale on "Try another problem"
+  after leaving a problem while parked on Step 6. Added `sim.syncNav()` (`main.js`, thin wrapper over
+  `stepper.sync()`) and call it at the end of `exitProblem()`.
+- Extended: `verify/interaction.mjs` §8 now drives a full load → Step 6 → exit cycle and asserts the
+  accent at each stage, not just the free-play case ADR-198 originally covered.
+- See `DECISIONS.md` ADR-142 for why this fix's decision record lives here rather than under a
+  fresh root `ADR-198` body: ADR-198 is one of the 45 references ADR-142 documents as orphaned from
+  Vishnu's merge (a citation with no body anywhere, deliberately left that way) — this topic's own
+  `CHANGELOG.md` is where its decisions have actually been recorded all along.
+
 ## 2026-08-09 — The tangent method's frame stops moving; its labels are set outward (ADR-214)
 
 **1. Fixed: the drawing rescaled on the final step (ADR-214).**

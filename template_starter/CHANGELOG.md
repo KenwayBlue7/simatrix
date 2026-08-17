@@ -3,6 +3,22 @@
 Notable changes to this template. (Module 2's history was intentionally not carried over —
 this changelog starts fresh, per MODULE-STARTER §3.2.)
 
+## 2026-07-31
+- Fixed: retired the auto-fired, one-shot `markComplete()` shape (last file in the repo still carrying it) in favor of the platform-wide button-driven, latchless "Finish lesson" pattern. `main.js`'s `markComplete()` drops the `window.__simComplete` guard down to a one-line latchless post. `stepper.js` removes the `firstArrival`/`visited.has(TOTAL)` auto-fire from `goToStep()` and instead wires a new `#btn-finish` click listener (`markComplete()` + an announce), and adds the missing `markComplete` entry to the `sim` JSDoc typedef. Ungated — matches `graphics_module_1_topic_4_understanding_orthographic_views`'s ungated precedent, since this starter has no domain state to gate on; a real topic cut from this template should decide its own gate (see root `MODULE-STARTER.md` §3.11, added alongside this fix). (`main.js`, `src/stepper.js`.)
+- Added: `#btn-finish` button in `.card__nav`, after `#btn-next` — same mutual-exclusivity idiom as every other migrated topic (`stepper.js`'s `renderNav()` hides one exactly when it shows the other). (`index.html`.)
+
+## 2026-07-28
+- Added: a new `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` once, fired on first arrival at the terminal step (step 3) — the host's second sanctioned outbound signal, for a "next topic / stay" overlay (ADR-078 addendum), so every future topic minted from this template inherits it. (`main.js`, `src/stepper.js`.)
+
+## 2026-07-27
+- Changed: the Problem Library overlay's title now centers in its header row (was hard-left) — a 44px spacer counterweights the close button so it stays corner-anchored (ADR-082), and future topics minted from this template inherit it. (`index.html`.)
+
+## 2026-07-25
+- Fixed: the Compare-split CSS/markup scaffolding still carried the dead floating "compact" card (title bar + expand/close buttons) that ADR-080 removed platform-wide — no `main.js` wiring existed here to trigger its resize-strand bug, but every new topic minted from this template would have re-seeded the dead chrome. Cleaned to the single-shape docked split (grid-area cell only) with a CSS-only single-column restack below 768px, matching every other Compare-card topic. (`index.html`.)
+
+## 2026-07-24
+- Added: `markBooted()` now posts `{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` resolves — the host loading screen's boot-ready signal (ADR-078, narrows ADR-002), so every future topic minted from this template inherits it. (`main.js`.)
+
 ## 2026-07-20
 - Changed: `--color-vp-line` darkened `#bc5d1e → #b25718` (platform-wide AA promotion, ~4.92:1 on paper) — `index.html` `:root`, so new topics minted from this template inherit the darker amber.
 

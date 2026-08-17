@@ -1,0 +1,6 @@
+{
+  "title": "Tangent Lines",
+  "description": "Three compass-and-straightedge tangent-line constructions — two tangents from an external point to a circle, and common external and internal tangents to two circles — each animated step by step with points of tangency marked and labelled, then set up as a textbook problem to verify, including an applied crossed-belt-drive capstone.",
+  "difficulty": "intermediate",
+  "tags": ["diploma-engineering-graphics", "geometrical-constructions", "tangent-lines", "guided-stepper", "2d-svg"]
+}

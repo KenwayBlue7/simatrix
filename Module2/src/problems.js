@@ -77,6 +77,19 @@ export const FIELD_LABELS = Object.freeze({
  *                              `modes` object. ONLY the keys present are checked — a field
  *                              the textbook does not specify is left OUT, never pinned to an
  *                              arbitrary value, so the student may set it freely.
+ * @property {Object} [method]  Show Method (ADR-084) construction-order override, for
+ *                              'both-planes' problems ONLY — optional and additive (never a
+ *                              required export, same precedent as EXCLUDED_TYPES/setup/path,
+ *                              ADR-083). Absent entirely for 'one-plane' problems: a single
+ *                              inclined axis needs no decomposition, so Show Method goes
+ *                              straight from simple position to the fully resolved pose with
+ *                              no per-problem data at all. Present shape:
+ *                              `{ order: ['HP','VP'] | ['VP','HP'] }` — which plane's
+ *                              inclination the textbook resolves FIRST (main.js's
+ *                              planMethodStages defaults to HP-first when absent). Every
+ *                              'both-planes' entry below was checked against its own
+ *                              statement's phrasing; add `method.order` only on an entry where
+ *                              the textbook genuinely resolves VP before HP.
  */
 
 /**
@@ -200,6 +213,11 @@ export const PROBLEMS = Object.freeze([
   },
 
   // ---- Inclined to BOTH planes (dual manual inclination — filtered out in the Topic 2 clone) ----
+  // Show Method (ADR-084) authoring pass: both entries below were checked against their own
+  // statement's phrasing for a `method.order` override. Both state the HP angle before the VP
+  // angle, matching main.js planMethodStages' HP-first default — no `method` key added to
+  // either (a verification pass, not a mandatory per-problem edit; see the Problem typedef's
+  // `method` doc above).
   {
     id: 'sqpyr-both',
     tier: 'both-planes',

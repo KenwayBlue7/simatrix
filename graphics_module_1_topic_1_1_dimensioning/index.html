@@ -71,24 +71,30 @@
 
   <style>
     /*
-      Bundled web fonts (DESIGN.md typography / RULES.md §2.15). Local subset woff2 in
-      ./assets/fonts/ — no runtime Google Fonts fetch, so the sim works offline after the
-      initial load. Atkinson Hyperlegible (UI/body), IBM Plex Mono (numbers).
+      Bundled web fonts (DESIGN.md typography). Shared platform font host (ADR-086, amends
+      RULES.md §2.12/§2.15's local-only mandate for this track) — Atkinson Hyperlegible
+      (UI/body), IBM Plex Mono (numbers).
     */
     @font-face {
       font-family: "Atkinson Hyperlegible";
-      font-style: normal; font-weight: 400; font-display: swap;
-      src: url("./assets/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/atkinson-hyperlegible-latin-400-normal.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
     }
     @font-face {
       font-family: "Atkinson Hyperlegible";
-      font-style: normal; font-weight: 700; font-display: swap;
-      src: url("./assets/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/atkinson-hyperlegible-latin-700-normal.woff2") format("woff2");
+      font-weight: 700;
+      font-style: normal;
+      font-display: swap;
     }
     @font-face {
       font-family: "IBM Plex Mono";
-      font-style: normal; font-weight: 400; font-display: swap;
-      src: url("./assets/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+      src: url("https://ipcgxpcfrqlxicgtyhql.supabase.co/storage/v1/object/public/simulations/_shared/fonts/ibm-plex-mono-latin-400-normal.woff2") format("woff2");
+      font-weight: 400;
+      font-style: normal;
+      font-display: swap;
     }
 
     /*
@@ -264,7 +270,7 @@
     /* --- Floating viewport controls + the orbit hint --- */
     .vp-controls {
       position: absolute;
-      top: calc(44px + var(--space-5));
+      top: calc(44px + var(--space-3)); /* one 44px button-height down + the current host-chrome clearance (DESIGN.md §5.12) */
       left: var(--space-4);
       display: flex;
       gap: var(--space-2);
@@ -559,7 +565,9 @@
     /* ---- Wizard hide/show toggle ---- */
     .wizard-toggle {
       position: absolute;
-      top: calc(44px + var(--space-5));
+      /* NOT the .vp-controls 44px+space-3 clearance — this top-right toggle has nothing above
+         it, so it is decoupled from the left cluster's host-chrome-avoidance logic entirely. */
+      top: var(--space-3);
       right: var(--space-3);
       /* Above the examples board (8), so the panel can still be collapsed while reading. */
       z-index: 12;
@@ -1929,6 +1937,12 @@
           </div>
           <button id="btn-back" class="btn btn--nav" type="button" hidden>Back</button>
           <button id="btn-next" class="btn btn--primary btn--nav" type="button">Next</button>
+          <!-- Finish lesson: takes over the footer's primary slot once Next hides at the
+               terminal step (Step 6). Fires sim:complete (ADR-078 addendum, revised — no
+               latch, every click reposts). Own element, own listener: NOT a relabel of
+               #btn-next. Gated on isComplete(6) (all 12 seeded faults found) — a real
+               completion signal, not mere arrival at Step 6. -->
+          <button id="btn-finish" class="btn btn--primary btn--nav" type="button" hidden disabled>Finish lesson</button>
           <!-- What still stands between the learner and the next step (never colour alone). -->
           <p class="step-gate" id="step-gate" hidden></p>
         </footer>

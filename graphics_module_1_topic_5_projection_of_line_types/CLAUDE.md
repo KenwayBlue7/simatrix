@@ -37,6 +37,10 @@ the Rotation Method construction — carried over from the Lines topic).
 **Scope boundary:** self-contained Three.js *simulation payload* only. The host Simatrix website
 (navbar, module browser, account UI) is out of scope.
 
+**`sim:ready` boot signal** (ADR-078, narrows ADR-002): `markBooted()` posts
+`{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` — the one
+sanctioned outbound `postMessage`. Do not add any other `postMessage`/inbound listener.
+
 ---
 
 ## Architecture — Module 2 orchestrator pattern (ADR-033)
@@ -46,8 +50,11 @@ the Rotation Method construction — carried over from the Lines topic).
   cameras + their `OrbitControls` (the dual-camera §5.18 stack — quick-views + the ADR-036 fold
   swoop), the single `rebuild()` pipeline (full WebGL disposal contract, ADR-004), the render loop,
   the two CSS2D overlays, the Compare state machine + the ADR-021/ADR-037 workbench split, the
-  Rotation Method construction system, the **per-step camera framing** (`frameStep`), and
-  `window.simAPI`. No leaf imports a sibling leaf (RULES.md §3.6).
+  Rotation Method construction system, the **per-step camera framing** (`frameStep`), the
+  **clip-aware auto-zoom** (`reframeIfClipped`, ADR-014 — dollies the free-orbit perspective camera
+  back when typed-field values push the line past the frame; sequenced against `frameStep` via a
+  `stepFraming` guard so the two camera movers never race), and `window.simAPI`. No leaf imports a
+  sibling leaf (RULES.md §3.6).
 - **Data-driven line types.** Each of the six positions is a **configuration object** in
   `lineTypesData.js` (`STEPS`), NOT a bespoke render path. A step's `set` LOCKS the `case` + the
   angles it does not teach; `controls` lists the meaningful controls; `cam` is the vantage the
@@ -58,19 +65,26 @@ the Rotation Method construction — carried over from the Lines topic).
   case + angles, sets all views on, gently frames the camera, and routes into `rebuild()`. It is a
   conceptual TOUR — no answer gates; a step counts complete once visited.
 - **World axes** (Module-1 family): `HP = XZ plane (y=0)` · `VP = XY plane (z=0)` · `fold line = X`.
-  `÷10`, ADR-018: 1 world unit = 10 mm. Sheet 24×24 units (240 mm), framed apparatus-tight.
+  `÷10`, ADR-018: 1 world unit = 10 mm. Sheet is **32×32 units (320 mm)**, `PLANE_LIFT = 10` — the
+  HP/VP planes are OFFSET (not origin-centred), spanning `[-6, +26]` on the axis the drawing uses,
+  sized to the typed-field TL ceiling (200mm) plus a 3u annotation margin (ADR-079 — the drawing
+  only ever occupies the first quadrant, so an origin-centred plane wastes half its area).
+  `GRID.divs` scales with `SHEET` to keep the 1.0u = 10 mm engineering cell.
 - **Per-step camera (frameStep)** glides the **free-orbit perspective camera** to each step's
   vantage on entry — an orbit-preserving reframe, not a held-angle lock (§5.8). Any user drag
   cancels it; orbit behaviour stays identical to every other Module-1 topic. The fold still flies
   the ADR-036 orthographic swoop unchanged.
-- **Compare / workbench** (ADR-012 / ADR-021 / ADR-037): the 3D scene is always the main pane; the
-  finished 2D orthographic drawing appears on demand, rendered on its OWN `WebGLRenderer`/canvas
-  (ADR-076 — a genuinely separate surface from the 3D viewport, not a scissored pass on a shared
-  one). Available on every step. The expanded split docks three floating rounded cards (3D
-  viewport, 2D drawing, rail) on a `--color-panel` shell (DESIGN.md §5.13) with an independent
-  `#rail-toggle` Hide/Show control; `WORKBENCH_CONTROLS` re-parents the drivers (`tl`/`theta`/`phi`)
-  **and** the Rotation Method launcher (`rotation`) into the rail, so the construction runs inside
-  the split like any other control.
+- **Compare / workbench** (ADR-012 / ADR-021 / ADR-037, narrowed by ADR-080): the 3D scene is
+  always the main pane; the finished 2D orthographic drawing appears on demand, rendered on its OWN
+  `WebGLRenderer`/canvas (ADR-076 — a genuinely separate surface from the 3D viewport, not a
+  scissored pass on a shared one). Available on every step. Compare has exactly one shape, at every
+  viewport width — the split docks three floating rounded cards (3D viewport, 2D drawing, rail) on
+  a `--color-panel` shell (DESIGN.md §5.13) with an independent `#rail-toggle` Hide/Show control.
+  There is no compact/floating fallback card and no `matchMedia`-driven demotion (§5.16a) — below
+  768px the same split grid restacks to a single column instead of switching to a different Compare
+  UI. `WORKBENCH_CONTROLS` re-parents the drivers (`tl`/`theta`/`phi`) **and** the Rotation Method
+  launcher (`rotation`) into the rail, so the construction runs inside the split like any other
+  control.
 - **Rotation Method (Step 6):** the rotating-line construction (`rotationMethod.js`, ported from the
   Lines topic's `trueLength.js`, unchanged by the renderer split) animates on the Compare sheet —
   swings each foreshortened view flat to recover the True Length and the true angles θ, φ. Torn
@@ -86,7 +100,8 @@ graphics_module_1_topic_5_projection_of_line_types/
 │                        (ADR-037), fold swoop, frameStep, Rotation Method, simAPI)
 ├── meta.json         ← platform metadata (title = "Projection of Straight Lines — Types of Lines")
 ├── CLAUDE.md · CHANGELOG.md
-├── assets/fonts/     ← bundled woff2 (byte-identical to the platform set)
+│                     (fonts: @font-face served from Supabase Storage CDN, ADR-086 —
+│                      no local assets/fonts/ anymore)
 └── src/
     ├── anim.js            ← tween/easing engine (byte-identical to the platform copy)
     │  # pure data

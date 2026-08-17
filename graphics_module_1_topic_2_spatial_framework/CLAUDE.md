@@ -155,6 +155,9 @@ Concretely for this topic:
 - **`window.simAPI`** (`src/main.js`) exposes `pause()` / `resume()` / `reset()`. `reset()`
   routes through the single `rebuild()` pipeline — when an in-sim Reset control is added, it
   **must** call `simAPI.reset()`, never a second reset path (RULES.md §2.9).
+- **`sim:ready` boot signal** (ADR-078, narrows ADR-002): `markBooted()` posts
+  `{ type: 'sim:ready' }` to `window.parent` once, after `document.fonts.ready` — the one
+  sanctioned outbound `postMessage`. Do not add any other `postMessage`/inbound listener.
 - **Mobile notice**, boot watchdog + WebGL fallback, and the reduced-motion collapse are
   already present in `index.html`/`main.js` — reuse them, don't re-implement.
 - **Self-starting**: `src/main.js` calls `init()` itself at module load; no external caller.
@@ -192,7 +195,8 @@ graphics_module_1_topic_2_spatial_framework/
 │                            separate dock — + the #term-pop singleton); self-starting
 ├── meta.json              ← platform metadata (done)
 ├── CLAUDE.md              ← THIS file
-├── assets/fonts/          ← bundled woff2 (done, byte-identical to the platform set)
+│                          (fonts: @font-face served from Supabase Storage CDN, ADR-086 —
+│                           no local assets/fonts/ anymore)
 └── src/
     ├── main.js            ← orchestrator: scene, OrbitControls, single rebuild() (leaf-owned
     │                         disposal contract), rAF loop (ticks anim.js), window.simAPI,

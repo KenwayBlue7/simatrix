@@ -12,5 +12,9 @@ desktop.ini
 
 # Archives and generated codebase dumps (keep out of history)
 *.zip
+*.pdf
 
 /.obsidian
+
+# graphify knowledge-graph output (regenerable via `graphify update .`)
+/graphify-out/

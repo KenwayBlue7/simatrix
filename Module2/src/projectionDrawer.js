@@ -263,10 +263,11 @@ function visibleInVP(faces) {
  * that observer (`worldNormal.z > 0`), otherwise the body occludes it and it is
  * drawn dashed. Convexity makes the normal test exact, as for HP/VP.
  *
- * SIGN (CLAUDE.md): the `> 0` here pairs with the PP_FOLD_TARGET (−90° about local X)
- * fold in main.js. The observer direction is unchanged by the fold, so this `> 0` test
- * is retained; only the side view's PLACEMENT changed (now beside the top view). Re-derive
- * VISUALLY against the worked square pyramid if the fold sign changes — do not flip blindly.
+ * SIGN (CLAUDE.md): the `> 0` here pairs with the PP_FOLD_TARGET (+90° about local Y,
+ * ADR-106) fold in main.js. The observer direction is unchanged by the fold, so this
+ * `> 0` test is retained; only the side view's PLACEMENT changed (now beside the FRONT
+ * view, not the top view — ADR-106). Re-derive VISUALLY against the worked square
+ * pyramid if the fold sign changes — do not flip blindly.
  *
  * @param {import('./meshAnalyzer.js').Face[]} faces Faces sharing the edge.
  * @returns {boolean}
@@ -274,6 +275,105 @@ function visibleInVP(faces) {
 function visibleInPP(faces) {
   for (const f of faces) if (f.worldNormal.z > 0) return true;
   return false;
+}
+
+/**
+ * Is this edge on the OUTLINE (silhouette boundary) of the HP (top) view — the ADR-087 "outermost
+ * boundary lines, drawn first" beat? Deliberately built as `visibleInHP(faces) &&` (straddle OR
+ * single-face) so **outline is a strict SUBSET of visible, by construction** — never a "hidden
+ * outline" edge. Straddling means at least one incident face faces up (`worldNormal.y > 0`) AND at
+ * least one faces down/edge-on (`<= 0`); a single-incident-face edge straddles trivially (there is
+ * nothing on its far side to contradict it).
+ *
+ * DIFFERENT from `EdgeType.SILHOUETTE` (meshAnalyzer's classification is 3D and orbit-invariant —
+ * "how many faces share this edge, at all") and from plain `visibleInHP` (outline is the narrower
+ * test: a visible internal crease on a convex solid, e.g. a pyramid's near-side base edge, is
+ * visible but not a boundary line). Because outline ⊆ visible, outline edges are redrawn again by
+ * the later visible-face / visible-generator beats — accepted deliberately (ADR-087): a learner
+ * re-traces the outline before adding interior detail, matching the textbook, rather than the code
+ * suppressing the overlap.
+ *
+ * @param {import('./meshAnalyzer.js').Face[]} faces Faces sharing the edge.
+ * @returns {boolean}
+ */
+function onOutlineHP(faces) {
+  if (!visibleInHP(faces)) return false;
+  if (faces.length === 1) return true;
+  let front = false, back = false;
+  for (const f of faces) { if (f.worldNormal.y > 0) front = true; else back = true; }
+  return front && back;
+}
+
+/**
+ * Is this edge on the OUTLINE of the VP (front) view? Same `visibleInVP(faces) &&` straddle test
+ * as {@link onOutlineHP}, against the VP observer axis (`worldNormal.x`) — see that function's
+ * header for the full rationale (outline ⊆ visible by construction, deliberate beat-1 redraw
+ * under ADR-087).
+ *
+ * @param {import('./meshAnalyzer.js').Face[]} faces Faces sharing the edge.
+ * @returns {boolean}
+ */
+function onOutlineVP(faces) {
+  if (!visibleInVP(faces)) return false;
+  if (faces.length === 1) return true;
+  let front = false, back = false;
+  for (const f of faces) { if (f.worldNormal.x > 0) front = true; else back = true; }
+  return front && back;
+}
+
+/**
+ * Is this edge on the OUTLINE of the PP (side) view? Same `visibleInPP(faces) &&` straddle test as
+ * {@link onOutlineHP}, against the PP observer axis (`worldNormal.z`) — see that function's header
+ * for the full rationale. Unused while ADR-088 keeps the side view out of the Show Method replay,
+ * but kept alongside its HP/VP siblings rather than special-cased away — `drawProjections`
+ * classifies all three planes uniformly, and a future consumer (the live 3D pane, or a restored
+ * side-view beat) gets it for free.
+ *
+ * @param {import('./meshAnalyzer.js').Face[]} faces Faces sharing the edge.
+ * @returns {boolean}
+ */
+function onOutlinePP(faces) {
+  if (!visibleInPP(faces)) return false;
+  if (faces.length === 1) return true;
+  let front = false, back = false;
+  for (const f of faces) { if (f.worldNormal.z > 0) front = true; else back = true; }
+  return front && back;
+}
+
+/**
+ * Axis-alignment threshold for the base/generator edge split (ADR-087). Compared against the
+ * ABSOLUTE VALUE of the dot product of a (unit) edge direction and the solid's (unit) axis
+ * direction — a base/cap edge is perpendicular to the axis (dot ≈ 0), a generator (a prism's
+ * lateral edge, a pyramid/cone's slant edge) is not. Same order of magnitude as
+ * {@link WELD_TOLERANCE}-style epsilons elsewhere in this codebase (meshAnalyzer.js `1e-3`): far
+ * below the smallest real slant angle on any generated solid, so it only ever absorbs float error
+ * from the matrix transform, never mis-splits a genuine edge.
+ * @type {number}
+ */
+const AXIS_ALIGN_EPS = 1e-3;
+
+/**
+ * Classify an edge as a solid's BASE/cap edge or a GENERATOR (longitudinal/slant edge) — the
+ * ADR-087 split `strokeMethodLines`'s beats key off, alongside the existing visible/hidden split.
+ * Every Module 2 solid is generated upright about its own LOCAL +Y axis (CLAUDE.md); `axisDir` is
+ * that axis rotated into WORLD space by the pose's own rotation (the caller's job — see
+ * `drawProjections`'s `options.axis`). Because a pose's transform is always rigid (rotation +
+ * translation, uniform scale), a base/cap edge — perpendicular to the local axis by construction —
+ * stays perpendicular to `axisDir` in world space, and a generator — which has a component along
+ * the axis — keeps a non-zero dot product regardless of the pose. A zero-length edge (should not
+ * occur; addSegment's own EPSILON guard drops it from the drawn batches downstream regardless)
+ * defaults to `'base'` rather than dividing by zero.
+ * @param {THREE.Vector3} p1 Edge start (world).
+ * @param {THREE.Vector3} p2 Edge end (world).
+ * @param {THREE.Vector3} axisDir Unit world-space solid axis.
+ * @returns {'base' | 'generator'}
+ */
+function edgeKindOf(p1, p2, axisDir) {
+  const dx = p2.x - p1.x, dy = p2.y - p1.y, dz = p2.z - p1.z;
+  const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+  if (len < EPSILON) return 'base';
+  const dot = (dx * axisDir.x + dy * axisDir.y + dz * axisDir.z) / len;
+  return Math.abs(dot) > AXIS_ALIGN_EPS ? 'generator' : 'base';
 }
 
 // ============================================================================
@@ -303,12 +403,13 @@ function projectVP(p) {
 /**
  * Project a world point onto PP, the profile (side) plane — the "cast to the side
  * wall" view. Zeroes Z, keeps X and Y. The plane's standoff from the solid (its z0
- * offset, and the flatten hinge about the HP∩PP line) is owned by the CONSUMER:
- * main.js parents the returned ppGroup under a hinge group translated to (0, 0, z0)
- * in WORLD space and rotated about its local X (folding the plane down onto the HP),
- * so here we draw the bare side view at z = 0 in that group's local frame. (The third
- * orthographic view — there is no Unity sign to re-derive; like HP/VP it just zeroes
- * one world coordinate.)
+ * offset, and the flatten hinge about the VP∩PP line) is owned by the CONSUMER
+ * (ADR-106): main.js parents the returned ppGroup under a hinge group NESTED inside
+ * vpFoldGroup, translated to local (0, 0, z0), and rotated about its local Y (folding
+ * the plane sideways into the VP plane, then riding the VP's own fold down with the
+ * front view), so here we draw the bare side view at z = 0 in that group's local
+ * frame. (The third orthographic view — there is no Unity sign to re-derive; like
+ * HP/VP it just zeroes one world coordinate.)
  * @param {THREE.Vector3} p
  * @returns {THREE.Vector3}
  */
@@ -355,9 +456,12 @@ function addSegment(batch, a, b) {
  * @param {number}       linewidth Width in CSS pixels.
  * @param {boolean}      dashed   Dashed (true) or solid (false).
  * @param {THREE.Vector2} resolution Drawing-buffer size; required by LineMaterial.
+ * @param {'base' | 'generator' | 'outline' | undefined} [kind] ADR-087 edge-feature tag, stamped
+ *   onto `userData.kind` beside the existing `userData.hidden` — undefined for batches this
+ *   classification doesn't apply to (connectors, dimensions).
  * @returns {LineSegments2 | null}
  */
-function buildSegments(batch, color, linewidth, dashed, resolution) {
+function buildSegments(batch, color, linewidth, dashed, resolution, kind) {
   if (batch.positions.length === 0) return null;
 
   const geometry = new LineSegmentsGeometry();
@@ -399,6 +503,10 @@ function buildSegments(batch, color, linewidth, dashed, resolution) {
   // Compare canvas) can tell visible from occluded without relying on undocumented
   // LineMaterial getter behaviour.
   segments.userData.hidden = dashed;
+  // ADR-087: base/generator/outline tag, same reasoning as userData.hidden above — read back
+  // by harvestLineGroup (main.js) so Show Method's beat gates can filter without re-deriving
+  // face normals from data that's already been discarded by this point.
+  if (kind) segments.userData.kind = kind;
   return segments;
 }
 
@@ -441,7 +549,10 @@ function buildArrowMesh(positions, color) {
  * @property {THREE.Group} connectorGroup Dotted 3D→2D connector lines to HP + VP (upright view).
  * @property {THREE.Group} ppConnectorGroup Dotted 3D→PP connector lines (upright view) — the
  *   side-view counterpart of connectorGroup. Kept SEPARATE so the consumer can reveal it only
- *   once the side view (Step 5) is shown, rather than with the top + front views (Step 4).
+ *   once showSideViewFlag is on, rather than with the top + front views. (ADR-162: Step 5's
+ *   single reveal action sets showSideViewFlag alongside showProjectionsFlag on the same click,
+ *   but this group still animates on its own beat within that one reveal — see main.js
+ *   revealViewsSequence.)
  * @property {THREE.Group} flatConnectorGroup Dashed 2D projectors linking the top
  *   view to the FOLDED front view across the ground line — the connector lines of
  *   the flattened drawing. Positioned at the folded layout; the consumer fades them
@@ -457,6 +568,16 @@ function buildArrowMesh(positions, color) {
  *   hpDimensionGroup, built in the same upright X = 0 frame as vpGroup. Kept SEPARATE so the
  *   consumer parents it under the VP FOLD PIVOT — then the front-view dimensions fold down
  *   flat WITH the VP instead of standing upright after the flatten (the split's whole point).
+ * @property {THREE.Group} hpOutlineGroup ADR-087 — the HP view's outline-only edges (see
+ *   `onOutlineHP`), same style as `hpGroup`'s visible batch. A redundant COPY, not a subset
+ *   carved out of `hpGroup`: those edges are still present in `hpGroup` too (a beat-gated
+ *   consumer needs both "outline alone" and "every visible edge including the outline" as
+ *   independently selectable sets). NOT added to `group` or to `hpGroup` — the live 3D pane
+ *   has no use for a redundant duplicate layer and simply never reads this property; Show
+ *   Method's headless harvest is the only consumer. Held by `dispose()`/`setResolution()`
+ *   regardless of whether anything ever parents it.
+ * @property {THREE.Group} vpOutlineGroup Same as `hpOutlineGroup`, for the VP view.
+ * @property {THREE.Group} ppOutlineGroup Same as `hpOutlineGroup`, for the PP view.
  * @property {(width: number, height: number) => void} setResolution
  *   Push a new drawing-buffer size to every LineMaterial. Call once after
  *   creation and again on every resize, or line widths render wrong.
@@ -495,8 +616,23 @@ function buildArrowMesh(positions, color) {
  * @param {boolean} [options.drawHidden=true] Draw occluded edges as dashed lines.
  * @param {boolean} [options.drawConnectors=true] Draw the dotted 3D→2D connectors.
  * @param {number} [options.z0=0] PP standoff (ppHingeGroup.position.z, owned by the
- *   consumer). Needed only to place the folded side-view flat connectors at z0 − x;
- *   harmless at 0 when no profile plane has been seated yet.
+ *   consumer). Needed only to place the folded side-view flat connectors at the VP∩PP
+ *   hinge, z0 − x (ADR-106); harmless at 0 when no profile plane has been seated yet.
+ * @param {THREE.Vector3} [options.axis=(0,1,0)] ADR-087 — the solid's WORLD-space axis
+ *   direction (unit vector), used only to split each plane's visible/hidden batch further into
+ *   base/generator sub-batches (see `edgeKindOf`). Every Module 2 solid is generated upright
+ *   about LOCAL +Y (CLAUDE.md); pass local +Y rotated by the pose's own rotation — e.g.
+ *   `new THREE.Vector3(0, 1, 0).transformDirection(matrixWorld)` for the live mesh, or the same
+ *   against a headless stage's pose matrix. Defaults to world +Y (correct for an upright,
+ *   unrotated solid) so existing callers that never pass it still classify sensibly.
+ * @param {{ heightMM: number, baseMM: number|null }} [options.restrictedDims] ADR-102 — when
+ *   given, REPLACES the full 5-dim bbox layer with exactly two dims: overall height (labelled
+ *   with `heightMM`, the caller's TRUE value — not the projected Y-extent, which is only correct
+ *   in Set 1's simple position) and the true base-polygon-edge length (labelled with `baseMM`;
+ *   pass `null` for curved-base solids, which have no single edge to dimension — see
+ *   `findBaseRingEdge`'s own doc for why this module doesn't infer that itself). Only Show
+ *   Method's `projectSet` (main.js) passes this; the live pane's own `drawProjections` call never
+ *   does, so its 5-dim toggle is untouched by this option's existence.
  * @returns {ProjectionResult}
  */
 export function drawProjections(edgeMap, options = {}) {
@@ -507,6 +643,8 @@ export function drawProjections(edgeMap, options = {}) {
     drawConnectors = true,
     drawDimensions = true,
     z0 = 0,
+    axis = new THREE.Vector3(0, 1, 0),
+    restrictedDims = null,
   } = options;
 
   const resolution = new THREE.Vector2(width, height);
@@ -520,14 +658,24 @@ export function drawProjections(edgeMap, options = {}) {
   const connectorColor = cssColor('--color-bench-grey');
   const inkColor = cssColor('--color-ink'); // dimension linework (Type B, Flat-Ink)
 
-  // Two batches per plane: visible (solid) and occluded (dashed). An edge lands
-  // in each plane's visible/occluded batch independently of the other two planes.
-  const hpVisible = newBatch();
-  const hpHidden = newBatch();
-  const vpVisible = newBatch();
-  const vpHidden = newBatch();
-  const ppVisible = newBatch();
-  const ppHidden = newBatch();
+  // ADR-087: FOUR batches per plane now, not two — visible/hidden (unchanged) crossed with
+  // base/generator (new, via edgeKindOf). Plus one more OUTLINE batch per plane (visible-only,
+  // a deliberate redundant copy — see onOutlineHP's header and hpOutlineGroup's JSDoc above).
+  const hpVisibleBase = newBatch();
+  const hpVisibleGenerator = newBatch();
+  const hpHiddenBase = newBatch();
+  const hpHiddenGenerator = newBatch();
+  const hpOutline = newBatch();
+  const vpVisibleBase = newBatch();
+  const vpVisibleGenerator = newBatch();
+  const vpHiddenBase = newBatch();
+  const vpHiddenGenerator = newBatch();
+  const vpOutline = newBatch();
+  const ppVisibleBase = newBatch();
+  const ppVisibleGenerator = newBatch();
+  const ppHiddenBase = newBatch();
+  const ppHiddenGenerator = newBatch();
+  const ppOutline = newBatch();
   const connectors = newBatch();
   const ppConnectors = newBatch();
   const flatConnectors = newBatch();
@@ -554,28 +702,36 @@ export function drawProjections(edgeMap, options = {}) {
     const vp1 = projectVP(edge.p1);
     const vp2 = projectVP(edge.p2);
 
+    // ADR-087: base-vs-generator is a single, plane-independent classification (it depends only
+    // on the edge's own 3D direction against the solid's axis, not on any observer), computed
+    // once and reused for all three planes below.
+    const kind = edgeKindOf(edge.p1, edge.p2, axis);
+
     // Decide solid vs dashed INDEPENDENTLY for each plane. A silhouette/boundary
     // edge (1 face) and a real internal crease run through the same convex normal
     // test; if drawHidden is off, an edge occluded in a given view is dropped from
     // that view only (it may still be visible — solid — in the other).
     if (visibleInHP(faces)) {
-      addSegment(hpVisible, hp1, hp2);
+      addSegment(kind === 'generator' ? hpVisibleGenerator : hpVisibleBase, hp1, hp2);
+      if (onOutlineHP(faces)) addSegment(hpOutline, hp1, hp2); // deliberate redundant copy
     } else if (drawHidden) {
-      addSegment(hpHidden, hp1, hp2);
+      addSegment(kind === 'generator' ? hpHiddenGenerator : hpHiddenBase, hp1, hp2);
     }
 
     if (visibleInVP(faces)) {
-      addSegment(vpVisible, vp1, vp2);
+      addSegment(kind === 'generator' ? vpVisibleGenerator : vpVisibleBase, vp1, vp2);
+      if (onOutlineVP(faces)) addSegment(vpOutline, vp1, vp2);
     } else if (drawHidden) {
-      addSegment(vpHidden, vp1, vp2);
+      addSegment(kind === 'generator' ? vpHiddenGenerator : vpHiddenBase, vp1, vp2);
     }
 
     const pp1 = projectPP(edge.p1);
     const pp2 = projectPP(edge.p2);
     if (visibleInPP(faces)) {
-      addSegment(ppVisible, pp1, pp2);
+      addSegment(kind === 'generator' ? ppVisibleGenerator : ppVisibleBase, pp1, pp2);
+      if (onOutlinePP(faces)) addSegment(ppOutline, pp1, pp2);
     } else if (drawHidden) {
-      addSegment(ppHidden, pp1, pp2);
+      addSegment(kind === 'generator' ? ppHiddenGenerator : ppHiddenBase, pp1, pp2);
     }
 
     registerVertex(uniqueVertices, edge.p1);
@@ -603,13 +759,15 @@ export function drawProjections(edgeMap, options = {}) {
       const foldedFront = new THREE.Vector3(-vertex.y, 0, vertex.z);
       addSegment(flatConnectors, projectHP(vertex), foldedFront);
 
-      // Side-view projector: link the TOP-view point to the folded SIDE-view point.
-      // The PP now hinges DOWN onto the HP about the HP∩PP line (−90° about local X, in
-      // world space), carrying a PP point (x, y, 0) at standoff z0 to (x, 0, z0 − y) —
-      // beside the TOP view. Top and side share world X (= the solid's x), so this
-      // projector runs along Z at constant x, tying the side view to the top view.
-      const foldedSide = new THREE.Vector3(vertex.x, 0, z0 - vertex.y);
-      addSegment(flatConnectors, projectHP(vertex), foldedSide);
+      // Side-view projector: link the FRONT-view point to the folded SIDE-view point
+      // (ADR-106). The PP now hinges SIDEWAYS into the VP plane about the VP∩PP line
+      // (+90° about local Y, nested inside vpFoldGroup so it rides the VP's own fold
+      // down), carrying a PP point (x, y, 0) at standoff z0 to (−y, 0, z0 − x) — beside
+      // the FRONT view. Front and side share world X (= −vertex.y, the same mapping
+      // foldedFront uses), so this projector runs HORIZONTALLY at constant world x,
+      // tying the side view to the front view — not the top view.
+      const foldedSide = new THREE.Vector3(-vertex.y, 0, z0 - vertex.x);
+      addSegment(flatConnectors, foldedFront, foldedSide);
     }
   }
 
@@ -642,32 +800,67 @@ export function drawProjections(edgeMap, options = {}) {
     const V = (x, y, z) => new THREE.Vector3(x, y, z);
     const EXTENT_EPS = 1e-3;
 
-    // Front view (VP, X = 0) → vpDim* (folds with the VP). Height (Y), width (Z, shared with
-    // the top view), and the clearance above the ground line (Y = 0 = HP∩VP) when the solid
-    // stands off HP. Built in the X = 0 plane, the same frame vpGroup draws in, so parenting
-    // this group under the VP fold pivot folds these dims down flat with the front view.
-    if (max.y - min.y > EXTENT_EPS) {
-      pushLinearDim(vpDimBatch, vpArrowPos, vpDimLabels, V(0, min.y, max.z), V(0, max.y, max.z),
-        V(0, 0, DIM_OFFSET), (max.y - min.y) * WORLD_TO_MM);
-    }
-    if (max.z - min.z > EXTENT_EPS) {
-      pushLinearDim(vpDimBatch, vpArrowPos, vpDimLabels, V(0, max.y, min.z), V(0, max.y, max.z),
-        V(0, DIM_OFFSET, 0), (max.z - min.z) * WORLD_TO_MM);
-    }
-    if (min.y > EXTENT_EPS) {
-      pushLinearDim(vpDimBatch, vpArrowPos, vpDimLabels, V(0, 0, min.z), V(0, min.y, min.z),
-        V(0, 0, -DIM_OFFSET), min.y * WORLD_TO_MM);
-    }
+    if (restrictedDims) {
+      // ADR-102/103 — Show Method's own restricted dimension layer (Set 1 only, ADR-103):
+      // overall height + the TRUE base-edge length ONLY, never the live pane's 5 bbox-extent
+      // dims below (untouched, reached only via the `else` branch — restrictedDims is never
+      // passed by the live pane's own drawProjections call). Both dims land in whichever view
+      // the live pane's own placement idiom already uses for that feature (VP for height, HP for
+      // the base edge), so the restricted layer folds/flattens exactly like the full one.
+      // `valueMM` is the caller's TRUE value (main.js reads it straight off shapeData — every Set
+      // shares one geometry, so it's pose-invariant), decoupled from the placement geometry below
+      // exactly the way pushLinearDim already separates the two for every other dim in this file.
+      if (restrictedDims.heightMM != null && max.y - min.y > EXTENT_EPS) {
+        // ADR-103: the dimension LINE stays at the bbox's own max.z (a fixed screen position,
+        // margin-side), but each extension line now ANCHORS to a real point of the drawing at
+        // that height — see pushLinearDim's anchorA/B and ringZExtentAt's own doc for why a
+        // pyramid/cone apex (a single point, usually nowhere near max.z) needs this and a prism
+        // (whose top ring already reaches max.z) does not.
+        const topAnchorZ = ringZExtentAt(edgeMap, max.y, EXTENT_EPS) ?? max.z;
+        const botAnchorZ = ringZExtentAt(edgeMap, min.y, EXTENT_EPS) ?? max.z;
+        pushLinearDim(vpDimBatch, vpArrowPos, vpDimLabels, V(0, min.y, max.z), V(0, max.y, max.z),
+          V(0, 0, DIM_OFFSET), restrictedDims.heightMM,
+          V(0, min.y, botAnchorZ), V(0, max.y, topAnchorZ));
+      }
+      if (restrictedDims.baseMM != null) {
+        // null for Cone/Cylinder (main.js's own gate — no polygon base edge exists to measure;
+        // this module stays shape-agnostic, per its own header, so it never infers that itself).
+        const baseEdge = findBaseRingEdge(edgeMap, axis);
+        if (baseEdge) {
+          const center = box.getCenter(new THREE.Vector3());
+          const off = baseEdgeDimOffset(baseEdge.p1, baseEdge.p2, center);
+          pushLinearDim(hpDimBatch, hpArrowPos, hpDimLabels, baseEdge.p1, baseEdge.p2, off,
+            restrictedDims.baseMM);
+        }
+      }
+    } else {
+      // Front view (VP, X = 0) → vpDim* (folds with the VP). Height (Y), width (Z, shared with
+      // the top view), and the clearance above the ground line (Y = 0 = HP∩VP) when the solid
+      // stands off HP. Built in the X = 0 plane, the same frame vpGroup draws in, so parenting
+      // this group under the VP fold pivot folds these dims down flat with the front view.
+      if (max.y - min.y > EXTENT_EPS) {
+        pushLinearDim(vpDimBatch, vpArrowPos, vpDimLabels, V(0, min.y, max.z), V(0, max.y, max.z),
+          V(0, 0, DIM_OFFSET), (max.y - min.y) * WORLD_TO_MM);
+      }
+      if (max.z - min.z > EXTENT_EPS) {
+        pushLinearDim(vpDimBatch, vpArrowPos, vpDimLabels, V(0, max.y, min.z), V(0, max.y, max.z),
+          V(0, DIM_OFFSET, 0), (max.z - min.z) * WORLD_TO_MM);
+      }
+      if (min.y > EXTENT_EPS) {
+        pushLinearDim(vpDimBatch, vpArrowPos, vpDimLabels, V(0, 0, min.z), V(0, min.y, min.z),
+          V(0, 0, -DIM_OFFSET), min.y * WORLD_TO_MM);
+      }
 
-    // Top view (HP, Y = 0) → hpDim* (stays flat under the HP). Depth (X) and the distance
-    // from VP (the top view's clearance from the ground line X = 0) when the solid stands off VP.
-    if (max.x - min.x > EXTENT_EPS) {
-      pushLinearDim(hpDimBatch, hpArrowPos, hpDimLabels, V(min.x, 0, min.z), V(max.x, 0, min.z),
-        V(0, 0, -DIM_OFFSET), (max.x - min.x) * WORLD_TO_MM);
-    }
-    if (min.x > EXTENT_EPS) {
-      pushLinearDim(hpDimBatch, hpArrowPos, hpDimLabels, V(0, 0, max.z), V(min.x, 0, max.z),
-        V(0, 0, DIM_OFFSET), min.x * WORLD_TO_MM);
+      // Top view (HP, Y = 0) → hpDim* (stays flat under the HP). Depth (X) and the distance
+      // from VP (the top view's clearance from the ground line X = 0) when the solid stands off VP.
+      if (max.x - min.x > EXTENT_EPS) {
+        pushLinearDim(hpDimBatch, hpArrowPos, hpDimLabels, V(min.x, 0, min.z), V(max.x, 0, min.z),
+          V(0, 0, -DIM_OFFSET), (max.x - min.x) * WORLD_TO_MM);
+      }
+      if (min.x > EXTENT_EPS) {
+        pushLinearDim(hpDimBatch, hpArrowPos, hpDimLabels, V(0, 0, max.z), V(min.x, 0, max.z),
+          V(0, 0, DIM_OFFSET), min.x * WORLD_TO_MM);
+      }
     }
   }
 
@@ -688,15 +881,35 @@ export function drawProjections(edgeMap, options = {}) {
   hpDimensionGroup.name = 'HP Dimensions';
   const vpDimensionGroup = new THREE.Group();
   vpDimensionGroup.name = 'VP Dimensions';
+  // ADR-087 — redundant-copy outline layers (see hpOutlineGroup's JSDoc above). NOT added to
+  // `group`/`hpGroup`/etc.; only Show Method's headless harvest reads these.
+  const hpOutlineGroup = new THREE.Group();
+  hpOutlineGroup.name = 'HP Outline';
+  const vpOutlineGroup = new THREE.Group();
+  vpOutlineGroup.name = 'VP Outline';
+  const ppOutlineGroup = new THREE.Group();
+  ppOutlineGroup.name = 'PP Outline';
 
-  // Per plane: visible = solid + full weight, occluded = dashed + lighter weight,
-  // both in the plane's own hue. VP visible is now SOLID (was wrongly dashed).
-  addIfPresent(hpGroup, buildSegments(hpVisible, hpColor, LINE_WIDTH_PX.visible, false, resolution));
-  addIfPresent(hpGroup, buildSegments(hpHidden, hpColor, LINE_WIDTH_PX.hidden, true, resolution));
-  addIfPresent(vpGroup, buildSegments(vpVisible, vpColor, LINE_WIDTH_PX.visible, false, resolution));
-  addIfPresent(vpGroup, buildSegments(vpHidden, vpColor, LINE_WIDTH_PX.hidden, true, resolution));
-  addIfPresent(ppGroup, buildSegments(ppVisible, ppColor, LINE_WIDTH_PX.visible, false, resolution));
-  addIfPresent(ppGroup, buildSegments(ppHidden, ppColor, LINE_WIDTH_PX.hidden, true, resolution));
+  // Per plane: visible = solid + full weight, occluded = dashed + lighter weight, both in the
+  // plane's own hue. VP visible is now SOLID (was wrongly dashed). ADR-087: each of visible/
+  // hidden now splits further into base/generator (4 children per plane instead of 2) — same
+  // pixels as before, just reorganized into more, smaller batches so a consumer can tell them
+  // apart; `kind` never affects colour or width.
+  addIfPresent(hpGroup, buildSegments(hpVisibleBase, hpColor, LINE_WIDTH_PX.visible, false, resolution, 'base'));
+  addIfPresent(hpGroup, buildSegments(hpVisibleGenerator, hpColor, LINE_WIDTH_PX.visible, false, resolution, 'generator'));
+  addIfPresent(hpGroup, buildSegments(hpHiddenBase, hpColor, LINE_WIDTH_PX.hidden, true, resolution, 'base'));
+  addIfPresent(hpGroup, buildSegments(hpHiddenGenerator, hpColor, LINE_WIDTH_PX.hidden, true, resolution, 'generator'));
+  addIfPresent(hpOutlineGroup, buildSegments(hpOutline, hpColor, LINE_WIDTH_PX.visible, false, resolution, 'outline'));
+  addIfPresent(vpGroup, buildSegments(vpVisibleBase, vpColor, LINE_WIDTH_PX.visible, false, resolution, 'base'));
+  addIfPresent(vpGroup, buildSegments(vpVisibleGenerator, vpColor, LINE_WIDTH_PX.visible, false, resolution, 'generator'));
+  addIfPresent(vpGroup, buildSegments(vpHiddenBase, vpColor, LINE_WIDTH_PX.hidden, true, resolution, 'base'));
+  addIfPresent(vpGroup, buildSegments(vpHiddenGenerator, vpColor, LINE_WIDTH_PX.hidden, true, resolution, 'generator'));
+  addIfPresent(vpOutlineGroup, buildSegments(vpOutline, vpColor, LINE_WIDTH_PX.visible, false, resolution, 'outline'));
+  addIfPresent(ppGroup, buildSegments(ppVisibleBase, ppColor, LINE_WIDTH_PX.visible, false, resolution, 'base'));
+  addIfPresent(ppGroup, buildSegments(ppVisibleGenerator, ppColor, LINE_WIDTH_PX.visible, false, resolution, 'generator'));
+  addIfPresent(ppGroup, buildSegments(ppHiddenBase, ppColor, LINE_WIDTH_PX.hidden, true, resolution, 'base'));
+  addIfPresent(ppGroup, buildSegments(ppHiddenGenerator, ppColor, LINE_WIDTH_PX.hidden, true, resolution, 'generator'));
+  addIfPresent(ppOutlineGroup, buildSegments(ppOutline, ppColor, LINE_WIDTH_PX.visible, false, resolution, 'outline'));
   addIfPresent(connectorGroup, buildSegments(connectors, connectorColor, LINE_WIDTH_PX.connector, true, resolution));
   addIfPresent(ppConnectorGroup, buildSegments(ppConnectors, connectorColor, LINE_WIDTH_PX.connector, true, resolution));
   addIfPresent(flatConnectorGroup, buildSegments(flatConnectors, connectorColor, LINE_WIDTH_PX.connector, true, resolution));
@@ -742,6 +955,9 @@ export function drawProjections(edgeMap, options = {}) {
     flatConnectorGroup,
     hpDimensionGroup,
     vpDimensionGroup,
+    hpOutlineGroup,
+    vpOutlineGroup,
+    ppOutlineGroup,
     setResolution(w, h) {
       resolution.set(w, h);
       const applyResolution = (root) => root.traverse((obj) => {
@@ -750,8 +966,9 @@ export function drawProjections(edgeMap, options = {}) {
       });
       // Walk every held sub-group: vpGroup, ppGroup and the two dimension groups get reparented
       // OUT of `group` into the fold pivot / view frame by the consumer, so `group.traverse`
-      // alone would miss them.
-      for (const sub of [group, ppGroup, ppConnectorGroup, flatConnectorGroup, hpDimensionGroup, vpDimensionGroup]) applyResolution(sub);
+      // alone would miss them. The three ADR-087 outline groups are never parented anywhere by
+      // anyone, but still hold LineMaterials that need the current resolution.
+      for (const sub of [group, ppGroup, ppConnectorGroup, flatConnectorGroup, hpDimensionGroup, vpDimensionGroup, hpOutlineGroup, vpOutlineGroup, ppOutlineGroup]) applyResolution(sub);
     },
     dispose() {
       // Full WebGL disposal contract (CLAUDE.md): geometry + material per object,
@@ -761,8 +978,10 @@ export function drawProjections(edgeMap, options = {}) {
       // the consumer (main.js flatten) reparents vpGroup and ppGroup OUT of `group`
       // into the fold pivot, so a `group.traverse` would miss them and leak their
       // LineMaterials. Walking the sub-groups directly disposes everything we
-      // created regardless of who currently parents it.
-      for (const sub of [hpGroup, vpGroup, ppGroup, connectorGroup, ppConnectorGroup, flatConnectorGroup, hpDimensionGroup, vpDimensionGroup]) {
+      // created regardless of who currently parents it. The three ADR-087 outline groups are
+      // NEVER parented anywhere (hpOutlineGroup's own JSDoc) — walking them directly is the
+      // only way they get disposed at all.
+      for (const sub of [hpGroup, vpGroup, ppGroup, connectorGroup, ppConnectorGroup, flatConnectorGroup, hpDimensionGroup, vpDimensionGroup, hpOutlineGroup, vpOutlineGroup, ppOutlineGroup]) {
         sub.traverse((obj) => {
           obj.geometry?.dispose();
           // Dispose ANY material — the LineMaterial of the projection/dimension lines OR
@@ -835,6 +1054,128 @@ function pushArrowTriangle(out, tip, along, perp) {
   out.push(tip.x, tip.y, tip.z, a.x, a.y, a.z, b.x, b.y, b.z);
 }
 
+const BASE_RING_EPS = 1e-2; // world units — how close two 'base'-kind edges' axial projections
+                             // must be to count as the SAME ring (see findBaseRingEdge)
+
+/**
+ * Real Z reach of the drawing at a given height (ADR-103) — the largest Z among every edgeMap
+ * vertex within `eps` of `targetY`. Anchors the restricted height dim's extension lines to an
+ * actual point of the front view instead of a synthetic bbox corner: a prism's top and base
+ * rings both already reach the bbox's own Z extent (so this returns the same value the old bbox
+ * corner used — a no-op there), but a pyramid/cone's apex is a single point usually nowhere near
+ * it, and THAT mismatch is exactly the "extension line floats disconnected near the top" bug —
+ * the old code anchored it to `max.z` (a corner of the BASE ring) at apex height, a point that
+ * was never actually part of the front view's outline there.
+ * @param {Map<string, import('./meshAnalyzer.js').EdgeRecord>} edgeMap
+ * @param {number} targetY World Y to search at.
+ * @param {number} eps Tolerance on `targetY`.
+ * @returns {number | null} null if no vertex falls within `eps` of `targetY`.
+ */
+function ringZExtentAt(edgeMap, targetY, eps) {
+  let z = -Infinity;
+  let found = false;
+  for (const { edge } of edgeMap.values()) {
+    for (const p of [edge.p1, edge.p2]) {
+      if (Math.abs(p.y - targetY) <= eps && p.z > z) { z = p.z; found = true; }
+    }
+  }
+  return found ? z : null;
+}
+
+/**
+ * Find the base-ring edge to dimension (ADR-103, fixing ADR-102's original pick). Among every
+ * axis-perpendicular ('base'-kind, `edgeKindOf`) edge, the base ring and the top/cap ring are
+ * both 'base' kind, so they're told apart by axial position — for a RIGID transform (rotation +
+ * translation, uniform scale; every Set's pose), `dot(worldPoint, axisDir)` is an affine function
+ * of the point's LOCAL Y (proof: worldPoint = R·localPoint + T, axisDir = R·(0,1,0), and R being
+ * orthogonal means dot(R·localPoint, R·(0,1,0)) = dot(localPoint, (0,1,0)) = localPoint.y), so it
+ * preserves the base-vs-top ordering regardless of how the Set is posed. The base (every Module 2
+ * solid is generated upright about local +Y, local Y=0 at the base — CLAUDE.md) is therefore
+ * whichever cluster has the SMALLER axial projection.
+ *
+ * TWO fixes over the original ADR-102 pick, both found by reading the textbook (John, Fig 12.20
+ * onward) against a live square pyramid:
+ *  1. `classifyEdge`/`EdgeType.COPLANAR` — the SAME filter the main draw loop already applies at
+ *     this file's own edge-walk above — now excludes triangulation seams before they ever reach
+ *     the 'base' classification. A flat N-gon base face arrives as a fan of triangles; the
+ *     diagonals between them are 'base'-kind (they lie in the base plane, ⊥ the axis) and, being
+ *     longer than any real polygon edge, always won the old "greatest projected length" pick —
+ *     the direct cause of the reported "base edge is a diagonal" bug.
+ *  2. The selection metric is no longer length (restricting the whole feature to Set 1 — ADR-103
+ *     — means the base is always drawn in TRUE shape here, so every real base edge already has
+ *     the same true length; "least foreshortened" no longer discriminates anything). Instead the
+ *     edge is picked for PLACEMENT: the one whose direction has the largest world-X component,
+ *     i.e. reads most nearly VERTICAL on the method sheet (`flattenHP`'s `v = -x`). Its in-plane
+ *     normal is then dominantly Z, which `baseEdgeDimOffset` turns into a dimension line that
+ *     sits beside the view (sheet-horizontal offset) rather than stacking toward the xy line —
+ *     John's own convention (Fig 12.21's edge b–a, Fig 12.25's edge c–d). For a base deliberately
+ *     turned in plan (e.g. the "Orient to Corner" 45° preset), no edge is purely X- or
+ *     Z-aligned — the same metric still picks a definite edge and `baseEdgeDimOffset` draws an
+ *     ALIGNED dimension parallel to it (Fig 12.20's turned-square frustum), rather than crashing
+ *     or degenerating the way a symmetric diagonal did.
+ * Curved-base solids (Cone/Cylinder) have no single true edge — the caller decides whether to
+ * call this at all (main.js gates on shapeData.shape, not attempted here: this module stays
+ * geometry-only, per its own header, and has no shape-kind concept).
+ * @param {Map<string, import('./meshAnalyzer.js').EdgeRecord>} edgeMap
+ * @param {THREE.Vector3} axisDir Unit world-space solid axis (see drawProjections' own `axis`).
+ * @returns {{ p1: THREE.Vector3, p2: THREE.Vector3 } | null} null when no base-kind edge exists.
+ */
+function findBaseRingEdge(edgeMap, axisDir) {
+  const baseEdges = [];
+  for (const { edge, faces } of edgeMap.values()) {
+    if (classifyEdge(faces) === EdgeType.COPLANAR) continue; // triangulation seam, e.g. a base diagonal — not a real edge
+    if (edgeKindOf(edge.p1, edge.p2, axisDir) !== 'base') continue;
+    const midAx = (edge.p1.x + edge.p2.x) / 2 * axisDir.x
+      + (edge.p1.y + edge.p2.y) / 2 * axisDir.y
+      + (edge.p1.z + edge.p2.z) / 2 * axisDir.z;
+    baseEdges.push({ p1: edge.p1, p2: edge.p2, midAx });
+  }
+  if (baseEdges.length === 0) return null;
+  const minAx = Math.min(...baseEdges.map((e) => e.midAx));
+  let best = null;
+  let bestScore = -1;
+  for (const e of baseEdges) {
+    if (e.midAx - minAx > BASE_RING_EPS) continue; // top/cap ring — skip
+    const ex = e.p2.x - e.p1.x, ez = e.p2.z - e.p1.z;
+    const len = Math.hypot(ex, ez); // HP flatten drops Y
+    if (len < 1e-6) continue; // degenerate — shouldn't occur for a real base edge, stays harmless
+    const score = Math.abs(ex) / len; // 1 ⇒ edge runs along world X ⇒ reads vertical on the sheet
+    if (score > bestScore) { bestScore = score; best = e; }
+  }
+  return best ? { p1: best.p1, p2: best.p2 } : null;
+}
+
+/**
+ * World-space offset for a base-edge dimension line (ADR-102/103): perpendicular to the edge
+ * WITHIN the HP flatten plane (drops Y, keeps X/Z), scaled to {@link DIM_OFFSET}, pointing AWAY
+ * from `center` (the solid's own bbox centre) so the dimension never lands back on top of the
+ * drawn edge. Relies on `findBaseRingEdge` (ADR-103) now always handing it a REAL polygon edge —
+ * a real edge's midpoint is never the bbox centre (unlike the diagonal ADR-102 originally picked,
+ * whose midpoint coincides with it exactly, degenerating this dot-product sign test to ~0 and
+ * leaving the offset pointing whichever way the raw perpendicular happened to fall — the direct
+ * cause of the dimension landing in the gap between the top and front views). For an
+ * axis-aligned base this offset is purely sideways (beside the view, John's own placement); for a
+ * base turned in plan it is a genuine diagonal, same as Fig 12.20's aligned dimension. Falls back
+ * to the bbox dims' own (0,0,DIM_OFFSET) when the edge has no XZ extent (degenerate input stays
+ * harmless; `findBaseRingEdge` already excludes zero-length edges itself).
+ * @param {THREE.Vector3} p1
+ * @param {THREE.Vector3} p2
+ * @param {THREE.Vector3} center
+ * @returns {THREE.Vector3}
+ */
+function baseEdgeDimOffset(p1, p2, center) {
+  const ex = p2.x - p1.x;
+  const ez = p2.z - p1.z;
+  const len = Math.hypot(ex, ez);
+  if (len < 1e-6) return new THREE.Vector3(0, 0, DIM_OFFSET);
+  let nx = -ez / len;
+  let nz = ex / len;
+  const midX = (p1.x + p2.x) / 2;
+  const midZ = (p1.z + p2.z) / 2;
+  if (nx * (midX - center.x) + nz * (midZ - center.z) < 0) { nx = -nx; nz = -nz; }
+  return new THREE.Vector3(nx * DIM_OFFSET, 0, nz * DIM_OFFSET);
+}
+
 /**
  * Push one linear dimension between features `A` and `B`, its dimension line stood off
  * perpendicular by `off`. Emits the two extension lines (a {@link DIM_EXT_GAP} gap off
@@ -846,18 +1187,26 @@ function pushArrowTriangle(out, tip, along, perp) {
  * @param {SegmentBatch} batch
  * @param {number[]}     arrows  Flat triangle-vertex buffer for the filled arrowheads.
  * @param {{ pos: THREE.Vector3, text: string }[]} labels  Collected label placements.
- * @param {THREE.Vector3} A        First measured feature (world space).
- * @param {THREE.Vector3} B        Second measured feature (world space).
+ * @param {THREE.Vector3} A        First point defining the dimension LINE's position (world).
+ * @param {THREE.Vector3} B        Second point defining the dimension line's position (world).
  * @param {THREE.Vector3} off      Perpendicular offset to the dimension line (world).
  * @param {number}        valueMM  The true measurement in millimetres.
+ * @param {THREE.Vector3} [anchorA=A] Real feature point the first extension line starts from
+ *  (ADR-103) — defaults to `A` itself. Needed when the dimension line's own position (`A`) is a
+ *  synthetic bbox corner rather than a point actually on the drawing (e.g. the restricted height
+ *  dim's top end, which must reach the solid's real apex, not the bbox corner above it — see
+ *  `drawProjections`' own call site) so the extension line lands on a real edge instead of
+ *  floating disconnected beside it.
+ * @param {THREE.Vector3} [anchorB=B] Real feature point the second extension line starts from.
  */
-function pushLinearDim(batch, arrows, labels, A, B, off, valueMM) {
+function pushLinearDim(batch, arrows, labels, A, B, off, valueMM, anchorA = A, anchorB = B) {
   const dir = off.clone().normalize();            // extension-line direction (unit)
   const Ad = A.clone().add(off);                  // A projected onto the dimension line
   const Bd = B.clone().add(off);                  // B projected onto the dimension line
-  // extension lines: gap off the feature → overshoot past the dimension line
-  addSegment(batch, A.clone().addScaledVector(dir, DIM_EXT_GAP), Ad.clone().addScaledVector(dir, DIM_EXT_OVERSHOOT));
-  addSegment(batch, B.clone().addScaledVector(dir, DIM_EXT_GAP), Bd.clone().addScaledVector(dir, DIM_EXT_OVERSHOOT));
+  // extension lines: gap off the REAL feature (anchorA/B, which may differ from A/B — see the
+  // anchor params' own doc) → overshoot past the dimension line
+  addSegment(batch, anchorA.clone().addScaledVector(dir, DIM_EXT_GAP), Ad.clone().addScaledVector(dir, DIM_EXT_OVERSHOOT));
+  addSegment(batch, anchorB.clone().addScaledVector(dir, DIM_EXT_GAP), Bd.clone().addScaledVector(dir, DIM_EXT_OVERSHOOT));
   // the dimension line
   addSegment(batch, Ad, Bd);
   // outward filled 3:1 triangle arrowheads (back-spread splays in the extension-line

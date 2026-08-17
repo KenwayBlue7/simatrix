@@ -10,11 +10,18 @@
 This is the **Simatrix Starter Template** — the stripped, platform-only boilerplate a new subject
 module duplicates (see `../MODULE-STARTER.md`, Case C). It boots to an empty 3D paper-background
 scene with a working guided stepper, the Compare-workbench scaffolding, `window.simAPI`,
-`meta.json` (all four fields), the bundled `woff2` fonts, the boot watchdog + WebGL fallback, and
-the dismissible < 768px mobile notice already wired — and nothing subject-specific. `rebuild()` is
+`meta.json` (all four fields), the CDN-hosted fonts (Supabase Storage, ADR-086), the boot
+watchdog + WebGL fallback, and the dismissible < 768px mobile notice already wired — and nothing
+subject-specific. `rebuild()` is
 an empty pipeline that already runs the disposal contract, ready for your domain geometry. Replace
 this paragraph, fill in the sections below, wire `main.js` to your own domain, and build your own
 `ARCHITECTURE.md`/`DECISIONS.md`/`RULES.md` before writing simulation code.
+
+**Do not remove `markBooted()`'s `sim:ready` emit.** The platform-wide `../PLATFORM-RULES.md`
+§1.10 (ADR-078, narrows the root `../DECISIONS.md` ADR-002) requires every subject to announce
+boot completion to the host via one sanctioned `window.parent.postMessage({ type: 'sim:ready' },
+'*')`, fired once from `markBooted()` after `document.fonts.ready`. This template already wires
+it — keep it even as you replace everything else in `main.js`.
 
 ---
 
