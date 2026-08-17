@@ -39,6 +39,7 @@ const FOLD_REFOLD_ICON = '↩', FOLD_REFOLD_TEXT = 'Fold back to 3D';
  *   fold: () => void,
  *   unfold: () => void,
  *   isFolded: () => boolean,
+ *   method?: { canRun: () => boolean },
  *   spotlight?: (id: string) => void,
  *   orbitHint?: () => void,
  * }} sim  — injected by main.js (the simController contract).
@@ -66,6 +67,7 @@ export function initStepper(sim) {
   const btnFinish = $('btn-finish');
   const btnFold = $('btn-fold');
   const doneFold = $('done-fold');
+  const btnShowMethod = $('btn-show-method');
 
   if (elTotal) elTotal.textContent = String(TOTAL);
 
@@ -130,7 +132,12 @@ export function initStepper(sim) {
     }
   }
 
-  /** Reflect the live fold state into the step-4 toggle + its done badge. */
+  /** Reflect the live fold state into the step-4 toggle + its done badge, and — once folded —
+   *  swap the primary slot to Show Method (ADR-165). One loud action at any moment (DESIGN.md
+   *  §5.1): before the fold, #btn-fold is primary and Show Method stays hidden; the instant the
+   *  fold completes, #btn-fold demotes to secondary ("Fold back to 3D") and Show Method takes
+   *  over as the step's one primary action. Gate reuses the SAME `folded` predicate isComplete(4)
+   *  already reads — no new stepper state. */
   function renderActions() {
     const folded = sim.isFolded();
     if (btnFold) {
@@ -138,8 +145,13 @@ export function initStepper(sim) {
       const label = btnFold.querySelector('#fold-label');
       if (icon) icon.textContent = folded ? FOLD_REFOLD_ICON : FOLD_IDLE_ICON;
       if (label) label.textContent = folded ? FOLD_REFOLD_TEXT : FOLD_IDLE_TEXT;
+      btnFold.classList.toggle('btn--primary', !folded);
     }
     if (doneFold) doneFold.hidden = !folded;
+    if (btnShowMethod) {
+      btnShowMethod.hidden = !folded;
+      btnShowMethod.disabled = !(sim.method?.canRun?.() ?? false);
+    }
   }
 
   function renderNav() {

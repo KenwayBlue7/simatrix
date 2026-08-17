@@ -3,7 +3,9 @@
 // When a line is inclined to BOTH planes, neither view shows the true length. The rotating-line
 // method swings each view parallel to XY to reveal it: Part A rotates the TOP view about the pivot
 // end → True Length & θ (with HP); Part B rotates the FRONT view about the pivot → True Length &
-// φ (with VP). A 12-phase animated construction on the orthographic sheet.
+// φ (with VP). A 14-phase animated construction on the orthographic sheet (ADR-165: beat 0 is the
+// given-state, beat 1 draws the four Fig 10-15(ii)/10-16(ii) loci up front, beats 2-13 are the
+// original 12-phase rotate/arc/project/join sequence, shifted).
 //
 // Phase 4E scope: the construction GEOMETRY only (the rotated view, its locus arc, the projector,
 // the horizontal locus, the recovered True-Length line, and the θ/φ angle arcs). Text callouts
@@ -20,7 +22,7 @@ import { PLACEMENT, bisectorAnchor } from './labelPlacement.js';
 
 const P2 = PLACEMENT.sheet2D; // marker letter · angle-bisector radius · TL-value lift (one shared policy)
 
-const TL_N = 12;
+const TL_N = 14;
 const DURATION = 9000;
 const DURATION_FLAT = 400; // both views already TL (θ=φ=0 default) — nothing to rotate through
 const TL2_N = 8;
@@ -182,11 +184,19 @@ export function createTrueLength({ resolved, method = 'I' }) {
   const dirA = Math.atan2(bTLA[1] - fvPiv[1], bTLA[0] - fvPiv[0]);
   const dirB = Math.atan2(bTLB[1] - tvPiv[1], bTLB[0] - tvPiv[0]);
 
+  // The four loci (Fig 10-15(ii)/10-16(ii)): straight reference lines parallel to xy through
+  // each of the four view points — cd/pq (elevation, through a′/b′) and ef/rs (plan, through
+  // a/b) — the paths each point would travel if rotated to lie on xy. Revealed together as the
+  // construction's setup beat (animate()'s locusLines, below); previously only pq/rs (fvLoc/
+  // tvLoc) were drawn — ef/cd (tvPivLoc/fvPivLoc) were missing entirely (ADR-165).
+  const tvPivLoc = conLine(COL.locus, true);  // ef — through a (tvPiv), plan
+  const fvLoc = conLine(COL.locus, true);     // pq — through b′ (fvOth), elevation
+  const fvPivLoc = conLine(COL.locus, true);  // cd — through a′ (fvPiv), elevation
+  const tvLoc = conLine(COL.locus, true);     // rs — through b (tvOth), plan
   // Part A elements (top-view rotation → TL & θ)
   const rotTV = conLine(COL.hp, false);
   const arcA = conLine(COL.locus, false);
   const projA = conLine(COL.construct, true);
-  const fvLoc = conLine(COL.locus, true);
   const markA = marker(bTLA[0], bTLA[1], COL.tlg, 'b₁′');
   const tlA = conLine(COL.tlg, false);
   const thetaA = conLine(COL.tlg, false);
@@ -194,8 +204,7 @@ export function createTrueLength({ resolved, method = 'I' }) {
   const rotFV = conLine(COL.vp, false);
   const arcB = conLine(COL.locus, false);
   const projB = conLine(COL.construct, true);
-  const tvLoc = conLine(COL.locus, true);
-  const markB = marker(bTLB[0], bTLB[1], COL.tlg, 'b₁');
+  const markB = marker(bTLB[0], bTLB[1], COL.tlg, 'b₂'); // Fig 10-16(ii) names this point b₂, not b₁ (ADR-165 fix)
   const tlB = conLine(COL.tlg, false);
   const phiB = conLine(COL.tlg, false);
   // α/β (Inclined_to_Both.pdf Art 10-5, fig. 10-13): the ORIGINAL (unrotated) view's own angle
@@ -215,56 +224,74 @@ export function createTrueLength({ resolved, method = 'I' }) {
   const betaLbl = addLabel(group, `β=${Math.round(resolved.beta)}°`, bisectorAnchor(tvPiv, startA / 2, R2), { color: '--tl-green', size: '11px' });
   [thLbl, tlLblA, phLbl, tlLblB, alphaLbl, betaLbl].forEach((l) => setOp(l, 0));
 
-  const aidsA = [rotTV, arcA, projA, fvLoc], aidsB = [rotFV, arcB, projB, tvLoc];
+  // Part A's own swing/arc/projector (dimmed, not hidden, once Part B starts); Part B's own
+  // swing/arc/projector (hidden until Part B starts). The four loci are shared setup — they
+  // reveal once at beat 1 and are never re-hidden or dimmed by either part starting.
+  const locusLines = [tvPivLoc, fvPivLoc, fvLoc, tvLoc];
+  const aidsA = [rotTV, arcA, projA], aidsB = [rotFV, arcB, projB];
 
   function animate(p) {
     const G = p * TL_N;
+    // Beat 1 (setup, Fig 10-15(ii)/10-16(ii)): all four loci — straight lines at their FINAL
+    // fixed extents (they depend only on the resolved line, not on animation progress).
+    setSeg(tvPivLoc, tvPiv, [bTLA[0], tvPiv[1]]);
+    setSeg(fvLoc, fvOth, [bTLA[0], fvOth[1]]);
+    setSeg(fvPivLoc, fvPiv, [bTLB[0], fvPiv[1]]);
+    setSeg(tvLoc, tvOth, [bTLB[0], tvOth[1]]);
+    locusLines.forEach((o) => setOp(o, lc(G, 1.6, 2.2)));
     // ---- Part A ----
-    { const t = easeOut(lc(G, 0, 1)), ang = startA + (0 - startA) * t;
-      setSeg(rotTV, tvPiv, [tvPiv[0] + Math.cos(ang) * Lplan, tvPiv[1] + Math.sin(ang) * Lplan]); setOp(rotTV, G > 0 ? 1 : 0); }
-    { const t = easeOut(lc(G, 1, 2)); setArc(arcA, tvPiv[0], tvPiv[1], Lplan, startA, startA + (0 - startA) * t); setOp(arcA, G >= 1 ? 1 : 0); }
-    { const t = easeOut(lc(G, 2, 3)); setSeg(projA, tvRot, [tvRot[0], tvRot[1] + (bTLA[1] - tvRot[1]) * t]); setOp(projA, G >= 2 ? 1 : 0);
-      setSeg(fvLoc, [fvOth[0], fvOth[1]], [bTLA[0], fvOth[1]]); setOp(fvLoc, lc(G, 2.5, 3.2)); }
-    setOp(markA, lc(G, 3, 3.5));
-    { const t = easeOut(lc(G, 4, 5)); setSeg(tlA, fvPiv, lerp2(fvPiv, bTLA, t)); setOp(tlA, G >= 4 ? 1 : 0); }
-    setArc(thetaA, fvPiv[0], fvPiv[1], 0.8, 0, dirA); setOp(thetaA, lc(G, 5, 5.4));
-    setOp(tlLblA, lc(G, 4.3, 4.9)); setOp(thLbl, lc(G, 5, 5.6));
-    setArc(alphaArc, fvPiv[0], fvPiv[1], 1.1, 0, startB); setOp(alphaArc, lc(G, 5.1, 5.5));
-    setOp(alphaLbl, lc(G, 5.3, 5.9));
+    { const t = easeOut(lc(G, 2, 3)), ang = startA + (0 - startA) * t;
+      setSeg(rotTV, tvPiv, [tvPiv[0] + Math.cos(ang) * Lplan, tvPiv[1] + Math.sin(ang) * Lplan]); setOp(rotTV, G > 2 ? 1 : 0); }
+    { const t = easeOut(lc(G, 3, 4)); setArc(arcA, tvPiv[0], tvPiv[1], Lplan, startA, startA + (0 - startA) * t); setOp(arcA, G >= 3 ? 1 : 0); }
+    { const t = easeOut(lc(G, 4, 5)); setSeg(projA, tvRot, [tvRot[0], tvRot[1] + (bTLA[1] - tvRot[1]) * t]); setOp(projA, G >= 4 ? 1 : 0); }
+    setOp(markA, lc(G, 5, 5.5));
+    { const t = easeOut(lc(G, 6, 7)); setSeg(tlA, fvPiv, lerp2(fvPiv, bTLA, t)); setOp(tlA, G >= 6 ? 1 : 0); }
+    setArc(thetaA, fvPiv[0], fvPiv[1], 0.8, 0, dirA); setOp(thetaA, lc(G, 7, 7.4));
+    setOp(tlLblA, lc(G, 6.3, 6.9)); setOp(thLbl, lc(G, 7, 7.6));
+    setArc(alphaArc, fvPiv[0], fvPiv[1], 1.1, 0, startB); setOp(alphaArc, lc(G, 7.1, 7.5));
+    setOp(alphaLbl, lc(G, 7.3, 7.9));
     // ---- Part B ----
-    { const t = easeOut(lc(G, 6, 7)), ang = startB + (0 - startB) * t;
-      setSeg(rotFV, fvPiv, [fvPiv[0] + Math.cos(ang) * Lelev, fvPiv[1] + Math.sin(ang) * Lelev]); setOp(rotFV, G >= 6 ? 1 : 0); }
-    { const t = easeOut(lc(G, 7, 8)); setArc(arcB, fvPiv[0], fvPiv[1], Lelev, startB, startB + (0 - startB) * t); setOp(arcB, G >= 7 ? 1 : 0); }
-    { const t = easeOut(lc(G, 8, 9)); setSeg(projB, fvRot, [fvRot[0], fvRot[1] + (bTLB[1] - fvRot[1]) * t]); setOp(projB, G >= 8 ? 1 : 0);
-      setSeg(tvLoc, [tvOth[0], tvOth[1]], [bTLB[0], tvOth[1]]); setOp(tvLoc, lc(G, 8.5, 9.2)); }
-    setOp(markB, lc(G, 9, 9.5));
-    { const t = easeOut(lc(G, 10, 11)); setSeg(tlB, tvPiv, lerp2(tvPiv, bTLB, t)); setOp(tlB, G >= 10 ? 1 : 0); }
-    setArc(phiB, tvPiv[0], tvPiv[1], 0.8, 0, dirB); setOp(phiB, lc(G, 11, 11.4));
-    setOp(tlLblB, lc(G, 10.3, 10.9)); setOp(phLbl, lc(G, 11, 11.6));
-    setArc(betaArc, tvPiv[0], tvPiv[1], 1.1, 0, startA); setOp(betaArc, lc(G, 11.1, 11.5));
-    setOp(betaLbl, lc(G, 11.3, 11.9));
-    // Part B started → dim the Part A aids so the sheet stays readable.
-    if (G >= 6) aidsA.forEach((o) => setOp(o, 0.18));
-    if (G < 6) { aidsB.forEach((o) => setOp(o, 0)); setOp(markB, 0); setOp(tlB, 0); setOp(phiB, 0); setOp(tlLblB, 0); setOp(phLbl, 0); }
+    { const t = easeOut(lc(G, 8, 9)), ang = startB + (0 - startB) * t;
+      setSeg(rotFV, fvPiv, [fvPiv[0] + Math.cos(ang) * Lelev, fvPiv[1] + Math.sin(ang) * Lelev]); setOp(rotFV, G >= 8 ? 1 : 0); }
+    { const t = easeOut(lc(G, 9, 10)); setArc(arcB, fvPiv[0], fvPiv[1], Lelev, startB, startB + (0 - startB) * t); setOp(arcB, G >= 9 ? 1 : 0); }
+    { const t = easeOut(lc(G, 10, 11)); setSeg(projB, fvRot, [fvRot[0], fvRot[1] + (bTLB[1] - fvRot[1]) * t]); setOp(projB, G >= 10 ? 1 : 0); }
+    setOp(markB, lc(G, 11, 11.5));
+    { const t = easeOut(lc(G, 12, 13)); setSeg(tlB, tvPiv, lerp2(tvPiv, bTLB, t)); setOp(tlB, G >= 12 ? 1 : 0); }
+    setArc(phiB, tvPiv[0], tvPiv[1], 0.8, 0, dirB); setOp(phiB, lc(G, 13, 13.4));
+    setOp(tlLblB, lc(G, 12.3, 12.9)); setOp(phLbl, lc(G, 13, 13.6));
+    setArc(betaArc, tvPiv[0], tvPiv[1], 1.1, 0, startA); setOp(betaArc, lc(G, 13.1, 13.5));
+    setOp(betaLbl, lc(G, 13.3, 13.9));
+    // Part B started → dim Part A's own swing/arc/projector (not its recovered TL line/angles,
+    // and not the shared loci, which stay legible throughout).
+    if (G >= 8) aidsA.forEach((o) => setOp(o, 0.18));
+    if (G < 8) { aidsB.forEach((o) => setOp(o, 0)); setOp(markB, 0); setOp(tlB, 0); setOp(phiB, 0); setOp(tlLblB, 0); setOp(phLbl, 0); }
   }
 
   animate(0);
   // Discrete-step phase table (constructionStepper.js) — breakpoints along the SAME G/TL_N
   // domain animate() already uses; captions grounded in True Length.pdf Art 10-8 (Method I,
   // figs 10-15/10-16/10-17) + Inclined to Both.pdf Art 10-5/10-6 (apparent angles α/β).
+  // 14 beats (ADR-165, up from 12): beat 0 is the given state (free — animate(0) already draws
+  // nothing extra); beat 1 draws the four loci up front (Fig 10-15(ii)/10-16(ii)'s setup, not
+  // previously represented as its own step); beats 2-13 are the original rotate/arc/project/join
+  // sequence. Beat 13's caption also folds in Fig 10-17(ii)'s "hold B, turn A" variant as a
+  // footnote — it proves the pivot choice is arbitrary but adds no new geometry, so it doesn't
+  // earn its own beat.
   const phases = [
-    { t: 1 / TL_N, caption: 'Swing the top view’s free end about the pivot until parallel to xy.' },
-    { t: 2 / TL_N, caption: 'Trace the arc it sweeps — centre at the pivot, radius equal to the top view’s length — to b₁.' },
-    { t: 3.5 / TL_N, caption: 'Drop a projector through b₁ to meet b′’s horizontal locus at b′₁.' },
-    { t: 5 / TL_N, caption: `Join the pivot’s front-view point to b′₁ — the true length of AB (${Math.round(resolved.tl)} mm).` },
-    { t: 5.6 / TL_N, caption: `θ = ${Math.round(resolved.theta)}° — the angle this line makes with xy is AB’s true inclination with the H.P.` },
-    { t: 5.9 / TL_N, caption: `α = ${Math.round(resolved.alpha)}° — the original (unrotated) front view’s own angle with xy, always greater than θ (apparent inclination).` },
-    { t: 7 / TL_N, caption: 'Swing the front view’s free end about the pivot until parallel to xy.' },
-    { t: 8 / TL_N, caption: 'Trace the arc it sweeps, to b′₂.' },
-    { t: 9.5 / TL_N, caption: 'Drop a projector through b′₂ to meet b’s vertical locus at b₂.' },
-    { t: 11 / TL_N, caption: `Join the pivot’s top-view point to b₂ — the true length of AB (${Math.round(resolved.tl)} mm).` },
-    { t: 11.6 / TL_N, caption: `φ = ${Math.round(resolved.phi)}° — the angle this line makes with xy is AB’s true inclination with the V.P.` },
-    { t: 11.9 / TL_N, caption: `β = ${Math.round(resolved.beta)}° — the original top view’s own angle with xy, always greater than φ (apparent inclination).` },
+    { t: 0, caption: 'Given: the reference line xy, the front view a′b′, and the top view ab — neither view shows the true length.' },
+    { t: 2 / TL_N, caption: 'Through each end draw a line parallel to xy — cd and pq in the front view, ef and rs in the top view. These are the paths the ends travel as each view rotates.' },
+    { t: 3 / TL_N, caption: 'Swing the top view’s free end about the pivot until parallel to xy.' },
+    { t: 4 / TL_N, caption: 'Trace the arc it sweeps — centre at the pivot, radius equal to the top view’s length — to b₁ on ef.' },
+    { t: 5.5 / TL_N, caption: 'Drop a projector through b₁ to meet b′’s horizontal locus pq at b′₁.' },
+    { t: 7 / TL_N, caption: `Join the pivot’s front-view point to b′₁ — the true length of AB (${Math.round(resolved.tl)} mm).` },
+    { t: 7.6 / TL_N, caption: `θ = ${Math.round(resolved.theta)}° — the angle this line makes with xy is AB’s true inclination with the H.P.` },
+    { t: 7.9 / TL_N, caption: `α = ${Math.round(resolved.alpha)}° — the original (unrotated) front view’s own angle with xy, always greater than θ (apparent inclination).` },
+    { t: 9 / TL_N, caption: 'Swing the front view’s free end about the pivot until parallel to xy.' },
+    { t: 10 / TL_N, caption: 'Trace the arc it sweeps, to b′₂ on cd.' },
+    { t: 11.5 / TL_N, caption: 'Drop a projector through b′₂ to meet b’s locus rs at b₂.' },
+    { t: 13 / TL_N, caption: `Join the pivot’s top-view point to b₂ — the true length of AB (${Math.round(resolved.tl)} mm).` },
+    { t: 13.6 / TL_N, caption: `φ = ${Math.round(resolved.phi)}° — the angle this line makes with xy is AB’s true inclination with the V.P.` },
+    { t: 13.9 / TL_N, caption: `β = ${Math.round(resolved.beta)}° — the original top view’s own angle with xy, always greater than φ (apparent inclination). Holding B fixed and turning A instead gives the same true length (Fig. 10-17(ii)).` },
   ];
   return { group, animate, duration: (fvTrue && tvTrue) ? DURATION_FLAT : DURATION, phases };
 }
