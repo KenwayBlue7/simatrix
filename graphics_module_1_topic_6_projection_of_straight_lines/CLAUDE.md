@@ -99,14 +99,34 @@ sanctioned outbound `postMessage`. Do not add any other `postMessage`/inbound li
   with an independent `#rail-toggle` Hide/Show control (`setupRailToggle`) floating at the 3D
   viewport's bottom-left corner. There is no compact/floating fallback card and no
   `matchMedia`-driven demotion (§5.16a) — below 768px the same split grid restacks to a single
-  column instead of switching to a different Compare UI. `WORKBENCH_CONTROLS` re-parents the
-  geometry-driver controls (`tl`/`disthp`/`distvp`/`theta`/`phi`) into the docked
-  `#workbench-rail` (two titled clusters, Dimensions / Inclination); re-parent the existing
-  `[data-ctrl]` nodes, never mirror inputs (§5.17). The construction launchers (`truelength`,
-  `traces`) dock separately, in `#con-dock` — a direct `<body>` child that floats at the 2D
-  drawing panel's bottom-right corner, mirroring `#rail-toggle`'s floating-corner convention on
-  the opposite pane (`ensureConDock()`/`CON_DOCK_CONTROLS`, topic-local). A construction runs
-  inside the split like any other control.
+  column instead of switching to a different Compare UI. `WORKBENCH_CONTROLS` re-parents ALL
+  seven controls — the geometry drivers (`tl`/`disthp`/`distvp`/`theta`/`phi`) AND the two
+  construction launchers (`truelength`, `traces`) — into the docked `#workbench-rail`, grouped
+  into three titled clusters (Dimensions / Inclination / Constructions, `WORKBENCH_GROUPS`,
+  topic-local); re-parent the existing `[data-ctrl]` nodes, never mirror inputs (§5.17). **The
+  launchers no longer dock separately** — `#con-dock`, the floating corner dock they used through
+  2026-08-17, is deleted (ADR-166 reverses RULES.md §5.16's ADR-165-audit T6 clarification; the
+  literal rail rule now applies here with no exception). The launchers' Constructions cluster
+  keeps the fixed-width `.ctrl` column the old dock used (`#workbench-rail .ctrl`, 180px) and the
+  same ADR-051 stray-hide guard (`.ctrl[hidden]{display:flex!important}`), ported to the new
+  location; they lost the old dock's "no hover shift" chrome match to `#rail-toggle` and now take
+  the rail's plain `.btn:hover`. **The rail is a two-lane row** (ADR-167, 2026-08-17): Dimensions +
+  Inclination nest inside a growing `#rail-drivers` wrapper (`WORKBENCH_GROUPS[].lane`) that pins
+  Constructions to the row's right end; the five sliders shrink via
+  `clamp(158px, calc(20vw - 130px), 200px)` on `#workbench-rail .field` instead of staying
+  fixed-width, so all three clusters hold one row (144px tall) down to a 158px-per-field floor
+  before the rail's own `flex-wrap` fallback takes over — same one-row-per-cluster shape ADR-166
+  shipped, just narrower fields instead of a forced wrap. A construction still runs inside the
+  split like any other control. Its beat-nav row (`#con-nav`) remains a separate floating element
+  pinned bottom-centre
+  of the `compare` grid cell (`ensureConNav()`, topic-local), wearing `.method-bar`'s pill chrome
+  and `.btn--small` sizing so the in-Compare walkthrough and the Show Method takeover read as one
+  control (2026-08-16, buttons re-sized 2026-08-17). Its `max-width` cap — added to clear
+  `#con-dock`'s 180px column — is removed outright as of ADR-166 (2026-08-17), with no replacement
+  value pending a visual review now that `#con-dock` is gone. The beat CAPTION does **not** live in
+  that pill — it's a separate band (`.compare-card__top`) prepended into `#compare-card` itself, so
+  it reads at the top of the 2D drawing card rather than stacked on the Back/Next buttons at the
+  bottom (2026-08-17, Module 2 ADR-095's flow-row rationale applied to the card).
 - **2D Compare vehicle — Three.js ortho sheet, own renderer (ADR-076).** Unlike the sibling Points
   topic (ADR-034, Canvas2D), the Lines 2D drawing + its animated **Traces** and **True-Length**
   constructions are rendered with the **fat-line (`Line2`) stack in a dedicated ortho scene**
@@ -132,6 +152,19 @@ sanctioned outbound `postMessage`. Do not add any other `postMessage`/inbound li
   worst-case-sized frame (see `sheet2DLayout.js`'s own comment for the full rationale).
 - **No solid machinery.** Lines draws points/lines, not solids: no shape generators, no
   `meshAnalyzer.js`, no `projectionDrawer.js`, no hidden-line classification.
+- **Show Method (ADR-165)** — a Module-2-style full-viewport, beat-gated True-Length walkthrough,
+  launched from a Step 4 button once folded (a stand-in for ADR-085's `foldProgress === 1` gate —
+  this topic's fold is step 4 of 5, not a terminal step). `methodView.js` is presentation only
+  (the focus trap, Escape/Space, the `{sync,close,dispose}` handle — Module 2's
+  `methodController.js` CONTRACT, not its code); `main.js`'s `methodBegin()`/`methodEnd()`
+  re-parent the EXISTING `compareSheet` stage in and out (ADR-076 untouched, no 3rd render
+  surface) and drive a construction leaf through the SAME `constructionStepper.js` the
+  in-Compare `.con-nav` row already uses — a second, independent instance, so the two entry
+  points never fight over one mounted overlay. Beats-only, deliberately no Sets/chips (this
+  topic has one line, one construction — not Module 2's multi-pose problem). Does NOT pause the
+  sim loop on open (Module 2 does, because its takeover fully covers a 3D scene it no longer
+  needs; here the takeover IS the sheet's only visible surface, and pausing would stop the very
+  loop that repaints it).
 
 ## File structure (as built)
 
@@ -168,7 +201,13 @@ graphics_module_1_topic_6_projection_of_straight_lines/
     │                        render pass), the view dimensions, sheet labels, + the construction overlay
     │  # constructions (animated overlays on the sheet)
     ├── traces.js         ← the animated HT/VT trace construction (+ HT/VT/h/v labels)
-    ├── trueLength.js     ← the 12-phase rotating-line True-Length construction (+ b₁/TL/θ/φ labels)
+    ├── trueLength.js     ← the 14-phase rotating-line True-Length construction (+ b₁/TL/θ/φ labels)
+    ├── constructionStepper.js ← discrete Next/Back adapter over a leaf's animate(p)/phases —
+    │                        shared by the in-Compare .con-nav row AND the Show Method takeover
+    ├── methodView.js     ← Show Method (ADR-165): full-viewport, beat-gated True-Length
+    │                        walkthrough, launched from Step 4 once folded. Presentation only —
+    │                        re-parents the EXISTING compareSheet stage (main.js owns that), no
+    │                        3rd render surface, no Sets/chips (this topic has neither)
     │  # workflow chrome
     ├── stepper.js        ← the 5-step guided controller + the construction launchers
     ├── uiManager.js      ← the parameter dock (TL / distance HP-VP / θ / φ) + the Reset confirm
