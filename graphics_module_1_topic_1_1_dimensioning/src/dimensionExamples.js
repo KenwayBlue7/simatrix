@@ -11,9 +11,14 @@
 //   • LEADER_DEMO    — Step 1's Fig. 4.4 leader-head study and Fig. 4.7/4.8 space study.
 //   • ARRANGEMENTS   — Step 4: the same located features re-dimensioned every way §4.3
 //                      gives, each with the variants its own figure prints.
-//   • completeDrawing() — the fully dimensioned plate.
-//   • MISTAKES       — Step 6: twelve seeded faults, each with the rule it breaks, the spec
-//                      that expresses it, and the corrected spec it morphs back into.
+//   • completeDrawing() — the fully dimensioned plate. Step 6's 3-D sheet, and the drawing
+//                      the scale and unit study acts on.
+//
+// A twelfth export, MISTAKES, used to live here: twelve faults seeded into completeDrawing()
+// for a marker hunt in Step 6. The lecturers' review of 2026-08-16 removed that exercise —
+// Step 6 now reads the chapter's own wrong/correct pairs (`reviewFigures.js`) instead, which
+// SHOW the same mistakes rather than testing for them. Do not re-add a faulty variant of the
+// Guide Plate here without that decision being reversed first.
 //
 // All coordinates are the part's own MILLIMETRE frame (origin at the bottom-left of the
 // outline), the same frame `dimensionData.js` describes the geometry in.
@@ -666,127 +671,3 @@ export function completeDrawing() {
     },
   ];
 }
-
-/**
- * The seeded faults of Step 6. Each names the rule it breaks, carries the SPEC OVERRIDE that
- * expresses the fault (merged over the correct spec of the same id, or added outright when
- * `add` is set), and the marker position the learner clicks.
- *
- * Faults 9–12 are NOTATION faults. The textbook's own worked examples (Figs. 4.28–4.34) and
- * every one of its exercise figures (4.35–4.44) are littered with them — `8R`, `20φ`,
- * `24 Dia`, `Rad 4 mm`, `80 mm Dia`, `D12`, `12D` — and correcting them is most of what
- * Examples 4.1 to 4.7 actually ask the student to do. They look like nothing and they are
- * the commonest fault in a first-year drawing.
- *
- * @type {Array<{
- *   id:string, target:string, add?:boolean, at:number[], title:string,
- *   rule:string, why:string, fix:string, wrong:object,
- * }>}
- */
-export const MISTAKES = Object.freeze([
-  {
-    id: 'm-short', target: 'd-200', at: [100, LANE.below2 - 6],
-    title: 'Projection line stops short',
-    rule: 'Projection lines',
-    why: 'It should run 1 to 2 mm past the dimension line. Stopping short leaves you guessing where the measurement really ends.',
-    fix: 'Run it a little past the line.',
-    wrong: { extShort: true },
-  },
-  {
-    id: 'm-cross', target: 'd-50', at: [186, 46],
-    title: 'Dimension line crossing the part',
-    rule: 'Crossing lines',
-    why: 'Dropped inside the outline, this one cuts across the chamfer and the slot. Two lines crossing can always be read as one.',
-    fix: 'Move it clear of the part, 5 to 6 mm outside.',
-    wrong: { at: 176 },
-  },
-  {
-    id: 'm-arrow', target: 'd-100', at: [LANE.left3, PLATE.height + 10],
-    title: 'A second style of arrow head',
-    rule: 'Arrow heads',
-    why: 'One style per drawing. This one is filled in solid while every other arrow on the sheet is open.',
-    fix: 'Use the same head everywhere.',
-    wrong: { termination: 'filled' },
-  },
-  {
-    id: 'm-text', target: 'd-95', at: [PLATE.stepX * 0.78, LANE.above1 + 9],
-    title: 'Value sitting on its line',
-    rule: 'Placing the value',
-    why: 'The number goes above the line, not on it. Dropped onto the line the two fight each other and neither reads cleanly.',
-    fix: 'Lift it just clear, above the line, in the middle.',
-    wrong: { textNudgeMm: [0, -6] },
-  },
-  {
-    id: 'm-nosymbol', target: 'd-bore', at: [F.bore.at[0] + 22, F.bore.at[1] + 22],
-    title: 'Shape symbol missing',
-    rule: 'Shape symbols',
-    why: 'A bare "40" on a leader could be a length, a width or a depth. ø40 can only be a diameter. (Across the circle you may drop it — the line shows what it spans. On a leader, never.)',
-    fix: 'Write ø in front of the number.',
-    wrong: { text: String(F.bore.dia) },
-  },
-  {
-    id: 'm-leader', target: 'd-square', at: [F.square.at[0] + 26, F.square.at[1] + 17],
-    title: 'Leader too shallow',
-    rule: 'Leader lines',
-    why: 'At 8° it lies almost flat, parallel to the dimension below it — so it reads as one more dimension line instead of a pointer.',
-    fix: 'Take it off at 30° or steeper.',
-    wrong: { dirDeg: 8, lengthMm: 46 },
-  },
-  {
-    id: 'm-hidden', target: 'd-hidden-dim', add: true, at: [F.cskHole.at[0] + 26, LANE.below4 + 7],
-    title: 'Measured from a dashed line',
-    rule: 'Visible edges',
-    why: 'This one runs to the dashed countersink on the BACK of the plate. This view cannot show a back-face feature truly, so the number measures a shadow.',
-    fix: 'Measure from the drilled circle you can see, and put the countersink in a note.',
-    wrong: {
-      kind: 'linear', axis: 'x', tone: 'bad',
-      from: [0, 0], to: [F.cskHole.at[0] + CSK.dia / 2, F.cskHole.at[1]],
-      at: LANE.below4, text: String(F.cskHole.at[0] + CSK.dia / 2),
-    },
-  },
-  {
-    id: 'm-duplicate', target: 'd-duplicate', add: true, at: [F.slot.at[0] + 12, LANE.below5 + 7],
-    title: 'The same size given twice',
-    rule: 'Say it once',
-    why: 'The slot is already placed by the chain below. Measuring it again from the left edge means that if the two ever disagree, nobody can tell which is right.',
-    fix: 'State each size exactly once.',
-    wrong: {
-      kind: 'linear', axis: 'x', tone: 'bad',
-      from: [0, 0], to: F.slot.at, at: LANE.below5, text: String(F.slot.at[0]),
-    },
-  },
-
-  // --- notation faults (Figs. 4.28–4.44) ------------------------------------
-  {
-    id: 'm-order', target: 'd-corner', at: [-28, 104],
-    title: 'Symbol written after the number',
-    rule: 'Symbol goes first',
-    why: 'R12, not 12R. With the symbol trailing, every reader has to go back and re-read the number to find out what it was.',
-    fix: 'Symbol first, tight against the number: R12.',
-    wrong: { text: `${PLATE.cornerR}R` },
-  },
-  {
-    id: 'm-word', target: 'd-fillet', at: [70, 46],
-    title: 'A word where a symbol belongs',
-    rule: 'Symbol, not a word',
-    why: '"Rad 15 mm" gets two things wrong in three words: use the symbol R, not the word — and sizes are already in millimetres, so "mm" never follows a number.',
-    fix: 'Write R15. No word, no unit.',
-    wrong: { text: `Rad ${PLATE.filletR} mm` },
-  },
-  {
-    id: 'm-diaword', target: 'd-sphere', at: [196, 78],
-    title: '"Dia" written out — and the ball lost',
-    rule: 'Symbol, not a word',
-    why: '"24 Dia" spells out what ø already says — and throws away the S, so a round SEAT now reads as a plain drilled hole the same size.',
-    fix: 'Write Sø24: symbol first, and the S that says it is a ball.',
-    wrong: { text: `${F.sphere.dia} Dia` },
-  },
-  {
-    id: 'm-dprefix', target: 'd-spigot-dia', at: [SPIGOT_RECT.x1 + 14, SPIGOT_RECT.y1 + 10],
-    title: '"D" used for diameter',
-    rule: 'Use ø, not D',
-    why: 'D is not a shape symbol — it is a hand-lettering habit. And on a rectangle, where nothing else says the feature is round, ø is the only thing making this a cylinder rather than a flat tongue.',
-    fix: 'Write ø28.',
-    wrong: { text: `D${F.spigot.dia}` },
-  },
-]);

@@ -2,6 +2,131 @@
 
 All notable changes to this topic. Platform-wide entries live in `../CHANGELOG.md`.
 
+## 2026-08-17 — No textbook figure number reaches the learner
+
+The four worked examples came from four numbered figures of the chapter, and for one day the UI
+said so: the chips read `Fig. 4.28` over `L-plate`, the board's header carried a `Fig. 4.30`
+span, and each sheet's `aria-label` opened "Figure 4.31, Rod support…". A UI-cleanup review
+removed all of it. **This is a standalone learning module, not a viewer for a scanned textbook**,
+and a figure number is a reference a first-year student cannot act on.
+
+| Where | Was | Now |
+|---|---|---|
+| Chips | `Fig. 4.28` over `L-plate`, plus an `aria-label` "Figure 4.28, L-plate" | `L-plate` — an ordinary `.chips` row, no glyph, the text its own accessible name |
+| Board header | `Fig. 4.28 · L-plate · Parallel dimensioning · Example 1 of 4` | `L-plate · Parallel dimensioning · Example 1 of 4` |
+| Each sheet's `aria-label` | "Figure 4.28, L-plate: Wrong dimensioning…" | "L-plate: Wrong dimensioning…" |
+| CSS | `.rf-board__no`, and the `#example-chips` stacking rule that existed only to hold the number | both gone |
+
+**The drawings, the dimensional data, the wrong/correct comparison and every explanation are
+untouched.** `verify/reviewfigures.mjs` still reports the same 10 / 10 / 11 / 11 values and
+`verify/clearance.mjs` the same 49 drawings.
+
+`reviewFigures.js` keeps `no` per figure — it records which figure of the chapter each sheet came
+from, so the geometry stays checkable against the scan — with a ⚠️ on the field saying it must
+never reach the DOM.
+
+**This closes the exception opened yesterday, so CLAUDE.md's no-citations rule now has none**, and
+a test enforces it. The Step-6 walk sweeps every rendered string and every `aria-label`, `title`,
+`alt` and `placeholder` in the panel and on the board for `Fig`, `Figure n`, `4.2x`, `4.3x` and
+`§`, across all four examples, with the sheet study open, and over the step's own copy and closing
+summary. It was verified to be capable of failing by planting three citations — rendered text, an
+`aria-label`, and a `§` — and catching all three.
+
+## 2026-08-16 — Step 6 becomes the worked examples, and nothing else
+
+A second lecturers' review, on the two-half Step 6 built two days earlier: the fault hunt is
+redundant now that the chapter's own wrong/correct pairs are in front of the student, and having
+both made the step read as two assessments stacked on one another. **The twelve-fault hunt is
+removed — deleted, not hidden.**
+
+**Gone from the panel:** the `How to review` segmented control, the progress meter and its
+`n / 12 solved` count, the milestone line, the `With faults` / `Corrected` selector, Step 6's
+compare toggle and its slot, and the verdict card that judged each accusation.
+
+**Gone from the code:**
+
+| Where | What |
+|---|---|
+| `src/dimensionExamples.js` | the whole `MISTAKES` catalogue — twelve faults, ~120 lines |
+| `src/main.js` | `faultyDrawing()`, `reviewHotspots()`, `onHotspotPick()`, `setHotspots()`, `drawing.hotspots`, the `found`/`missed`/`visited`/`lastPicked` sets, and `showReview(view)` — replaced by `showSheet()`, which draws the Guide Plate correctly and only |
+| `src/dimensionLabels.js` | `setHotspots()` and the whole hotspot layer, with its `onPick` callback |
+| `src/dimensionUI.js` | `setReviewMode`, `setReviewView`, `renderScore`, `milestoneFor`, `reportFault`, and the `reviewMode` / `reviewView` / `faultsFound` state |
+| `index.html` | the `.vp-hotspot` marker component (46 lines), the `.progress` meter (42 lines), the dead `.score` block, and the `#review-sheet-fold.is-off` fade |
+| `simAPI` | `setReviewView` → `setSheetView`; `compareKind` loses its `'review'` case |
+
+**Step 6 now completes on reading all four examples.** Next is still never disabled; this drives
+the rail's ✓ and the closing summary only.
+
+**The chips are the whole navigation.** *(They carried the chapter's figure number when this
+entry was written; the entry above removed it the following day, and the chips now name the part
+alone.)*
+
+**"The sheet itself" now owns the viewport while it is open.** The scale and unit study acts on
+the 3-D Guide Plate, which the examples board covers, so opening the fold takes the board down
+and closing it brings the pair back — the same contract as Step 1's studies. Picking an example
+chip closes the fold. Nothing was removed from that study; §4.5 items 4–5 are still taught.
+
+**Verification.** `verify/reviewfigures.mjs` 4/4 and `verify/clearance.mjs` 49 drawings, both
+unchanged. In the browser: a rewritten Step-6 walk (~60 assertions, including one pass that
+proves not one fault selector, marker, meter, CSS rule or `simAPI` entry survives anywhere in
+the document), the accessibility suite, the full-lesson regression, the panel-layout table and
+the figure walk — all green, console clean.
+
+> Three suites — `figwalk`, `ux`, `cmp2`/`s4meth` — were reporting failures that turned out to be
+> the harness, not the sim: they never called `open()`, so each ran against whatever state the
+> previous suite had left in the tab and read one step behind. Fixed. What remains after that is
+> one real pre-existing issue, unrelated to this work and identical on the committed baseline:
+> `cmp2`'s compare pair is 5 px off centre, and `s4meth` sees sheet A mid-reveal.
+
+## 2026-08-14 — Step 6 gains the chapter's own four worked examples
+
+A lecturers' review found the review step too abstract: it asked a learner to spot faults on the
+Guide Plate without ever having been shown a wrong drawing beside its corrected form. Chapter 4
+prints exactly that, four times over, and the class is set those four as Examples 4.1–4.4. They
+are now in the lesson.
+
+> **Superseded on 2026-08-16**, which removed the fault hunt this entry kept. Everything below
+> about the four worked examples still stands; the "two halves" no longer do.
+
+**Step 6 has two halves, chosen by a `.seg` at the top of the panel.**
+
+- **Worked examples** (the new default) — Figs. 4.28 *L-plate*, 4.29 *Lock plate*, 4.30
+  *Template* and 4.31 *Rod support*, each drawn twice: wrongly on the left under **✗ Wrong
+  dimensioning**, correctly on the right under **✓ Correct dimensioning**, with *What is wrong?*
+  and *Why the corrected version is better* underneath. Six bullets a side, naming every fault
+  the left-hand sheet carries.
+- **Find the faults** — the twelve-fault hunt on the Guide Plate, entirely unchanged.
+
+**The examples are flat 2-D and nothing else.** No canvas, no camera, no orbit, no isometric, no
+animation — the lecturers asked for plain illustrations, and a student comparing two sheets is
+reading paper. `src/reviewFigureSvg.js` strokes them as SVG at one user unit per millimetre, so
+the line weights ARE the chapter's (0.6 thick, 0.22 thin) and a value at font-size 3.5 IS §4.5
+item 3's 3.5 mm lettering. They render on a board that covers the WebGL viewport, because a
+320 px panel cannot hold two engineering drawings side by side.
+
+**The geometry and every value are read off the scans of pp. 36–37, not drawn from memory.**
+L-plate 60 × 70, R20 top-left, ø20 and ø16 on one centre line 20 in. Lock plate 114 × 48, a
+12 × 10 notch, R10, chain 12 · 8 · 74 · 20 across and 10 · 14 · 24 up. Template 106 × 50, R8,
+ø20 at (20, 30), a 60° cut that fixes the top edge at x = 80. Rod support 80 × 52, R4 corners,
+ø40 boss over a ø24 bore, four ø8 on a 60 × 32 pitch, and a hidden feature 14 deep.
+
+**Two departures from the scans, both for legibility and both recorded in the source.** Fig.
+4.30's `5` moves into the middle of the clear space the land leaves rather than being squeezed
+against the riser, and Fig. 4.31's ø24 leader runs 6 mm further out. At the chapter's own
+placement both values land on the part's outline at screen size.
+
+**`verify/reviewfigures.mjs`** measures every sheet in Node — no browser needed, both new modules
+being pure leaves. The four CORRECTED sheets must show no value overlapping another and no value
+sitting on the outline; all four pass. The four faulty ones are reported and never counted,
+because every one of their faults is the lesson.
+
+**Step 6 now completes on both halves** — all four examples read AND all twelve faults found.
+Next is still never disabled; this drives the rail's ✓ and the closing summary only.
+
+**Fixed while here:** switching from the hunt back to the examples left the Guide Plate's CSS2D
+values and its twelve marker buttons painted over the board, and left those buttons in the tab
+order behind a panel nobody could see. The label layer now goes down with the board.
+
 ## 2026-08-06 — the annotation layout pass: a second look before anything is inked
 
 A graphical-quality change only. **Six steps, the educational flow, the interaction logic, the

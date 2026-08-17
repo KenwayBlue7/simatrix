@@ -43,7 +43,7 @@ reading the *object* instead of the *dimension*, so the figures now grow with th
 | 2 | **Plate with a hole** | 130 × 80 × 20, ø30 | Step 1 (line legend, leader study) · **Step 2 (all ten rules)** | `ø`, a centre line, a hidden outline, and every rule about where a dimension's parts may go |
 | 3 | **Slotted plate** | 130 × 80 × 20, R15, two ø12, a 16 × 40 slot | Step 4 (arrangement) | several *located* features in a row — the only thing chain / parallel / running / co-ordinates can be argued about |
 | 4 | **Chamfered plate** | 130 × 80 × 20, 20 × 45° corner, ø24 | Step 3 (values) | a horizontal, a vertical, a **sloping** and an **angular** dimension — the four cases aligned and unidirectional actually differ on |
-| 5 | **Guide Plate** | 200 × 100 × 30, fourteen features | Step 5 (symbols) · Step 6 (review) | the complete component, once the fundamentals are in place |
+| 5 | **Guide Plate** | 200 × 100 × 30, fourteen features | Step 5 (symbols) · Step 6 (the sheet study) | the complete component, once the fundamentals are in place |
 
 All five share one visual style, one line alphabet, one renderer and one interaction set —
 they are the same `dimensionRig.js` build fed different data, so nothing about *how* a
@@ -151,15 +151,35 @@ by adding one.
    circle four ways plus the "ø omitted" case, the radius three ways including the large
    offset radius, the square three ways, the chamfer external / simplified / internal, and the
    countersink by diameter (Fig. 4.27a) and by depth (Fig. 4.27b).
-6. **Review** *(Guide Plate)* — the complete engineering drawing, applying everything the
-   simple figures taught. It carries its full dimensioning plus **twelve** seeded faults:
-   eight that break a rule, and four **notation** faults of exactly the kind Figs. 4.28–4.44
-   spend their time correcting (`12R`, `Rad 15 mm`, `24 Dia`, `D28`). Click a marker to accuse
-   a dimension; a correct accusation re-draws the fault into its BIS form in front of you. The
-   step also carries **the sheet itself** — a caption band, a scale selector that resizes the
-   drawing while every value on it stays exactly the same (§4.5 item 5), and a unit selector
-   that restates the drawing in centimetres with the general note §4.5 item 4 requires. The
-   nine rules of §4.6 and the class-work system of §4.5 are open from the moment the step is.
+6. **Review** — the chapter's own four worked examples, and nothing else to do but read them.
+
+   Figs. 4.28 *L-plate* (parallel), 4.29 *Lock plate* (chain), 4.30 *Template* and 4.31 *Rod
+   support* (both combined) are Examples 4.1–4.4, and what the class is set. Each is drawn twice
+   side by side — **✗ Wrong dimensioning** on the left, **✓ Correct dimensioning** on the right —
+   with *What is wrong?* and *Why the corrected version is better* underneath, six bullets a side
+   naming every fault the left-hand sheet carries. Four chips choose between them, named for the
+   part: *L-plate*, *Lock plate*, *Template*, *Rod support*. **No figure number reaches the
+   screen** — the chapter's numbering is recorded in the source data so the geometry stays
+   checkable, but the module reads as a lesson of its own, not as a textbook viewer, and a
+   citation is a reference a first-year student cannot act on. They are **flat 2-D SVG**: no canvas, no camera, no
+   orbit, no animation. A lecturers' review asked for plain illustrations, on the grounds that a
+   student comparing two sheets is reading paper. Below 720 px of viewport the pair stacks, wrong
+   above correct.
+
+   **The step is passive on purpose.** It used to end with a twelve-fault hunt on the Guide
+   Plate — click a marker, accuse a dimension, watch the meter fill. A second lecturers' review
+   (2026-08-16) removed it: being shown a mistake beside its correction is what teaches it, and
+   two assessments in one step buried the pairs that do the teaching.
+
+   The step also carries **the sheet itself**, which is where the Guide Plate still lives — a
+   caption band, a scale selector that resizes the drawing while every value on it stays exactly
+   the same (§4.5 item 5), and a unit selector that restates the drawing in centimetres with the
+   general note §4.5 item 4 requires. Opening that fold takes the examples board down and gives
+   the viewport to the finished sheet; closing it brings the pair back. The nine rules of §4.6
+   and the class-work system of §4.5 are open from the moment the step is.
+
+   The step counts as complete when all four examples have been read. Next is never disabled;
+   this drives the rail's ✓ and the summary only.
 
 ---
 
@@ -189,11 +209,16 @@ graphics_module_1_topic_1_1_dimensioning/
     ├── dimensionLayout.js      PURE — the annotation layout pass: works out where every
     │                           stroke and value will land, finds the pairs closer than 3 mm,
     │                           and moves the lower-priority one clear (ADR-126)
-    ├── dimensionLabels.js      CSS2D values, draggable pills and clickable review markers
+    ├── dimensionLabels.js      CSS2D values and the draggable pills of Step 2
     ├── dimensionSteps.js       PURE DATA — step copy, glossary, §4.6 checklist, §4.5 system
     ├── dimensionRules.js       PURE DATA — Step 2's rule/violation pairs + placement checks
     ├── dimensionSymbols.js     PURE DATA — Step 5's §4.4 symbol catalogue
-    ├── dimensionExamples.js    PURE DATA — anatomy, arrangements, complete drawing, faults
+    ├── dimensionExamples.js    PURE DATA — anatomy, arrangements, the complete drawing
+    ├── reviewFigures.js        PURE DATA — Step 6's four worked examples (Figs. 4.28–4.31):
+    │                           geometry, a wrong AND a correct annotation set for each,
+    │                           and the six-a-side explanation
+    ├── reviewFigureSvg.js      strokes one of those as FLAT SVG — no canvas, no camera,
+    │                           no animation. 1 user unit = 1 mm, so the weights are BIS's
     ├── dimensionAnimations.js  PURE DATA — timings, stagger maths, named camera poses
     ├── dimensionUI.js          the guided stepper + every step's controls
     ├── anim.js                 the shared tween engine (byte-identical, RULES.md §7.1)
@@ -233,7 +258,8 @@ never touched, so the drawing always states the same sizes between the same poin
 kept only if the sheet as a whole gets less crowded, which is why it can never cure one clash by
 causing another. Five contacts are lawful and exempt — chief among them a projection line
 crossing a dimension line, which is how every stacked arrangement in §4.3 works. Drawings that
-are *meant* to be wrong (Step 2's rules, Step 6's faults) take no part at all.
+are *meant* to be wrong (Step 2's ten broken rules) take no part at all — and Step 6's four
+wrong sheets never reach it, being flat SVG from a renderer this pass does not feed.
 
 **The figure is data, not code.** `main.js` holds one `currentFigure` and one `setFigure(id)`,
 which swaps the datum and then runs the ordinary path — `rebuild()`, resize, re-pose, re-caption
@@ -277,6 +303,8 @@ see ADR-079, and do not "fix" them back.
 ```bash
 node verify/clearance.mjs          # what is still tight, if anything
 node verify/clearance.mjs --all    # every drawing, and every nudge the layout pass made
+node verify/reviewfigures.mjs      # Step 6's four worked examples: overlaps and values on lines
+node verify/reviewfigures.mjs --all  # …the deliberately faulty sheets too, for information
 ```
 
 That one needs no browser: the layout pass and the spec catalogues are pure data leaves, so all
@@ -295,7 +323,7 @@ full pass:
   variants, 5 termination styles plus the included-angle slider, all three regimes of the
   space study, 3 leader heads, 4 line types, both methods plus a rotation plus the oblique
   clock plus both angular styles, 6 arrangements with every variant plus the compare split,
-  9 symbols with every variant, both scales, both units, and all twelve faults found.
+  9 symbols with every variant, both scales, both units, and all four worked examples read.
 - Value drag and the keyboard nudge both report a placement verdict against §4.2.
 - `renderer.info.memory` flat across 50 rapid `simAPI.reset()` calls (geometries 3 → 3), and
   every CSS2D node removed with it (labels 0 → 0).

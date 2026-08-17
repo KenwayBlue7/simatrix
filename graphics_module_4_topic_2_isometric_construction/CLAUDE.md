@@ -2,13 +2,29 @@
 
 A guided **conceptual construction lesson**. Topic 1 answered *"what is an isometric drawing?"*;
 this topic answers *"how is one constructed?"* — and answers it as a **process**, not a recipe. The
-learner picks any of ten solids, gives it real dimensions, reads its three orthographic views, then
+learner picks any of fifteen solids, gives it real dimensions, reads its three orthographic views, then
 watches the same four-phase construction produce it: **axes → bounding box → shape → finish**.
 Because the phases are identical for every solid and only Phase C's contents change, the
 transferable idea is the ORDER, which is what lets a student construct a solid they have never seen.
 
-**This is NOT a problem-solving simulator.** It has no problem library, no answer checking, no
-scoring.
+**This is NOT a problem-solving simulator.** It has **no scoring and no verdict** — the learner is
+guided towards a construction, never marked on one.
+
+**Amended 2026-08-12.** This line previously read "no problem library, no answer checking, no
+scoring". Two of those three changed, on a lecturer requirement:
+
+- **It has a Problem Library** (`src/problemLibrary.js`), migrated from Topic 3: eighteen textbook
+  problems, each supplying a statement and the sizes it states. A problem is an INPUT to Step 1 like
+  choosing a solid, reached through **Practice Problems** exactly as Topic 3 reaches it, and it
+  resolves to a solid or to a combination (`src/problemBuilder.js`). The six steps and the four
+  phases are unchanged.
+- **It has a LIVE self-check** while a problem is loaded: Topic 3's `answerValidator.js`, migrated
+  with its logic unchanged and fed by `src/problemCheck.js`, painted as the platform's
+  `.match-status` line inside the problem card. It updates as the learner dials — no button, no
+  polling. `Still to match: …` while something disagrees with the question; `✓ Your construction
+  matches the problem.` when nothing does.
+- **Step 6 is still the replay**, with no verdict panel. Topic 3's one documented divergence
+  (ADR-055 amendment 2) survives, and Next is never gated on the check.
 
 ## Deliberately OUT of scope (task brief)
 Hidden-line conventions · sectioning · auxiliary views · inclination problems · intersection
@@ -60,12 +76,27 @@ PRIMITIVE-KIND vocabulary — never over solid names. Adding a solid is appendin
   Step-4 phase controller `goPhase(id)`, the Step-5 form comparison, the Step-6 replay, and
   `window.simAPI`. It owns no linework maths, no solid definitions, no step copy, no label offsets
   and no timing tables.
-- **`src/shapeData.js`** — leaf DATA. The ten solids: dimension fields (each with its engineering
+- **`src/shapeData.js`** — leaf DATA. The fifteen solids: dimension fields (each with its engineering
   `symbol`) · `axisSymbols` for the three box edges · `bounds()` · a geometry `body()` SPEC ·
   `views()` (2D primitives) · `construction()` (ordered 3D primitive stages). Knows nothing about
   THREE or the DOM. Also the mm ↔ world converter (1 world unit = 10 mm, RULES §6.8),
   `ISOMETRIC_SCALE` (0.816), and `resolveDims()` — the boundary that turns the learner's numbers
   into the geometry's numbers when a field is left UNKNOWN (ADR-045).
+- **`src/problemLibrary.js`** — leaf DATA. The eighteen textbook problems and their four categories,
+  migrated from Topic 3. Statements are VERBATIM. A problem names its solids in THIS topic's
+  vocabulary (`parts: [{ solidId, dims }]`, bottom first) because Topic 3's part parameters are
+  derived one way and cannot be inverted at runtime; the translation was done once, offline, and
+  checked against Topic 3's own `answerData.bounds`. Adding a problem is appending one object.
+- **`src/problemBuilder.js`** — leaf DATA. The whole join: one part resolves to a solid, two or more
+  resolve through `combinationBuilder.js`. No second composer, no second rendering path, no
+  per-problem branch.
+- **`src/answerValidator.js`** — leaf, pure. **Topic 3's validator, logic byte-identical** (only its
+  import line differs). Checkers are pure functions in one registry; a future check registers one
+  more entry. `pending` is not `fail`, tolerance is ±0.5 mm, and it never fills anything in.
+- **`src/problemCheck.js`** — leaf, pure. The adapter between Topic 2's live state and that
+  validator, plus the one line the problem card shows. Derives everything, stores nothing. `main.js`
+  re-runs it on the state changes the check depends on — a dimension, the subject, the form, a
+  phase, a stage — and never on a timer.
 - **`src/shapeFactory.js`** — leaf. Body spec → mesh + fattened ink edges + view-dependent
   silhouettes. One switch over geometry kinds. Owns and frees everything it builds. Also
   `topHalfExtent()` — how far the solid still spreads AT ITS TOP, and whether that top is round,

@@ -573,6 +573,10 @@
        Control primitives (DESIGN.md §5.1–§5.5)
        ============================================================ */
     .dock__group { display: flex; flex-direction: column; gap: var(--space-3); }
+    /* A group sets its own `display`, which OUTRANKS the UA stylesheet's `[hidden] { display: none }`
+       — so any group the sim hides needs its own rule, exactly as `.step-panel` and `.btn` do above.
+       Step 1 swaps between these two, and without this the hidden one keeps its space. */
+    .dock__group[hidden] { display: none; }
     .dock__group-title {
       margin: 0 0 var(--space-1);
       padding-bottom: var(--space-2);
@@ -613,6 +617,172 @@
       color: var(--color-ink);
     }
     .field__name { color: var(--color-ink-secondary); }
+
+    /* --- Step 1's combination builder. Layout only: every control in a row is an existing platform
+         component (`.field__select`, `.btn--ghost`) and the row adds no colour, no border and no
+         type of its own — just the column gap the rest of the dock is laid out on. --- */
+    #combo-parts { display: flex; flex-direction: column; gap: var(--space-3); }
+    .combo-row { display: flex; align-items: center; gap: var(--space-3); }
+    /* The position the solid occupies, in the dock's own eyebrow register. Fixed width so the
+       selects line up down the column rather than stepping in and out with the word length. */
+    .combo-row__tier {
+      flex: 0 0 4.5rem;
+      font-size: var(--text-xs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--color-ink-secondary);
+    }
+    .combo-row__select { flex: 1 1 auto; min-width: 0; }
+    .combo-row__remove { flex: 0 0 auto; }
+    /* A component's dimension fields, gathered under its name. Only a combination emits these, so a
+       single solid's dock is untouched. */
+    #dim-fields .field-group { display: flex; flex-direction: column; gap: var(--space-3); }
+    #dim-fields .field-group + .field-group { margin-top: var(--space-4); }
+
+    /* ============================================================
+       The Problem Library — Topic 3's components, value for value.
+       ============================================================
+       Every rule below is copied from
+       `graphics_module_4_topic_3_isometric_projection_problem_library/index.html`, which is the
+       approved implementation of this surface: the library entry, the active-problem card, and the
+       full-viewport browser overlay. Nothing is re-invented and no token is added — the point is
+       that the two topics look and behave identically here. */
+
+    /* The library entry — the Lines topic's component. It reads as a compact link but carries the
+       full 44px target, and the negative right margin pulls the ghost's own padding off so its
+       LABEL lines up with the card's right edge rather than sitting a step inside it. */
+    .library-entry {
+      flex: none;
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
+      min-height: 44px;
+      margin-right: calc(var(--space-2) * -1);
+      padding: 0 var(--space-2);
+      font: inherit;
+      font-size: var(--text-sm);
+      color: var(--color-ink-secondary);
+      background: transparent;
+      border: 1px solid transparent;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .library-entry:active { transform: scale(0.97); }
+    .library-entry:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .library-entry__icon { flex: none; width: 18px; height: 18px; }
+
+    /*
+      The active problem: a quiet paper CARD carrying the statement, the hints and the actions —
+      the same content surface as the step card below it, on the same grey shell, so the two read
+      as one column rather than a banner sitting on top of a panel.
+    */
+    #active-problem {
+      flex: 0 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      padding: var(--space-3);
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+    }
+    /* `display: flex` above is an AUTHOR rule, and an author rule outranks the UA stylesheet's
+       `[hidden] { display: none }` — so the card would stay on screen with its `hidden` property
+       set. Topic 3 does not need this line because it carries a global `[hidden]` override; this
+       topic does not, so the rule is stated where it is needed. */
+    #active-problem[hidden] { display: none; }
+    #active-problem-statement {
+      margin: 0;
+      font-size: var(--text-sm);
+      line-height: 1.5;
+      color: var(--color-ink);
+    }
+    .problem-meta {
+      margin: 0;
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--color-ink-secondary);
+    }
+    /* What this topic does not draw of what the question asks. Two problems carry one. */
+    #active-problem-limitation {
+      margin: 0;
+      font-size: var(--text-sm);
+      line-height: 1.5;
+      color: var(--color-ink-secondary);
+    }
+    /*
+      Help and read-state on the left, leaving the problem on the right. Grouping by intent, so
+      the destructive-ish action is not one of three interchangeable ghosts in a row.
+    */
+    .problem-actions {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: var(--space-2);
+    }
+    #active-problem-exit-btn { margin-left: auto; }
+    /*
+      Leaving a problem discards its work, so it asks first — the same two-state confirm the Reset
+      control uses (RULES.md §4.19), reusing its prompt/separator classes.
+    */
+    #active-problem-exit-confirm {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+    }
+    /* Its own `display` outranks the UA `[hidden]`, exactly as `.reset-confirm` needs above. */
+    #active-problem-exit-confirm[hidden] { display: none; }
+    /*
+      Scaffolded hints — revealed one at a time, never dumped. The platform hint callout
+      (DESIGN.md §5.8): a full accent-wash box, never a coloured side-stripe.
+    */
+    #active-problem-hints {
+      margin: 0;
+      padding: var(--space-2) var(--space-3);
+      border-radius: var(--radius-sm);
+      background: var(--color-accent-soft);
+      font-size: var(--text-sm);
+      line-height: 1.5;
+      color: var(--color-ink);
+    }
+    #active-problem-hint-list {
+      margin: 0;
+      padding-left: var(--space-5);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+    }
+    #active-problem-hint-list li { padding-left: var(--space-1); }
+    /* The live self-check line — the platform component, value for value (Module2/index.html). */
+    .match-status {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      margin: 0;
+      font-size: var(--text-sm);
+      line-height: 1.4;
+      color: var(--color-ink-secondary);
+    }
+    .match-status[hidden] { display: none; }
+    .match-status__icon { flex: none; width: 16px; height: 16px; }
+    /* The matched moment is the lesson's small payoff: a calm success pop (soft green + the check
+       glyph — Two-Cue Rule), the one place colour is spent in this card. A mismatch is NEVER red:
+       it is guidance about what is still to match, not an error. */
+    .match-status--ok {
+      color: var(--color-success);
+      font-weight: 700;
+      padding: var(--space-1) var(--space-2);
+      background: var(--color-success-soft);
+      border-radius: var(--radius-xs);
+    }
 
     /* --- An optional dimension: the learner declares it stated or unknown. --- */
     .field__optional { display: flex; align-items: center; gap: var(--space-2); min-height: 32px; }
@@ -1107,6 +1277,147 @@
       .osheet__edge, .osheet__xy, .osheet__projectors line { stroke-dashoffset: 0; }
     }
 
+    /* ============================================================
+       Problem browser — the full-viewport, focus-trapped overlay
+       ============================================================ */
+    /* Topic 3's overlay, value for value: a fixed header that never scrolls and ONE scrolling body
+       with the padded scrollbar pill (DESIGN.md §4.3 z-ladder, §5.11 scrollbar). */
+    .problem-library {
+      position: fixed;
+      inset: 0;
+      z-index: var(--z-overlay);
+      display: flex;
+      flex-direction: column;
+      background: var(--color-paper);
+      box-shadow: var(--shadow-md); /* transient floating surface (Flat-Ink exception, §4.9) */
+    }
+    /* Same author-rule trap as the problem card: `display: flex` would keep the overlay on screen
+       with `hidden` set, because an author rule outranks the UA stylesheet's `[hidden]`. */
+    .problem-library[hidden] { display: none; }
+    /* Calm scale-and-fade in; collapses to instant under reduced motion (global rule). */
+    @keyframes libraryIn { from { opacity: 0; transform: scale(0.98); } to { opacity: 1; transform: none; } }
+    .problem-library:not([hidden]) { animation: libraryIn var(--dur-step) var(--ease-standard); }
+    @media (prefers-reduced-motion: reduce) {
+      .problem-library:not([hidden]) { animation: none; }
+    }
+    .problem-library__header {
+      flex: none;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: var(--space-3);
+      padding: var(--space-4) var(--space-5);
+      border-bottom: 1px solid var(--color-border);
+    }
+    .problem-library__title {
+      margin: 0;
+      font-size: var(--text-title);
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -0.01em;
+      color: var(--color-ink);
+    }
+    .problem-library__close {
+      flex: none;
+      width: 44px;
+      height: 44px;
+      display: grid;
+      place-items: center;
+      color: var(--color-ink-secondary);
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--dur-fast) var(--ease-standard),
+                  border-color var(--dur-fast) var(--ease-standard),
+                  color var(--dur-fast) var(--ease-standard),
+                  transform var(--dur-fast) var(--ease-standard);
+    }
+    .problem-library__close:active { transform: scale(0.97); }
+    .problem-library__close:focus-visible { outline: none; box-shadow: var(--ring-focus); }
+    .problem-library__close svg { width: 20px; height: 20px; }
+    /*
+      Symmetric padding, deliberately. A right-only scrollbar gutter would shift the centred 920px
+      column off true centre by half the difference — invisible on a narrow card, but this column
+      is centred in the whole window, where the offset reads.
+    */
+    .problem-library__body {
+      flex: 1 1 auto;
+      min-height: 0;
+      overflow-y: auto;
+      padding: var(--space-5);
+    }
+    .problem-library__body::-webkit-scrollbar { width: 10px; }
+    .problem-library__body::-webkit-scrollbar-track { background: transparent; }
+    .problem-library__body::-webkit-scrollbar-thumb {
+      background: var(--color-border);
+      background-clip: padding-box;
+      border: 3px solid transparent;
+      border-radius: 999px;
+    }
+    @supports (-moz-appearance: none) {
+      .problem-library__body { scrollbar-width: thin; scrollbar-color: var(--color-border) transparent; }
+    }
+    .problem-library__inner { max-width: 920px; margin: 0 auto; }
+
+    /* Category headings take the platform LABEL role — the same register as `.dock__group-title`
+       in the panel, so there is one heading language across the topic. */
+    .problem-group { margin: 0 0 var(--space-6); }
+    .problem-group__title {
+      margin: 0 0 var(--space-1);
+      font-size: var(--text-xs);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      color: var(--color-ink-secondary);
+    }
+    .problem-group__blurb {
+      margin: 0 0 var(--space-3);
+      max-width: 76ch;
+      font-size: var(--text-sm);
+      line-height: 1.55;
+      color: var(--color-ink-secondary);
+    }
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: var(--space-4);
+    }
+    .problem-card {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-2);
+      text-align: left;
+      padding: var(--space-4);
+      background: var(--color-paper);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-md);
+      cursor: pointer;
+    }
+    /* Title · description · difficulty. Nothing else — no badges, no source metadata. */
+    .problem-card__title { font-weight: 700; }
+    .problem-card__hint { font-size: var(--text-sm); color: var(--color-ink-secondary); line-height: 1.5; }
+    .problem-card__difficulty {
+      margin-top: auto;
+      padding-top: var(--space-2);
+      font-family: var(--font-mono);
+      font-size: var(--text-xs);
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--color-ink-secondary);
+    }
+    @media (hover: hover) and (pointer: fine) {
+      /* The Lines topic's exact library-entry hover: it lifts onto paper rather than the panel
+         tint, because it sits ON the paper card, not on the grey shell. */
+      .library-entry:hover { background: var(--color-paper); border-color: var(--color-border); color: var(--color-ink); }
+      .problem-card:hover { border-color: var(--color-accent); }
+      .problem-library__close:hover {
+        background: var(--color-paper);
+        border-color: var(--color-bench-grey);
+        color: var(--color-ink);
+      }
+    }
+
     /* --- Flow strip (reused verbatim from Topic 1): the Step-4 phase transport and the
          Step-6 chain. Each node is a real button that drives the viewport to that stage,
          so the strip is the learner's transport through the demonstration rather than a
@@ -1553,6 +1864,43 @@
 
   <!-- Guided Stepper chrome — step rail + step card. stepper.js drives it. -->
   <aside id="wizard" aria-label="Guided steps">
+    <!--
+      The loaded problem, above the stepper — Topic 3's card, structure for structure. It appears
+      only while a problem is loaded; in free practice it stays out and the column below it is the
+      ordinary Topic 2 wizard, unchanged.
+
+      THE CITATION IS NOT RENDERED here either: `problem.source` is carried in the data and shown on
+      the library card, but the panel exists for the QUESTION and a provenance line competes with it
+      for the same eyebrow register.
+    -->
+    <section id="active-problem" aria-label="The problem" hidden>
+      <p class="problem-meta">Textbook problem</p>
+      <p id="active-problem-statement"></p>
+      <p id="active-problem-limitation" hidden></p>
+      <div id="active-problem-hints" hidden>
+        <ol id="active-problem-hint-list"></ol>
+      </div>
+      <!--
+        The live self-check. The platform's `.match-status` line, in the platform's own wording:
+        "Still to match: …" while something disagrees with the question, and a green check the
+        moment nothing does. It is a live region because it changes without the learner touching it
+        — a slider drag is what updates it.
+      -->
+      <p class="match-status" id="active-problem-status" role="status" aria-live="polite"></p>
+      <div class="problem-actions">
+        <button id="active-problem-hint-btn" class="btn btn--ghost" type="button" hidden>Need a hint?</button>
+        <button id="active-problem-hide-btn" class="btn btn--ghost" type="button">Hide Text</button>
+        <button id="active-problem-exit-btn" class="btn btn--ghost" type="button">Exit Problem</button>
+        <!-- Two-state confirm — only "Yes" leaves the problem, mirroring Reset (RULES.md §4.19). -->
+        <div id="active-problem-exit-confirm" role="group" aria-label="Exit confirmation" hidden>
+          <span class="reset-confirm__prompt">Leave this problem?</span>
+          <button id="active-problem-exit-yes" class="btn btn--ghost" type="button">Yes</button>
+          <span class="reset-confirm__sep">·</span>
+          <button id="active-problem-exit-no" class="btn btn--ghost" type="button">Cancel</button>
+        </div>
+      </div>
+    </section>
+
     <div class="wizard-main">
     <ol id="step-rail" aria-label="Progress">
       <li class="rail__item" data-step="1"><button type="button" class="rail__btn"><span class="rail__marker">1</span><span class="rail__label">Choose Solid</span></button></li>
@@ -1572,6 +1920,20 @@
       <header>
         <div class="card__eyebrow-row">
           <p class="card__eyebrow">Step <span id="step-current">1</span> of <span id="step-total">6</span></p>
+          <!--
+            The platform library entry, component and icon identical to Topic 3 and the Lines topic:
+            an open-book glyph (two facing pages) at 18px, `flex: none` so it centres against the
+            label whatever its own metrics, and the ghost pulled flush to the card's right edge.
+            The eyebrow row was already a space-between flex with a single child — a right-hand slot
+            waiting for an occupant.
+          -->
+          <button id="open-problem-library" class="library-entry" type="button" aria-haspopup="dialog">
+            <svg class="library-entry__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H11v15H5.5A1.5 1.5 0 0 0 4 20.5Z" />
+              <path d="M20 5.5A1.5 1.5 0 0 0 18.5 4H13v15h5.5A1.5 1.5 0 0 1 20 20.5Z" />
+            </svg>
+            <span>Practice Problems</span>
+          </button>
         </div>
         <h2 class="card__title" id="step-title">Choose a Solid</h2>
         <p class="card__lead" id="step-lead"></p>
@@ -1580,7 +1942,21 @@
       <div class="card__body">
         <!-- STEP 1 — Choose the solid. Meet it; construct nothing yet. -->
         <section class="step-panel" data-step="1">
+          <!--
+            Single solid, or a COMBINATION of them. The platform segmented control, used exactly as
+            Step 5's form toggle uses it — two buttons sharing a seam, the live one carrying both the
+            accent fill and `aria-pressed`. The step itself is unchanged: this is still "choose what
+            you are constructing", and everything after it is the same six-step workflow.
+          -->
           <div class="dock__group">
+            <h3 class="dock__group-title">What are you constructing?</h3>
+            <div id="subject-modes" class="segmented" role="group" aria-label="Single solid or combination of solids">
+              <button type="button" class="segmented__btn" data-mode="single" aria-pressed="true">Single Solid</button>
+              <button type="button" class="segmented__btn" data-mode="combination" aria-pressed="false">Combination of Solids</button>
+            </div>
+          </div>
+
+          <div class="dock__group" id="single-dock">
             <h3 class="dock__group-title">The solid</h3>
             <label class="sr-only" for="solid-select">Solid</label>
             <select id="solid-select" class="field__select" aria-label="Choose a solid"></select>
@@ -1588,6 +1964,21 @@
             <p class="dock__note">Drag the viewport to turn it. Look at where its faces, edges and curves are — those are what the construction will have to place.</p>
             <p class="dock__note">Every solid here is constructed by the <strong>same four phases</strong>, in the same order. What changes between them is only the third phase, and only because the shapes themselves differ.</p>
           </div>
+
+          <!--
+            The combination builder. It lists the solids BOTTOM FIRST — the order the object is
+            really built in, and the order Phase C constructs it in — so the list the learner edits
+            reads the same way as the drawing they get.
+          -->
+          <div class="dock__group" id="combo-dock" hidden>
+            <h3 class="dock__group-title">The combination</h3>
+            <p class="dock__note">Build it from the bottom up. Each solid is seated <strong>centrally</strong> on the top face of the one below, which is the one relationship the textbook's combinations use.</p>
+            <div id="combo-parts"></div>
+            <button id="combo-add" class="btn btn--ghost step-action" type="button">+ Add solid</button>
+            <p class="dock__note" id="combo-blurb"></p>
+            <p class="dock__note">A combination is drawn by <strong>exactly the same procedure</strong> as a single solid — the same axes, the same boxes, the same four phases. The one new thing to settle is where each solid sits relative to the one under it, and seating it centrally on the face below settles it.</p>
+          </div>
+
         </section>
 
         <!-- STEP 2 — Dimensions. The only numbers the construction will ever use. -->
@@ -1802,6 +2193,29 @@
       <span class="vp-note__text"></span>
     </div>
   </main>
+
+  <!--
+    The Problem Library browser — Topic 3's overlay, structure for structure. It is a SELECTOR, not
+    a second application: opening it pauses the rAF loop because it covers the live viewport, and
+    nothing else changes. The camera, the current step, the dimensions and the whole scene graph are
+    exactly as they were when it closes again.
+  -->
+  <div id="problem-library" class="problem-library" role="dialog" aria-modal="true"
+       aria-labelledby="problem-library-title" hidden>
+    <header class="problem-library__header">
+      <!-- Titled for the control that opens it: a learner who clicks "Practice Problems" must not
+           arrive somewhere called something else. -->
+      <h1 class="problem-library__title" id="problem-library-title">Practice problems</h1>
+      <button id="problem-library-close" class="problem-library__close" type="button" aria-label="Close practice problems">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
+    </header>
+    <div class="problem-library__body">
+      <div class="problem-library__inner" id="problem-library-list"></div>
+    </div>
+  </div>
 
   <!-- Live region: main.js + stepper.js narrate step + mode changes for screen readers. -->
   <div id="sim-status" class="sr-only" role="status" aria-live="polite"></div>

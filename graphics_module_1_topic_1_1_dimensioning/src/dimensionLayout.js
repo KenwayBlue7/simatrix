@@ -41,7 +41,9 @@
 // WHAT IS EXCLUDED ENTIRELY. A drawing that is MEANT to be wrong must stay wrong: a spec that is
 // flagged `bad`/`good`, that carries one of the deliberate-fault knobs (`extShort`, `extSkew`,
 // `textNudgeMm`), or that is `pinned` takes no part — it is neither moved nor avoided. Step 2's
-// ten broken rules and Step 6's twelve seeded faults are the whole lesson of those steps.
+// ten broken rules are the whole lesson of that step. (Step 6's four wrong/correct pairs are
+// wrong on purpose too, but they never reach this pass at all: they are flat SVG built by
+// `reviewFigureSvg.js`, which shares no code with the renderer this pass feeds.)
 //
 // Layering (ADR-007 / RULES.md §3.6): PURE LEAF. Imports only the pure-data `dimensionData.js`
 // (ADR-078). No THREE, no DOM, no scene. `dimensionDraw.js` imports the geometry helpers,

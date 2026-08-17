@@ -63,7 +63,7 @@ spends their attention reading the OBJECT rather than the DIMENSION.
 | `hole` — Plate with a hole | + ø30, csk ø44 far face | Step 1 legend + leader study · **Step 2, all ten rules** | one hole, its centre line, one hidden outline |
 | `slot` — Slotted plate | + R15, 2 × ø12, 16 × 40 slot | Step 4 arrangement | three located features in a row |
 | `chamfer` — Chamfered plate | + 20 × 45°, ø24 | Step 3 values | a sloping and an angular dimension |
-| `guide` — Guide Plate | 200 × 100 × 30, 14 features | Step 5 symbols · Step 6 review | everything |
+| `guide` — Guide Plate | 200 × 100 × 30, 14 features | Step 5 symbols · Step 6 sheet study | everything |
 
 > **⚠️ DO NOT "simplify" by deleting a figure or by putting a step back on the Guide Plate.**
 > The progression *is* the pedagogy. Equally, do not add a seventh step to make room for a
@@ -92,7 +92,8 @@ rig's geometry from a step function to "just change the shape".
 
 ### Figure 5 — the Guide Plate
 
-The complete component, reserved for Step 5 and Step 6 (`src/dimensionData.js`, `FIGURES.guide`):
+The complete component, reserved for Step 5 and for Step 6's sheet study (`src/dimensionData.js`,
+`FIGURES.guide`):
 200 × 100 × 30 mm, stepped, carrying a rectangular block, a shoulder, an R15 fillet, an R12
 corner, a 10 × 45° chamfer, a ø40 bore **chamfered 3 × 45° at its front mouth**, a ø14 hole
 countersunk ø24 × 90° **on the far face**, a □22 square hole, a 16 × 48 slot, an Sø24 / SR12
@@ -113,7 +114,7 @@ on the right end face**.
 > otherwise has no hidden detail at all, and §4.6 rule 5 ("dimensions are to be given from
 > visible outlines rather than from hidden lines") needs a real dashed outline to argue
 > against. Moving it to the near face silently removes the drawing's only Type E/F line and
-> guts Step 2's `visible-outlines` rule and Step 6's `m-hidden` fault.
+> guts Step 2's `visible-outlines` rule, which is the only place left that argues against it.
 
 Every feature is real geometry — the countersink a true 90° cone, the seat a true spherical
 bowl — so the 3-D view never exposes a drawn-on lie. The solid is one manifold, hard-edged,
@@ -138,11 +139,12 @@ Geometry still changes only inside `rebuild()` (RULES.md §3.1).
 
 **Leaf layering.** The topic's *pure-data* modules (`dimensionData`, `dimensionSteps`,
 `dimensionRules`, `dimensionSymbols`, `dimensionExamples`, `dimensionAnimations`,
-`dimensionLayout`) carry no behaviour and no scene objects, and are importable by any leaf —
-the `genericSolid.js` exception of RULES.md §3.6, recorded in ADR-078. The **behavioural**
-leaves (`dimensionRig`, `dimensionDraw`, `dimensionLabels`, `dimensionUI`) never import one
-another. `dimensionDraw` imports `dimensionLayout`, which is the one data leaf that also owns
-maths — see below.
+`dimensionLayout`, `reviewFigures`) carry no behaviour and no scene objects, and are importable
+by any leaf — the `genericSolid.js` exception of RULES.md §3.6, recorded in ADR-078. The
+**behavioural** leaves (`dimensionRig`, `dimensionDraw`, `dimensionLabels`, `dimensionUI`) never
+import one another. `dimensionDraw` imports `dimensionLayout`, which is the one data leaf that
+also owns maths — see below. `reviewFigureSvg` imports `reviewFigures` and nothing else: it
+emits an SVG string and touches neither the DOM nor Three.js, so it stays measurable in Node.
 
 ## The annotation layout pass (ADR-126)
 
@@ -173,11 +175,12 @@ and moves the LOWER-PRIORITY one until they are not.
 > parallel dimensioning); and a leader's first 6 mm, which exists to touch something.
 > Two VALUES are exempt from none of it.
 
-> **⚠️ A DRAWING THAT IS MEANT TO BE WRONG MUST STAY WRONG.** Step 2's ten broken rules and
-> Step 6's twelve seeded faults take no part in the pass — not moved, not avoided. They are
-> excluded by `tone: 'bad'`/`'good'`, by carrying a fault knob (`extShort`, `extSkew`,
-> `textNudgeMm`), or by `pinned`, which `faultyDrawing()` stamps on every merged fault. Delete
-> that stamp and the mistake hunt tidies itself away in front of the learner.
+> **⚠️ A DRAWING THAT IS MEANT TO BE WRONG MUST STAY WRONG.** Step 2's ten broken rules take no
+> part in the pass — not moved, not avoided. They are excluded by `tone: 'bad'`/`'good'`, by
+> carrying a fault knob (`extShort`, `extSkew`, `textNudgeMm`), or by `pinned`. Delete that and
+> the pass tidies the lesson away in front of the learner. (Step 6's four `wrong` sheets are
+> wrong on purpose too, but they never reach this pass at all — they are flat SVG from
+> `reviewFigureSvg.js`, which shares no code with the renderer the pass feeds.)
 
 The pass is memoised on a signature of the layout-relevant spec fields, so it runs once per
 change and not once per animation frame. It stands down entirely when a spec carries `only`
@@ -224,9 +227,16 @@ corrected one ✓ (Two-Cue Rule, §4.6).
 
 **Plain teaching language, and NO citations anywhere a learner can see.** No section numbers,
 rule numbers, item numbers or figure numbers in any card, chip, label, tooltip, announcement,
-checklist entry or page description. They stay in the source comments, which are for us — every
-rule remains traceable to the chapter from the code without putting a reference in front of a
-first-year student mid-sentence.
+checklist entry, accessible name or page description. They stay in the source comments, which are
+for us — every rule remains traceable to the chapter from the code without putting a reference in
+front of a first-year student mid-sentence.
+
+**This rule has NO exceptions, and it is enforced by a test.** Step 6's worked examples came from
+four numbered figures of the chapter and briefly said so on their chips and board header; a review
+on 2026-08-17 removed that, and the Step-6 walk now sweeps every rendered string and every
+`aria-label`/`title`/`alt`/`placeholder` in the panel and the board for `Fig`, `Figure n`, `4.2x`,
+`4.3x` and `§`. An accessible name counts as learner-facing — the sweep covers it because a chip
+whose visible label is clean can still read a citation aloud.
 
 Budgets that keep the drawing the hero: **step bodies 75–100 words**, three short paragraphs on
 the What it is / Why we use it / instruction pattern; **summaries 4–5 short bullets** — six only
@@ -395,7 +405,7 @@ measures the bare word at 93 px of a 156 px segment already). It also sits direc
 layout selector and asks the same shape of question about the same drawing, so the two read as
 one pair. Do not "unify" them into two segmented controls without re-measuring at 1280 px.
 | `.seg` | A genuine two- or three-way **either/or** (Correct·Violation, Aligned·Unidirectional) | Never a toggle |
-| `.toggle` | An **on/off overlay** (the compare on Steps 3/4/6, the eight-directions study) | Fixed label; the switch carries state |
+| `.toggle` | An **on/off overlay** (the compare on Steps 3 and 4, the eight-directions study) | Fixed label; the switch carries state |
 
 Two rules that are easy to break by accident:
 
@@ -408,15 +418,19 @@ Two rules that are easy to break by accident:
   did.
 
 `.fold` is the disclosure for anything that is reference, or a secondary study: Step 1's three
-"how it is drawn" studies, Step 6's sheet settings and rules list. Closing a Step-1 fold puts
+"how it is drawn" studies, Step 6's sheet settings and rules list — and in Step 6 the sheet fold
+also owns the viewport while it is open, exactly as a Step-1 study does. Closing a Step-1 fold puts
 the drawing back to the plain anatomy, so the viewport never keeps showing a study whose
 control is no longer on screen.
 
-## The comparison (Step 3's two methods, Step 4's layout × method, Step 6's fixed pair)
+## The comparison (Step 3's two methods, Step 4's layout × method)
 
-ONE compare component, three uses. `compareSlots` in `dimensionUI.js` lists its three homes —
-`compare-slot-3`, `compare-slot-4`, `compare-slot-6` — and `toggleCompare()` branches per step.
-`compareKind` in `main.js` (`'method' | 'layout' | 'review' | null`) says which is live. **Do not
+ONE compare component, two uses. `compareSlots` in `dimensionUI.js` lists its two homes —
+`compare-slot-3` and `compare-slot-4` — and `toggleCompare()` branches per step. There was a
+third, `compare-slot-6`, holding the faulty Guide Plate beside the corrected one; it went with the
+fault hunt on 2026-08-16, and Step 6's comparison is now the worked examples' own two sheets,
+which are always side by side and need no control at all.
+`compareKind` in `main.js` (`'method' | 'layout' | null`) says which is live. **Do not
 infer it from `compareMethod !== null`** — that cannot tell "Step 4, both sheets in Method 1"
 from "no comparison at all", and a Step-4 method change would then repaint the wrong sheet.
 
@@ -488,14 +502,96 @@ Things that are easy to break:
   A CSS2D pill is a fixed pixel width however small the drawing gets, so the longest note runs
   off the edge at narrow viewports. It is applied to BOTH sheets, so they stay identical.
 
-## Step 6 is an ASSESSMENT, not a seventh lesson
+## Step 6 IS the worked examples — the fault hunt is GONE
 
-Its copy is deliberately the shortest in the module, and the panel leads with the progress
-meter rather than with prose: the learner is here to look at the drawing. The four marker
-states (untouched · checked · wrongly accused · solved) each carry a glyph as well as a colour,
-the last-judged marker is ringed so the drawing and the explanation card point at each other,
-and the explanation is three short lines — Wrong · Why · Correct. Completing the hunt switches
-the viewport to the corrected sheet; that IS the reward, so do not leave the faults on screen.
+A lecturers' review (2026-08-14) found the review too abstract: a learner was asked to find
+faults having never been shown a wrong drawing beside its corrected form. Chapter 4 prints
+exactly that four times — Examples 4.1–4.4, Figs. **4.28** L-plate, **4.29** Lock plate,
+**4.30** Template, **4.31** Rod support — and those four are what the class is set. They went in
+beside the existing twelve-fault hunt, and a second review (**2026-08-16**) removed the hunt
+outright: being shown a mistake beside its correction is what teaches it, and two assessments in
+one step buried the pairs that do the teaching. Step 6 is now **passive and instructional**.
+
+> **⚠️ DO NOT RE-ADD A FAULT HUNT, A SCORE, A PROGRESS METER OR A MARKER.** `MISTAKES`,
+> `faultyDrawing()`, `reviewHotspots()`, `onHotspotPick()`, `setHotspots()`, `renderScore()`,
+> `reportFault()`, the `.vp-hotspot` component and the `.progress` component were all deleted on
+> 2026-08-16, and `sim.setReviewView` became `sim.setSheetView`. The removal is the requirement,
+> not a side effect of one — the lecturers asked for the step to stop testing. Reversing it is a
+> product decision, not a refactor.
+
+**Four chips are the whole navigation, and they name the PART** — `L-plate`, `Lock plate`,
+`Template`, `Rod support`. Nothing else: an ordinary `.chips` row, no glyph.
+
+> **⚠️ NO TEXTBOOK CITATION REACHES THE LEARNER, and Step 6 has no exception.** The chips briefly
+> carried `Fig. 4.28` over the part's name, and the board's header printed it too; a UI-cleanup
+> review on **2026-08-17** took both out. This is a standalone learning module, not a viewer for
+> a scanned textbook, and a figure number is a reference a first-year student cannot act on. The
+> Voice section's no-citations rule below therefore stands with NO exceptions — do not reopen
+> one. `reviewFigures.js` still records `no` per figure so the geometry stays checkable against
+> the scan, and `verify`'s Step-6 walk sweeps every rendered string AND every `aria-label`,
+> `title`, `alt` and `placeholder` in the panel and the board for `Fig`, `Figure n`, `4.2x`,
+> `4.3x` and `§`, on all four examples and with the sheet study open.
+
+| File | What it is |
+|---|---|
+| `src/reviewFigures.js` | PURE DATA. The four figures: outline, circles, centre lines, hidden detail, and TWO annotation sets each (`wrong` / `correct`) plus the six-a-side prose |
+| `src/reviewFigureSvg.js` | The SVG renderer. Six annotation kinds and nothing else |
+| `verify/reviewfigures.mjs` | Measures every sheet in Node — no browser |
+
+> **⚠️ FLAT 2-D IS THE REQUIREMENT, not a shortcut.** No canvas, no camera, no orbit, no
+> isometric, no animation. The lecturers asked for plain illustrations because a student
+> comparing two sheets is reading paper, and anything that turns or tweens moves their attention
+> off the drawing. Do NOT "upgrade" these to the WebGL renderer — `dimensionDraw.js` answers a
+> different question, and reusing it would drag a camera and a scene graph in behind it.
+
+> **⚠️ THE GEOMETRY AND EVERY VALUE ARE THE CHAPTER'S**, read off the scans of pp. 36–37. The
+> figures are internally consistent and a single edit breaks that: Fig. 4.29's chain reads
+> 12 · 8 · 74 · 20 = 114 and 10 · 14 · 24 = 48; Fig. 4.30's 60° cut is what fixes the top edge at
+> x = 80 (45 of rise over 45/tan 60°); Fig. 4.28's ø20 hole is centred ON the R20 corner's own
+> centre. Change a link and you must change the overall, and then it is not the chapter's figure.
+
+> **⚠️ THE `wrong` SETS MUST STAY WRONG.** They take no part in the ADR-126 layout pass — nothing
+> here goes near it — and `verify/reviewfigures.mjs` reports them without counting them. A fault
+> sheet "fixed" to clear the verifier has had its lesson deleted. Same reasoning as Step 2's ten
+> broken rules.
+
+**Two departures from the scans, both for legibility, both commented where they are made:** Fig.
+4.30's `5` sits in the middle of the space the land leaves rather than against the riser, and
+Fig. 4.31's ø24 leader runs 6 mm further out. At the chapter's own placement both values land on
+the outline at screen size. Everything else is where the chapter puts it.
+
+**The board covers the viewport, and the CSS2D layer goes down with it.** A 320 px panel cannot
+hold two engineering drawings side by side, so `setExamples()` in `main.js` paints
+`#review-sheet` over `#sim-viewport` and sets `labelRenderer.domElement.style.display = 'none'`.
+An opaque background is NOT enough on its own: CSS2D labels are real DOM, so leaving the layer up
+paints every one of the Guide Plate's values over the examples and leaves any focusable one in
+the tab order behind a panel nobody can see. Closing "The sheet itself" is the path that would
+do it.
+
+**"The sheet itself" OWNS THE VIEWPORT while it is open.** The scale and unit study (§4.5 items
+4–5) acts on the 3-D Guide Plate, which the board covers, so the fold takes the board down on
+open and puts the pair back on close — and picking an example chip closes the fold. Same contract
+as Step 1's studies: a control whose subject is not visible is not a control. `enterStep(6)` calls
+`showSheet()` so the plate is ready UNDER the board, and `goToStep`'s step-6 branch then decides
+which of the two wins. That branch runs LAST for exactly that reason.
+
+**The pair stacks below 720 px — and that is a CONTAINER query, not a viewport one.** The
+viewport shrinks whenever the wizard panel is open, so a media query would measure the wrong box.
+
+**Step 6 completes on reading all four examples.** There is nothing here to get right or wrong.
+Next is still never disabled; this drives the rail's ✓ and the closing summary only. `renderNav`
+suppresses the gate hint on the last step, so `gateHint`/`gateHintLong` deliberately have no entry
+for 6 — and note that a COMPLETED last step carries a terminal ✓ instead of `is-current`, so no
+rail item has that class. Any harness that asks the rail "which step am I on?" must read the
+visible `.step-panel` instead.
+
+## Step 6 is a READING, not a seventh lesson and not a test
+
+Its copy is deliberately the shortest in the module and the panel leads with the chips: the
+learner is here to look at two drawings, not to read the panel and not to be scored. The verdict
+card under the chips names the part and says how many faults the left sheet carries; the board's
+own two lists name each one. Colour is never alone — the wrong sheet's captions carry ✗ and the
+right sheet's ✓, and every fault is written out in prose.
 
 ## Step ownership (do not shuffle back)
 
@@ -507,12 +603,44 @@ as elements. Moving them back overloads Step 2 and leaves Step 1 passive again.
 
 **Each step also owns its FIGURE, and picks it in its own `show*()` function** — `setFigure()`
 is called by `showStudy`, `showRule`, `showMethods`, `showArrangement`, `showSymbol` and
-`showReview`, never from `dimensionUI.js`. The controller entries that change *what is being
+`showSheet`, never from `dimensionUI.js`. The controller entries that change *what is being
 studied* inside a step (`addDimensions`, `focusLineType`) re-pick too, which is how Step 1
 swaps plain ↔ holed as a fold opens. A step must never assume the figure it inherited from the
 step before it.
 
-## Verification (last full pass, 2026-08-06)
+## Verification
+
+### The worked examples (2026-08-16)
+
+`node verify/reviewfigures.mjs` — no browser. The four CORRECTED sheets must show no value
+overlapping another and no value sitting on the part's outline; **4/4 pass**. The four faulty
+sheets are printed and never counted (`--all` shows their deliberate faults). Measured in the
+browser as well, over a full Step-6 walk at 1440 and 900 px: all four examples open, both sheets
+render at the same scale, the corrected sheet's real glyph boxes never overlap, the pair stacks
+to one column below 720 px with the board never scrolling sideways and values still 14 px tall,
+the four chips fit two rows and carry no citation, "The sheet itself" hands the viewport back and forth without leaving
+a CSS2D label over the board or anything of the plate in the tab order, leaving Step 6 gives the
+viewport back, reset returns to the first example, and the console stays clean.
+
+> **⚠️ ONE PASS PROVES NO CITATION REACHES THE LEARNER**, and it is not vacuous: it was checked
+> by planting `Fig. 4.28` as rendered text, `Based on Figure 4.31` as an `aria-label` and a `§`
+> in the verdict card, and it caught all three. Keep that property if you edit the regex.
+
+> **⚠️ ONE PASS PROVES THE FAULT HUNT IS GONE, not hidden**, and it runs FIRST — everything else
+> would pass with a `display: none` fault system still wired underneath. It asserts a zero count
+> for `[data-review-mode]`, `#review-hunt-block`, `#rev-faults`/`#rev-correct`, `.progress`,
+> `#review-detail`, `#compare-slot-6`, `.vp-hotspot`, any CSS rule matching
+> `vp-hotspot|progress__|\.score`, and the `simAPI` keys `setReviewView`/`reportFault`/
+> `setHotspots`. Keep it first when you edit that walk.
+
+> **⚠️ A SUITE THAT DOES NOT CALL `open()` IS LYING TO YOU.** `figwalk`, `ux`, `cmp2` and
+> `s4meth` each ran against whatever state the previous suite left in the tab, so every "step N"
+> assertion read one step behind and looked like a sim bug — it was reported as pre-existing
+> flake on 2026-08-14 and it was not flake, it was the harness. All four now load the page first.
+> What survives that fix and still reproduces byte-identically on the committed baseline is one
+> real issue: `cmp2` finds the compare pair ~5 px off the viewport centre.
+
+### The 3-D sheets (last full pass, 2026-08-06)
 
 `node verify/clearance.mjs` needs **no browser**: `dimensionLayout.js` and the three spec
 catalogues are pure data leaves, so every drawing in the lesson can be laid out and measured in
@@ -531,8 +659,9 @@ disabled (RULES.md §2.17–§2.18):
 - **The clearance audit**: 27 drawings, 12 nudges, every drawing within budget. Measured in the
   browser too — 0 px of overlap between any two value pills on Step 3, under both methods.
 
-- **The figure walk**: 18/18 — the right figure on every step and inside every Step-1 study,
-  the compare's two named sheets, Step 3's six labels, Step 6's twelve markers, console clean.
+- **The figure walk**: the right figure on every step and inside every Step-1 study, the
+  compare's two named sheets, Step 3's six labels, Step 6's board owning the viewport over the
+  Guide Plate, console clean.
 - **The Step-4 layout × method walk**: 26/26. It measures the claim rather than the wiring — on
   Running-both-ways the three vertical values TURN under Method 1 and stay LEVEL under Method 2,
   while all four horizontal values are written identically under both — and asserts 0 px² of
@@ -544,8 +673,8 @@ disabled (RULES.md §2.17–§2.18):
 - **Zero console errors, zero warnings** over a full walk: 10 rules × 2 variants, 5 termination
   styles + the angle slider, all three regimes of the space study, 3 leader heads, 4 line
   types, both methods + rotation + the oblique clock + both angular styles, 6 arrangements with
-  every variant + the compare split, 9 symbols with every variant, both scales, both units,
-  12/12 faults found and corrected. The §4.6 checklist and the §4.5 system are painted on entry
+  every variant + the compare split, 9 symbols with every variant, both scales, both units, and
+  all four worked examples read. The §4.6 checklist and the §4.5 system are painted on entry
   to Step 6, not on completion.
 - Value drag and the keyboard nudge both return a §4.2 placement verdict.
 - `renderer.info.memory` flat across 50 rapid `simAPI.reset()` calls; CSS2D nodes 0 → 0.

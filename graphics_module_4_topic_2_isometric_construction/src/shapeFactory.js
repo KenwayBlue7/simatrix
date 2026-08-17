@@ -76,12 +76,20 @@ export function topHalfExtent(spec) {
   const round = (r) => ({ hw: r, hd: r, round: true });
   const point = { hw: 0, hd: 0, round: true };
   switch (spec.kind) {
+    // A stack throws highest whatever its TOP component throws, so the answer is that component's.
+    case 'assembly': {
+      const top = spec.parts?.[spec.parts.length - 1];
+      return top ? topHalfExtent(top.spec) : point;
+    }
     case 'box': return { hw: toWorld(spec.w) / 2, hd: toWorld(spec.d) / 2, round: false };
     case 'revolve': return round(toWorld(spec.rTop));   // cone → 0, cylinder/frustum → the top circle
     // A polygon is treated as its circumscribing square: a corner can sit anywhere on that circle,
     // so this errs high by design rather than letting a vertex poke through the title.
     case 'prism': return { hw: toWorld(spec.r), hd: toWorld(spec.r), round: false };
-    case 'pyramid': return point;                        // an apex
+    // A pyramid ends in an apex; a FRUSTUM of one ends in a polygon, read like a prism's top.
+    case 'pyramid': return spec.rTop
+      ? { hw: toWorld(spec.rTop), hd: toWorld(spec.rTop), round: false }
+      : point;
     case 'sphere': return point;                         // the pole, directly over the centre
     case 'hemisphere': return point;                     // the crown of the dome
     default: return point;
@@ -113,8 +121,12 @@ function buildGeometry(spec) {
     }
     case 'pyramid': {
       // An n-sided cone IS an n-gonal pyramid: regular base, identical sloping faces, apex centred
-      // over the base by construction.
-      const g = new THREE.ConeGeometry(toWorld(spec.r), toWorld(spec.h), spec.sides);
+      // over the base by construction. A `rTop` cuts that apex off parallel to the base, which is a
+      // lathe between two polygons — the same relationship `revolve` has to its own frustum, so the
+      // family stays one case rather than becoming two kinds.
+      const g = spec.rTop
+        ? new THREE.CylinderGeometry(toWorld(spec.rTop), toWorld(spec.r), toWorld(spec.h), spec.sides, 1, false)
+        : new THREE.ConeGeometry(toWorld(spec.r), toWorld(spec.h), spec.sides);
       g.rotateY(spec.rot ?? 0);
       g.translate(0, toWorld(spec.h) / 2, 0);
       return { geometry: g, extra: [] };
@@ -192,26 +204,46 @@ function billboardPositions({ r, half }) {
 /**
  * Build one teaching solid from a body spec.
  *
- * @param {object} spec        `solid.body(dims)`.
+ * ONE OR MANY, ONE RIG. A single solid and a combination are the same structure here: the spec is
+ * normalised into a list of COMPONENTS, and a plain solid is simply the one-component case. Nothing
+ * below branches on how many there are.
+ *
+ * EACH COMPONENT IS A TWO-GROUP RIG:
+ *   placement   position only — the height its base sits at, scaled by the ISOMETRIC SCALE
+ *   body        uniform scale — the component's own drawn size
+ * The split is not decoration: it is what lets a component be drawn at its TRUE diameter while the
+ * height of its centre is still reduced. That pair IS the sphere rule, and expressing it as two
+ * numbers is what keeps this file from ever having to know which solids are spheres.
+ *
+ * @param {object} spec        `solid.body(dims)`. `{ kind:'assembly', parts:[…] }` for a combination.
  * @param {THREE.Vector2} resolution  Drawing-buffer size for `LineMaterial`.
+ * @param {{ trueSize?: boolean, height?: number }} [opts]  For a single solid: whether the isometric
+ *   scale leaves it alone, and its overall height in mm (so the figure title can be placed against
+ *   the drawn top rather than against an assumed one).
  * @returns {{
  *   group: THREE.Group,
  *   setOpacity: (v:number) => void,
  *   setEdgesVisible: (on:boolean) => void,
+ *   setFormScale: (axial:number) => void,
+ *   formScale: () => number,
+ *   drawnTop: () => { y:number, hw:number, hd:number, round:boolean },
  *   setResolution: (w:number,h:number) => void,
  *   update: (camera: THREE.Camera) => void,
  *   dispose: () => void,
  * }}
  */
-export function buildShape(spec, resolution) {
+export function buildShape(spec, resolution, opts = {}) {
   const group = new THREE.Group();
   const owned = { geometries: [], materials: [] };
 
-  const { geometry, extra } = buildGeometry(spec);
-  owned.geometries.push(geometry, ...extra);
+  // A plain solid is the one-component case, so there is exactly one code path below.
+  const componentSpecs = spec?.kind === 'assembly'
+    ? (spec.parts ?? [])
+    : [{ spec, y: 0, h: opts.height ?? 0, trueSize: Boolean(opts.trueSize) }];
 
-  // Flat CAD read: shininess 0, flat shading, no PBR, no shadows (RULES.md §3.24). `transparent`
-  // so a step can cross-fade the finished drawing in over the construction.
+  // ONE body material and ONE ink material for the whole drawing. Opacity is a property of the
+  // DRAWING, not of a component — a step cross-fades the finished solid in as a single object — so
+  // sharing them keeps `setOpacity` a two-line operation however many components there are.
   const bodyMaterial = new THREE.MeshPhongMaterial({
     color: roleColor('solid'),
     shininess: 0,
@@ -224,10 +256,7 @@ export function buildShape(spec, resolution) {
     side: THREE.DoubleSide, // the hemisphere's cap is a single-sided disc
   });
   owned.materials.push(bodyMaterial);
-  group.add(new THREE.Mesh(geometry, bodyMaterial));
-  for (const g of extra) group.add(new THREE.Mesh(g, bodyMaterial));
 
-  // ---- Finished visible edges -------------------------------------------------------------
   const inkMaterial = new LineMaterial({
     color: roleColor('finished'),
     linewidth: WEIGHT.finished,
@@ -237,42 +266,83 @@ export function buildShape(spec, resolution) {
   inkMaterial.resolution.copy(resolution);
   owned.materials.push(inkMaterial);
 
-  const edgeSource = new THREE.EdgesGeometry(geometry, 20);
-  const lineGeo = new LineSegmentsGeometry().fromEdgesGeometry(edgeSource);
-  edgeSource.dispose();
-  owned.geometries.push(lineGeo);
-  const outline = new LineSegments2(lineGeo, inkMaterial);
-  outline.computeLineDistances();
-  group.add(outline);
-
-  // ---- View-dependent silhouettes ---------------------------------------------------------
-  const sil = silhouetteSpec(spec);
-  /** Holder spun about Y each frame so its two generators sit on the visible outline. */
-  const silHolder = new THREE.Group();
-  group.add(silHolder);
-  if (sil.segments.length) {
-    const geo = new LineSegmentsGeometry();
-    geo.setPositions(sil.segments.flat());
-    owned.geometries.push(geo);
-    const line = new LineSegments2(geo, inkMaterial); // shares the ink material, so it fades along
-    line.computeLineDistances();
-    silHolder.add(line);
-  }
-
-  /** Camera-facing outline ring (sphere / hemisphere). */
-  let billboard = null;
-  if (sil.billboard) {
-    const geo = new LineSegmentsGeometry();
-    geo.setPositions(billboardPositions(sil.billboard));
-    owned.geometries.push(geo);
-    billboard = new LineSegments2(geo, inkMaterial);
-    billboard.computeLineDistances();
-    billboard.position.y = sil.billboard.y;
-    group.add(billboard);
-  }
-
   const meshes = [];
-  group.traverse((o) => { if (o.isMesh) meshes.push(o); });
+  const units = componentSpecs.map((part) => {
+    const placement = new THREE.Group();
+    group.add(placement);
+    const body = new THREE.Group();
+    placement.add(body);
+
+    const { geometry, extra } = buildGeometry(part.spec);
+    owned.geometries.push(geometry, ...extra);
+    const own = [new THREE.Mesh(geometry, bodyMaterial)];
+    for (const g of extra) own.push(new THREE.Mesh(g, bodyMaterial));
+    own.forEach((m) => { body.add(m); meshes.push(m); });
+
+    // ---- Finished visible edges ------------------------------------------------------------
+    const edgeSource = new THREE.EdgesGeometry(geometry, 20);
+    const lineGeo = new LineSegmentsGeometry().fromEdgesGeometry(edgeSource);
+    edgeSource.dispose();
+    owned.geometries.push(lineGeo);
+    const outline = new LineSegments2(lineGeo, inkMaterial);
+    outline.computeLineDistances();
+    body.add(outline);
+
+    // ---- View-dependent silhouettes --------------------------------------------------------
+    const sil = silhouetteSpec(part.spec);
+    /** Holder spun about Y each frame so its two generators sit on the visible outline. */
+    const silHolder = new THREE.Group();
+    body.add(silHolder);
+    if (sil.segments.length) {
+      const geo = new LineSegmentsGeometry();
+      geo.setPositions(sil.segments.flat());
+      owned.geometries.push(geo);
+      const line = new LineSegments2(geo, inkMaterial); // shares the ink material, so it fades along
+      line.computeLineDistances();
+      silHolder.add(line);
+    }
+
+    /** Camera-facing outline ring (sphere / hemisphere). */
+    let billboard = null;
+    if (sil.billboard) {
+      const geo = new LineSegmentsGeometry();
+      geo.setPositions(billboardPositions(sil.billboard));
+      owned.geometries.push(geo);
+      billboard = new LineSegments2(geo, inkMaterial);
+      billboard.computeLineDistances();
+      billboard.position.y = sil.billboard.y;
+      body.add(billboard);
+    }
+
+    return {
+      spec: part.spec,
+      y: part.y ?? 0,
+      h: part.h ?? 0,
+      trueSize: Boolean(part.trueSize),
+      placement,
+      body,
+      outline,
+      silHolder,
+      billboard,
+      meshes: own,
+      hasSilhouette: sil.segments.length > 0,
+    };
+  });
+
+  /** The live isometric scale. 1 is an Isometric View; `ISOMETRIC_SCALE` is an Isometric Projection. */
+  let axialScale = 1;
+
+  function applyScale(axial) {
+    axialScale = axial;
+    for (const u of units) {
+      // Drawn size: reduced, unless this component has no axial length to reduce.
+      u.body.scale.setScalar(u.trueSize ? 1 : axial);
+      // Where it sits: ALWAYS reduced. A seating height is a length set off along the vertical axis
+      // like any other, even for the one component whose own size is not.
+      u.placement.position.y = toWorld(u.y) * axial;
+    }
+  }
+  applyScale(1);
 
   return {
     group,
@@ -286,24 +356,49 @@ export function buildShape(spec, resolution) {
     /** Step 4 hides the finished edges while the construction is being drawn, so the learner is
      *  watching the construction produce them rather than tracing over an answer already on screen. */
     setEdgesVisible(on) {
-      outline.visible = on;
-      silHolder.visible = on;
-      if (billboard) billboard.visible = on;
-      meshes.forEach((m) => { m.visible = on; });
+      for (const u of units) {
+        u.outline.visible = on;
+        u.silHolder.visible = on;
+        if (u.billboard) u.billboard.visible = on;
+        u.meshes.forEach((m) => { m.visible = on; });
+      }
+    },
+
+    /** Drive the drawing to one isometric scale. Step 5's toggle tweens through this. */
+    setFormScale(axial) { applyScale(axial); },
+    formScale: () => axialScale,
+
+    /**
+     * The top of the DRAWN figure, and how far it still spreads there — what the figure title has to
+     * hang clear of. Derived from the live scales, so it is right in either form and for a stack of
+     * any depth without the caller having to model any of it.
+     */
+    drawnTop() {
+      let best = { y: 0, hw: 0, hd: 0, round: true };
+      for (const u of units) {
+        const s = u.body.scale.x;
+        const y = toWorld(u.y) * axialScale + toWorld(u.h) * s;
+        if (y < best.y) continue;
+        const t = topHalfExtent(u.spec);
+        best = { y, hw: t.hw * s, hd: t.hd * s, round: t.round };
+      }
+      return best;
     },
 
     setResolution(w, h) { inkMaterial.resolution.set(w, h); },
 
     update(camera) {
-      if (sil.segments.length) {
-        // Face the generators square-on to the camera in plan: the outline of a solid of revolution
-        // is always the pair of generators perpendicular to the view direction.
-        const v = camera.position;
-        silHolder.rotation.y = Math.atan2(-v.x, -v.z) + Math.PI / 2;
+      const v = camera.position;
+      for (const u of units) {
+        if (u.hasSilhouette) {
+          // Face the generators square-on to the camera in plan: the outline of a solid of
+          // revolution is always the pair of generators perpendicular to the view direction.
+          u.silHolder.rotation.y = Math.atan2(-v.x, -v.z) + Math.PI / 2;
+        }
+        // A sphere's outline is a true circle about its centre from EVERY direction, so the ring is
+        // a pure billboard — it takes the camera's own orientation.
+        if (u.billboard) u.billboard.quaternion.copy(camera.quaternion);
       }
-      // A sphere's outline is a true circle about its centre from EVERY direction, so the ring is a
-      // pure billboard — it takes the camera's own orientation.
-      if (billboard) billboard.quaternion.copy(camera.quaternion);
     },
 
     dispose() {
@@ -312,6 +407,8 @@ export function buildShape(spec, resolution) {
       owned.materials.forEach((m) => { m.map?.dispose(); m.dispose(); });
       owned.geometries.length = 0;
       owned.materials.length = 0;
+      units.length = 0;
+      meshes.length = 0;
       group.clear();
     },
   };

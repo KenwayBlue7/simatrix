@@ -26,10 +26,11 @@ import {
   STEPS, BIS_CHECKLIST, CLASSWORK_SYSTEM, LINE_TYPES, SHEET_SETTINGS, METHODS, METHOD_CHOICE,
 } from './dimensionSteps.js';
 import {
-  ELEMENTS, ARRANGEMENTS, METHOD_SHOWING_LAYOUTS, COORDINATE_TABLE, MISTAKES,
+  ELEMENTS, ARRANGEMENTS, METHOD_SHOWING_LAYOUTS, COORDINATE_TABLE,
 } from './dimensionExamples.js';
 import { RULES, TERMINATIONS, LEADER_HEADS } from './dimensionRules.js';
 import { SYMBOLS, BIS_SYMBOL_IDS } from './dimensionSymbols.js';
+import { REVIEW_FIGURES, reviewFigure } from './reviewFigures.js';
 import { fitDecision } from './dimensionDraw.js';
 
 const TOTAL = STEPS.length;
@@ -53,7 +54,6 @@ const GATE = Object.freeze({
  *   sync: () => void,
  *   reset: () => void,
  *   reportPlacement: (res: { ok: boolean, rule?: string, message: string }) => void,
- *   reportFault: (found: string[], picked: string|null, correct: boolean) => void,
  *   dispose: () => void,
  * }}
  */
@@ -333,8 +333,10 @@ export function initUI(sim) {
     symbolVariant: null,
     symbolsSeen: new Set(),
 
-    reviewView: 'faults',
-    faultsFound: new Set(),
+    // Step 6 IS the worked examples. The lecturers' review of 2026-08-16 removed the
+    // twelve-fault hunt that used to share the step with them.
+    exampleId: REVIEW_FIGURES[0].id,
+    examplesSeen: new Set([REVIEW_FIGURES[0].id]),
     sheetScale: '1:1',
     sheetUnits: 'mm',
     completed: false,
@@ -348,7 +350,10 @@ export function initUI(sim) {
       case 3: return state.methodsSeen.size >= GATE.methods;
       case 4: return state.arrangementsSeen.size >= GATE.arrangements;
       case 5: return BIS_SYMBOL_IDS.every((id) => state.symbolsSeen.has(id));
-      case 6: return state.faultsFound.size >= MISTAKES.length;
+      // All four of the chapter's wrong/correct pairs read. Reading them IS the review — there
+      // is nothing here to get right or wrong, and this does not block Next; it drives the
+      // rail's ✓ and the closing summary only.
+      case 6: return state.examplesSeen.size >= REVIEW_FIGURES.length;
       default: return false;
     }
   }
@@ -374,6 +379,9 @@ export function initUI(sim) {
       3: GATE.methods - state.methodsSeen.size,
       4: GATE.arrangements - state.arrangementsSeen.size,
       5: BIS_SYMBOL_IDS.filter((id) => !state.symbolsSeen.has(id)).length,
+      // No entry for 6: renderNav suppresses the gate on the LAST step, where there is no
+      // Next to nudge towards. What is left of the review is said by the closing summary and
+      // by the "How to review" control, which shows both halves whichever one is open.
     }[i];
     return left > 0 ? `${left} left` : '';
   }
@@ -1100,10 +1108,12 @@ export function initUI(sim) {
   //
   // ONE control, in ONE place, wherever a comparison is on offer. It used to be a block button
   // in Step 4 whose label rewrote itself, and a third segment of a three-way control in Step 6
-  // — two different affordances for the same idea, in two different positions. Now both steps
-  // paint the same toggle into a fixed slot directly under the step's own primary control, so
-  // the learner never has to look for it.
-  const compareSlots = [$('compare-slot-3'), $('compare-slot-4'), $('compare-slot-6')].filter(Boolean);
+  // — two different affordances for the same idea, in two different positions. Both remaining
+  // steps now paint the same toggle into a fixed slot directly under the step's own primary
+  // control, so the learner never has to look for it. (Step 6 had a slot too, until its
+  // faulty-versus-corrected pair went with the fault hunt; its comparison is now the worked
+  // examples' own two sheets, which are always side by side and need no control at all.)
+  const compareSlots = [$('compare-slot-3'), $('compare-slot-4')].filter(Boolean);
   const compareToggles = compareSlots.map((slot) => createToggle(slot, {
     label: 'Compare side by side',
     onToggle: (on) => toggleCompare(on),
@@ -1124,13 +1134,6 @@ export function initUI(sim) {
         : 'Single drawing shown.');
       return;
     }
-    if (currentStep === 6) {
-      setReviewView(state.reviewView);
-      sim.announce(on
-        ? 'Both drawings side by side: the faulty one on the left, the corrected one on the right.'
-        : 'Single drawing shown.');
-      return;
-    }
     // The LIGHT path: only sheet B appears or goes, and only the card is repainted. Going back
     // through `sim.setArrangement` would re-run the main drawing's reveal animation.
     if (on) keepPairDistinct('layout');   // the pair may have gone identical while the compare was down
@@ -1143,15 +1146,13 @@ export function initUI(sim) {
   /** Push the compare state into whichever slot the current step owns. Split out so main.js
    *  can drop the compare (see `compareDropped`) without repainting a whole step. */
   function renderCompare() {
-    // Step 6 compares the faulty drawing with the corrected one — a fixed pair, no second list.
     // Step 4 compares ANY layout in EITHER method with any other, so it discloses two more
-    // selectors: one per axis, in the same order as the two above them.
+    // selectors: one per axis, in the same order as the two above them. Step 3 holds one
+    // drawing in both value systems and needs no second list.
     const inStep4 = currentStep === 4;
-    const note = currentStep === 3
-      ? 'The same drawing in both value systems, side by side'
-      : inStep4
-        ? 'Hold any layout, in either method, beside this one'
-        : 'The faulty drawing beside the corrected one';
+    const note = inStep4
+      ? 'Hold any layout, in either method, beside this one'
+      : 'The same drawing in both value systems, side by side';
     for (const t of compareToggles) t.set(state.compare, { disabled: false, note });
     if (compareWithGroup) compareWithGroup.hidden = !(inStep4 && state.compare);
   }
@@ -1258,38 +1259,72 @@ export function initUI(sim) {
   });
 
   // ==========================================================================
-  // Step 6 — review + mistake hunt + the sheet itself
+  // Step 6 — the chapter's worked examples + the sheet itself
   // ==========================================================================
-  const reviewBtns = [...document.querySelectorAll('[data-view]')];
-  const reviewCount = $('review-count');
-  const reviewTrack = $('review-track');
-  const reviewMilestone = $('review-milestone');
-  const reviewDetail = $('review-detail');
+  const exampleChips = $('example-chips');
+  const exampleDetail = $('example-detail');
+  const sheetFold = $('review-sheet-fold');
   const scaleChips = $('scale-chips');
   const unitChips = $('unit-chips');
   const sheetDetail = $('sheet-detail');
 
   /**
-   * Which drawing the viewport shows. TWO states plus the shared compare toggle, where there
-   * used to be a three-way segmented control — "Compare" was never a sibling of "With faults"
-   * and "Corrected", it was an overlay on top of whichever one was chosen, and it is a toggle
-   * everywhere else in the module.
+   * The chips are the whole of Step 6's navigation.
+   *
+   * ⚠️ THEY NAME THE PART AND NOTHING ELSE. The chips briefly carried the chapter's figure
+   * number as well ("Fig. 4.28" over "L-plate"); it was taken out again on 2026-08-17 because
+   * this is a standalone learning module, not a viewer for a scanned textbook, and a citation
+   * in front of a first-year student is a speed bump they cannot act on. That restores the
+   * no-citations rule in CLAUDE.md's Voice section to having NO exceptions — keep it that way.
+   * `reviewFigures.js` still records each figure's number in `no`, for us, in the data.
    */
-  function setReviewView(view) {
-    state.reviewView = view;
-    for (const b of reviewBtns) {
-      const active = b.dataset.view === view;
-      b.classList.toggle('is-active', active);
-      b.setAttribute('aria-pressed', String(active));
+  function paintExamples() {
+    if (!exampleChips || exampleChips.childElementCount) return;
+    for (const f of REVIEW_FIGURES) {
+      chip(exampleChips, {
+        key: 'example', value: f.id, label: f.name, onPick: () => selectExample(f.id),
+      });
     }
-    renderCompare();
-    sim.setReviewView(state.compare ? 'compare' : view);
-    sim.announce(state.compare
-      ? 'Both drawings side by side: faulty on the left, corrected on the right.'
-      : { faults: 'The faulty drawing. Every marker is a dimension worth checking.',
-          correct: 'The corrected drawing is shown.' }[view]);
+    latch(exampleChips, 'example', state.exampleId);
   }
-  for (const b of reviewBtns) on(b, 'click', () => setReviewView(b.dataset.view));
+
+  /** Put one worked example on the board and say, in the panel, what it is there to show. */
+  function selectExample(id) {
+    const fig = reviewFigure(id) || REVIEW_FIGURES[0];
+    state.exampleId = fig.id;
+    state.examplesSeen.add(fig.id);
+    latch(exampleChips, 'example', fig.id);
+    // Picking an example is a request for the board, so the sheet study gives the viewport
+    // back. Closing the fold is what runs `sim.setExamples` again — see the toggle below.
+    if (sheetFold?.open) sheetFold.open = false;
+    else sim.setExamples(fig.id);
+    if (exampleDetail) {
+      exampleDetail.className = 'detail detail--verdict';
+      exampleDetail.innerHTML = `<h3>${fig.name} — ${fig.arrangement.toLowerCase()}</h3>`
+        + `<p>${fig.faults.length} things are wrong with the left-hand drawing. `
+        + `The list under the pair names every one of them, and says what the corrected sheet does instead.</p>`;
+    }
+    sim.announce(`${fig.name}, ${fig.arrangement.toLowerCase()}. `
+      + 'The wrongly dimensioned drawing is on the left and the corrected one on the right.');
+    if (state.examplesSeen.size >= REVIEW_FIGURES.length && !state.completed) {
+      state.completed = true;
+      sim.completeLesson();
+    }
+    sync();
+  }
+
+  /**
+   * "The sheet itself" OWNS THE VIEWPORT while it is open.
+   *
+   * The scale and unit study acts on the 3-D Guide Plate, and the examples board covers it, so
+   * the two cannot both be on screen. Opening the fold takes the board down; closing it puts
+   * the current pair back. Same contract as Step 1's studies, which return the drawing to the
+   * plain anatomy on close — a control whose subject is not visible is not a control.
+   */
+  on(sheetFold, 'toggle', () => {
+    if (sheetFold.open) sim.setSheetView();
+    else sim.setExamples(state.exampleId);
+  });
 
   function paintSheetSettings() {
     if (scaleChips && !scaleChips.childElementCount) {
@@ -1328,44 +1363,6 @@ export function initUI(sim) {
     sim.setSheetUnits(id);
     renderSheetDetail(u.note, u.label);
     sim.announce(`${u.label}. ${u.note}`);
-  }
-
-  /** Milestones worth marking, and nothing between them — a note on every single find would
-   *  be noise, and a hunt with no landmarks feels endless. */
-  function milestoneFor(n) {
-    if (n >= MISTAKES.length) return 'Every fault found. The drawing reads correctly now.';
-    if (n === 1) return 'First one found. Eleven to go.';
-    if (n === Math.ceil(MISTAKES.length / 2)) return 'Halfway. Six left.';
-    return null;
-  }
-
-  /**
-   * The assessment meter: one cell per fault, plus the count. A bare "0 of 12 faults found"
-   * states a fact; the filled cells show at a glance how much is left, which is the question
-   * a learner mid-hunt is actually asking.
-   */
-  function renderScore() {
-    const n = state.faultsFound.size;
-    const total = MISTAKES.length;
-    if (reviewTrack) {
-      if (reviewTrack.childElementCount !== total) {
-        reviewTrack.innerHTML = Array.from({ length: total }, () => '<span class="progress__cell"></span>').join('');
-      }
-      [...reviewTrack.children].forEach((c, i) => c.classList.toggle('is-on', i < n));
-      reviewTrack.setAttribute('aria-label', `${n} of ${total} faults solved`);
-    }
-    if (reviewCount) reviewCount.textContent = `${n} / ${total} solved`;
-    if (reviewMilestone) {
-      const text = milestoneFor(n);
-      reviewMilestone.hidden = !text;
-      reviewMilestone.textContent = text ? `✓ ${text}` : '';
-    }
-    if (n >= total && !state.completed) {
-      state.completed = true;
-      // The finished sheet is the reward, so show it rather than leaving the faults on screen.
-      setReviewView('correct');
-      sim.completeLesson();
-    }
   }
 
   /** The §4.6 checklist and the §4.5 class-work system are REFERENCE, not a reward: they are
@@ -1522,8 +1519,10 @@ export function initUI(sim) {
     if (currentStep === 6) {
       paintReference();
       paintSheetSettings();
-      setReviewView(state.reviewView);
-      renderScore();
+      paintExamples();
+      // LAST, and it owns the viewport: enterStep has just put the 3-D sheet up, and the board
+      // has to win over it unless the learner has left "The sheet itself" open.
+      if (sheetFold?.open) sim.setSheetView(); else selectExample(state.exampleId);
     }
     // The compare slot is per-step, so it has to be re-stated on arrival — including on the
     // steps that do not own one, where both toggles simply read "off".
@@ -1602,34 +1601,6 @@ export function initUI(sim) {
       sim.announce(res.ok ? `Legal placement. ${res.message}` : `Rule broken. ${res.message}`);
     },
 
-    /**
-     * main.js reports a Step-6 hotspot pick. The card answers three questions in three short
-     * lines — what is wrong, why it is wrong, what is correct — because a learner mid-hunt
-     * reads the verdict and goes back to the drawing; they do not settle in for a paragraph.
-     */
-    reportFault(foundIds, pickedId, correct) {
-      state.faultsFound = new Set(foundIds);
-      const mistake = MISTAKES.find((m) => m.id === pickedId);
-      if (reviewDetail) {
-        if (correct && mistake) {
-          reviewDetail.className = 'detail detail--right';
-          reviewDetail.innerHTML = `<h3>✓ ${mistake.title}</h3>
-            <dl>
-              <dt>Wrong</dt><dd>${mistake.rule}</dd>
-              <dt>Why</dt><dd>${mistake.why}</dd>
-              <dt>Correct</dt><dd>${mistake.fix}</dd>
-            </dl>`;
-          sim.announce(`Correct. ${mistake.title}. ${mistake.why} ${mistake.fix}`);
-        } else if (pickedId) {
-          reviewDetail.className = 'detail detail--wrong';
-          reviewDetail.innerHTML = '<p><span class="detail__flag">✗ Not this one</span><br>That dimension is drawn correctly. Look again at where projection lines stop, which arrow heads are which, where each number sits, and whether every symbol is written the right way round.</p>';
-          sim.announce('Not this one — that dimension is correct. Look again.');
-        }
-      }
-      renderScore();
-      sync();
-    },
-
     reset() {
       state.dimensionsAdded = false;
       state.elementsSeen.clear();
@@ -1655,8 +1626,8 @@ export function initUI(sim) {
       state.symbolId = null;
       state.symbolVariant = null;
       state.symbolsSeen.clear();
-      state.reviewView = 'faults';
-      state.faultsFound.clear();
+      state.exampleId = REVIEW_FIGURES[0].id;
+      state.examplesSeen = new Set([REVIEW_FIGURES[0].id]);
       state.sheetScale = '1:1';
       state.sheetUnits = 'mm';
       state.completed = false;
@@ -1682,12 +1653,13 @@ export function initUI(sim) {
       ruleSelect?.setValue(RULES[0].id);
       arrangementSelect?.setValue(ARRANGEMENTS[0].id);
       renderCompare();
-      renderScore();
+      if (sheetFold) sheetFold.open = false;
       latch(scaleChips, 'scale', '1:1');
       latch(unitChips, 'unit', 'mm');
+      latch(exampleChips, 'example', state.exampleId);
+      if (exampleDetail) { exampleDetail.className = 'detail'; exampleDetail.textContent = ''; }
       if (sheetDetail) { sheetDetail.className = 'detail'; sheetDetail.textContent = 'Change the scale and watch every value stay exactly where it is.'; }
       if (placeDetail) { placeDetail.className = 'detail'; placeDetail.textContent = 'Waiting for you to move the value.'; }
-      if (reviewDetail) { reviewDetail.className = 'detail'; reviewDetail.textContent = 'Every marker is a dimension worth a second look. Some are innocent.'; }
       if (lineTypeDetail) { lineTypeDetail.className = 'detail'; lineTypeDetail.textContent = 'Pick a line type to hold it on the drawing and fade the rest.'; }
       if (leaderDetail) { leaderDetail.className = 'detail'; leaderDetail.textContent = 'Pick a head to take the same note to a different kind of thing.'; }
       goToStep(1, { announce: false });

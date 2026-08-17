@@ -9,7 +9,7 @@
   <!-- Inline data-URI icon: without one the browser requests /favicon.ico and logs a 404,
        which shows up as a console error in verification. No external host (RULES.md §2.4). -->
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M2 8h12M2 5v6M14 5v6' stroke='%231f2933' stroke-width='1.4' fill='none' stroke-linecap='round'/%3E%3C/svg%3E" />
-  <meta name="description" content="Learn to dimension a drawing on one real machined plate — build a dimension piece by piece, flip every rule to see what breaks, write the values both ways, lay the sheet out five ways, place every shape symbol, then hunt the faults in a finished drawing." />
+  <meta name="description" content="Learn to dimension a drawing on one real machined plate — build a dimension piece by piece, flip every rule to see what breaks, write the values both ways, lay the sheet out five ways, place every shape symbol, then read the textbook's own wrongly and correctly dimensioned drawings side by side." />
 
   <!--
     Three.js is loaded as CDN ES modules ONLY, pinned to 0.160.0 (RULES.md §2.2–§2.4).
@@ -261,53 +261,6 @@
     .vp-value.is-dragging .vp-value__text { box-shadow: var(--ring-focus); }
     .vp-value[tabindex]:focus-visible .vp-value__text { outline: none; box-shadow: var(--ring-focus); }
 
-    /* --- Review hotspots (Step 6). Real buttons: the mistake hunt is keyboard-playable. */
-    .vp-hotspot {
-      width: 26px; height: 26px;
-      display: grid; place-items: center;
-      padding: 0;
-      border: 1.5px solid var(--color-bench-grey);
-      border-radius: 50%;
-      background: var(--color-paper);
-      color: var(--color-ink-secondary);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      font-weight: 700;
-      line-height: 1;
-      cursor: pointer;
-      transition: transform var(--dur-fast) var(--ease-standard),
-                  border-color var(--dur-fast) var(--ease-standard),
-                  background var(--dur-fast) var(--ease-standard);
-    }
-    /* 44px pointer/touch target without growing the painted disc (DESIGN.md §5.1). */
-    .vp-hotspot::before {
-      content: ""; position: absolute;
-      top: 50%; left: 50%; transform: translate(-50%, -50%);
-      width: 44px; height: 44px;
-    }
-    @media (hover: hover) and (pointer: fine) {
-      .vp-hotspot:hover { border-color: var(--color-ink); background: var(--color-panel); }
-    }
-    .vp-hotspot:active { transform: scale(0.94); }
-    .vp-hotspot:focus-visible { outline: none; box-shadow: var(--ring-focus); }
-    /*
-      Four marker states, each with its own SHAPE or glyph as well as its colour (Two-Cue Rule):
-      untouched "?", visited "?" on a filled disc, wrongly accused "✗", solved "✓". The learner
-      has twelve of these to work through and must never lose track of which they have tried.
-    */
-    .vp-hotspot.is-visited { border-color: var(--color-ink-secondary); background: var(--color-panel); color: var(--color-ink); }
-    .vp-hotspot.is-found  { border-color: var(--color-flag-right); color: var(--color-flag-right); background: var(--color-success-soft); }
-    .vp-hotspot.is-missed { border-color: var(--color-flag-wrong); color: var(--color-flag-wrong); background: var(--color-flag-wrong-soft); }
-    /* The one just judged, so the eye can find it again next to the explanation card. */
-    .vp-hotspot.is-current { box-shadow: 0 0 0 3px var(--color-accent-soft), 0 0 0 4px var(--color-accent); }
-    .vp-hotspot.is-found.is-current { animation: hotspot-solved var(--dur-slow) var(--ease-standard); }
-    @keyframes hotspot-solved {
-      0%   { transform: scale(1); }
-      45%  { transform: scale(1.28); }
-      100% { transform: scale(1); }
-    }
-    .vp-hotspot.is-faded  { opacity: 0.2; }
-
     /* --- Floating viewport controls + the orbit hint --- */
     .vp-controls {
       position: absolute;
@@ -483,12 +436,133 @@
     }
     .vp-caption__scale, .vp-caption__note { color: var(--color-ink-secondary); }
 
+    /* ============================================================
+       Step 6's worked examples — the chapter's own wrong/correct pairs (Figs. 4.28–4.31)
+
+       FLAT 2-D, ON PURPOSE. These are DRAWINGS, not models: no canvas, no camera, no orbit,
+       no animation. A student comparing two sheets is reading paper, and anything that turns
+       or tweens is asking them to look at the wrong thing (lecturers' review, 2026-08-14).
+
+       The board covers the WebGL viewport rather than living in the wizard panel, because a
+       320 px column cannot hold two engineering drawings side by side. It is opaque, so the
+       scene beneath it — including the CSS2D label layer, which carries no z-index of its
+       own — is completely hidden while it is up.
+       ============================================================ */
+    .rf-board {
+      position: absolute;
+      inset: 0;
+      z-index: 8;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+      background: var(--color-paper);
+      padding: var(--space-4) var(--space-4) var(--space-6);
+      container-type: inline-size;
+    }
+    /* Nothing that belongs to the 3-D sheet may show through or stay clickable. */
+    #sim-viewport.is-examples .vp-controls,
+    #sim-viewport.is-examples .vp-figure,
+    #sim-viewport.is-examples .vp-caption,
+    #sim-viewport.is-examples .vp-hint { display: none; }
+
+    .rf-board__head {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: baseline;
+      gap: var(--space-2) var(--space-3);
+      padding-bottom: var(--space-3);
+      border-bottom: 1px solid var(--color-border);
+      margin-bottom: var(--space-4);
+    }
+    .rf-board__name { font-size: var(--text-lead); font-weight: 700; color: var(--color-ink); }
+    .rf-board__mode {
+      font-size: var(--text-xs);
+      color: var(--color-ink-secondary);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-xs);
+      padding: 2px var(--space-2);
+    }
+    .rf-board__count { margin-left: auto; font-size: var(--text-xs); color: var(--color-ink-secondary); }
+
+    .rf-pair { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+    .rf-cell { margin: 0; display: flex; flex-direction: column; min-width: 0; }
+    .rf-cell__cap {
+      display: flex;
+      align-items: center;
+      gap: var(--space-2);
+      font-size: var(--text-sm);
+      font-weight: 700;
+      padding-bottom: var(--space-2);
+    }
+    /* Two-Cue Rule (§4.6): the glyph carries the verdict as well as the colour, and the prose
+       under the pair names every fault by hand. Colour is never the only cue. */
+    .rf-cell__flag {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 20px; height: 20px; flex: 0 0 auto;
+      border-radius: 50%; font-size: var(--text-xs); line-height: 1;
+    }
+    .rf-cell--wrong .rf-cell__cap { color: var(--color-flag-wrong); }
+    .rf-cell--wrong .rf-cell__flag { background: var(--color-flag-wrong-soft); color: var(--color-flag-wrong); }
+    .rf-cell--right .rf-cell__cap { color: var(--color-flag-right); }
+    .rf-cell--right .rf-cell__flag { background: var(--color-success-soft); color: var(--color-flag-right); }
+    .rf-cell__art {
+      flex: 1 1 auto;
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      background: var(--color-paper);
+      padding: var(--space-2);
+    }
+
+    /* ---- The line alphabet, in SVG. One user unit is one millimetre, so these widths ARE
+       the chapter's: thick for edges you can see, thin for everything that measures. ---- */
+    .rf-svg { display: block; width: 100%; height: auto; }
+    .rf-outline { stroke: var(--color-ink); stroke-width: 0.6; fill: none; stroke-linejoin: round; stroke-linecap: round; }
+    .rf-thin    { stroke: var(--color-ink); stroke-width: 0.22; fill: none; }
+    .rf-hidden  { stroke: var(--color-ink); stroke-width: 0.3; stroke-dasharray: 3 1.6; fill: none; }
+    .rf-centre  { stroke: var(--color-ink); stroke-width: 0.22; stroke-dasharray: 6 1.4 0.1 1.4; stroke-linecap: round; fill: none; }
+    .rf-head    { fill: var(--color-ink); stroke: none; }
+    .rf-val     { font-family: var(--font-mono); font-size: 3.5px; fill: var(--color-ink); }
+    /* The strokes the explanation is about. Only ever on a sheet already captioned "Wrong". */
+    .rf-ann.is-bad .rf-thin { stroke: var(--color-flag-wrong); }
+    .rf-ann.is-bad path     { stroke: var(--color-flag-wrong); }
+    .rf-ann.is-bad .rf-head { fill: var(--color-flag-wrong); }
+    .rf-ann.is-bad .rf-val  { fill: var(--color-flag-wrong); }
+
+    .rf-why { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-4); margin-top: var(--space-4); }
+    .rf-why section {
+      border: 1px solid var(--color-border);
+      border-left-width: 3px;
+      border-radius: var(--radius-sm);
+      padding: var(--space-3);
+      background: var(--color-panel);
+    }
+    .rf-why--wrong { border-left-color: var(--color-flag-wrong); }
+    .rf-why--right { border-left-color: var(--color-flag-right); }
+    .rf-why h3 { margin: 0 0 var(--space-2); font-size: var(--text-sm); }
+    .rf-why--wrong h3 { color: var(--color-flag-wrong); }
+    .rf-why--right h3 { color: var(--color-flag-right); }
+    .rf-why ul { margin: 0; padding-left: 1.1em; }
+    .rf-why li { font-size: var(--text-sm); line-height: 1.5; margin-bottom: var(--space-1); }
+
+    /*
+      NARROW BOARD — the viewport shrinks whenever the wizard is open, so this is a CONTAINER
+      query and not a viewport one. Below 720 px the two sheets stop being side by side and
+      stack, wrong above correct, which is the reading order the prose already uses.
+    */
+    @container (max-width: 720px) {
+      .rf-pair, .rf-why { grid-template-columns: 1fr; }
+      .rf-board__count { margin-left: 0; width: 100%; }
+    }
+    @media (prefers-reduced-motion: no-preference) {
+      .rf-board { scroll-behavior: smooth; }
+    }
+
     /* ---- Wizard hide/show toggle ---- */
     .wizard-toggle {
       position: absolute;
       top: calc(44px + var(--space-5));
       right: var(--space-3);
-      z-index: 5;
+      /* Above the examples board (8), so the panel can still be collapsed while reading. */
+      z-index: 12;
       width: 44px; height: 44px;
       display: grid; place-items: center;
       padding: 0;
@@ -721,8 +795,7 @@
 
     /*
       `[hidden]` LOSES to any author rule that sets `display` — and this panel sets
-      `display: flex` on chips rows, option lists, the progress meter and the segmented
-      controls. Every one of those that gets hidden was therefore still laid out as an empty
+      `display: flex` on chips rows, option lists and the segmented controls. Every one of those that gets hidden was therefore still laid out as an empty
       flex box reserving its own height and the panel's gap around it. This is the canonical
       fix, and it is why the per-component `[hidden]` overrides below are no longer needed.
     */
@@ -1113,49 +1186,6 @@
     .toggle[aria-pressed="true"] .toggle__switch::after { transform: translateX(16px); }
 
     /*
-      Progress — Step 6's assessment meter. A count alone ("0 of 12") states a fact; the bar
-      makes the remaining work legible at a glance, which is what a learner halfway through a
-      hunt actually wants to know.
-    */
-    .progress { display: flex; flex-direction: column; gap: var(--space-2); }
-    .progress__head {
-      display: flex;
-      align-items: baseline;
-      justify-content: space-between;
-      gap: var(--space-3);
-      font-family: var(--font-mono);
-      font-size: var(--text-xs);
-      text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: var(--color-ink-secondary);
-    }
-    .progress__count { font-size: var(--text-sm); color: var(--color-ink); font-weight: 700; letter-spacing: 0; }
-    .progress__track {
-      display: flex;
-      gap: 3px;
-      height: 10px;
-    }
-    .progress__cell {
-      flex: 1 1 0;
-      border-radius: 2px;
-      background: var(--color-panel);
-      box-shadow: inset 0 0 0 1px var(--color-border);
-      transition: background var(--dur-base) var(--ease-standard),
-                  box-shadow var(--dur-base) var(--ease-standard);
-    }
-    .progress__cell.is-on {
-      background: var(--color-success);
-      box-shadow: inset 0 0 0 1px var(--color-success);
-    }
-    .progress__milestone {
-      margin: 0;
-      font-size: var(--text-sm);
-      font-weight: 700;
-      color: var(--color-success);
-    }
-    .progress__milestone[hidden] { display: none; }
-
-    /*
       Accordion. COLLAPSED IT IS EXACTLY ITS HEADER — no padding on the wrapper, no reserved
       body height, no margin of its own. The rule that used to sit here (`padding-top: 16px`
       on the .fold itself) was invisible space that every collapsed section paid for; the
@@ -1311,8 +1341,7 @@
       The CONTROL is 44 px tall even though the TRACK is 4 px: the painted track was also the
       whole hit target, so grabbing the slider meant hitting a four-pixel-high strip. The track
       is drawn on the runnable-track pseudo-element instead, and the input itself is a
-      transparent 44 px band around it (DESIGN.md §5.1, the same rule the round review markers
-      follow).
+      transparent 44 px band around it (DESIGN.md §5.1).
     */
     .slider-row input[type="range"] {
       flex: 1 1 auto;
@@ -1401,16 +1430,6 @@
     ol.checklist { margin: 0; padding-left: 1.3em; font-size: var(--text-sm); line-height: 1.5; color: var(--color-ink-secondary); }
     ol.checklist li { margin-bottom: var(--space-2); }
     ol.checklist li:last-child { margin-bottom: 0; }
-
-    .score {
-      display: flex;
-      align-items: baseline;
-      gap: var(--space-2);
-      font-family: var(--font-mono);
-      font-size: var(--text-sm);
-      color: var(--color-ink-secondary);
-    }
-    .score b { font-size: var(--text-title); color: var(--color-ink); }
 
     /* Nav footer — pinned outside the scroll region. */
     /*
@@ -1629,6 +1648,17 @@
     </div>
 
     <p class="vp-hint" id="vp-hint">Drag to orbit · scroll to zoom · “Front view” returns to the drawing</p>
+
+    <!--
+      Step 6's worked examples. Painted by main.js's setExamples() from `reviewFigures.js`;
+      empty and hidden until the learner asks for it. Flat SVG, no canvas and no camera —
+      see the note on .rf-board in the style block above.
+    -->
+    <!-- NOT a live region: swapping examples would read the whole board — two drawings and a
+         dozen bullets — out loud. selectExample() announces the change in one sentence, and
+         each sheet carries its own aria-label describing what is on it. -->
+    <div class="rf-board" id="review-sheet" hidden tabindex="-1"
+         role="region" aria-label="Worked example: wrong and correct dimensioning"></div>
   </main>
 
   <!-- ============================================================
@@ -1838,44 +1868,34 @@
               <button type="button" class="btn btn--secondary btn--block" id="btn-symbol-view" hidden>Turn the plate over to read it</button>
             </div>
 
-            <!-- ===== Step 6 — review + the mistake hunt + the sheet itself ===== -->
+            <!-- ===== Step 6 — the chapter's worked examples + the sheet itself ===== -->
             <div class="step-panel" data-step="6" hidden>
               <!--
-                The assessment leads. Progress first, then the hunt, then the explanation of the
-                last verdict — the order the learner's attention actually moves in. Everything
-                that is reference rather than assessment folds away below.
+                ONE JOB: read the chapter's four wrong/correct pairs. The lecturers' review of
+                2026-08-16 removed the twelve-fault hunt that used to sit here — a student who
+                has just been shown a mistake beside its correction does not also need to be
+                tested on finding one, and two assessments in one step buried the pairs.
+                The chips are the whole navigation; everything below them is reference.
               -->
-              <div class="progress" id="review-progress">
-                <div class="progress__head">
-                  <span>Progress</span>
-                  <span class="progress__count" id="review-count">0 / 12 solved</span>
-                </div>
-                <div class="progress__track" id="review-track" role="img" aria-label="0 of 12 faults solved"></div>
-                <p class="progress__milestone" id="review-milestone" hidden></p>
-              </div>
-
-              <p class="step-hint">Click a marker on the drawing to accuse that dimension. Some break a rule; others just write a symbol badly. Both count.</p>
-              <div class="detail" id="review-detail" role="status">Every marker is a dimension worth a second look. Some are innocent.</div>
-
               <div>
-                <span class="group__label">Which drawing</span>
-                <!-- Two states, not three: the third was a compare, and compare is a toggle
-                     everywhere else in the module. -->
-                <div class="seg" role="group" aria-label="Which drawing to show">
-                  <button type="button" class="seg__btn is-active" id="rev-faults" data-view="faults" aria-pressed="true">With faults</button>
-                  <button type="button" class="seg__btn" id="rev-correct" data-view="correct" aria-pressed="false">Corrected</button>
-                </div>
-                <!-- The compare control's fixed slot — same component and same position as Step 4. -->
-                <div class="compare-slot" id="compare-slot-6"></div>
+                <span class="group__label">Which example</span>
+                <div class="chips" id="example-chips" role="group" aria-label="Which worked example"></div>
+                <p class="step-hint">Read the left drawing first and try to say what is wrong with it. Then look right, and check your list against the one below the pair.</p>
+                <div class="detail" id="example-detail" role="status"></div>
               </div>
 
+              <!--
+                OPENING THIS FOLD TAKES THE BOARD DOWN. The scale and unit study acts on the
+                3-D sheet, which the examples board covers, so the fold owns the viewport while
+                it is open and hands it back on close — the same contract as Step 1's studies.
+              -->
               <details class="fold" id="review-sheet-fold">
                 <summary>The sheet itself</summary>
                 <div class="fold__body">
                   <div>
                     <div class="chips" id="scale-chips" role="group" aria-label="Scale of drawing"></div>
                     <div class="chips" id="unit-chips" role="group" aria-label="Unit of the drawing"></div>
-                    <p class="step-hint">Watch carefully: the drawing changes size, the numbers do not.</p>
+                    <p class="step-hint">The finished plate takes the viewport while this is open. Watch carefully: the drawing changes size, the numbers do not.</p>
                     <div class="detail" id="sheet-detail" role="status">Change the scale and watch every value stay exactly where it is.</div>
                   </div>
                 </div>

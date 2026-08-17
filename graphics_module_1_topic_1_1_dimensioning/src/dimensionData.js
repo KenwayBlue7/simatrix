@@ -4,7 +4,7 @@
 //
 // PURE DATA LEAF (ADR-007 star rule / RULES.md §3.6): imports nothing, owns no DOM and
 // no Three.js objects. Every other layer — the mesh generator (dimensionRig.js), the BIS
-// dimension renderer (dimensionDraw.js), the arrangement/mistake catalogues — reads its
+// dimension renderer (dimensionDraw.js), the arrangement catalogues — reads its
 // numbers from here, so a change to the part lands everywhere at once.
 //
 // UNITS. Every number below is in MILLIMETRES, the BIS unit for engineering drawings
@@ -395,8 +395,8 @@ export function toWorld(xMm, yMm) {
 }
 
 /**
- * Half the depth of the SHEET in world units — where the dimension apparatus, the values, the
- * caption and the review markers are drawn.
+ * Half the depth of the SHEET in world units — where the dimension apparatus, the values and
+ * the caption are drawn.
  *
  * It is the thickest figure's half thickness, and it is a constant on purpose: dimension lines
  * belong to the paper, not to the front face of the part, so they must not step towards the

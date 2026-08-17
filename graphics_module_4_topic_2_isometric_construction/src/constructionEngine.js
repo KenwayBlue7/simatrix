@@ -109,6 +109,23 @@ function generatorPositions(y0, r0, y1, r1, count) {
   return pos;
 }
 
+/**
+ * Corner i of one outline joined to corner i of another, at two heights — the sloping edges of a
+ * frustum of a pyramid. `verticals` cannot draw them (they do not rise straight) and `spokes` cannot
+ * (there is no single apex to run to), so this is its own primitive rather than a flag on either.
+ */
+function edgePositions(y0, pts0, y1, pts1) {
+  const pos = [];
+  const n = Math.min(pts0.length, pts1.length);
+  for (let i = 0; i < n; i++) {
+    pos.push(
+      toWorld(pts0[i][0]), toWorld(y0), toWorld(pts0[i][1]),
+      toWorld(pts1[i][0]), toWorld(y1), toWorld(pts1[i][1]),
+    );
+  }
+  return pos;
+}
+
 function markerPositions(y) {
   const Y = toWorld(y); const m = toWorld(MARKER_MM);
   return [-m, Y, 0, m, Y, 0, 0, Y - m, 0, 0, Y + m, 0, 0, Y, -m, 0, Y, m];
@@ -140,6 +157,7 @@ function primitivePositions(p) {
     case 'verticals': return { positions: verticalPositions(p.y0, p.y1, p.pts) };
     case 'spokes': return { positions: spokePositions(p.y, p.apexY, p.pts) };
     case 'generators': return { positions: generatorPositions(p.y0, p.r0, p.y1, p.r1, p.count) };
+    case 'edges': return { positions: edgePositions(p.y0, p.pts0, p.y1, p.pts1) };
     case 'marker': return { positions: markerPositions(p.y) };
     case 'billboard': return { positions: billboardPositions(p.r, p.half), billboard: { y: toWorld(p.y) } };
     default: return null;
@@ -160,7 +178,7 @@ function primitivePositions(p) {
  *   origin: THREE.Vector3,
  *   bounds: { width:number, depth:number, height:number },
  *   axes: { key:string, label:string, from:string, group:THREE.Group, material:LineMaterial, tip:THREE.Vector3, lengthMm:number }[],
- *   box: { group: THREE.Group, material: LineMaterial },
+ *   boxes: { label:string, group: THREE.Group, material: LineMaterial, line: LineSegments2 }[],
  *   stages: { id:string, label:string, note:string, objects:THREE.Object3D[], materials:LineMaterial[] }[],
  *   billboards: THREE.Object3D[],
  *   setResolution: (w:number,h:number) => void,
@@ -238,12 +256,20 @@ export function buildConstruction({ solid, dims, resolution }) {
     };
   });
 
-  // ---- Phase B: the enclosing bounding box ---------------------------------------------------
-  // Geometry is written relative to the origin corner so the same scale-from-the-corner growth
-  // applies: the box literally builds itself along the three axes just drawn.
-  const boxPositions = [];
-  {
-    const W = -2 * hw; const D = -2 * hd; const H = h; // signed, measured FROM the origin corner
+  // ---- Phase B: the enclosing bounding box(es) -----------------------------------------------
+  // Geometry is written relative to each box's own origin corner so the same scale-from-the-corner
+  // growth applies: a box literally builds itself along the three axes just drawn.
+  //
+  // ONE BOX PER COMPONENT. A solid declares `partBoxes(dims)` when it is made of more than one
+  // component, and each box stands on the finished top face of the one below — which is how a
+  // combination is really blocked out, and the reason a cone's base ellipse can be inscribed in the
+  // top face of the SLAB's box rather than judged by eye inside one larger box round both. A solid
+  // that declares nothing gets exactly one box from its own bounds, identical to before.
+  function makeBox({ width, depth, height, y = 0 }) {
+    const bw = toWorld(width) / 2;
+    const bd = toWorld(depth) / 2;
+    const positions = [];
+    const W = -2 * bw; const D = -2 * bd; const H = toWorld(height); // signed, FROM the corner
     const corners = [
       [0, 0, 0], [W, 0, 0], [W, 0, D], [0, 0, D],
       [0, H, 0], [W, H, 0], [W, H, D], [0, H, D],
@@ -253,14 +279,19 @@ export function buildConstruction({ solid, dims, resolution }) {
       [4, 5], [5, 6], [6, 7], [7, 4],
       [0, 4], [1, 5], [2, 6], [3, 7],
     ];
-    for (const [a, b] of edges) boxPositions.push(...corners[a], ...corners[b]);
+    for (const [a, b] of edges) positions.push(...corners[a], ...corners[b]);
+    const built = makeLine(positions);
+    const boxGroup = new THREE.Group();
+    boxGroup.position.set(bw, toWorld(y), bd);
+    boxGroup.add(built.line);
+    boxGroup.scale.setScalar(0.0001); // grows to 1 in Phase B
+    group.add(boxGroup);
+    return { group: boxGroup, material: built.material, line: built.line };
   }
-  const boxParts = makeLine(boxPositions);
-  const boxGroup = new THREE.Group();
-  boxGroup.position.copy(origin);
-  boxGroup.add(boxParts.line);
-  boxGroup.scale.setScalar(0.0001);
-  group.add(boxGroup);
+
+  const boxSpecs = solid.partBoxes?.(dims)
+    ?? [{ label: solid.name, width: bounds.width, depth: bounds.depth, height: bounds.height, y: 0 }];
+  const boxes = boxSpecs.map((bs) => ({ label: bs.label, ...makeBox(bs) }));
 
   // ---- Step 3: the three face highlights -----------------------------------------------------
   // Selecting a view on the orthographic sheet lights the face of the solid that view looks at, so
@@ -324,7 +355,8 @@ export function buildConstruction({ solid, dims, resolution }) {
     origin,
     bounds,
     axes,
-    box: { group: boxGroup, material: boxParts.material, line: boxParts.line },
+    /** One growable box per component; a single solid has exactly one, as before. */
+    boxes,
     stages,
     faces,
     billboards,

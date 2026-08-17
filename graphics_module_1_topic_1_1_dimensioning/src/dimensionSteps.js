@@ -350,15 +350,17 @@ export const STEPS = [
   {
     n: 6,
     rail: 'Review',
-    title: 'Read the drawing — and find the mistakes',
-    lead: 'The plate is fully dimensioned. Some of it is wrong.',
+    title: 'Review through worked examples',
+    lead: 'Four drawings, each done twice — once badly, once properly.',
     body: {
-      // Deliberately shorter than the teaching steps. This one is the assessment: the learner
-      // is here to look at the drawing, not to read the panel, so the copy states the task and
-      // gets out of the way. The marker glyphs and the progress meter carry the rest.
+      // Deliberately shorter than the teaching steps, and deliberately passive. The learner is
+      // here to LOOK at two drawings side by side, not to read the panel and not to be tested:
+      // the pair and the list under it carry the whole lesson. (This step used to end with a
+      // twelve-fault hunt on the Guide Plate; the lecturers' review of 2026-08-16 took it out
+      // — being shown a mistake beside its correction is what teaches it.)
       open: [
-        `Twelve faults are hidden in it. Some break a rule you have met; some just write a symbol badly.`,
-        `A fault nobody catches gets made in metal.`,
+        `Study each example below. The left-hand drawing breaks the rules; the right-hand one states exactly the same sizes properly.`,
+        `Read the wrong one first and say what you would change. The list under the pair then names every fault and what the corrected sheet does instead.`,
       ],
       postBody: [
         `<b>How it is drawn:</b> the caption, the scale and the units belong to a finished sheet as much as the sizes do.`,
@@ -368,9 +370,10 @@ export const STEPS = [
       title: 'Remember',
       points: [
         'A drawing goes wrong two ways: a rule broken, or a symbol written badly. The second is commoner.',
-        'State every size once. Twice is a contradiction waiting to happen.',
-        'Whatever the scale, write the REAL size on the line.',
-        'Millimetres need no unit. Anything else must be stated once, near the title.',
+        'The commonest of all: the symbol written after the number, or spelled out — 20ø, 8R, 24 Dia.',
+        'State every size once, from an edge you can point at. Never from another dimension.',
+        'Give the overall sizes. A reader should never have to add two numbers to find how long a part is.',
+        'Whatever the scale, write the REAL size on the line. Millimetres need no unit.',
       ],
     },
   },

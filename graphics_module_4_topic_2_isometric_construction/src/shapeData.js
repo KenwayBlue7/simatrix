@@ -31,6 +31,25 @@ export const MM_PER_UNIT = 10;
 export function toWorld(mm) { return mm / MM_PER_UNIT; }
 
 // ---------------------------------------------------------------------------
+// Check helpers. These three exist because `answerValidator.js` — migrated from Topic 3 with its
+// logic unchanged — needs them, and Topic 3 keeps them in a `helpers.js` this topic does not have.
+// They live here because this file is already this topic's stateless shared util (RULES.md §3.6a),
+// and because `ISOMETRIC_SCALE` already establishes that its constants live alongside its data.
+// ---------------------------------------------------------------------------
+
+/** Tolerance for every self-check comparison, in millimetres (RULES.md §6.1). */
+export const CHECK_TOLERANCE_MM = 0.5;
+
+/** Round to one decimal — the precision every readout and every dimension label is written at. */
+export function round1(v) { return Math.round(v * 10) / 10; }
+
+/** Build a readable list: ["a","b","c"] → "a, b and c". */
+export function humanList(items) {
+  if (items.length <= 1) return items.join('');
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
+
+// ---------------------------------------------------------------------------
 // Footprint helpers — the base outline of a solid as a list of [x, z] points in mm.
 // Shared by `views` (to draw the top view) and `construction` (to raise verticals), so the two can
 // never disagree about where a corner is.
@@ -128,6 +147,30 @@ function prismElevationEdges(xs, h) {
   return xs.map((x) => ({ k: 'line', x1: x, y1: -h / 2, x2: x, y2: h / 2, thin: true }));
 }
 
+/**
+ * The extents of a regular polygon lying in the horizontal plane — what the enclosing box is
+ * actually built to, which for anything other than a square is NOT the side length.
+ *
+ * The polygonal solids that predate this helper compute the same three values inline; they are left
+ * exactly as they are, because rewriting working geometry to share a helper is a refactor and buys
+ * the learner nothing.
+ */
+function polyExtents(r, sides, rot = 0) {
+  const pts = polygonPoints(r, sides, rot);
+  const xs = pts.map((p) => p[0]);
+  const zs = pts.map((p) => p[1]);
+  const minX = Math.min(...xs); const maxX = Math.max(...xs);
+  const minZ = Math.min(...zs); const maxZ = Math.max(...zs);
+  return { pts, xs, zs, width: maxX - minX, depth: maxZ - minZ, minX, maxX, minZ, maxZ };
+}
+
+/** The interior corner x-positions of a polygon — the edges that read inside its elevation. */
+function innerXs(xs) {
+  const min = Math.min(...xs); const max = Math.max(...xs);
+  return [...new Set(xs.map((x) => Number(x.toFixed(3))))]
+    .filter((x) => Math.abs(x - min) > 0.01 && Math.abs(x - max) > 0.01);
+}
+
 // ---------------------------------------------------------------------------
 // Construction primitives (3D, millimetres, y measured UP from the seating plane):
 //   { k:'axisLine',  y0, y1 }                    the vertical centre axis
@@ -136,6 +179,10 @@ function prismElevationEdges(xs, h) {
 //   { k:'verticals', y0, y1, pts }               vertical lines raised from each [x,z]
 //   { k:'spokes',    y, pts, apexY }             lines from each [x,z] up to the apex on the axis
 //   { k:'generators', y0, r0, y1, r1, count }    lines joining a lower ring to an upper ring
+//   { k:'edges',     y0, pts0, y1, pts1 }        lines joining corner i of one outline to corner i
+//                                                of another — the sloping edges of a FRUSTUM of a
+//                                                pyramid, which `verticals` cannot draw (they slope)
+//                                                and `spokes` cannot draw (there is no single apex)
 //   { k:'billboard', y, r, half }                a camera-facing circle (a sphere's true outline)
 //   { k:'marker',    y }                         a small point marker on the axis (an apex/centre)
 // A stage groups primitives with the sentence the tutor says while they appear.
@@ -239,7 +286,9 @@ export const SOLIDS = [
     id: 'cylinder',
     name: 'Cylinder',
     blurb: 'A circular base swept straight up. Its circles are the first thing that does NOT stay the same shape in an isometric drawing — each one becomes an ellipse.',
-    dims: [dim('diameter', 'Diameter', 'ØD', 50, 20, 90), dim('height', 'Height', 'H', 70, 20, 110)],
+    // The height range reaches 120 because a library problem states a 120 mm axis, and a field that
+    // cannot hold the size the question states is a field that cannot pose the question.
+    dims: [dim('diameter', 'Diameter', 'ØD', 50, 20, 90), dim('height', 'Height', 'H', 70, 20, 120)],
     axisSymbols: { width: 'ØD', depth: 'ØD', height: 'H' },
     bounds: (d) => ({ width: d.diameter, depth: d.diameter, height: d.height }),
     body: (d) => ({ kind: 'revolve', rBottom: d.diameter / 2, rTop: d.diameter / 2, h: d.height }),
@@ -431,6 +480,59 @@ export const SOLIDS = [
     },
   },
 
+  // ---- Hexagonal prism ----------------------------------------------------
+  // Added for the same reason the pentagonal prism exists — a polygon that does not fill its box —
+  // and because the textbook's combination examples are built on a HEXAGONAL SLAB (§16.8,
+  // Example 16.15). A slab is only a prism drawn short, so no new geometry kind is needed: this is
+  // one more `prism` entry, and the height range reaches down to slab thickness.
+  {
+    id: 'hexagonal-prism',
+    name: 'Hexagonal Prism',
+    blurb: 'Six rectangular faces between two hexagons. Drawn short it is the hexagonal SLAB the textbook stands its combinations on; drawn tall it is an ordinary prism. Either way the hexagon is constructed inside the box, never off its corners.',
+    dims: [dim('side', 'Base side', 'a', 30, 12, 60), dim('height', 'Height', 'H', 60, 10, 110)],
+    // Across the corners is the width, across the flats is the depth — neither of them is `a`.
+    axisSymbols: { width: 'L', depth: 'B', height: 'H' },
+    bounds: (d) => {
+      const pts = polygonPoints(circumradius(d.side, 6), 6, Math.PI / 6);
+      const xs = pts.map((p) => p[0]); const zs = pts.map((p) => p[1]);
+      return {
+        width: Math.max(...xs) - Math.min(...xs),
+        depth: Math.max(...zs) - Math.min(...zs),
+        height: d.height,
+      };
+    },
+    body: (d) => ({ kind: 'prism', r: circumradius(d.side, 6), h: d.height, sides: 6, rot: Math.PI / 6 }),
+    views: (d) => {
+      const R = circumradius(d.side, 6);
+      const pts = polygonPoints(R, 6, Math.PI / 6);
+      const xs = pts.map((p) => p[0]);
+      const w = Math.max(...xs) - Math.min(...xs);
+      const zs = pts.map((p) => p[1]);
+      const dep = Math.max(...zs) - Math.min(...zs);
+      const inner = [...new Set(xs.map((x) => Number(x.toFixed(3))))]
+        .filter((x) => Math.abs(x - Math.min(...xs)) > 0.01 && Math.abs(x - Math.max(...xs)) > 0.01);
+      return {
+        front: { w, h: d.height, shapes: [{ k: 'rect', w, h: d.height }, ...prismElevationEdges(inner, d.height)] },
+        top: { w, h: dep, shapes: [polyView(R, 6, Math.PI / 6)] },
+        side: { w: dep, h: d.height, shapes: [{ k: 'rect', w: dep, h: d.height }] },
+      };
+    },
+    construction: (d) => {
+      const pts = polygonPoints(circumradius(d.side, 6), 6, Math.PI / 6);
+      return [
+        stage('base', 'Base hexagon',
+          'The hexagon is constructed INSIDE the bottom face of the box, each corner placed from the top view. Its corners do not reach the corners of the box.',
+          [{ k: 'poly', y: 0, pts }]),
+        stage('top', 'Top hexagon',
+          'The identical hexagon is repeated on the top face of the box.',
+          [{ k: 'poly', y: d.height, pts }]),
+        stage('join', 'Join the corners',
+          'Join each base corner to the one directly above it. The three side faces that fall away from view would be drawn hidden on a finished sheet.',
+          [{ k: 'verticals', y0: 0, y1: d.height, pts }]),
+      ];
+    },
+  },
+
   // ---- Frustum of a cone --------------------------------------------------
   {
     id: 'frustum-cone',
@@ -550,6 +652,247 @@ export const SOLIDS = [
         stage('dome', 'Half the sphere',
           'The curved surface is half a sphere about the centre of that ellipse, so its outline is a true SEMICIRCLE. Height is only one radius: the box is half as tall as it is wide.',
           [{ k: 'axisLine', y0: 0, y1: r }, { k: 'billboard', y: 0, r, half: 'upper' }]),
+      ];
+    },
+  },
+
+  // =========================================================================
+  // The four solids the PROBLEM LIBRARY needs (2026-08-12).
+  //
+  // Each of these is one more object in this registry and nothing else — the ADR-043 path, taken as
+  // written. They exist because four migrated problems name them; they are ordinary solids, so they
+  // join Step 1's picker and the combination builder like every other entry, and a learner who meets
+  // a hexagonal pyramid inside a problem can go and practise one.
+  //
+  // Only the two FRUSTUMS needed anything beyond data: the `pyramid` geometry kind gained an
+  // optional `rTop` (a lathe between two polygons instead of a cone), and the construction primitive
+  // vocabulary gained `edges`. Both are single additive cases in switches that already existed.
+  // =========================================================================
+
+  // ---- Pentagonal pyramid -------------------------------------------------
+  {
+    id: 'pentagonal-pyramid',
+    name: 'Pentagonal Pyramid',
+    blurb: 'Five sloping faces rising from a pentagon to one apex. The base does not fill its box and the apex is not above a corner of it — so both have to be constructed rather than guessed.',
+    dims: [dim('side', 'Base side', 'a', 30, 15, 60), dim('height', 'Height', 'H', 70, 20, 110)],
+    axisSymbols: { width: 'L', depth: 'B', height: 'H' },
+    bounds: (d) => {
+      const e = polyExtents(circumradius(d.side, 5), 5, Math.PI / 5);
+      return { width: e.width, depth: e.depth, height: d.height };
+    },
+    body: (d) => ({ kind: 'pyramid', r: circumradius(d.side, 5), h: d.height, sides: 5, rot: Math.PI / 5 }),
+    views: (d) => {
+      const R = circumradius(d.side, 5);
+      const e = polyExtents(R, 5, Math.PI / 5);
+      const hh = d.height / 2;
+      // The apex stands over the CENTRE of the polygon, which is the origin of these points — so in
+      // each elevation it is at 0, not at the middle of the box.
+      return {
+        front: {
+          w: e.width, h: d.height,
+          shapes: [{ k: 'poly', pts: [[e.minX, -hh], [e.maxX, -hh], [0, hh]] }],
+        },
+        top: { w: e.width, h: e.depth, shapes: [polyView(R, 5, Math.PI / 5), ...diagonals(e.pts)] },
+        side: {
+          w: e.depth, h: d.height,
+          shapes: [{ k: 'poly', pts: [[-e.maxZ, -hh], [-e.minZ, -hh], [0, hh]] }],
+        },
+      };
+    },
+    construction: (d) => {
+      const pts = polygonPoints(circumradius(d.side, 5), 5, Math.PI / 5);
+      return [
+        stage('base', 'Base pentagon',
+          'The pentagon is constructed INSIDE the bottom face of the box, each corner placed from the top view.',
+          [{ k: 'poly', y: 0, pts }]),
+        stage('apex', 'Locate the apex',
+          'The apex is on the vertical axis above the centre of the pentagon, at the height read from the front view.',
+          [{ k: 'axisLine', y0: 0, y1: d.height }, { k: 'marker', y: d.height }]),
+        stage('edges', 'Join the edges',
+          'Join each base corner to the apex. Two of the five sloping edges fall away from view and would be drawn hidden on a finished sheet.',
+          [{ k: 'spokes', y: 0, apexY: d.height, pts }]),
+      ];
+    },
+  },
+
+  // ---- Hexagonal pyramid --------------------------------------------------
+  {
+    id: 'hexagonal-pyramid',
+    name: 'Hexagonal Pyramid',
+    blurb: 'Six sloping faces rising from a hexagon to one apex. The textbook stands this one centrally on a slab — the base is constructed inside its box exactly as the hexagonal prism\'s is.',
+    dims: [dim('side', 'Base side', 'a', 25, 12, 60), dim('height', 'Height', 'H', 65, 20, 110)],
+    axisSymbols: { width: 'L', depth: 'B', height: 'H' },
+    bounds: (d) => {
+      const e = polyExtents(circumradius(d.side, 6), 6, Math.PI / 6);
+      return { width: e.width, depth: e.depth, height: d.height };
+    },
+    body: (d) => ({ kind: 'pyramid', r: circumradius(d.side, 6), h: d.height, sides: 6, rot: Math.PI / 6 }),
+    views: (d) => {
+      const R = circumradius(d.side, 6);
+      const e = polyExtents(R, 6, Math.PI / 6);
+      const hh = d.height / 2;
+      return {
+        front: {
+          w: e.width, h: d.height,
+          shapes: [{ k: 'poly', pts: [[e.minX, -hh], [e.maxX, -hh], [0, hh]] }],
+        },
+        top: { w: e.width, h: e.depth, shapes: [polyView(R, 6, Math.PI / 6), ...diagonals(e.pts)] },
+        side: {
+          w: e.depth, h: d.height,
+          shapes: [{ k: 'poly', pts: [[-e.maxZ, -hh], [-e.minZ, -hh], [0, hh]] }],
+        },
+      };
+    },
+    construction: (d) => {
+      const pts = polygonPoints(circumradius(d.side, 6), 6, Math.PI / 6);
+      return [
+        stage('base', 'Base hexagon',
+          'The hexagon is constructed INSIDE the bottom face of the box, each corner placed from the top view. Its corners do not reach the corners of the box.',
+          [{ k: 'poly', y: 0, pts }]),
+        stage('apex', 'Locate the apex',
+          'The apex is on the vertical axis above the centre of the hexagon, at the height read from the front view. Mark it before drawing a single sloping edge.',
+          [{ k: 'axisLine', y0: 0, y1: d.height }, { k: 'marker', y: d.height }]),
+        stage('edges', 'Join the edges',
+          'Join each base corner to the apex. The edges on the far side would be drawn hidden on a finished sheet.',
+          [{ k: 'spokes', y: 0, apexY: d.height, pts }]),
+      ];
+    },
+  },
+
+  // ---- Frustum of a square pyramid ----------------------------------------
+  {
+    id: 'frustum-square-pyramid',
+    name: 'Frustum of Square Pyramid',
+    blurb: 'A square pyramid with its top cut off parallel to the base. Two squares of different sizes at different heights, joined corner to corner — the sloping edges are what is left of the pyramid.',
+    dims: [
+      dim('bottom', 'Base side', 'a', 60, 20, 90),
+      dim('top', 'Top side', 'b', 35, 10, 80),
+      dim('height', 'Height', 'H', 70, 20, 110),
+    ],
+    axisSymbols: { width: 'a', depth: 'a', height: 'H' },
+    // The top square is not an edge of the enclosing box, so the box-edge dimensions cannot carry it.
+    extraDims: (d) => [{
+      symbol: 'b',
+      from: [-d.top / 2, d.height, 0],
+      to: [d.top / 2, d.height, 0],
+      push: [0, 1, 0],
+    }],
+    bounds: (d) => ({
+      width: Math.max(d.bottom, d.top),
+      depth: Math.max(d.bottom, d.top),
+      height: d.height,
+    }),
+    body: (d) => ({
+      kind: 'pyramid',
+      r: circumradius(d.bottom, 4),
+      rTop: circumradius(d.top, 4),
+      h: d.height, sides: 4, rot: Math.PI / 4,
+    }),
+    views: (d) => {
+      const hb = d.bottom / 2; const ht = d.top / 2; const hh = d.height / 2;
+      const w = Math.max(d.bottom, d.top);
+      const trapezium = { k: 'poly', pts: [[-hb, -hh], [hb, -hh], [ht, hh], [-ht, hh]] };
+      const ptsB = polygonPoints(circumradius(d.bottom, 4), 4, Math.PI / 4);
+      const ptsT = polygonPoints(circumradius(d.top, 4), 4, Math.PI / 4);
+      return {
+        front: { w, h: d.height, shapes: [trapezium] },
+        top: {
+          w, h: w,
+          shapes: [
+            { k: 'rect', w: d.bottom, h: d.bottom },
+            { k: 'rect', w: d.top, h: d.top, thin: true },
+            // The sloping edges seen from above: each base corner joined to the top corner above it.
+            ...ptsB.map(([x, z], i) => ({
+              k: 'line', x1: x, y1: -z, x2: ptsT[i][0], y2: -ptsT[i][1], thin: true,
+            })),
+          ],
+        },
+        side: { w, h: d.height, shapes: [trapezium] },
+      };
+    },
+    construction: (d) => {
+      const ptsB = polygonPoints(circumradius(d.bottom, 4), 4, Math.PI / 4);
+      const ptsT = polygonPoints(circumradius(d.top, 4), 4, Math.PI / 4);
+      return [
+        stage('base', 'Base square',
+          'The larger square on the bottom face of the box.',
+          [{ k: 'poly', y: 0, pts: ptsB }]),
+        stage('top', 'Top square',
+          'The smaller square sits at the full height on the SAME vertical axis, centred over the base. Its size comes from the top view, its position from the front view.',
+          [{ k: 'axisLine', y0: 0, y1: d.height }, { k: 'poly', y: d.height, pts: ptsT }]),
+        stage('edges', 'Join the corners',
+          'Join each base corner to the corner directly above it. Those four lines SLOPE — they are the sloping edges of the original pyramid, cut short.',
+          [{ k: 'edges', y0: 0, pts0: ptsB, y1: d.height, pts1: ptsT }]),
+      ];
+    },
+  },
+
+  // ---- Frustum of a hexagonal pyramid -------------------------------------
+  {
+    id: 'frustum-hexagonal-pyramid',
+    name: 'Frustum of Hexagonal Pyramid',
+    blurb: 'A hexagonal pyramid with its top cut off parallel to the base. Both hexagons are constructed inside their own faces of the box, then joined corner to corner.',
+    dims: [
+      dim('bottom', 'Base side', 'a', 40, 15, 60),
+      dim('top', 'Top side', 'b', 22, 8, 55),
+      dim('height', 'Height', 'H', 70, 20, 110),
+    ],
+    axisSymbols: { width: 'L', depth: 'B', height: 'H' },
+    bounds: (d) => {
+      const b = polyExtents(circumradius(d.bottom, 6), 6, Math.PI / 6);
+      const t = polyExtents(circumradius(d.top, 6), 6, Math.PI / 6);
+      return {
+        width: Math.max(b.width, t.width),
+        depth: Math.max(b.depth, t.depth),
+        height: d.height,
+      };
+    },
+    body: (d) => ({
+      kind: 'pyramid',
+      r: circumradius(d.bottom, 6),
+      rTop: circumradius(d.top, 6),
+      h: d.height, sides: 6, rot: Math.PI / 6,
+    }),
+    views: (d) => {
+      const Rb = circumradius(d.bottom, 6); const Rt = circumradius(d.top, 6);
+      const b = polyExtents(Rb, 6, Math.PI / 6);
+      const t = polyExtents(Rt, 6, Math.PI / 6);
+      const w = Math.max(b.width, t.width);
+      const dep = Math.max(b.depth, t.depth);
+      const hh = d.height / 2;
+      const k = Rt / Rb;   // both hexagons are the same shape, so an inner edge slopes by this ratio
+      const outline = { k: 'poly', pts: [[b.minX, -hh], [b.maxX, -hh], [t.maxX, hh], [t.minX, hh]] };
+      const inner = innerXs(b.xs).map((x) => ({
+        k: 'line', x1: x, y1: -hh, x2: x * k, y2: hh, thin: true,
+      }));
+      return {
+        front: { w, h: d.height, shapes: [outline, ...inner] },
+        top: {
+          w, h: dep,
+          shapes: [
+            polyView(Rb, 6, Math.PI / 6),
+            { ...polyView(Rt, 6, Math.PI / 6), thin: true },
+            ...b.pts.map(([x, z], i) => ({
+              k: 'line', x1: x, y1: -z, x2: t.pts[i][0], y2: -t.pts[i][1], thin: true,
+            })),
+          ],
+        },
+        side: { w: dep, h: d.height, shapes: [{ k: 'poly', pts: [[-b.maxZ, -hh], [-b.minZ, -hh], [-t.minZ, hh], [-t.maxZ, hh]] }] },
+      };
+    },
+    construction: (d) => {
+      const ptsB = polygonPoints(circumradius(d.bottom, 6), 6, Math.PI / 6);
+      const ptsT = polygonPoints(circumradius(d.top, 6), 6, Math.PI / 6);
+      return [
+        stage('base', 'Base hexagon',
+          'The larger hexagon is constructed inside the bottom face of the box, each corner placed from the top view.',
+          [{ k: 'poly', y: 0, pts: ptsB }]),
+        stage('top', 'Top hexagon',
+          'The smaller hexagon sits at the full height on the SAME vertical axis, centred over the base and turned the same way.',
+          [{ k: 'axisLine', y0: 0, y1: d.height }, { k: 'poly', y: d.height, pts: ptsT }]),
+        stage('edges', 'Join the corners',
+          'Join each base corner to the corner directly above it. Every one of those six lines slopes inward — they are the sloping edges of the original pyramid.',
+          [{ k: 'edges', y0: 0, pts0: ptsB, y1: d.height, pts1: ptsT }]),
       ];
     },
   },

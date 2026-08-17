@@ -40,10 +40,12 @@ import { TERMS, SHEET_SETTINGS, METHODS } from './dimensionSteps.js';
 import { MM_PER_UNIT, FIGURES, DEFAULT_FIGURE, toWorld, HALF_DEPTH } from './dimensionData.js';
 import {
   anatomyDrawing, ELEMENTS, ELEMENT_PARTS, methodDrawing, obliqueClock,
-  leaderDemo, spaceDemo, ARRANGEMENTS, completeDrawing, MISTAKES,
+  leaderDemo, spaceDemo, ARRANGEMENTS, completeDrawing,
 } from './dimensionExamples.js';
 import { RULES, dragDemo, validatePlacement } from './dimensionRules.js';
 import { SYMBOLS } from './dimensionSymbols.js';
+import { REVIEW_FIGURES, reviewFigure } from './reviewFigures.js';
+import { figureSvg } from './reviewFigureSvg.js';
 import { TIMING, VIEWS, staggered, uniform } from './dimensionAnimations.js';
 import { tween, tick as tickTweens, cancelAll as cancelTweens, easeStandard, easeCamera, easeDraw } from './anim.js';
 
@@ -164,7 +166,6 @@ const drawing = {
   /** @type {string|null} */ lineTypeFocus: null,
   /** Scales every VALUE on the sheet without touching the drawing (§4.5 item 4). */
   unitFactor: 1,
-  hotspots: [],
 };
 
 /**
@@ -184,7 +185,7 @@ const drawing = {
  */
 let compareMethod = null;
 
-/** @type {'method'|'layout'|'review'|null} Which comparison is on screen; null when none. */
+/** @type {'method'|'layout'|null} Which comparison is on screen; null when none. */
 let compareKind = null;
 
 /** Step 4 only: which LAYOUT sheet B is showing, so a method change can rename it. */
@@ -251,14 +252,6 @@ let revealTween = null;
 
 /** Step-2 drag state: how far the learner has pulled the value off its legal position (mm). */
 let dragNudge = [0, 0];
-
-/** Step-6 progress: solved faults, innocent dimensions already accused, and the marker most
- *  recently judged (ringed on the drawing so it can be found beside its explanation). */
-const found = new Set();
-const missed = new Set();
-const visited = new Set();
-/** @type {string|null} */
-let lastPicked = null;
 
 let rafId = null;
 let running = false;
@@ -488,7 +481,7 @@ function rebuild() {
 
   layerA = createDimensionLayer({ width, height });
   contentA.add(layerA.group);
-  labelsA = createLabelLayer(contentA, { width, height, onDrag: onValueDrag, onPick: onHotspotPick });
+  labelsA = createLabelLayer(contentA, { width, height, onDrag: onValueDrag });
 
   // Sheet B carries the "before" drawing of a Step-4 / Step-6 comparison. It is built with
   // the sheet so a compare never has to touch geometry outside rebuild().
@@ -623,13 +616,6 @@ function redraw() {
     for (const l of b) l.text = inUnits(l.text);
     labelsB.setLabels(b);
   }
-}
-
-/** Replace the clickable review markers. Kept OUT of redraw(): the markers are real DOM
- *  buttons, and rebuilding them on every animation frame would throw away keyboard focus. */
-function setHotspots(list) {
-  drawing.hotspots = list;
-  labelsA?.setHotspots(list);
 }
 
 /** Where the callout pill sits: the empty band above the live figure, clear of the topmost
@@ -966,7 +952,6 @@ const idsOf = (specs) => specs.map((s) => s.id);
  */
 function showStudy({ revealed = true, animate = false } = {}) {
   setFigure(step1.study === 'leader' || drawing.lineTypeFocus ? 'hole' : 'plate');
-  setHotspots([]);
   setCallout(null);
   drawing.focusElement = null;
   // Every Step-1 study reads against the bare outline: a leader that ends in a DOT points at
@@ -1006,7 +991,6 @@ function showRule(ruleId, variant) {
   // never interfere.
   const dragSpec = { ...dragDemo(), textNudgeMm: dragNudge.slice() };
   drawing.specs = [...set.map((s) => ({ ...s })), dragSpec];
-  setHotspots([]);
   drawing.focusElement = null;
   // Some rules are only legible against the part's own centre lines — "never dimension ON a
   // centre line", and Fig. 4.2's opposite permission that a centre line may BE a projection
@@ -1024,7 +1008,6 @@ function showRule(ruleId, variant) {
 function showMethods() {
   setFigure('chamfer');
   drawing.specs = obliqueOn ? obliqueClock() : methodDrawing();
-  setHotspots([]);
   drawing.focusElement = null;
   // The clock is about the VALUES, so the part steps back behind them.
   setRig({ centreLines: false, dimmed: obliqueOn });
@@ -1073,7 +1056,6 @@ function showArrangement(id, variantId) {
     ? (a.variants.find((v) => v.id === variantId) ?? a.variants[0])
     : null;
   drawing.specs = (variant ?? a).build();
-  setHotspots([]);
   drawing.focusElement = null;
   // The arrangement is the subject; the part steps back behind it.
   setRig({ centreLines: false, dimmed: true });
@@ -1092,7 +1074,6 @@ function showSymbol(id, variantId) {
     : null;
   drawing.specs = variant ? variant.specs.map((s) => ({ ...s })) : [];
   setCallout(sym ? sym.name : null);
-  setHotspots([]);
   drawing.focusElement = null;
   // A circular feature is read against its centre lines.
   setRig({ centreLines: true, dimmed: false });
@@ -1103,75 +1084,91 @@ function showSymbol(id, variantId) {
   }
 }
 
-/** The Step-6 drawing: the complete dimensioning with every un-found fault still in place.
- *
- *  A dimension carrying a seeded fault is PINNED, which takes it out of the annotation layout
- *  pass altogether (dimensionLayout.js) — neither moved nor avoided. The fault is the lesson:
- *  a pass that quietly tidied a badly placed dimension back into line would delete the very
- *  thing the learner is hunting for, and the hotspot would point at nothing. */
-function faultyDrawing() {
-  const byId = new Map(completeDrawing().map((s) => [s.id, { ...s }]));
-  for (const m of MISTAKES) {
-    if (found.has(m.id)) continue;
-    if (m.add) byId.set(m.target, { id: m.target, ...m.wrong, pinned: true });
-    else byId.set(m.target, { ...byId.get(m.target), ...m.wrong, pinned: true });
-  }
-  return [...byId.values()];
-}
-
 /**
- * The twelve review markers, each in one of four states. Twelve is enough that a learner will
- * lose their place without them: an untouched marker looks different from one they have already
- * tried and cleared, from one they wrongly accused, and from one they have solved — and the one
- * just judged is ringed, so the explanation card and the drawing point at each other.
+ * Step 6's 3-D sheet: the Guide Plate, fully and correctly dimensioned.
+ *
+ * It is the only drawing this step has, and it exists for one control — the scale and unit
+ * study inside "The sheet itself". The worked examples are flat SVG on a board over the top
+ * (see `setExamples`), so this is what the viewport shows whenever that board is down.
+ *
+ * There is no faulty variant any more. The twelve seeded faults and the marker hunt they drove
+ * were removed at the lecturers' review of 2026-08-16: the chapter's four wrong/correct pairs
+ * teach the same mistakes by showing them, and a second assessment on top buried the pairs.
  */
-function reviewHotspots() {
-  return MISTAKES.map((m) => {
-    const w = toWorld(m.at[0], m.at[1]);
-    const state = found.has(m.id) ? 'found'
-      : missed.has(m.id) ? 'missed'
-      : visited.has(m.id) ? 'visited'
-      : null;
-    return {
-      id: m.id,
-      label: {
-        found: `${m.title} — solved`,
-        missed: 'You checked this one: it is drawn correctly',
-        visited: 'Already checked — correct',
-      }[state] || 'Check this dimension',
-      position: new THREE.Vector3(w.x, w.y, HALF_DEPTH + 0.8),
-      state,
-      current: m.id === lastPicked,
-    };
-  });
-}
-
-function showReview(view) {
-  // The complete engineering drawing, exactly as the lecturers asked: the review is where the
-  // learner applies everything the simple figures taught them to the part they will be examined
-  // on. Nothing here is new except the number of features at once.
+function showSheet() {
   setFigure('guide');
   compareMethod = null;
-  compareKind = view === 'compare' ? 'review' : null;
+  compareKind = null;
   compareLayoutId = null;
+  compareSpecs = null;
   drawing.focusElement = null;
   setRig({ centreLines: false, dimmed: false });
-
-  if (view === 'compare') {
-    // Sheet B (left) holds the faulty drawing, sheet A (right) the corrected one.
-    drawing.specs = completeDrawing();
-    compareSpecs = faultyDrawing();
-    setHotspots([]);
-    setCompareOffsets(true);
-    setSheetNames('With faults', 'Corrected');
-  } else {
-    compareSpecs = null;
-    setCompareOffsets(false);
-    drawing.specs = view === 'correct' ? completeDrawing() : faultyDrawing();
-    setHotspots(view === 'faults' ? reviewHotspots() : []);
-  }
+  setCompareOffsets(false);
+  drawing.specs = completeDrawing();
   drawing.progress = null;
   redraw();
+}
+
+// ============================================================================
+// Step 6's worked examples — the chapter's own wrong/correct pairs (Figs. 4.28–4.31)
+// ============================================================================
+
+/** Which example is on the board, or null when the 3-D drawing is showing instead. */
+let exampleId = null;
+
+/**
+ * Put one of the chapter's worked examples on the board, or take the board down and give the
+ * viewport back to the 3-D drawing.
+ *
+ * WHY IT IS PAINTED HERE. The board lives inside `#sim-viewport`, and the viewport belongs to
+ * `main.js` — `dimensionUI.js` owns the wizard panel and reaches the scene only through this
+ * controller. The board is flat SVG with no scene object in it, so nothing about it goes near
+ * `rebuild()`; the ONLY thing it shares with the 3-D sheet is the viewport it covers.
+ *
+ * The render loop keeps running underneath. That is deliberate and it is cheap: the board is
+ * opaque, the frames cost one draw of a static scene, and stopping the loop would mean the
+ * camera arrives cold — with a stale `LineMaterial.resolution` after any resize — the moment
+ * the learner switches back.
+ *
+ * @param {string|null} id  a figure id from REVIEW_FIGURES, or null to take the board down
+ */
+function setExamples(id) {
+  const board = document.getElementById('review-sheet');
+  if (!board) return;
+  const fig = id ? reviewFigure(id) : null;
+  exampleId = fig ? fig.id : null;
+  viewport?.classList.toggle('is-examples', !!fig);
+  board.hidden = !fig;
+  // THE LABEL LAYER GOES DOWN WITH IT, and an opaque board is not enough on its own. CSS2D
+  // labels are real DOM, so leaving the layer up paints every one of the Guide Plate's values
+  // over the examples — and any focusable one is left in the tab order behind a panel nobody
+  // can see. Closing "The sheet itself" is the path that would do it.
+  if (labelRenderer) labelRenderer.domElement.style.display = fig ? 'none' : '';
+  if (!fig) { board.innerHTML = ''; return; }
+
+  const li = (items) => items.map((t) => `<li>${t}</li>`).join('');
+  const i = REVIEW_FIGURES.indexOf(fig) + 1;
+  board.innerHTML = `
+    <div class="rf-board__head">
+      <span class="rf-board__name">${fig.name}</span>
+      <span class="rf-board__mode">${fig.arrangement}</span>
+      <span class="rf-board__count">Example ${i} of ${REVIEW_FIGURES.length}</span>
+    </div>
+    <div class="rf-pair">
+      <figure class="rf-cell rf-cell--wrong">
+        <figcaption class="rf-cell__cap"><span class="rf-cell__flag" aria-hidden="true">✗</span>Wrong dimensioning</figcaption>
+        <div class="rf-cell__art">${figureSvg(fig, 'wrong')}</div>
+      </figure>
+      <figure class="rf-cell rf-cell--right">
+        <figcaption class="rf-cell__cap"><span class="rf-cell__flag" aria-hidden="true">✓</span>Correct dimensioning</figcaption>
+        <div class="rf-cell__art">${figureSvg(fig, 'correct')}</div>
+      </figure>
+    </div>
+    <div class="rf-why">
+      <section class="rf-why--wrong"><h3>What is wrong?</h3><ul>${li(fig.faults)}</ul></section>
+      <section class="rf-why--right"><h3>Why the corrected version is better</h3><ul>${li(fig.fixes)}</ul></section>
+    </div>`;
+  board.scrollTop = 0;
 }
 
 // ============================================================================
@@ -1222,7 +1219,7 @@ function setSheetUnits(id) {
 }
 
 // ============================================================================
-// Interaction — dragging a value (Step 2) and picking a fault (Step 6)
+// Interaction — dragging a value (Step 2)
 // ============================================================================
 
 /** Millimetres of drawing per screen pixel, at the current ortho zoom. */
@@ -1268,40 +1265,6 @@ function onValueDrag(id, dxPx, dyPx, phaseName) {
     },
     onComplete: () => { dragNudge = [0, 0]; },
   });
-}
-
-/** A Step-6 marker was clicked. A correct accusation morphs the faulty dimension back into
- *  its BIS-compliant form in front of the learner. */
-function onHotspotPick(id) {
-  const mistake = MISTAKES.find((m) => m.id === id);
-  const correct = !!mistake && !found.has(id);
-  lastPicked = id;
-  if (!correct) { missed.add(id); visited.add(id); }
-  if (correct) {
-    found.add(id);
-    drawing.specs = faultyDrawing();
-    setHotspots(reviewHotspots());
-    // Redraw the one corrected dimension from nothing, so the fix is visible as a change.
-    const target = mistake.add ? null : mistake.target;
-    if (target) {
-      drawing.progress = Object.fromEntries(drawing.specs.map((s) => [s.id, s.id === target ? 0 : 1]));
-      redraw();
-      tween({
-        from: 0, to: 1, duration: TIMING.morph, ease: easeDraw,
-        onUpdate: (t) => {
-          drawing.progress = Object.fromEntries(drawing.specs.map((s) => [s.id, s.id === target ? t : 1]));
-          redraw();
-        },
-        onComplete: () => { drawing.progress = null; redraw(); },
-      });
-    } else {
-      drawing.progress = null;
-      redraw();
-    }
-  } else {
-    setHotspots(reviewHotspots()); // repaint so the wrong accusation shows on the marker
-  }
-  ui?.reportFault([...found], id, correct);
 }
 
 // ============================================================================
@@ -1456,7 +1419,6 @@ window.simAPI = {
     drawing.focusElement = null;
     drawing.lineTypeFocus = null;
     drawing.unitFactor = 1;
-    drawing.hotspots = [];
     drawing.progress = null;
     compareSpecs = null;
     compareMethod = null;
@@ -1477,10 +1439,7 @@ window.simAPI = {
     sheet.units = 'mm';
     sheet.captionOn = false;
     updateCaption();
-    found.clear();
-    missed.clear();
-    visited.clear();
-    lastPicked = null;
+    setExamples(null);
     // A reset puts back the view the sim OPENS on, which is the isometric.
     pose = { az: VIEWS.pictorial.azimuthDeg, el: VIEWS.pictorial.elevationDeg };
     camera.zoom = 1;
@@ -1637,7 +1596,12 @@ const simController = {
 
   setView(name) { setView(name); },
 
-  setReviewView(view) { showReview(view); },
+  /** Step 6 — take the examples board down and give the viewport back to the finished sheet.
+   *  Called when "The sheet itself" opens, so the scale and unit study has something to act on. */
+  setSheetView() { setExamples(null); showSheet(); },
+
+  /** Step 6 — put one of the chapter's worked examples up, or `null` for the 3-D drawing. */
+  setExamples(id) { setExamples(id); },
 
   /** The wizard has moved to step `n`: hand it its drawing. */
   enterStep(n) {
@@ -1647,6 +1611,8 @@ const simController = {
     compareLayoutId = null;
     setCompareOffsets(false);
     setCallout(null);
+    // The worked examples belong to Step 6 alone; leaving it always gives the viewport back.
+    if (n !== 6) setExamples(null);
     // The caption band belongs to the finished sheet, which is what Step 6 is about.
     sheet.captionOn = n === 6;
     updateCaption();
@@ -1663,14 +1629,16 @@ const simController = {
       case 3: showMethods(); break;
       case 4: /* painted by the wizard's own setArrangement call */ break;
       case 5: showSymbol(null); break;
-      case 6: /* painted by the wizard's own setReviewView call */ break;
+      // Step 6 opens on the worked examples, and the board covers the viewport — but the sheet
+      // has to be UNDER it, ready for the moment "The sheet itself" is opened.
+      case 6: showSheet(); break;
       default: break;
     }
   },
 
   completeLesson() {
-    showToast('Every fault found — the drawing reads correctly now.');
-    announce('Lesson complete. Every fault has been found and corrected.');
+    showToast('All four worked examples read. That is the lesson.');
+    announce('Lesson complete. You have read all four worked examples.');
   },
 
   reset() { window.simAPI.reset(); },

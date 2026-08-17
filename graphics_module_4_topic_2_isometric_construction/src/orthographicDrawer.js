@@ -62,8 +62,16 @@ function el(name, attrs = {}) {
  * THE one switch over 2D primitive kinds (`rect` / `circle` / `poly` / `line` / `arc`).
  * `pathLength="1"` on every stroked node lets one CSS rule draw ANY shape on, whatever its real
  * perimeter — no per-shape dash length to keep in sync.
+ *
+ * A primitive may carry its own `cx` / `cy` offset from the view's centre, in the same millimetres
+ * and the same "+y is up" convention the primitives themselves are authored in. A single solid
+ * declares neither and lands exactly on the view centre, as before; a COMBINATION uses them to
+ * place each component's outline at the height that component sits at, so the composed view is
+ * still one drawing rather than several stacked pictures.
  */
-function renderPrimitive(gr, prim, cx, cy) {
+function renderPrimitive(gr, prim, viewCx, viewCy) {
+  const cx = viewCx + (prim.cx ?? 0);
+  const cy = viewCy - (prim.cy ?? 0);   // view y is up, SVG y runs down
   const cls = prim.thin ? 'osheet__edge osheet__edge--thin' : 'osheet__edge';
   switch (prim.k) {
     case 'rect':

@@ -1,24 +1,23 @@
 // CSS2D label layer (Module 1 Topic 1.1 — Dimensioning).
 //
 // Everything on the drawing that is TEXT rather than linework lives here: the dimensional
-// values, the Ø / R / Sø / SR / □ prefixed notes, the co-ordinate point numbers, and the
-// clickable review hotspots of Step 6. `dimensionDraw.js` computes each anchor from the
-// same geometry it strokes and hands the descriptors over through main.js, so the value
-// can never drift off the line it belongs to.
+// values, the Ø / R / Sø / SR / □ prefixed notes and the co-ordinate point numbers.
+// `dimensionDraw.js` computes each anchor from the same geometry it strokes and hands the
+// descriptors over through main.js, so the value can never drift off the line it belongs to.
 //
 // WHY CSS2D (RULES.md §3.27): a CSS2DObject is a real DOM node parked at a 3-D point —
 // vector-sharp at any DPR, themed from the same tokens as the chrome, focusable and
 // readable by assistive tech. That matters more here than anywhere else in the platform:
-// the dimensional VALUE is the payload of the whole topic, and in Steps 2 and 6 it has to
-// be draggable and clickable, which baked text could never be.
+// the dimensional VALUE is the payload of the whole topic, and in Step 2 it has to be
+// draggable, which baked text could never be.
 //
 // TEXT ORIENTATION. CSS2DRenderer owns each object's OUTER element transform (it positions
 // the node in screen space), so any rotation — BIS Method-1 turns the value to lie along
 // its dimension line — must live on an INNER span. Method-2 leaves every value horizontal.
 //
 // Layering (ADR-007 / RULES.md §3.6): leaf module. Imports THREE + CSS2DObject only, and
-// reports drags/clicks back through callbacks — it never converts screen pixels to world
-// units itself, because the camera belongs to main.js.
+// reports drags back through a callback — it never converts screen pixels to world units
+// itself, because the camera belongs to main.js.
 //
 // DISPOSAL (RULES.md §3.5): every CSS2DObject's DOM node is pulled out of the document in
 // clear()/dispose(); they accumulate fast otherwise.
@@ -51,11 +50,9 @@ import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
  * @param {THREE.Scene} scene Labels are added here; CSS2DRenderer walks the same graph.
  * @param {Object} [options]
  * @param {(id: string, dxPx: number, dyPx: number, phase: 'start'|'move'|'end') => void} [options.onDrag]
- * @param {(id: string) => void} [options.onPick]
  * @returns {{
  *   group: THREE.Group,
  *   setLabels: (list: LabelDescriptor[]) => void,
- *   setHotspots: (list: { id: string, label: string, position: THREE.Vector3, state?: string }[]) => void,
  *   setCallout: (descriptor: CalloutDescriptor|null) => void,
  *   setSheetCaption: (descriptor: (CalloutDescriptor & { sub?: string })|null) => void,
  *   setFocus: (ids: Set<string>|null) => void,
@@ -66,7 +63,7 @@ import { CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
  * }}
  */
 export function createLabelLayer(scene, options = {}) {
-  const { onDrag, onPick } = options;
+  const { onDrag } = options;
   const resolution = new THREE.Vector2(options.width || 1, options.height || 1);
 
   const group = new THREE.Group();
@@ -75,8 +72,6 @@ export function createLabelLayer(scene, options = {}) {
 
   /** @type {{ obj: CSS2DObject, el: HTMLElement, id: string }[]} */
   let values = [];
-  /** @type {{ obj: CSS2DObject, el: HTMLElement, id: string }[]} */
-  let hotspots = [];
   /** The single viewport callout naming whatever the step is currently pointing at. */
   /** @type {{ obj: CSS2DObject, el: HTMLElement }|null} */
   let callout = null;
@@ -95,7 +90,7 @@ export function createLabelLayer(scene, options = {}) {
   /** Apply the current focus set: focused nodes stay full strength, the rest fade back.
    *  Opacity + weight, never a hue change — the Two-Cue Rule holds without new colour. */
   function applyFocus() {
-    for (const { el, id } of [...values, ...hotspots]) {
+    for (const { el, id } of values) {
       const off = focus && !focus.has(id);
       el.classList.toggle('is-faded', !!off);
     }
@@ -186,38 +181,6 @@ export function createLabelLayer(scene, options = {}) {
     },
 
     /**
-     * Replace the clickable review hotspots (Step 6). Real <button>s, so the mistake hunt
-     * is keyboard-playable and screen-reader announced — never a bare raycast target.
-     */
-    setHotspots(list) {
-      for (const entry of hotspots) removeObject(entry);
-      hotspots = [];
-      for (const h of list) {
-        const el = document.createElement('button');
-        el.type = 'button';
-        el.className = 'vp-hotspot';
-        if (h.state) el.classList.add(`is-${h.state}`);
-        // The marker just judged is ringed, so the drawing and the explanation card point at
-        // each other across twelve near-identical discs.
-        if (h.current) el.classList.add('is-current');
-        el.setAttribute('aria-label', h.label);
-        el.title = h.label;
-        // Glyph as well as colour, so the four states never rely on hue alone (Two-Cue Rule).
-        el.textContent = h.state === 'found' ? '✓' : h.state === 'missed' ? '✗' : '?';
-        el.style.pointerEvents = 'auto';
-        el.addEventListener('click', (e) => { e.stopPropagation(); onPick?.(h.id); });
-        el.addEventListener('pointerdown', (e) => e.stopPropagation());
-
-        const obj = new CSS2DObject(el);
-        obj.position.copy(h.position);
-        obj.center.set(0.5, 0.5);
-        group.add(obj);
-        hotspots.push({ obj, el, id: h.id });
-      }
-      applyFocus();
-    },
-
-    /**
      * Name the thing the step is currently pointing at, ON the drawing (the `.vp-callout`
      * pill of the sibling Foundations topic). Pass null to take it off.
      *
@@ -284,11 +247,10 @@ export function createLabelLayer(scene, options = {}) {
     setResolution(w, h) { resolution.set(w, h); },
 
     clear() {
-      for (const entry of [...values, ...hotspots]) removeObject(entry);
+      for (const entry of values) removeObject(entry);
       if (caption) { removeObject(caption); caption = null; }
       if (callout) removeObject(callout);
       values = [];
-      hotspots = [];
       callout = null;
     },
 

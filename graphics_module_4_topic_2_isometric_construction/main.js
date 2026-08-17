@@ -26,7 +26,15 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { CSS2DRenderer } from 'three/addons/renderers/CSS2DRenderer.js';
 
 import { SOLIDS, getSolid, defaultDims, toWorld, ISOMETRIC_SCALE, resolveDims } from './src/shapeData.js';
-import { buildShape, topHalfExtent } from './src/shapeFactory.js';
+import {
+  buildCombination, defaultCombination, defaultCombinationDims, MIN_PARTS, MAX_PARTS,
+} from './src/combinationBuilder.js';
+import { DEFAULT_PROBLEM_ID } from './src/problemLibrary.js';
+import {
+  resolveProblem, problemSubject, problemDims, initialFormMode,
+} from './src/problemBuilder.js';
+import { checkProblem } from './src/problemCheck.js';
+import { buildShape } from './src/shapeFactory.js';
 import { buildConstruction } from './src/constructionEngine.js';
 import { buildDimensions } from './src/dimensionLayer.js';
 import { initOrthoSheet } from './src/orthographicDrawer.js';
@@ -77,7 +85,21 @@ let transfers;             // Phase B's view → axis dimension carrier
 
 /** Learner-owned state. Everything visible is derived from this and the current step. */
 const state = {
+  /**
+   * What the learner is constructing: one solid, a COMBINATION of them (§16.8), or a textbook
+   * PROBLEM from the library.
+   *
+   * All three are source configuration — the composed subject, its bounds and its geometry are all
+   * derived from it on demand and none of them is ever stored (RULES.md §3.35's rule, applied to the
+   * subject rather than to the dimensions). A problem is not a fourth kind of thing: it resolves to
+   * one of the first two (`problemBuilder.js`).
+   */
+  mode: 'single',
   solidId: SOLIDS[0].id,
+  /** The combination, ordered BOTTOM FIRST. Only read while `mode === 'combination'`. */
+  combo: defaultCombination(),
+  /** The library problem. Only read while `mode === 'problem'`. */
+  problemId: DEFAULT_PROBLEM_ID,
   dims: defaultDims(SOLIDS[0]),
   /**
    * Dimensions the learner has declared UNKNOWN, key → true. A problem that gives only a base
@@ -94,12 +116,119 @@ const state = {
 };
 
 /**
+ * THE SUBJECT the whole sim is describing — one solid from the registry, or the synthetic solid a
+ * combination composes to (`combinationBuilder.js`).
+ *
+ * Both satisfy the SAME contract `shapeData.js` documents, which is the whole of what makes
+ * combination support an extension rather than a second pipeline: every consumer below this line
+ * asks for a solid and gets one, and none of them learns which kind it was.
+ *
+ * Cached on the configuration that produces it, because a subject is asked for several times per
+ * rebuild and a combination composes closures each time it is built.
+ */
+let subjectCache = { key: null, solid: null };
+
+function currentSolid() {
+  const key = { combination: `c:${state.combo.map((p) => p.solidId).join('+')}`, problem: `p:${state.problemId}` }[state.mode]
+    ?? `s:${state.solidId}`;
+  if (subjectCache.key !== key) {
+    const solid = {
+      combination: () => buildCombination(state.combo),
+      // A problem resolves to a solid or to a combination — never to a third kind of subject.
+      problem: () => problemSubject(currentProblem()),
+    }[state.mode]?.() ?? getSolid(state.solidId);
+    subjectCache = { key, solid };
+  }
+  return subjectCache.solid;
+}
+
+/** The library problem on screen, or `null` when the learner is in free practice. */
+function currentProblem() {
+  return state.mode === 'problem' ? resolveProblem(state.problemId) : null;
+}
+
+/** Which free-practice mode to return to when a problem is closed. */
+let freeMode = 'single';
+
+// ============================================================================
+// The live problem check.
+//
+// The learner's work is judged by Topic 3's validator, unchanged (`answerValidator.js`), against
+// Topic 2's live state adapted into the shape it reads (`problemCheck.js`). It runs on the STATE
+// CHANGES it depends on and nowhere else — no polling, no per-frame work, no geometry rebuilt to
+// check anything. The whole check is a pure computation over numbers this module already has.
+//
+// PROGRESS is the one thing the check needs that the drawing does not: which phases have been
+// worked, and which construction stages have actually been drawn. Both are recorded as they happen
+// and cleared when the subject changes, because they describe THIS attempt at THIS problem.
+// ============================================================================
+
+/** Phases reached, in the order they were reached. `checkConstructionOrder` reads the order. */
+let phasesDone = [];
+/** Construction stage ids actually drawn (Phase C reveals them one at a time). */
+let stagesDone = new Set();
+
+function resetProgress() {
+  phasesDone = [];
+  stagesDone = new Set();
+}
+
+/** Re-run the check and hand the result to the dock. Cheap, pure, and safe to call often. */
+function runProblemCheck() {
+  const problem = currentProblem();
+  if (!problem) { ui?.renderCheck?.(null); return; }
+  const result = checkProblem(problem, currentSolid(), currentDims(), state.formMode, {
+    phasesDone,
+    stagesDone: [...stagesDone],
+  });
+  ui?.renderCheck?.(result);
+}
+
+/** Is a library problem on screen? The one test every free-practice control is guarded by. */
+function problemLoaded() { return state.mode === 'problem'; }
+
+/** Drop the cached subject. Called whenever the configuration that produced it changes. */
+function invalidateSubject() { subjectCache = { key: null, solid: null }; }
+
+/**
  * The dimension set the GEOMETRY is built from: the learner's numbers, with any dimension they left
  * unspecified filled in by its own demonstration value. Everything that touches geometry asks
  * through here, so no consumer has to know a value was withheld.
  */
 function currentDims() {
-  return resolveDims(getSolid(state.solidId), state.dims, state.unspecified);
+  return resolveDims(currentSolid(), state.dims, state.unspecified);
+}
+
+/**
+ * Re-key the dimension set onto whatever the subject now is, keeping every value the new subject
+ * still has a field for.
+ *
+ * A combination's keys are namespaced per component (`p0_edge`), so they never collide with a single
+ * solid's — which means switching mode back and forth keeps BOTH sets of numbers, and changing one
+ * component of a combination leaves the others exactly as the learner set them.
+ */
+function reconcileDims() {
+  const solid = currentSolid();
+  // A PROBLEM states its own sizes, and those stated sizes ARE the given data — so they replace the
+  // set outright rather than inheriting whatever the learner last dialled. Reading them is the
+  // second step of the solve, not the sim filling an answer in (RULES.md §6.2's distinction).
+  if (state.mode === 'problem') {
+    state.dims = problemDims(currentProblem());
+    state.unspecified = {};
+    return;
+  }
+  const next = state.mode === 'combination'
+    ? defaultCombinationDims(state.combo)
+    : defaultDims(solid);
+  for (const f of solid.dims) {
+    if (state.dims[f.key] != null) next[f.key] = state.dims[f.key];
+  }
+  state.dims = next;
+  // A withheld dimension belongs to a field; drop the flag when the field goes.
+  const keys = new Set(solid.dims.map((f) => f.key));
+  for (const key of Object.keys(state.unspecified)) {
+    if (!keys.has(key)) delete state.unspecified[key];
+  }
 }
 
 let rafId = null;
@@ -414,11 +543,14 @@ function contentFocus() {
 function rebuild() {
   disposeScene();
 
-  const solid = getSolid(state.solidId);
+  const solid = currentSolid();
   const res = resolution();
   const dims = currentDims();
 
-  shape = buildShape(solid.body(dims), res);
+  shape = buildShape(solid.body(dims), res, {
+    trueSize: Boolean(solid.trueDiameterInProjection),
+    height: solid.bounds(dims).height,
+  });
   shapeGroup.add(shape.group);
 
   construction = buildConstruction({ solid, dims, resolution: res });
@@ -432,6 +564,8 @@ function rebuild() {
   cameraRig.focusOn(focus.center, focus.radius);
 
   notifyStateChange();
+  // Dimensions or the subject just changed — the two things a size check is about.
+  runProblemCheck();
 }
 
 // ============================================================================
@@ -466,23 +600,43 @@ function hideAxes({ animate = false } = {}) {
   });
 }
 
-/** Phase B: grow the enclosing box out along those axes. */
+/**
+ * Phase B: grow the enclosing box out along those axes.
+ *
+ * A combination gets ONE BOX PER COMPONENT, each standing on the finished top face of the one below,
+ * and they arrive BOTTOM UP — which is how the drawing is really blocked out. A single solid has
+ * exactly one box and no stagger, so its timing is unchanged.
+ */
+const BOX_STAGGER = 320;
+
 function showBox({ animate = true, opacity = 1 } = {}) {
-  construction.box.line.visible = true;
-  growGroup(construction.box.group, 1, animate ? 700 : 0);
-  fadeMaterial(construction.box.material, construction.box.line, opacity, animate ? 700 : 0);
+  const many = construction.boxes.length > 1;
+  construction.boxes.forEach((box, i) => {
+    const run = () => {
+      box.line.visible = true;
+      growGroup(box.group, 1, animate ? 700 : 0);
+      fadeMaterial(box.material, box.line, opacity, animate ? 700 : 0);
+    };
+    const delay = animate && many && !prefersReducedMotion ? i * BOX_STAGGER : 0;
+    if (delay) sequencerBeats.push(setTimeout(run, delay));
+    else run();
+  });
 }
 
 function hideBox({ animate = false } = {}) {
-  fadeMaterial(construction.box.material, construction.box.line, 0, animate ? 380 : 0);
-  if (!animate) construction.box.group.scale.setScalar(0.0001);
-  else growGroup(construction.box.group, 0.0001, 380);
+  for (const box of construction.boxes) {
+    fadeMaterial(box.material, box.line, 0, animate ? 380 : 0);
+    if (!animate) box.group.scale.setScalar(0.0001);
+    else growGroup(box.group, 0.0001, 380);
+  }
 }
 
 /** Phase C: reveal the per-solid construction stages in the order the data lists them. */
 function showStage(index, { animate = true } = {}) {
   const st = construction.stages[index];
   if (!st) return;
+  stagesDone.add(st.id);
+  runProblemCheck();
   st.materials.forEach((m, i) => {
     const obj = st.objects[i];
     fadeMaterial(m, obj, 1, animate ? 520 : 0);
@@ -581,15 +735,16 @@ function ndcHeight(x, y, z) {
 
 function updateFigureTitles() {
   if (!construction || !labels || !shape) return;
-  const scale = shape.group.scale.x;
-  const b = construction.bounds;
-  const topY = toWorld(b.height) * scale;
 
-  // The spread of the solid AT ITS TOP, not of its enclosing box — a sphere's highest point is its
-  // pole, directly over the centre, so it needs no clearance at all while a cuboid does.
-  const top = topHalfExtent(getSolid(state.solidId).body(currentDims()));
-  const hw = top.hw * scale;
-  const hd = top.hd * scale;
+  // The DRAWN top of the figure, and how far it still spreads there — not the enclosing box's
+  // half-width. A sphere's highest point is its pole, directly over the centre, so it needs no
+  // clearance at all while a cuboid does; and for a COMBINATION the answer is whatever the topmost
+  // component throws, at the height the stack actually puts it. The shape rig owns both, because it
+  // is the only thing that knows the live per-component scales.
+  const top = shape.drawnTop();
+  const topY = top.y;
+  const hw = top.hw;
+  const hd = top.hd;
 
   // Measure, don't model. An earlier version resolved the corner offsets against the camera's up
   // axis, which is only right for a parallel projection — under perspective the FAR top corner is
@@ -717,6 +872,9 @@ let phaseStageEl = null;
 
 function markPhase(id) {
   state.phase = id;
+  // Reaching a phase is progress the check reads (order, and how much is drawn).
+  if (id && phasesDone[phasesDone.length - 1] !== id) phasesDone.push(id);
+  runProblemCheck();
   document.querySelectorAll('#phase-strip .flow-strip__node').forEach((btn) => {
     if (btn.dataset.phase === id) btn.setAttribute('aria-current', 'step');
     else btn.removeAttribute('aria-current');
@@ -925,21 +1083,21 @@ function enterFormComparison() {
  */
 function applyFormMode(mode, { animate = true } = {}) {
   state.formMode = FORM_SCALE[mode] ? mode : 'view';
-  const solid = getSolid(state.solidId);
-  const scale = formScaleFor(solid, state.formMode);
-  const b = construction.bounds;
-  const h = toWorld(b.height);
-  const hw = toWorld(b.width) / 2;
-  const hd = toWorld(b.depth) / 2;
+  runProblemCheck();   // which form is drawn is one of the things the question fixes
+  // The ISOMETRIC SCALE for the form, handed whole to the shape rig. The rig applies it per
+  // component — reduced size for anything with an axial length, reduced SEATING HEIGHT for
+  // everything including the parts drawn at true size. That pair is the sphere rule, and expressing
+  // it once here is what keeps it true of a sphere standing alone and of a sphere on a slab.
+  const axial = FORM_SCALE[state.formMode] ?? 1;
 
   if (shape) {
-    const from = shape.group.scale.x;
+    const from = shape.formScale();
     if (animate && !prefersReducedMotion) {
-      animateValue(shape.group, from, scale, 620, (v) => shape.group.scale.setScalar(v));
+      animateValue('formScale', from, axial, 620, (v) => shape.setFormScale(v));
     } else {
-      liveTweens.get(shape.group)?.cancel();
-      liveTweens.delete(shape.group);
-      shape.group.scale.setScalar(scale);
+      liveTweens.get('formScale')?.cancel();
+      liveTweens.delete('formScale');
+      shape.setFormScale(axial);
     }
   }
 
@@ -947,7 +1105,7 @@ function applyFormMode(mode, { animate = true } = {}) {
   // against the live camera every frame, which is what keeps the clearance identical whichever form
   // is on screen and however the learner has orbited.
   labels.make('formTitle', FORM_TITLE[state.formMode], 'vp-label--title',
-    labels.placeFigureTitle(h * scale));
+    labels.placeFigureTitle(shape ? shape.drawnTop().y : toWorld(construction.bounds.height)));
   labels.set('formTitle', true, { animate });
 
   syncFormChrome();
@@ -964,7 +1122,7 @@ function syncFormChrome() {
   document.querySelectorAll('.form-card').forEach((card) => {
     card.classList.toggle('is-active', card.dataset.form === mode);
   });
-  const solid = getSolid(state.solidId);
+  const solid = currentSolid();
   const exempt = Boolean(solid.trueDiameterInProjection);
   const head = document.getElementById('form-drawn-head');
   if (head) {
@@ -1010,20 +1168,29 @@ function renderSolidFormNote(solid) {
  * it, so the table can never disagree with the drawing.
  */
 function renderFormRows() {
-  const solid = getSolid(state.solidId);
+  const solid = currentSolid();
   const host = document.getElementById('form-table');
   if (!host) return;
   const dims = currentDims();
-  const scale = formScaleFor(solid, state.formMode);
+  const axial = FORM_SCALE[state.formMode] ?? 1;
+  // A field belonging to a component drawn at TRUE size is not reduced, whatever the rest of the
+  // drawing does. For a single solid that is the solid's own flag and the column is uniform, exactly
+  // as before; for a combination it is per component, which is what makes a sphere on a reduced slab
+  // readable as the two facts it is.
+  const solidTrue = Boolean(solid.trueDiameterInProjection);
   host.innerHTML = '';
   for (const spec of solid.dims) {
     const trueLen = dims[spec.key];
+    const scale = (spec.trueSize ?? solidTrue) ? 1 : axial;
     const row = document.createElement('div');
     row.className = 'form-row';
 
     const name = document.createElement('span');
     name.className = 'form-row__name';
-    name.textContent = `${spec.symbol} · ${spec.label}`;
+    // Inside a combination the same symbol can appear twice, so the component names the row.
+    name.textContent = spec.part
+      ? `${spec.symbol} · ${spec.part} ${spec.label.toLowerCase()}`
+      : `${spec.symbol} · ${spec.label}`;
 
     const trueVal = document.createElement('span');
     trueVal.className = 'form-row__value';
@@ -1043,7 +1210,7 @@ function setFormMode(mode) {
   if (mode === state.formMode) return;
   applyFormMode(mode, { animate: true });
 
-  const solid = getSolid(state.solidId);
+  const solid = currentSolid();
   if (solid.trueDiameterInProjection) {
     // Saying "reduced to 0.816" here would be false, and the learner can see it is false — the
     // drawing did not move. Name the exception instead.
@@ -1138,7 +1305,7 @@ function playSummary(from = 'views') {
   if (startIndex <= 3) {
     beats.push({ at: at('shape'), run: () => {
       markChain('shape');
-      fadeMaterial(construction.box.material, construction.box.line, 0.55, 320);
+      for (const box of construction.boxes) fadeMaterial(box.material, box.line, 0.55, 320);
       construction.stages.forEach((_, i) => {
         sequencerBeats.push(setTimeout(() => showStage(i), prefersReducedMotion ? 0 : i * 520));
       });
@@ -1182,9 +1349,9 @@ function resetSceneLayers() {
   // Step 5 leaves the solid scaled to whichever form was on screen. Every other step draws it at
   // true size, so the scale is part of what a step change resets.
   if (shape) {
-    liveTweens.get(shape.group)?.cancel();
-    liveTweens.delete(shape.group);
-    shape.group.scale.setScalar(1);
+    liveTweens.get('formScale')?.cancel();
+    liveTweens.delete('formScale');
+    shape.setFormScale(1);
   }
   labels.remove('formTitle');
   const closing = document.getElementById('summary-closing');
@@ -1233,7 +1400,7 @@ function selectView(key) {
   orthoSheet.highlight(key);
   highlightFace(key);
   cameraRig.flyTo(cameraRig.pose(key), { duration: 1400 });
-  const solid = getSolid(state.solidId);
+  const solid = currentSolid();
   const words = {
     front: `Front view — the ${solid.name} seen straight from the front, projected on the VP.`,
     top: `Top view — the ${solid.name} seen from directly above, projected on the HP.`,
@@ -1256,7 +1423,7 @@ function enterStep(n) {
       showFinishedSolid({ animate: false });
       labels.set('title', true, { animate: true });
       cameraRig.flyTo(cameraRig.pose('threeQuarter'), { duration: 1100 });
-      announce(`${getSolid(state.solidId).name} selected. Drag to rotate it.`);
+      announce(`${currentSolid().name} selected. Drag to rotate it.`);
       break;
 
     case 2: // Set dimensions — the same solid, now with its overall sizes named.
@@ -1553,7 +1720,14 @@ window.simAPI = {
     isoAngles?.set(false);
     clearFlowNote();
 
+    state.mode = 'single';       // reset returns to the single-solid teaching state
     state.solidId = SOLIDS[0].id;
+    state.combo = defaultCombination();
+    state.problemId = DEFAULT_PROBLEM_ID;
+    freeMode = 'single';
+    resetProgress();
+    ui.closeBrowser?.();     // the browser is a selector over the sim; a reset closes it
+    invalidateSubject();
     state.dims = defaultDims(SOLIDS[0]);
     state.unspecified = {};      // every dimension specified again — the default teaching state
     state.phase = null;
@@ -1578,17 +1752,141 @@ const simController = {
   announce,
   flowNote,
 
+  /** The active subject, for the dock. Derived on demand — never stored (RULES.md §3.35's rule). */
+  subject: currentSolid,
+
+  /** The library problem on screen, or null in free practice. Derived on demand, like the subject. */
+  problem: currentProblem,
+
   /** Step 1: choosing a solid replaces the whole geometry set, so it goes through rebuild(). */
   setSolid(id) {
-    if (id === state.solidId) return;
+    // While a problem is loaded the QUESTION names the solid, and Step 1's controls are locked to
+    // say so. The guard is here as well as in the dock because a control that is merely disabled can
+    // still be driven programmatically, and half-applying a subject change — new dimension keys
+    // against the old subject — is what produces geometry built from undefined numbers.
+    if (problemLoaded()) return;
+    if (id === state.solidId && state.mode === 'single') return;
     const solid = getSolid(id);
     state.solidId = solid.id;
+    invalidateSubject();
     state.dims = defaultDims(solid);
     state.unspecified = {};   // a new solid brings its own fields; none of them start withheld
     rebuild();
     ui.render(state);
     enterStep(stepper?.step() ?? 1);
     announce(`${solid.name} selected. ${solid.blurb}`);
+  },
+
+  // ==========================================================================
+  // Step 1 — combination of solids (§16.8).
+  //
+  // Every one of these is a SUBJECT change, so every one goes through the same single `rebuild()`
+  // the solid picker goes through. None of them touches the scene, and none of them knows what a
+  // combination is beyond "an ordered list of solid ids".
+  // ==========================================================================
+
+  /** Switch between constructing one solid and constructing a combination of them. */
+  setMode(mode) {
+    if (problemLoaded()) return;   // the question fixes the subject; Step 1 is locked to say so
+    const next = mode === 'combination' ? 'combination' : 'single';
+    if (next === state.mode) return;
+    state.mode = next;
+    invalidateSubject();
+    // Combination keys are namespaced per component, so they never collide with a single solid's —
+    // which means both sets of numbers survive a switch and switching back finds them intact.
+    reconcileDims();
+    rebuild();
+    ui.render(state);
+    enterStep(stepper?.step() ?? 1);
+    const solid = currentSolid();
+    announce(next === 'combination'
+      ? `Combination of solids. ${solid.name}. Choose the solids that make it up, from the base upward.`
+      : `Single solid. ${solid.name} selected.`);
+  },
+
+  /**
+   * Load a problem from the library (Practice Problems).
+   *
+   * A problem is a SUBJECT change like choosing a solid, so it takes the identical path — one
+   * `rebuild()`, one dock render, one re-entry into the step the learner is standing on. Nothing
+   * about the six steps, the four phases or the construction pipeline knows this happened.
+   */
+  setProblem(id) {
+    const problem = resolveProblem(id);
+    resetProgress();   // a new problem is a new attempt: its own phases, its own stages
+    if (state.mode === 'problem' && problem.id === state.problemId) return;
+    // Where free practice was left, so leaving the problem puts the learner back where they were.
+    if (state.mode !== 'problem') freeMode = state.mode;
+    state.problemId = problem.id;
+    state.mode = 'problem';
+    invalidateSubject();
+    reconcileDims();
+    // The question decides which of the two forms Step 5 opens in; the toggle stays live.
+    state.formMode = initialFormMode(problem);
+    rebuild();
+    ui.render(state);
+    enterStep(stepper?.step() ?? 1);
+    announce(`${problem.title}. ${problem.question}`);
+  },
+
+  /** Leave the problem and go back to free practice, where the learner left it. */
+  exitProblem() {
+    if (state.mode !== 'problem') return;
+    resetProgress();
+    state.mode = freeMode;
+    invalidateSubject();
+    reconcileDims();
+    state.formMode = 'view';   // free practice starts at true lengths, as it always has
+    rebuild();
+    ui.render(state);
+    enterStep(stepper?.step() ?? 1);
+    announce(`Problem closed. ${currentSolid().name}.`);
+  },
+
+  /** Change which solid sits at one position in the stack. */
+  setComboPart(index, id) {
+    if (problemLoaded()) return;
+    const part = state.combo[index];
+    if (!part || part.solidId === id) return;
+    state.combo = state.combo.map((p, i) => (i === index ? { solidId: getSolid(id).id } : p));
+    invalidateSubject();
+    reconcileDims();
+    rebuild();
+    ui.render(state);
+    enterStep(stepper?.step() ?? 1);
+    announce(`${getSolid(id).name} placed. ${currentSolid().name}.`);
+  },
+
+  /** Seat one more solid on top of the stack. */
+  addComboPart() {
+    if (problemLoaded()) return;
+    if (state.combo.length >= MAX_PARTS) return;
+    // Default to something that reads clearly ON something else rather than to the first entry in
+    // the registry, so the first press produces a drawing worth looking at.
+    const used = new Set(state.combo.map((p) => p.solidId));
+    const preferred = ['cone', 'sphere', 'hemisphere', 'square-pyramid', 'cylinder']
+      .find((id) => !used.has(id)) ?? SOLIDS[0].id;
+    state.combo = [...state.combo, { solidId: preferred }];
+    invalidateSubject();
+    reconcileDims();
+    rebuild();
+    ui.render(state);
+    enterStep(stepper?.step() ?? 1);
+    announce(`${getSolid(preferred).name} added on top. ${currentSolid().name}.`);
+  },
+
+  /** Take one solid back off. The base stays: a combination needs something to stand on. */
+  removeComboPart(index) {
+    if (problemLoaded()) return;
+    if (index <= 0 || state.combo.length <= MIN_PARTS) return;
+    const gone = getSolid(state.combo[index].solidId).name;
+    state.combo = state.combo.filter((_, i) => i !== index);
+    invalidateSubject();
+    reconcileDims();
+    rebuild();
+    ui.render(state);
+    enterStep(stepper?.step() ?? 1);
+    announce(`${gone} removed. ${currentSolid().name}.`);
   },
 
   /** Step 2: a dimension edit is still a geometry change, so it also goes through rebuild() — the
@@ -1610,7 +1908,7 @@ const simController = {
    * dimension has no slider to drag.
    */
   setDimSpecified(key, on) {
-    const solid = getSolid(state.solidId);
+    const solid = currentSolid();
     const spec = solid.dims.find((f) => f.key === key);
     if (!spec?.optional) return;
     const unspecified = !on;
