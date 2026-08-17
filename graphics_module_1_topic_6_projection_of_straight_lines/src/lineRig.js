@@ -64,11 +64,15 @@ const LW = { bold: 3.0, view: 2.0, projector: 1.4 };
 // endpoint coordinates; the manager creates, positions, and parents every label. No label offset,
 // class, or position math lives in this file.
 
-// The "cage" reference grid — the platform drafting grid, reproduced EXACTLY from the Points
-// reference (graphics_module_1_topic_3_points/src/hvPlanes.js): thin native LineSegments, the
-// plane hue faded `fade` toward paper, at `divs` divisions across the sheet, under every stroke
-// (renderOrder −1). This is the drafting/grid background DESIGN.md's "reference grids" call for.
-const GRID = { opacity: 0.55, fade: 0.60, divs: 44 };
+// The reference grid — thin native LineSegments in the neutral `--color-border` token at
+// `divs` divisions across the sheet, under every stroke (renderOrder −1). Matches Module 2's
+// GridHelper weight (DESIGN.md §2.1: `--color-bench-grey`/`--color-border` is the documented
+// token for "reference grids"; opacity 0.35 mirrors Module 2's hpGrid/vpGrid materials).
+// Deliberately DIFFERENT from the Points reference (graphics_module_1_topic_3_points/src/hvPlanes.js),
+// which paints a plane-hued "cage" at opacity 0.55 — that pattern predates DESIGN.md §2.1 and was
+// never itself a design decision (see the ADR in DECISIONS.md). Do not "fix" this back to match
+// Points; each plane's hue still reads via its fat-line perimeter border below, untouched.
+const GRID = { opacity: 0.35, divs: 44 };
 const GRID_CELL = SHEET / GRID.divs;
 
 const rootStyle = () => getComputedStyle(document.documentElement);
@@ -153,9 +157,8 @@ export function createLineRig({ resolved, view, foldAngle = 0, width = 1, height
     mesh.renderOrder = -2; // under the grid (−1) and all strokes (matches Points hvPlanes)
     parent.add(mesh);
 
-    // The cage reference grid (platform drafting grid — Points hvPlanes.js `calmGrid`): thin
-    // native lines, plane hue faded toward paper, placed on the plane in its local frame then
-    // rotated by `euler`, drawn under the strokes.
+    // The reference grid: thin native lines in the neutral border token, placed on the plane
+    // in its local frame then rotated by `euler`, drawn under the strokes.
     const hw = w / 2, hv = h / 2;
     const stepsU = Math.round(w / GRID_CELL);
     const stepsV = Math.round(h / GRID_CELL);
@@ -172,7 +175,7 @@ export function createLineRig({ resolved, view, foldAngle = 0, width = 1, height
     const gridGeo = new THREE.BufferGeometry();
     gridGeo.setAttribute('position', new THREE.Float32BufferAttribute(gridPos, 3));
     const gridMat = new THREE.LineBasicMaterial({
-      color: planeColor.clone().lerp(COL.paper, GRID.fade),
+      color: COL.border,
       transparent: true, opacity: GRID.opacity, depthWrite: false,
     });
     const grid = new THREE.LineSegments(gridGeo, gridMat);
