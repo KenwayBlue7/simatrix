@@ -431,7 +431,7 @@ into the orchestrator directly.
   driven by `main.js`'s state-change notifications. **Imports:** `problems.js` + the
   injected controller. **Provides:** `initProblemLibrary(sim)`.
 
-- **`methodController.js`** (ADR-139 pedagogy, ADR-140 container) — "Show Method": a
+- **`methodController.js`** (ADR-084 pedagogy, ADR-085 container) — "Show Method": a
   Step-6 walkthrough that replays the loaded problem's construction as 2-3 side-by-side
   Sets (simple position → one axis resolved → both), one construction beat at a time
   via Next/Back, plus Set-N focus chips. It draws into its OWN independent, focus-
@@ -451,6 +451,13 @@ into the orchestrator directly.
   lives in `main.js`, reusing `meshAnalyzer.js`/`projectionDrawer.js`/
   `vertexLabeler.js`'s exports). **Provides:** `initMethodController(sim)` →
   `{ sync, dispose }`.
+
+  **`graphics_module_1_topic_6_projection_of_straight_lines/src/methodView.js`** (ADR-165)
+  ports this CONTRACT — not this code — to a topic with no solid machinery and no Sets:
+  a single-line, single-construction Show Method over the SAME `constructionStepper.js`
+  the topic's in-Compare `.con-nav` row already used, re-parenting the topic's own
+  ADR-076 Three.js sheet renderer rather than a Canvas2D plate. See ADR-165 for the full
+  architectural comparison against this file.
 
 - **`terms.js`** — The inline glossary popovers (dotted-underline terms like "HP",
   "VP" that explain themselves on hover/focus/tap). **Imports:** nothing. **Provides:**
@@ -489,7 +496,7 @@ into the orchestrator directly.
   block**, the complete wizard/viewport markup (step card, rail, sliders, toggles,
   mobile notice), and finally loads
 
-  **Mandatory boot sequence (every topic, ADR-133):** `index.html`'s inline script
+  **Mandatory boot sequence (every topic, ADR-078):** `index.html`'s inline script
   arms `window.__simBooted = false` and a 15 s `__simBootTimer` watchdog before
   anything else runs. `main.js` must call `markBooted()` **last**, and only on a
   fully successful boot, which (1) flips `__simBooted = true` and clears the
@@ -499,7 +506,7 @@ into the orchestrator directly.
   guessing; cloning `template_starter/main.js`'s `markBooted()` verbatim is the
   required starting point.
 
-  **Completion signal (ADR-133 addendum, revised 2026-07-31):** a sibling
+  **Completion signal (ADR-078 addendum, revised 2026-07-31):** a sibling
   `markComplete()` posts `{ type: 'sim:complete' }` to `window.parent` so the host can
   surface its "next topic / stay" overlay. Every shipped topic — Module 2, all 9 KTU
   stepper topics (including the last 2 stragglers, `graphics_module_1_topic_1_foundations`
@@ -523,7 +530,7 @@ into the orchestrator directly.
   There is no remaining topic on the old auto-triggered/latched shape.
   One topic, `graphics_module_2_topic_1_introduction`, omits `markComplete()` entirely —
   it is a free-browse anatomy gallery with no steps and no "finished" state to hook (a
-  deliberate exclusion, not an oversight; see the ADR-133 addendum).
+  deliberate exclusion, not an oversight; see the ADR-078 addendum).
   `main.js` as an ES module. (Note: Module 2 keeps its CSS *inline* here, unlike
   Module 1 — see §8.)
 
@@ -679,13 +686,22 @@ independently — the 3D renderer via `#sim-viewport`'s `ResizeObserver` (`handl
 `compareSheet.js` itself didn't need to change: its `render(renderer)` method already took the
 renderer as an argument, so it was renderer-agnostic before this change too.
 
+**Show Method re-parents the sheet renderer, doesn't triple it (ADR-165, T6 only):** T6's
+`#method-view` takeover moves `.compare-card__stage` (canvas + CSS2D overlay together) INTO
+itself on open and back to `#compare-card` on close, rather than standing up a third
+`WebGLRenderer` — `compareSheet.js`'s renderer-agnostic `render(renderer)`, established by the
+paragraph above, is exactly what makes this possible with zero changes to that file. The render
+loop's sheet-paint gate widens from `compareOpen` to `compareOpen || methodOpen` so the sheet
+keeps repainting on the cold-open path (Show Method launched without Compare ever having been
+opened first).
+
 ---
 
 ## 6. The iframe Boundary
 
 Each Simatrix sim runs inside a sandboxed `iframe` on the host website. The contract
 is mostly **a global JavaScript API object, not message passing** — with one
-deliberate, narrow exception: a single outbound boot-ready signal (ADR-133).
+deliberate, narrow exception: a single outbound boot-ready signal (ADR-078).
 
 **Confirmed from the code:**
 
@@ -702,10 +718,10 @@ deliberate, narrow exception: a single outbound boot-ready signal (ADR-133).
   only on a fully successful boot — fires
   `window.parent.postMessage({ type: 'sim:ready' }, '*')` after `document.fonts.ready`
   resolves, so the host's loading screen can close exactly when the scene is
-  displayable rather than guessing from the iframe's `load` event (ADR-133).
+  displayable rather than guessing from the iframe's `load` event (ADR-078).
 - **The sim announces its own lesson completion.** `markComplete()` posts
   `window.parent.postMessage({ type: 'sim:complete' }, '*')`, so the host can surface
-  its "next topic / stay" overlay (ADR-133 addendum, revised 2026-07-31). Every shipped
+  its "next topic / stay" overlay (ADR-078 addendum, revised 2026-07-31). Every shipped
   topic fires it from a `#btn-finish` click, latchless (re-fires every click) — the
   footer nav for most, `#workbench-rail` for
   `graphics_module_1_topic_4_understanding_orthographic_views` (its footer is CSS-hidden
@@ -730,7 +746,7 @@ host reads, and the two sim → host signals, `sim:ready` (boot) and `sim:comple
 **What is NOT in this codebase:** beyond the two sanctioned emits (`sim:ready`,
 `sim:complete`), there is **no other `postMessage` and no `window.parent`/`window.top`
 usage anywhere in the repository** (verified by search across all folders; ADR-002,
-narrowed by ADR-133). So
+narrowed by ADR-078). So
 the actual host-side code that reaches into the iframe and calls `simAPI.*`, and the
 code that listens for `sim:ready`/`sim:complete` to drive the loading screen and the
 next-topic overlay, lives in the separate host website, which is not part of this

@@ -3,6 +3,55 @@
 All notable changes at the Simatrix project root (spanning Module1, Module2, and the
 topic deploy copies). Per-module changelogs live inside each module folder.
 
+## 2026-08-17
+- Changed: `graphics_module_1_topic_6_projection_of_straight_lines`'s `#workbench-rail` now holds
+  all three clusters (Dimensions/Inclination/Constructions) on one row at 1536px instead of
+  wrapping to two — a growing `#rail-drivers` lane pins Constructions to the right end, and the
+  sliders shrink via `clamp(158px, calc(20vw - 130px), 200px)` instead of staying fixed-width
+  (ADR-167). Rail height drops 239px → 144px at 1536px.
+- Changed: `graphics_module_1_topic_6_projection_of_straight_lines`'s True Length & Angles / Show
+  Traces launcher buttons now dock inside `#workbench-rail` (a new Constructions cluster) instead
+  of the separate floating `#con-dock` corner widget, which is deleted (ADR-166, reversing RULES.md
+  §5.16's ADR-165-audit T6 clarification at user request). `#con-nav`'s width cap — added only to
+  clear `#con-dock` — is removed with no replacement pending a visual review.
+- Changed: `graphics_module_1_topic_6_projection_of_straight_lines`'s in-Compare beat caption moved off the floating `#con-nav` button pill to a new band at the top of the 2D drawing card, and both walkthrough surfaces' Back/Next buttons shrank to match Module 2's `.btn--small` (a real size gap, confirmed by cascade audit, not a perceptual one).
+- Changed: DESIGN.md §5.1 documents `.btn--small` as a sanctioned 32px exception to the 44px button floor, reserved for floating walkthrough/step-nav pills.
+- Fixed: `graphics_module_1_topic_6_projection_of_straight_lines`'s `#workbench-rail` Constructions
+  cluster title sat visibly lower than Dimensions/Inclination's despite sharing one row — the
+  two-lane row's bottom-alignment (`flex-end`) penalized Constructions' shorter, label-less button
+  column; switched to `stretch` + per-cluster `space-between` (ADR-167 amendment).
+- Fixed: same topic — the title fix above left Constructions' buttons flush with the θ/φ slider
+  tracks instead of their labels; scoped `justify-content: flex-start` to just that cluster so the
+  button top lands exactly on the label top instead (ADR-167 second amendment).
+
+## 2026-08-16
+- Changed: `graphics_module_1_topic_6_projection_of_straight_lines`'s in-Compare `.con-nav`
+  step-through row moved out of `#con-dock`'s launcher column to its own floating bottom-centre
+  pill over the 2D pane, sharing `.method-bar`'s chrome — so the in-Compare walkthrough and the
+  Show Method takeover read as one control instead of two.
+
+## 2026-08-15
+- Fixed: `graphics_module_1_topic_6_projection_of_straight_lines`'s Show Method takeover and the
+  in-Compare `.con-nav` row jumped straight to each beat's end state on Next/Back with no reveal
+  animation — the shared `constructionStepper.js` now tweens between beats at the same quality as
+  the continuous Replay animation. Pre-existing gap in stepped nav, confirmed not a regression
+  from ADR-165. See `graphics_module_1_topic_6_projection_of_straight_lines/CHANGELOG.md`,
+  `DECISIONS.md` ADR-165 amendment.
+- Changed: same topic's `.con-nav` Back/Next buttons restyled to match the Show Method takeover's
+  `.method-bar` button hierarchy (Next primary, Back secondary) — cosmetic only.
+
+## 2026-08-14
+- Added: `graphics_module_1_topic_6_projection_of_straight_lines` gains a Show Method takeover
+  for the True-Length construction — a full-viewport, beat-gated Back/Next walkthrough launched
+  from Step 4, re-parenting the topic's own ADR-076 sheet renderer rather than opening a 3rd GL
+  context. Ports Module 2's Show Method interaction CONTRACT, not its code (no Sets/chips —
+  this topic has one line, one construction). See `graphics_module_1_topic_6_projection_of_straight_lines/CHANGELOG.md`, `DECISIONS.md` ADR-165.
+- Fixed: same topic's `trueLength.js` Method I construction was missing 2 of the 4 loci Fig
+  10-15(ii)/10-16(ii) draw, mislabelled one recovered point (`b₁` where the figure and the beat's
+  own caption both say `b₂`), and one caption said "vertical locus" for a locus drawn horizontal.
+  Found auditing the existing 12-phase table against the source figures for the Show Method beat
+  list; fixed in the shared `animate()` both the continuous playback and step-through read.
+
 ## 2026-08-12
 - Fixed: `Module2`'s method-split 3D pane was still over-zoomed on first entry — the prior
   ADR-163 follow-up fix corrected the framing's TIMING but not its target, which still framed

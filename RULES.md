@@ -515,6 +515,16 @@ Every rule is formatted:
 > *(ADR-021, ADR-037, ADR-076)*
 > Reason: the reserved wizard otherwise cramps each pane and gates the live controls (and any
 > construction launcher) away from the dual view.
+>
+> **Superseded clarification (was: T6 corner-dock exception; reversed 2026-08-17, ADR-166).**
+> ~~`traces`/`truelength` docked separately — `#con-dock`, a floating corner dock at the 2D panel's
+> bottom-right — NOT inside `#workbench-rail`.~~ T6's construction launchers now dock inside
+> `#workbench-rail` (its own "Constructions" cluster) like every other `WORKBENCH_CONTROLS` member —
+> the main rule above now applies to T6 literally, no exception needed. `#con-dock` was deleted; it
+> existed only to hold these two launchers (`ensureConDock()`/`CON_DOCK_CONTROLS` are gone with it).
+> **Show Method (ADR-165) is unaffected either way** — a full-viewport takeover, not a Compare-split
+> control at all; it does not touch `WORKBENCH_CONTROLS` or `#workbench-rail`, and §5.16c (below) is
+> not engaged by it either, since it opens no docked split.
 
 > **§5.16a ❌ NEVER** demote an expanded Compare split to a floating/compact card — platform-wide,
 > Compare has exactly one shape at every viewport width. Below the 768px breakpoint the same docked
@@ -542,6 +552,11 @@ Every rule is formatted:
 > rail to **1340 px**, starving the viewport row to **2 px** — the renderer, the drawing sheet and
 > the rail toggle all collapsed with it. A control the split cannot show is reached by leaving the
 > split, exactly as the sibling topics do.
+>
+> **Note (ADR-167, 2026-08-17):** T6's rail moving from a fixed-width wrapping row to a two-lane
+> row with `clamp()`-shrinking fields *reduces* rail height (239px → 144px at 1536px) — this
+> budget is not at risk from that change, since it trades a second wrapped row for a shrunk single
+> row instead of adding controls.
 
 > **§5.16c ✅ DO** let a docked split OTHER than Compare set its own pane ratio — Module 2's Show
 > Method 3D-pose-visualizer split (`body.method-split`) is 30/70 (3D pane / sheet), not Compare's

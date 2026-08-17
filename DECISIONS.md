@@ -8034,6 +8034,408 @@ as the module's destructive, confirm-guarded `#btn-reset`.
 
 ---
 
+## ADR-164: Topic 6's HP/VP reference grid conforms to DESIGN.md §2.1's neutral token, not the Module 1 hue "cage"
+
+**Date:** 2026-08-12
+**Decision:** In `graphics_module_1_topic_6_projection_of_straight_lines/src/lineRig.js`, the HP/VP
+reference grid drawn by `referencePlane()` now uses `--color-border` (`#e0e1e5`) at opacity 0.35 —
+matching Module 2's `hpGrid`/`vpGrid` `GridHelper` materials (`Module2/main.js`) exactly — instead
+of the plane's own hue (`--color-hp-line` teal / `--color-vp-line` amber) lerped 60% toward paper
+at opacity 0.55.
+**Why:** A user screenshot comparison showed Topic 6's ground grid reading visibly darker/denser
+than Module 2's. Audit found line width and cell density already matched Module 2 (both 1px native
+`LineBasicMaterial`, both a 1.0-world-unit = 10 mm cell); the entire visible gap was colour + opacity.
+DESIGN.md §2.1 documents `bench-grey`/`border` as the token for "reference grids," and §7.2 (Module
+1's exception list) grants no hue-grid exception — so Module 2 and DESIGN.md already agreed with
+each other, and Topic 6 was the sole drifter. The hue cage was never a decision for this topic; it
+was inherited by copy-lineage from `graphics_module_1_topic_3_points/src/hvPlanes.js`'s "cage"
+pattern (itself descended from the legacy `Module1/quadrants.js` `drawStage`), carried over
+uncritically when Topic 6 was cut from the Points skeleton (ADR-009).
+**Alternatives rejected:** (1) Keep the hue cage, only drop opacity 0.55 → 0.35 — rejected because
+it still leaves an undocumented per-topic token deviation instead of resolving it. (2) Match
+ADR-044's `GRID_OPACITY = 0.30` (Topic 4's Glass Box hue lattice) — rejected; ADR-044 is a
+deliberate, scoped exception for that topic's specific glass-box teaching device, not a general
+license for hue-tinted grids, and stacking a second same-hue precedent on top of it would make the
+platform's grid convention harder to reason about, not easier. Full parity with Module 2 (the
+platform's master/reference implementation, DESIGN.md's own framing) was chosen as the default any
+future audit should expect.
+**Consequences:** Easier: Topic 6's 3D viewport now reads at the same visual weight as Module 2 and
+every other module that uses the documented neutral-token grid (`template_starter`, all Module 3
+topics, `graphics_module_3_topic_2_2_conic_sections`, `graphics_module_2_topic_2_simple_positions`).
+Harder / known and accepted: Topic 6 now visually diverges from its closer M1 siblings —
+`graphics_module_1_topic_2_spatial_framework`, `graphics_module_1_topic_3_points`, and
+`graphics_module_1_topic_5_projection_of_line_types` — which still ship the 0.55 plane-hue cage in
+their own independent `hvPlanes.js`/`lineTypeRig.js` copies (no shared file; ADR-009 copy-lineage,
+not a live dependency). This is flagged as a platform-wide inconsistency for a future audit, not
+fixed here — those three topics were out of scope for this task. Each plane's hue identity is
+unaffected either way: it still reads via the fat-line perimeter border, which this change does not
+touch.
+**Status:** Active.
+
+---
+
+## ADR-165: Projection of Straight Lines gains a Show Method takeover for True Length — Module 2's CONTRACT ported, not its code
+
+**Date:** 2026-08-14
+**Decision:** `graphics_module_1_topic_6_projection_of_straight_lines` gains a Module-2-style Show
+Method: a full-viewport, focus-trapped, beat-gated Back/Next walkthrough of the True-Length
+construction (Art 10-8 Method I — the arc-swing/rotating-line method, `True Length.pdf` figs
+10-15/10-16/10-17; Method II is inherited unchanged for the θ+φ=90° case per ADR-110), launched
+from a new primary button on Step 4 once the fold completes. Traces is explicitly OUT of scope
+this pass.
+
+Audited against Module 2's Show Method (`methodController.js` + `main.js`'s ~1400-line engine
+half) before building anything, expecting a beats-only subset to be a clean port. It was not:
+
+- **The beat model already existed.** `constructionStepper.js` (shipped 2026-08-05, see that
+  date's CHANGELOG entry) is already a discrete Back/Next adapter over a leaf's `animate(p)` +
+  `phases: {t,caption}[]` contract — the exact shape Module 2's beat system approximates with
+  FOUR hand-synced parallel index tables (`methodBeatUnitCount`, `methodContentBeats`,
+  `methodBeatLabel`, the draw gates) and one duplicated `BEAT_COUNT`/`METHOD_BEAT_COUNT` constant
+  guarded only by a runtime assert. This topic's version is strictly better — one real table,
+  the leaf owns it, no cross-file constant to drift — so it is KEPT, not replaced.
+- **Sets are not a clean subset to drop — they are baked into Module 2's PRESENTATION, not just
+  its indexing.** A synthetic 1-element `sets()` array degrades functionally (no crash), but a
+  stray "Set 1" chip still renders, the open announcement still reads "Set 1 of 1", beat 0's
+  caption is still `Starting Set 1`, and the canvas still paints a per-Set caption — roughly 7
+  code sites in `methodController.js`/`main.js` would need stripping to make Set-awareness
+  actually vanish. This topic has ONE line and ONE construction; there is no Set concept to
+  degrade FROM. Built beats-only from scratch instead of porting a Set-aware controller and
+  disabling the Set parts.
+- **The render surface differs structurally, not cosmetically.** Module 2's takeover is Canvas2D
+  (`drawMethodSheet(ctx,w,h)`). This topic's 2D sheet is a live Three.js ortho scene on its OWN
+  `WebGLRenderer` (ADR-076) — there is no `ctx`, no `project(mmX,mmY)` to port. This is the exact
+  situation ADR-077 already set precedent for on this same topic ("the interaction model is what's
+  reused, re-expressed against the camera the sheet actually has") — applied here to the
+  CONTAINER contract instead of pan/zoom.
+
+**What was ported (the CONTRACT, from `methodController.js`):** the `{sync,dispose}` handle
+shape (here `{sync,close,dispose}` — `close` added so `unfold()`/`commit()`/`simAPI.reset()` can
+force-exit from outside), one `AbortController` teardown, the focus trap
+(`focusables()`/Tab-wrap), Escape-to-exit, Space-as-alternate-Next (swallowing `e.repeat`,
+skipping the synthetic click when `nextBtn` already has native focus to avoid a double-fire).
+
+**What was NOT ported:** Sets, focus chips, Skip, the ghost/tilt turn animation, the 3D-pose
+split (ADR-163) — none apply to a single line/single construction. No `BEAT_COUNT` constant
+either: the takeover reads `leaf.phases.length` at runtime (12→14 beats for Method I, 0/4/8 for
+Method II), the same thing `constructionStepper.js` already does — precisely the hazard ADR-094
+flagged in Module 2 (a hand-duplicated beat count that can silently desync) does not exist here
+by construction.
+
+**Container:** `#method-view`, a direct `<body>` sibling of `#problem-library`, following its
+`position:fixed; inset:0; z-index:var(--z-overlay)` overlay recipe exactly (per ADR-085's own
+"following `.problem-library`'s precedent exactly" instruction) — NOT the browser Fullscreen API,
+staying inside the `window.simAPI` iframe sandbox boundary. On open, `main.js` RE-PARENTS the
+EXISTING `.compare-card__stage` (canvas + CSS2D label overlay together) into `#method-view`, and
+back to `#compare-card` on close — the same re-parent idiom `enterWorkbench()` already uses for
+`#compare-card` itself, chosen over standing up a third render surface because `compareSheet.js`
+was already renderer-agnostic (`render(renderer)` takes the renderer as an argument, ADR-076) and
+construction aids are thin `THREE.Line`, needing no `LineMaterial.resolution` sync. The takeover
+builds its OWN construction leaf (`methodLeaf`, independent of the in-Compare `conLeaf`) and its
+OWN `constructionStepper.js` instance, so the pre-existing in-Compare `.con-nav` Back/Next row
+(2026-08-05) is UNCHANGED and coexists — two entry points, one beat model, nothing deleted or
+replaced.
+
+**Gate:** `folded === true` AND the current line has ≥1 constructible beat
+(`methodPhaseCount()` — cheap, pure `sheet2DLayout.js` math, no THREE build needed just to check
+emptiness). This is this topic's stand-in for ADR-085's `foldProgress === 1` gate — ADR-085's own
+text explicitly rejected "a new Step 7" for Module 2 ("Show Method reviews Step 6's answer, it is
+not a further construction step"); the analogous move here (a new Step 6) is pre-rejected by that
+same precedent, so the launcher lives ON Step 4 instead, swapping into the primary slot the
+instant `#btn-fold` vacates it (`stepper.js` `renderActions()` — `#btn-fold` demotes to secondary
+"Fold back to 3D"; DESIGN.md §5.1's "one loud action per step", the same rule ADR-162 cites for
+why two `.btn--block` primaries on one panel is a regression).
+
+**Pause contract — a deliberate, permanent divergence from ADR-085, not an oversight.** Module 2
+calls `simAPI.pause()` on open because its takeover fully covers a 3D scene the render loop no
+longer needs to draw. Here the takeover IS the 2D sheet renderer's only visible surface while
+open — `simAPI.pause()` would cancel the very `requestAnimationFrame` loop that repaints it. The
+takeover does NOT pause; the render loop's sheet-paint gate widens from `compareOpen` to
+`compareOpen || methodOpen` so the reparented stage keeps repainting regardless of whether Compare
+was ever separately opened. The 3D viewport keeps rendering too (harmlessly, fully covered by the
+opaque overlay) — cheaper than adding a visibility toggle for a scene nobody sees.
+
+**`trueLength.js` beat-count change is also a real bug fix, not just a remap.** Auditing the
+existing 12-phase table against `True Length.pdf` figs 10-15(ii)/10-16(ii) (required to write
+faithful beat captions) surfaced three defects, fixed in the same pass: (1) two of the figure's
+four loci — `ef`/`cd`, the reference lines through the PIVOT points — had no line objects at all,
+only `pq`/`rs` were ever drawn; added `tvPivLoc`/`fvPivLoc` plus a new setup beat that reveals all
+four together, before the swing/arc/project sequence, matching the textbook's own draw order.
+(2) Part B's recovered top-view point was labelled `b₁` — Fig 10-16(ii) names it `b₂`, and the
+beat's own caption already said "…at b₂"; fixed to match. (3) A caption read "meet b's vertical
+locus" for a locus drawn horizontal (parallel to xy) — the *projector* is vertical, the locus is
+not; corrected. All three land in the SAME `animate()` both the continuous 9s auto-play and the
+`.con-nav` step-through already read, so neither path can drift from the other.
+
+**Alternatives rejected:**
+- *Port `methodController.js` wholesale, disable its Set/chip code paths for a 1-Set case* —
+  rejected: ~7 presentation sites (chip, announce copy, beat-0 caption, canvas caption) still leak
+  through a synthetic 1-element Sets array; the remaining genuinely-reusable surface (the focus
+  trap, keyboard handling, the handle shape) is ~80 lines, easily written directly against this
+  topic's own beat adapter instead.
+- *Rewrite the beat model to match Module 2's `methodContentBeats`/`methodBeatLabel`/`BEAT_COUNT`
+  shape* — rejected: this topic's `phases`-array model is strictly simpler and already shipped;
+  replacing it with Module 2's more error-prone shape would be a regression, not parity.
+- *A second `WebGLRenderer` + a second `createCompareSheet()` instance for the takeover* —
+  rejected: `compareSheet.render(renderer)` was already renderer-agnostic by design (ADR-076), so
+  a third GL context would have bought nothing a re-parent didn't already provide for free, at the
+  cost of a new ADR amending ADR-076's own "second context" tradeoff to a third.
+- *Route the takeover through `ensureCompareForCon()`/`enterWorkbench()`* — rejected: both
+  force-unfold, destroying the launcher's own `folded` precondition — verbatim ADR-085's founding
+  grievance (b) (the Compare-hosted Show Method design that forced a `keepFlattened` flag through
+  four functions before ADR-085 moved it out).
+- *Call `simAPI.pause()` on open, matching Module 2 exactly* — rejected: would cancel the render
+  loop the takeover itself depends on to repaint the reparented sheet; see Pause contract, above.
+**Consequences:** `main.js` gains `methodOpen`/`methodLeaf`/`methodStepper`/`methodStageHome` state
+and `methodPhaseCount()`/`canShowMethod()`/`methodBegin()`/`methodEnd()`, plus a `method:
+{canRun,begin,end}` sub-object on `simController` — the pattern any future beat-gated takeover on
+this platform should read first, not Module 2's `methodController.js`, if the target topic is
+ALSO beats-only with a renderer-agnostic sheet. `stepper.js`'s `renderActions()` gains the
+primary/secondary swap; `constructionStepper.js` gained tweened beat motion in the same-day
+follow-up below, still with two independent call sites sharing no state. `trueLength.js`'s
+`animate()` reveal windows all shift +2 (`TL_N` 12→14) — cosmetic for the continuous auto-play
+(a couple hundred ms redistributed across the same ~9s), load-bearing for the beat captions.
+RULES.md §5.16's "construction launchers dock in `WORKBENCH_CONTROLS`" text and this topic's own
+CLAUDE.md's "`#con-dock`" description were found to already disagree with each other during this
+task's Phase A audit (pre-existing drift, unrelated to this feature) — flagged, not fixed here;
+out of scope. ARCHITECTURE.md gains no new Topic-6 component-breakdown section (none existed to
+extend); a future pass that adds one should fold this ADR's summary in. DESIGN.md's §4.3
+`--z-overlay` row is extended to also name `#method-view` (it already named `#problem-library`).
+
+**Amendment (2026-08-15) — beat-to-beat tween; `.con-nav` button hierarchy.** Two same-day
+follow-ups, filed against this ADR rather than a new one (neither changes the container/contract
+decisions above, both patch the beat adapter and its chrome):
+
+- **Stepped Next/Back snapped instead of animating** — confirmed pre-existing (not a regression
+  introduced above): `constructionStepper.js`'s `render()` always called
+  `leaf.animate(phases[i].t)` once, with no tween, and `.con-nav`'s own step-through
+  (`main.js` `stepCon()`) snapped identically before this feature existed. Tweening only ever
+  lived on `runCon()`'s continuous 9s ramp. Show Method promoting stepped nav to the takeover's
+  ONLY interaction is what surfaced it. Fix: `constructionStepper.js` now accepts an optional
+  `startTween(({from,to,duration,onUpdate}) => {cancel})` driver; when supplied, each Next/Back
+  tweens `p` from the previous beat's t to the new beat's t (duration = `|Δt| × leaf.duration`,
+  clamped to 350–1200 ms) instead of snapping, canceling any in-flight tween first so a fast
+  double-click re-targets from wherever `p` actually is, not the old resting beat. Omitting the
+  option keeps the original instant-snap behavior — the leaf module still imports nothing
+  (RULES.md §3.6); `main.js` injects a driver (`beatTween`, wrapping `anim.js`'s `tween()` with
+  `easeDraw`, ticked by the existing `tickTweens()` render-loop call) into BOTH call sites
+  (`stepCon()` and `methodBegin()`), so `.con-nav` and the takeover gained the same motion from
+  one change. Both leaf-drop sites (`teardownCon()`, `replayCon()`, `methodEnd()`) now call the
+  stepper's new `dispose()` first, so a tween in flight when a construction is torn down never
+  calls `animate()` on a leaf that's already gone.
+- **`.con-nav` read as unstyled next to `.method-bar`** — cosmetic only, no functional change,
+  both entry points still ship (ADR-165's "keep both" stands). `#con-nav-next` gains
+  `btn--primary`; `index.html` adds an explicit `#con-dock .con-nav__btns .btn`/`.btn--primary`
+  override (`#con-dock .btn`'s existing flat-panel repaint outranks a bare `.btn--primary` by
+  specificity, so the class alone would have been a no-op) plus matching `:hover`/`:active`
+  holds in the existing `@media (hover: hover)` block. The dock's own `0.8125rem/600` pill sizing
+  and 180px column width are kept — `.method-bar`'s `min-width: 96px` was NOT copied, it would
+  overflow the shared column.
+
+**Amendment (2026-08-17) — caption moves to the 2D card's top; buttons shrink to Module 2's
+`.btn--small`.** User-reported follow-up on two more `.con-nav` cosmetics from the two sessions
+after the above (`#con-nav` moved to a floating bottom-centre pill, then its caption split into
+its own chip stacked on the buttons):
+
+- **Caption relocated, not just re-decided.** Stacking the caption on the button pill kept it at
+  the BOTTOM of the drawing and read as a tall two-storey floating block. Moved to a new
+  `.compare-card__top` band **prepended into `#compare-card` itself** — a flow child, not an
+  overlay, so it sits at the TOP of the 2D drawing card and the stage shrinks to make room
+  (Module 2 ADR-095's rationale for `.method-title`, applied here to the Compare card instead of
+  the Show Method takeover). `main.js` `ensureConNav()` now builds and hides/shows this band
+  alongside the button pill; `#con-nav` itself carries only `.con-nav__btns`. Audited against the
+  width cap the pill grew two sessions ago to avoid overlapping `#con-dock`: that cap's floor
+  (`max(240px, …)`) existed only to fill with the (now-departed) stretched caption — with the
+  caption gone the pill shrink-wraps to two buttons, so the floor is dropped and only the ceiling
+  (`max-width`) is kept; the `#con-dock` clearance math itself is unchanged.
+- **Caption typography reverted as drift.** The previous split matched `.method-title`'s
+  `--text-lead`/600 in a painted bg+border chip — reported "distracting," and on inspection
+  `--text-lead` is the token DESIGN.md §3 already marks **retired post-ADR-073** ("no active
+  consumer"); this topic had quietly reintroduced its only consumer. Both `.method-caption`
+  (Show Method) and the new `.compare-card__caption` now share one rule at `--text-base`/400,
+  plain flow text with no chip paint — only a `border-bottom` on the containing band. The two
+  walkthrough surfaces' captions read as one voice again, at the quieter register.
+- **Button-size gap confirmed real, not perceptual, by full cascade audit** before any change:
+  topic 6's plain `.btn` is byte-identical to Module 2's (44px / `--space-4` / `font: inherit`);
+  the entire visible gap was `#con-nav .btn`/`.method-bar .btn`'s `min-width: 96px` floor plus a
+  `.btn--small` class Module 2's `#method-back`/`#method-next` have carried since ADR-095 that
+  this topic never ported. Ported `.btn--small` (32px / `--space-3` / `--text-sm`) verbatim; both
+  `min-width: 96px` rules deleted; applied to `#con-nav-back`/`-next` **and** this topic's own
+  `#method-back`/`-next`/`-exit` (ADR-165's "one control, two entry points" requires both to
+  shrink together, not just the one the user happened to screenshot). See DESIGN.md §5.1
+  amendment for the resulting undocumented-variant writeup.
+- **Regression check:** the `:empty{visibility:hidden}` reserved-height behavior (stops the sheet
+  from resizing — and re-triggering `compareSheet`'s ortho-frustum resolution sync — when the
+  first beat's caption lands mid-autoplay) carried over onto `.compare-card__caption` unchanged.
+  `constructionStepper.js`'s `captionEl` reference is identity-only, so re-parenting the caption
+  node into `#compare-card` needed no change there. `methodEnd()`'s `appendChild` restore of
+  `.compare-card__stage` still lands after the prepended band (order-safe).
+
+**Status:** Active.
+
+---
+
+## ADR-166: T6 construction launchers move from #con-dock into #workbench-rail — reverses ADR-165's audit clarification (RULES.md §5.16)
+
+**Date:** 2026-08-17
+**Decision:** `graphics_module_1_topic_6_projection_of_straight_lines`'s True Length & Angles /
+Show Traces launchers re-parent into `#workbench-rail` (a new 3rd cluster, "Constructions") on
+Compare-split entry, same as every other `WORKBENCH_CONTROLS` member. `#con-dock` — the topic-local
+floating corner dock these two launchers used exclusively — is deleted: the element, `ensureConDock()`,
+the `conDock` state var, `CON_DOCK_CONTROLS`, and its CSS block are all gone.
+
+**Reverses:** the "Clarification (found during ADR-165's audit, T6)" paragraph in RULES.md §5.16,
+which carved out `#con-dock` as T6's exception to the rail rule. That carve-out documented the
+codebase's then-current shape; the user explicitly requested the literal rail-docking reading of
+§5.16 be restored for T6.
+
+**Why:** user preference — a single rail hosting all workbench controls (drivers + constructions)
+reads as one instrument bench, instead of two separate floating widgets (rail + corner dock) that
+then need their own collision math against each other.
+
+**What changed:**
+- `main.js`: `WORKBENCH_GROUPS` gains `{ id: 'constructions', title: 'Constructions', keys:
+  ['truelength', 'traces'] }`. `CON_DOCK_CONTROLS` and its `enterWorkbench()` loop deleted. The
+  `conDock` state var and `ensureConDock()` deleted outright (nothing else ever consumed
+  `#con-dock` — confirmed by repo-wide grep before deleting). `exitWorkbench()`'s restore lookup
+  drops the now-dead `|| conDock?.querySelector(...)` fallback, keeping only the
+  `workbenchRail?.querySelector(...)` path.
+- `index.html`: `.con-dock` / `body.compare-split #con-dock` / `#con-dock .ctrl` / `.ctrl[hidden]`
+  / `#con-dock .btn` (+ its `:hover` override) CSS all deleted. New `#workbench-rail .ctrl` (mirrors
+  the old `#con-dock .ctrl`: 180px, column flex) and `#workbench-rail .ctrl[hidden]{display:flex
+  !important}` (the ADR-051 stray-hide guard, ported to the new location) added. The launcher
+  buttons lose the old dock's "no hover shift" chrome override — not ported, since it was matched
+  to `#rail-toggle`'s floating-pill treatment, not the rail's own `.btn` styling; they now take the
+  rail's plain `.btn:hover`.
+- `#con-nav`'s `max-width` cap (added in ADR-165's 2026-08-17 amendment, computed against
+  `#con-dock`'s 180px column to prevent a measured 34px overlap at 1536px) is **removed outright, no
+  replacement value** — the collision it guarded against can't happen once `#con-dock` is gone. Per
+  user instruction, deliberately left unconstrained pending a visual review, not re-capped
+  speculatively.
+- RULES.md §5.16's audit clarification struck and replaced (see that file).
+- No change to Show Method (ADR-165) — separate mechanism, never touched `WORKBENCH_CONTROLS` or
+  `#con-dock` either way.
+
+**Consequences:** §5.16b's rail-height budget concern (the Module-3 1340px regression that rule
+guards against) does not apply here — this adds one 2-button cluster, not a slider group; the rail
+stays well under that failure mode. The `#con-nav` pill's unconstrained width is an open item: it
+needs a real-browser visual check before any follow-up cap decision (tracked as a Phase-B
+verification step, not resolved by this ADR).
+
+**Alternatives rejected:**
+- *Leave `#con-dock` in place, empty, "in case something else docks there later"* — rejected:
+  nothing else has ever used it (confirmed by grep and by the topic's own CLAUDE.md, which named
+  the launchers as its only occupants), and speculative reuse isn't a reason to keep dead chrome
+  (RULES.md §5.17's own reasoning for re-parent-not-mirror: one source of truth, no orphaned paths).
+
+**Status:** Active.
+
+---
+
+## ADR-167: T6 `#workbench-rail` becomes a two-lane row — a growing drivers lane pins Constructions to the right end, fields shrink via `clamp()` instead of wrapping
+
+**Date:** 2026-08-17
+**Decision:** `#workbench-rail`'s three clusters (Dimensions / Inclination / Constructions,
+ADR-166) split into two flex lanes. Dimensions and Inclination nest inside a new `#rail-drivers`
+wrapper (`main.js` `WORKBENCH_GROUPS[].lane === 'drivers'`, built once in `ensureWorkbenchRail()`);
+Constructions stays a direct rail child (`lane: 'end'`). `#rail-drivers` is `flex: 1 1 auto` — it
+grows into all the row's leftover width, which is what pins Constructions to the right end.
+`.field` width changes from a fixed `200px` to `clamp(158px, calc(20vw - 130px), 200px)`, so the
+five sliders shrink together as the viewport narrows, keeping the whole row on one line, instead of
+staying fixed-width and forcing the Constructions cluster to wrap onto its own row below (the shape
+this ADR fixes — reproducible on ADR-166's own uncommitted state at 1536px).
+
+**Why:** user preference — Dimensions/Inclination sliders on the left, Constructions launchers
+pinned to the right, all on one row, with the sliders shrinking to fit rather than wrapping, down to
+an agreed floor.
+
+**What changed:**
+- `main.js`: `WORKBENCH_GROUPS` entries gain a `lane` field (`'drivers'` | `'end'`).
+  `ensureWorkbenchRail()` creates `#rail-drivers` once and appends each cluster into it or into the
+  rail directly per its `lane`. `enterWorkbench()`/`exitWorkbench()` are unaffected — both already
+  address wrappers by descendant `querySelector`, so the extra nesting level is transparent to them.
+- `index.html`: `#workbench-rail #rail-drivers { flex: 1 1 auto; }` (the growing lane) +
+  `#workbench-rail #rail-drivers + .rail__group { margin-left: 44px; }` (the gutter before
+  Constructions, matching the existing intra-lane `.rail__group + .rail__group` gutter).
+  `#workbench-rail .rail__group-body` changes from `flex-wrap: wrap` to `nowrap` — a cluster's own
+  fields must reflow as one unit with the row, never split mid-cluster. `#workbench-rail .field`
+  width becomes the `clamp()` above (was fixed `200px`). `#workbench-rail .field__num` narrows to
+  `3.75rem` (was inheriting the shared `4.5rem`, sized for a wider value string this topic never
+  shows), scoped to the rail only, buying back slider-track space at the clamp floor.
+
+**Alternatives rejected** (all measured live, Chrome, 1536×776 — see the topic's own Phase-A audit
+for the numbers):
+- *`flex-shrink` on `.rail__group`/`.field`, no wrapper* — rejected: flex line-breaking runs on each
+  item's hypothetical (unshrunk) size, so shrink factors never get a chance to act before the wrap
+  decision is made. Fields stayed 200px, the row still broke into two.
+- *`flex-basis: min-content` / `flex: 1 1 0` on a wrapper, fields left at `flex: 1 1 156px`* —
+  rejected: same failure mode as above once wrapping had already occurred; where `min-width: 0` was
+  added to force it, the φ field and the Constructions cluster silently overlapped by 46px.
+- *`margin-left: auto` on the Constructions cluster (no growing wrapper)* — rejected: per flexbox
+  spec §9.5, an auto margin absorbs all free space on its axis and zeroes every sibling's
+  `flex-grow` — auto-margin right-push and shrink-to-fit sliders are mutually exclusive on the same
+  row. A growing wrapper around the shrinking content is required instead.
+- *Reviving the ADR-021 2026-07-15 `grid-template-columns: repeat(auto-fit, minmax(200px, 1fr))`
+  amendment* — rejected: that grid no longer exists in this file. It was replaced by the current
+  `display:flex` clustering when the flat 7-wide row became three `.dock__group` clusters, and
+  `auto-fit`'s per-item reflow doesn't compose with "clusters must never split mid-group" anyway.
+- *120–140px field floor* — rejected after measurement: `"Distance from HP (end A)"` (this rail's
+  longest label) measures 156.3px and wraps to two lines below it, growing the rail's own height;
+  below ~130px the 14px slider thumb consumes the whole track, so the control becomes effectively
+  undraggable. User confirmed 158px (the last width every label holds one line) as the floor.
+
+**Consequences:** rail height drops from **239px to 144px** at 1536px (the second row is gone),
+handing 95px back to the `minmax(0, 1fr)` viewport row — RULES.md §5.16b's height-budget guard
+(the Module-3 1340px regression) is not engaged; this change moves away from that failure mode, not
+toward it. Below the 158px floor the rail's existing `flex-wrap` fallback still applies — whole
+clusters (not individual fields) drop to a second, centred row, unchanged from ADR-166's shape.
+This narrows the layout half of ADR-021's 2026-07-15 rail-layout amendment for this topic: that
+amendment's `auto-fit` grid had already been superseded in code by the `.dock__group` flex
+clustering before this ADR, but the log had not been updated to say so.
+
+**Amendment (2026-08-17, same day):** the two-lane row's `align-items: flex-end` (on both
+`#workbench-rail` and `#rail-drivers`) bottom-aligned the three clusters, but Constructions is a
+bare 44px `.ctrl` button with no label line above it — 27.2px shorter than Dimensions/
+Inclination's `.field` (label + gap + 44px row). Bottom-alignment by construction meant the
+shorter cluster's title sat 25.6px lower than the other two, even though all three were correctly
+on one row. Fixed by switching both `align-items` to `stretch` and adding
+`justify-content: space-between` to `.rail__group`: stretch equalises every cluster to the flex
+line's full height (levelling the titles), and each cluster's own `space-between` then re-anchors
+its body to the line's bottom (keeping controls level with the slider rows, the property
+`flex-end` used to provide). Verified live at 1536×776: all three `.dock__group-title` rects now
+share `top: 632.8` / `bottom: 656`, all three `.rail__group-body` bottoms share `743.2`, rail
+height unchanged at 144px. The `flex-wrap` fallback below the 158px floor is unaffected (rail
+254.4px, Constructions still drops to its own centred second row, checked with and without this
+amendment).
+
+**Second amendment (2026-08-17, same day):** the first amendment's `space-between` anchored
+every cluster's body to the *bottom* of its stretched column, which for Dimensions/Inclination
+lands the sliders level with each other's tracks — the desired outcome there — but Constructions'
+`.ctrl` is a bare button with no label row above it, so the same bottom-anchor instead landed the
+button flush with the slider **tracks** (699.2px at 1536px), 27.2px below where a `.field`'s own
+label text starts. User asked for the opposite anchor for this one cluster: button top level with
+the θ/φ label text, not the track. Two candidates were measured live: (a) an invisible spacer row
+inside `.ctrl` to mirror `.field`'s label-then-row structure, and (b) `justify-content: flex-start`
+scoped to just the Constructions cluster. (b) was taken — it landed the button's top edge exactly
+on the label's top edge (both 672.0px, 0px off) with a single declaration,
+`#workbench-rail .rail__group[data-group="constructions"] { justify-content: flex-start; }`,
+outranking the shared `.rail__group` rule by its added attribute selector (no rewrite of the
+shared rule, no specificity-loss risk). (a) was rejected without building it: the `.ctrl` wrapper
+nodes are the same `[data-ctrl]` elements `main.js`'s `WORKBENCH_CONTROLS` re-parents between the
+rail and the step wizard (`enterWorkbench()`/`exitWorkbench()`), so an invisible spacer added to
+`.ctrl` itself would need scoping to keep it out of the wizard's own rendering of the same nodes —
+solvable, but strictly more invasive than a rail-only override that touches no shared markup.
+Re-verified after applying (b): titles still level (632.8/632.8), rail still 144px/one row, and
+the `flex-wrap` fallback below 158px unaffected (rail 254.4px, Constructions title/button
+position unchanged from the first amendment's own wrap measurement). **Consequence, expected not
+a regression:** Constructions' buttons no longer align with the slider tracks — that alignment
+was a side effect of the first amendment's bottom-anchor, never a deliberate design intent, and is
+superseded here on explicit request.
+
+**Status:** Active.
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*

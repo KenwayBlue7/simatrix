@@ -269,7 +269,7 @@ token.** The full ladder is defined in `Module1/src/shell.css :root`:
 | `--z-term` | 60 | Term-definition popover (`#term-pop`) |
 | `--z-compare` | 90 | Compare-card frame (`#compare-card`) — Module 1 |
 | `--z-notice` | 100 | Mobile notice banner (`#mobile-note`) |
-| `--z-overlay` | 120 | Full-viewport modal — the Problem Library (`#problem-library`) |
+| `--z-overlay` | 120 | Full-viewport modal — the Problem Library (`#problem-library`); also the `graphics_module_1_topic_6_projection_of_straight_lines` Show Method takeover (`#method-view`, ADR-165) |
 | `--z-toast` | 130 | Success toast (`#sim-toast`) |
 | `--z-restoring` | 150 | WebGL context-lost "Restoring 3D view…" chip (`#sim-context-lost`) |
 | `--z-boot` | 200 | Boot diagnostic (`#boot-error`) — must sit above everything |
@@ -339,6 +339,18 @@ pairs any colour signal with a second cue.
   confirm** ("Reset everything? · Yes / Cancel"): the first click arms the prompt and steps Back/Next
   aside, and only **Yes** fires the reset. A single-click wipe is forbidden (RULES.md §4.19).
 - **Focus:** the accent focus halo, never removed.
+- **Compact variant (`.btn--small`):** `min-height: 32px`, `padding: 0 var(--space-3)`,
+  `font-size: var(--text-sm)` — the one sanctioned exception to this section's 44px floor.
+  Module 2 has shipped it on its Show Method walkthrough pill (`#method-back`/`#method-next`/
+  `#method-skip-set`/`#method-3d`/`#method-exit`) since ADR-095 without ever documenting it as a
+  variant; `graphics_module_1_topic_6_projection_of_straight_lines` ported the class and applied
+  it to its own two walkthrough entry points (`#con-nav-back`/`-next`, `#method-back`/`-next`/
+  `-exit`) 2026-08-17 after a screenshot-driven audit found its plain `.btn` (44px + a
+  `min-width: 96px` floor) read visibly larger than Module 2's equivalent buttons — confirmed by
+  full cascade comparison, not assumption; see DECISIONS.md ADR-165's second amendment. Reserve
+  this variant for floating walkthrough/step-nav pills, where the reduced target size trades
+  against keeping the chrome from dominating the drawing beneath it — not for primary in-flow
+  actions (Add, Next, Draw, Flatten), which stay at the 44px floor above.
 
 ### 5.2 Sliders
 
@@ -663,6 +675,14 @@ A module adds its own domain encodings and viewport behaviour **here**, never by
   longer applies. UI DOM ownership: the engine + `chrome.js` own the chrome; `src/uiManager.js` is
   a vestigial stub.
 - **The no-transform invariant** (§4.4) is required by the Compare card's `position:fixed` placement.
+- **HP/VP reference grid — inconsistent across the M1 sims (flagged, not yet unified):**
+  `graphics_module_1_topic_6_projection_of_straight_lines` conforms to this section's `bench-grey`/
+  `border` token at opacity 0.35 (matching Module 2's `GridHelper`, ADR-164). Its siblings
+  `graphics_module_1_topic_2_spatial_framework`, `graphics_module_1_topic_3_points`, and
+  `graphics_module_1_topic_5_projection_of_line_types` still ship an older plane-hue "cage" grid
+  (each plane's own colour, opacity 0.55) in their own independent `hvPlanes.js`/`lineTypeRig.js`
+  copies — inherited by copy-lineage (ADR-009), never a deliberate per-topic choice. A future audit
+  should decide whether to bring those three onto the documented token too.
 
 ### 7.3 Module 3 Topic 1 — Sections of Solids
 
