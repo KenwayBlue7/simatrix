@@ -2743,7 +2743,7 @@ learner's pan/zoom. `compareSheet.js` in both topics stays byte-parity (as it wa
 
 ---
 
-## ADR-078: Module 1 Topic 1.1 (Dimensioning) runs on ONE orthographic camera with authored linework — no perspective camera, no projection morph, no occlusion raycaster — and its pure-data catalogues are sibling-importable
+## ADR-133: Module 1 Topic 1.1 (Dimensioning) runs on ONE orthographic camera with authored linework — no perspective camera, no projection morph, no occlusion raycaster — and its pure-data catalogues are sibling-importable
 
 **Date:** 2026-07-26
 **Decision:** `graphics_module_1_topic_1_1_dimensioning` adopts the standalone orchestrator pattern
@@ -2797,7 +2797,7 @@ geometry behind it — rejected: the 3-D view would expose the lie the moment a 
 this whole topic is about drawings telling the truth. *(d)* Put every catalogue behind the
 orchestrator — rejected: `main.js` stops being an orchestrator.
 
-> **⚠️ POINT 2 SUPERSEDED BY ADR-081 (2026-07-27).** The topic now DOES carry the occlusion
+> **⚠️ POINT 2 SUPERSEDED BY ADR-136 (2026-07-27).** The topic now DOES carry the occlusion
 > raycaster and `three-mesh-bvh` — but only for the 3-D inspection, which did not exist when this
 > ADR was written. Point 2's reasoning held while the topic had a single fixed elevation and
 > nothing camera-dependent; once the learner can turn the part, "what can I see from here?" is a
@@ -2818,7 +2818,7 @@ them, Two-Cue Rule §4.6).
 
 ---
 
-## ADR-079: The Dimensioning topic's arrowhead proportions follow the textbook's Figs. 4.5–4.6 and §4.5, not the platform's 3:1 default
+## ADR-134: The Dimensioning topic's arrowhead proportions follow the textbook's Figs. 4.5–4.6 and §4.5, not the platform's 3:1 default
 
 **Date:** 2026-07-26
 **Decision:** In `graphics_module_1_topic_1_1_dimensioning`, the five termination styles are drawn to
@@ -2849,7 +2849,7 @@ re-argue it.
 
 ---
 
-## ADR-080: A figure the subject cannot show is a figure the topic does not teach — the Dimensioning plate carries three features that exist only to make one; and a permission is never rendered as a violation
+## ADR-135: A figure the subject cannot show is a figure the topic does not teach — the Dimensioning plate carries three features that exist only to make one; and a permission is never rendered as a violation
 
 **Date:** 2026-07-27
 **Decision:** Following the curriculum audit of `graphics_module_1_topic_1_1_dimensioning`
@@ -2912,7 +2912,7 @@ pipeline — and a half-built version would be worse than an honest absence.
 
 ---
 
-## ADR-081: The Dimensioning topic's 3-D inspection is classified LIVE by Foundations' raycaster; the front elevation keeps its authored linework (supersedes ADR-078 point 2)
+## ADR-136: The Dimensioning topic's 3-D inspection is classified LIVE by Foundations' raycaster; the front elevation keeps its authored linework (supersedes ADR-133 point 2)
 
 **Date:** 2026-07-27
 **Decision:** `graphics_module_1_topic_1_1_dimensioning` now carries the occlusion raycaster and
@@ -2933,7 +2933,7 @@ and swaps between them on the named camera pose:
   out dashed. Same mechanism as Foundations' X-ray; the chip is disabled in the elevation, where
   there is nothing to reveal.
 
-**Why:** ADR-078 point 2 argued that nothing in this topic was camera-dependent, so the raycaster
+**Why:** ADR-133 point 2 argued that nothing in this topic was camera-dependent, so the raycaster
 would buy nothing. That was true of a topic with one fixed elevation. It stopped being true the
 moment the 3-D view became an *inspection*: static dashed lines that do not move when the part
 does are not a simplification, they are wrong — they tell the learner a back-face feature is
@@ -2954,7 +2954,7 @@ classifier for this topic — rejected: two implementations of one idea, and the
 the one that gets the curved-surface silhouettes wrong.
 
 **Consequences:** The topic now pins `three-mesh-bvh` in its import map (RULES.md §2.20 applies to
-it after all — the note in ADR-078's consequences is superseded). `meshAnalyzer.js` is a third
+it after all — the note in ADR-133's consequences is superseded). `meshAnalyzer.js` is a third
 verbatim copy and must stay byte-identical to Foundations'. The BVH is built once per `rebuild()`
 and **freed with `disposeBoundsTree()` before the geometry** (ADR-004). Because the classifier
 welds and raycasts in WORLD space, the sheet must be square-on and centred while it is live:
@@ -2962,11 +2962,11 @@ entering a dynamic view drops the Step-3 turn and the two-sheet compare, both of
 flat-drawing devices, and returning to the front restores the turn. Measured on the Guide Plate:
 **≈5.3 ms per pass, 1222 rays over 4641 edges** — comfortably inside a frame, and the pass is
 gated on `lineDrawer.group.visible`, so the elevation costs nothing at all.
-**Status:** Active. Supersedes ADR-078 point 2 only.
+**Status:** Active. Supersedes ADR-133 point 2 only.
 
 ---
 
-## ADR-082: Module-3 Topic 2.2 (Conic Sections) is cut from its SIBLING topic, not from `template_starter/`
+## ADR-137: Module-3 Topic 2.2 (Conic Sections) is cut from its SIBLING topic, not from `template_starter/`
 
 **Date:** 2026-07-29
 **Decision:** `graphics_module_3_topic_2_2_conic_sections` was scaffolded by duplicating
@@ -2997,7 +2997,7 @@ from the master and verify it." The verification step is the part that is not op
 
 ---
 
-## ADR-083: The Conic Sections drawing sheet stores MILLIMETRES; the 3D scene keeps world units
+## ADR-138: The Conic Sections drawing sheet stores MILLIMETRES; the 3D scene keeps world units
 
 **Date:** 2026-07-29
 **Decision:** `ConicState` (eccentricity, focus-to-directrix distance, and every construction
@@ -3023,7 +3023,7 @@ the sibling topics'. Any future control that drives BOTH halves must state which
 
 ---
 
-## ADR-084: The conic curves are drawn by a pure `conicEngine.js` leaf, from ONE focal-polar model, as a display list
+## ADR-139: The conic curves are drawn by a pure `conicEngine.js` leaf, from ONE focal-polar model, as a display list
 
 **Date:** 2026-07-29
 **Decision:** All plane-curve mathematics and all Canvas2D drawing for the Compare sheet live in
@@ -3058,7 +3058,7 @@ after touching any layout.
 
 ---
 
-## ADR-085: In Conic Sections the section clipper EXTRACTS the curve; the cone is never cut away *(superseded by ADR-088 — the cone IS cut; the removed material is kept as a ghost)*
+## ADR-140: In Conic Sections the section clipper EXTRACTS the curve; the cone is never cut away *(superseded by ADR-165 — the cone IS cut; the removed material is kept as a ghost)*
 
 **Date:** 2026-07-29
 **Decision:** `sectionCut.js` (ADR-058) is ported verbatim into the Conic Sections topic, but its
@@ -3082,13 +3082,13 @@ by hand, pre-scene, so the rebuild disposal contract never sees it. `sim.hasCut(
 section was found at all, which is the Problem Library's cuts-the-solid guard here as in both
 siblings. A contributor who reads topic 1 first will find this surprising — it is stated in the
 topic's CLAUDE.md and README as well as here.
-**Status:** Superseded by ADR-088 (2026-07-31) — the cone IS truncated now, the reference
+**Status:** Superseded by ADR-165 (2026-07-31) — the cone IS truncated now, the reference
 topic's way; the nappe a hyperbola needs is preserved as a faint ghost of the removed material
 rather than by leaving the solid whole.
 
 ---
 
-## ADR-086: Conic Sections is sequenced as a lesson, not exposed as a parameter set — observe, then experiment, then name
+## ADR-141: Conic Sections is sequenced as a lesson, not exposed as a parameter set — observe, then experiment, then name
 
 **Date:** 2026-07-30
 **Decision:** The topic's six steps were re-cut into a story — meet the cone · cut it · six cuts,
@@ -3136,7 +3136,7 @@ sheet are suppressed below ~1.3 px per millimetre, because at compact card size 
 nine millimetres of "drawing" and the annotation becomes the figure.
 **Status:** Active
 
-## ADR-087: A label is a drawing annotation, not a floating word — leader lines, screen-space anchors, and a concealed axis drawn to convention
+## ADR-164: A label is a drawing annotation, not a floating word — leader lines, screen-space anchors, and a concealed axis drawn to convention
 
 **Date:** 2026-07-31
 **Decision:** Every name a Simatrix topic puts on a solid or on a sheet is placed the way a
@@ -3200,7 +3200,7 @@ zero spill across five orbit poses, the hover delay, and that both nappe labels 
 geometry.
 **Status:** Active
 
-## ADR-088: Conic Sections cuts for real, and its two panes are one model — the sheet draws the curve of the LIVE section (supersedes ADR-085)
+## ADR-165: Conic Sections cuts for real, and its two panes are one model — the sheet draws the curve of the LIVE section (supersedes ADR-140)
 
 **Date:** 2026-07-31
 **Decision:** Four changes, all of them the same decision seen from different ends: the cut, the
@@ -3213,13 +3213,13 @@ two pictures placed side by side.
   AIM a knife, and the readout already says what this cut would leave. Ticked, the clipper runs.
   The steps that DEMONSTRATE (3 onward) tick it themselves; Step 2, where cutting is the lesson,
   leaves it to the learner.
-- **The cone is truncated, and the cap is a real face — superseding ADR-085.** Each nappe's geometry
+- **The cone is truncated, and the cap is a real face — superseding ADR-140.** Each nappe's geometry
   is swapped for `cutGeometryWithPlane`'s result and its cap becomes material group 1 in the section
   token, the reference topic's own pattern. The previous build kept the solid whole, lifted the cap
   out as a floating mesh and made the cone translucent to see it through: the section face read as a
   stain rather than a surface, and the transparency cost correct depth sorting. Now it is lit like
   any other face, sorted like any other face, and visible from every angle with no trickery.
-  ADR-085's reason for keeping the solid whole — that truncation hides the nappe a hyperbola needs —
+  ADR-140's reason for keeping the solid whole — that truncation hides the nappe a hyperbola needs —
   is answered instead by drawing the REMOVED material as a faint ghost, so §6.1's own pictorials
   (Fig. 6.2, the section on a whole cone) still read while the cut is a real cut.
 - **The sheet draws the curve of the live cut.** `e = sin θ ÷ sin g` — the section's eccentricity
@@ -3266,7 +3266,7 @@ their own text, a construction that grows a new labelled element without adding 
 show up as an unexplained element; `verify/interaction.mjs` is the oracle for all of it.
 **Status:** Active
 
-## ADR-089: Conic Sections teaches the focal sphere — the focus and the directrix are FOUND on the cone before they are used on paper
+## ADR-166: Conic Sections teaches the focal sphere — the focus and the directrix are FOUND on the cone before they are used on paper
 
 **Date:** 2026-08-01
 **Decision:** Step 4's reveal runs in two acts rather than one. The first act is played on the
@@ -3297,7 +3297,7 @@ second act, the existing sheet reveal (§6.3), measure PF and PQ with them.
 **Why:** The syllabus audit of 2026-08-01 found this the largest conceptual gap in the topic:
 §6.2 defines the focus and the directrix ON THE CONE, and the simulation skipped straight to
 §6.3's locus, handing the learner two pieces of apparatus with no origin. Worse, the bridge the
-topic HAD invented between its two panes — `e = sin θ ÷ sin g` (ADR-088) — is correct
+topic HAD invented between its two panes — `e = sin θ ÷ sin g` (ADR-165) — is correct
 trigonometry that the chapter never states, so the one place the learner was told "these two
 pictures are the same thing" was the one place the book could not back up. The focal sphere is
 the book's own answer, it is inherently three-dimensional, and it is the one thing left in this
@@ -3323,7 +3323,7 @@ hyperbola. `verify/shipped-module.mjs` hammers the tilt with the apparatus fully
 because an undisposed sphere is the fastest way there is to exhaust a WebGL context.
 **Status:** Active
 
-## ADR-090: In Conic Sections the sheet draws WHAT THE CUT IS — three of §6.1's six sections are not plane conics
+## ADR-167: In Conic Sections the sheet draws WHAT THE CUT IS — three of §6.1's six sections are not plane conics
 
 **Date:** 2026-08-01
 **Decision:** `conicState` carries `cutKind` — `'conic' | 'circle' | 'triangle' | 'none'` — derived
@@ -3340,7 +3340,7 @@ from the live scene at the END of `rebuild()`, and the sheet has a layout for ea
 - **The plane clear of the cone.** Nothing is cut, and the sheet says so instead of holding the
   last curve it had.
 
-Everything else is a conic and behaves as ADR-088 set out. The dock's readout and Step 4's reveal
+Everything else is a conic and behaves as ADR-165 set out. The dock's readout and Step 4's reveal
 branch on the same `cutKind`, so the 3-D pane, the sheet and the words can never describe
 different things.
 
@@ -3367,7 +3367,7 @@ cone, at the two parallel planes that are the reason it has no directrix), and t
 vocabulary block stays shut for a cut that produced no focus and no directrix to name.
 **Status:** Active
 
-## ADR-091: The Conic Sections drawing sheet REPORTS what it measures — a worksheet, not a picture
+## ADR-168: The Conic Sections drawing sheet REPORTS what it measures — a worksheet, not a picture
 
 **Date:** 2026-08-01
 **Decision:** Every layout the engine returns carries `results` — a list of
@@ -3404,7 +3404,7 @@ against the formula that produced it, and the oblique-ellipse case caught a firs
 that check that compared against an x/y span.
 **Status:** Active
 
-## ADR-092: Every term Chapter 6 defines is CAPTIONED on the figure that draws it
+## ADR-169: Every term Chapter 6 defines is CAPTIONED on the figure that draws it
 
 **Date:** 2026-08-01
 **Decision:** The terminology sheet names §6.4's auxiliary circles (with their major and minor
@@ -3421,7 +3421,7 @@ Example 6.4's parallelogram method is GIVEN, so a learner meeting that construct
 shown its input nowhere.
 
 **Alternatives rejected:** *(a)* Put the four terms in the step card's prose — rejected: this
-topic's rule is that a name belongs to the thing it names, on the drawing (ADR-087). *(b)* A
+topic's rule is that a name belongs to the thing it names, on the drawing (ADR-164). *(b)* A
 separate "ellipse terminology" sheet to spread the load — rejected: Fig. 6.4 is one figure in
 the book and splitting it would lose exactly what it is for.
 
@@ -3432,7 +3432,7 @@ one name on a crowded frame, by design (RULES.md §3.39) — the maths oracle as
 is present in the layout, which is the check that cannot be defeated by a placement decision.
 **Status:** Active
 
-## ADR-093: §6.6's three properties of the parabola are DRAWN, and the drawing is the proof
+## ADR-170: §6.6's three properties of the parabola are DRAWN, and the drawing is the proof
 
 **Date:** 2026-08-01
 **Decision:** A `props` sheet mode with three stages, played from a Step-5 button that appears
@@ -3471,7 +3471,7 @@ contain. `verify/conic-math.mjs` integrates the hatched region to 0.66667 of the
 the tangency and perpendicularity claims off the display list.
 **Status:** Active
 
-## ADR-094: The rest of §6.8, and the one method of §6.5 that can be drawn without inventing it
+## ADR-171: The rest of §6.8, and the one method of §6.5 that can be drawn without inventing it
 
 **Date:** 2026-08-01
 **Decision:** Phases 6 and 7 of the audit roadmap, finishing the syllabus:
@@ -3503,7 +3503,7 @@ drawing, and the oracle demands the curve be close to the true ellipse WITHOUT b
 — an approximation that tested as exact would mean the construction was not being followed.
 **Status:** Active
 
-## ADR-095: Step 4 is a proof the learner WALKS — and the tangent plane is not tangent to the sphere
+## ADR-172: Step 4 is a proof the learner WALKS — and the tangent plane is not tangent to the sphere
 
 **Date:** 2026-08-01
 **Decision:** Step 4's explanation of where the focus and the directrix come from is rebuilt as
@@ -3559,7 +3559,7 @@ screenshots every stage — because whether a figure reads as one point of conta
 no assertion can make.
 **Status:** Active
 
-## ADR-096: The tangent plane is drawn as an ANNULUS, and the one-point tangency is shown where it actually happens
+## ADR-173: The tangent plane is drawn as an ANNULUS, and the one-point tangency is shown where it actually happens
 
 **Date:** 2026-08-01
 **Decision:** The Step-4 proof keeps its geometry exactly and changes only what is drawn.
@@ -3613,7 +3613,7 @@ test (`isDescendantOf`) because `traverse` gives none, and the proof's own parts
 dimmed as scenery.
 **Status:** Active
 
-## ADR-097: The two tangencies are two stages — sphere-to-cone is a CIRCLE, sphere-to-cut is a POINT
+## ADR-174: The two tangencies are two stages — sphere-to-cone is a CIRCLE, sphere-to-cut is a POINT
 
 **Date:** 2026-08-01
 **Decision:** Step 4's proof goes from six stages to seven, and the extra one exists to separate
@@ -3662,7 +3662,7 @@ set against the layout rather than the canvas, because the caption pass may legi
 it cannot place (§3.39).
 **Status:** Active
 
-## ADR-098: The three constructions course 1003 names are STAGED — one playback system, four constructions
+## ADR-175: The three constructions course 1003 names are STAGED — one playback system, four constructions
 
 **Date:** 2026-08-02
 **Decision:** The official syllabus turned up (`1003.pdf`, *Diploma Curriculum Revision 2026*), and
@@ -3719,7 +3719,7 @@ false in both ellipse constructions (it is a minor-axis end) and in the tangent 
 of the abscissa) — `O` is the centre, and the tip now says so.
 **Status:** Active
 
-## ADR-099: The focus-directrix construction opens with ONE line, and the newest line is the bright one
+## ADR-176: The focus-directrix construction opens with ONE line, and the newest line is the bright one
 
 **Date:** 2026-08-02
 **Decision:** Three usability changes to Step 5, none of them mathematical.
@@ -3762,7 +3762,7 @@ two oracles that asserted "5 of 6" were updated — the third time a hard-coded 
 needed changing, which §3.53 already warns about.
 **Status:** Active
 
-## ADR-100: Step 5 is a drawing workspace — the sheet takes the bench, and every method animates
+## ADR-177: Step 5 is a drawing workspace — the sheet takes the bench, and every method animates
 
 **Date:** 2026-08-03
 **Context:** An Engineering Graphics professor reviewed the shipped topic. The substance of the
@@ -3806,7 +3806,7 @@ first pair of arcs was struck. `curvePts` is filled at every stage even when unh
 analytic bbox that locks the sheet scale (ADR-053) must not shift as the construction plays.
 **Status:** Active
 
-## ADR-101: The concentric-circle construction numbers BOTH circles, and names its crossings
+## ADR-178: The concentric-circle construction numbers BOTH circles, and names its crossings
 
 **Date:** 2026-08-03
 **Context:** The professor's second review. The concentric-circle method divided both circles but
@@ -3839,7 +3839,7 @@ just the count: that each k and k′ share one radius and sit on their own circl
 crossing of outer k with inner k′, and that every named point satisfies the ellipse.
 **Status:** Active
 
-## ADR-102: Step 5's dock is a hierarchy, and a control that does nothing is not shown
+## ADR-179: Step 5's dock is a hierarchy, and a control that does nothing is not shown
 
 **Date:** 2026-08-03
 **Context:** A third review. The headline report was that "problem mode breaks the construction" —
@@ -3852,7 +3852,7 @@ construction ran correctly under a loaded problem for all thirteen methods. What
 wrong is that Step 5's dock had grown to **2140 px of content in a 588 px scroller**, and "Draw
 it step by step" sat ~850 px below the fold. Loading a problem adds a statement header, which
 pushed it a further 254 px down. The learner saw a panel with no playback control on it and
-reasonably concluded the animation was gone. The regression was mine: ADR-100 added the curve
+reasonably concluded the animation was gone. The regression was mine: ADR-177 added the curve
 picker, the tiered method list and a seven-row methodology card above the playback.
 
 **Decision:** fix it by ordering and by subtraction, not by adding a scrollbar hint.
@@ -3899,7 +3899,7 @@ fixed number of paints: the first paint of a sheet lays its captions out with me
 stale, so ~3% of its ink differs on that frame alone and never again.
 **Status:** Active
 
-## ADR-103: One viewport control — Compare — and a thumbnail minimizes rather than vanishes
+## ADR-180: One viewport control — Compare — and a thumbnail minimizes rather than vanishes
 
 **Date:** 2026-08-03
 **Context:** A fourth review. Step 5's viewport had accumulated four floating controls (Open/Hide
@@ -3937,7 +3937,7 @@ Compare both survive. The cluster also needs `visibility: visible` to outlive it
 since it lives inside `#sim-viewport`.
 **Status:** Active
 
-## ADR-104: The oblong method mirrors its fan, and carries its rays past the crossing
+## ADR-181: The oblong method mirrors its fan, and carries its rays past the crossing
 
 **Date:** 2026-08-03
 **Context:** A fifth review, of the rectangular (oblong) ellipse. Two complaints, both about the
@@ -3962,7 +3962,7 @@ sequence and the drawing rather than the arithmetic.
   shrink the moment the projections arrived.
 
 **The bug this uncovered.** `ROLE_ORDER` — the renderer's draw order — did not list the new
-`projection` role, so none of it reached the canvas. Nor did it list `plot`, added in ADR-102, so
+`projection` role, so none of it reached the canvas. Nor did it list `plot`, added in ADR-179, so
 the points the concentric-circle construction plots had not been painted since that pass either.
 Both were invisible in a way nothing could catch: the display list was right, the pen table had
 entries, and the oracles inspected layouts rather than pixels. A missing role now fails a test —
@@ -3975,11 +3975,11 @@ mirrored crossings are asserted to be reflections of the fan's own lines and to 
 ellipse, so the symmetry is checked as a claim rather than trusted.
 **Status:** Active
 
-## ADR-105: Step 5 IS Step 4, with the primary view swapped — the canvas box, not the pane
+## ADR-182: Step 5 IS Step 4, with the primary view swapped — the canvas box, not the pane
 
 **Date:** 2026-08-03
 **Context:** A sixth review, and a straightforward verdict: Step 5 had become a different
-interface. ADR-100 gave it a three-column grid, which meant a second layout language for one
+interface. ADR-177 gave it a three-column grid, which meant a second layout language for one
 step, a Compare menu that replaced the interface rather than selecting a view, and a minimize
 that collapsed a grid column.
 
@@ -4007,10 +4007,10 @@ rather than by reading the screenshot, which is the lesson: a floating control o
 stacking context has changed needs its z-index restated, not assumed.
 **Status:** Active
 
-## ADR-106: Compare opens a menu; Switch view swaps. The main view is a panel, not a window
+## ADR-183: Compare opens a menu; Switch view swaps. The main view is a panel, not a window
 
 **Date:** 2026-08-03
-**Context:** A seventh review. ADR-105 got the geometry right but left the chrome wrong: the
+**Context:** A seventh review. ADR-182 got the geometry right but left the chrome wrong: the
 main view still wore the floating card's title bar with Minimize, Fullscreen and Close, and
 Compare was doing two jobs — opening a menu AND being the only way to swap.
 
@@ -4038,7 +4038,7 @@ both directions.
 
 **Status:** Active
 
-## ADR-107: Step 4 answers the second question — where the four NAMES come from
+## ADR-184: Step 4 answers the second question — where the four NAMES come from
 
 **Date:** 2026-08-03
 **Context:** Step 4 explained why tilting the plane changes the curve, but never why the four
@@ -4052,7 +4052,7 @@ the real one.
   second implementation of the tour. Step 3 lists all six of §6.1's sections because its question
   is "what cuts are there"; Step 4 shows the four that have names to explain.
 - **A live eccentricity badge**, beside the tilt slider that drives it. The value is the REAL one
-  for the cut on the bench — `cutEccentricity()`, the chapter's own e = sin θ ÷ sin g (ADR-088) —
+  for the cut on the bench — `cutEccentricity()`, the chapter's own e = sin θ ÷ sin g (ADR-165) —
   never a number looked up from the curve's name.
 - **A four-row reference card** (e = 0 · 0 < e < 1 · e = 1 · e > 1) with the row the cut is
   currently in highlighted, so the table reads as a live position rather than a list.
@@ -4073,10 +4073,10 @@ ARRIVAL (the chip's pressed state) rather than for a fixed sleep; a first versio
 mid-tween and read the curve the plane was passing through.
 **Status:** Active
 
-## ADR-108: Compare is a MODE — the two views side by side — and Switch view is Step 5's alone
+## ADR-185: Compare is a MODE — the two views side by side — and Switch view is Step 5's alone
 
 **Date:** 2026-08-03
-**Context:** ADR-106 made Compare a menu opener, and ADR-103 before it had removed the
+**Context:** ADR-183 made Compare a menu opener, and ADR-180 before it had removed the
 side-by-side layout's entry point. That lost the thing Compare exists for: watching the cutting
 plane drive the drawing, with both on screen at once.
 
@@ -4097,7 +4097,7 @@ plane drive the drawing, with both on screen at once.
 - **Choosing a curve in Step 5 aims the plane at that cut.** The 3-D beside the drawing is a
   REFERENCE; it was showing the previous curve's cut while the sheet drew a different one. This
   does NOT re-couple the sheet to the cut — from Step 5 the drawing keeps its own given
-  dimensions (ADR-088) — it only points the reference at what is being drawn.
+  dimensions (ADR-165) — it only points the reference at what is being drawn.
 
 **On the thumbnail being "a static preview":** it never was. It is the live WebGL canvas in
 `#view-box`, rendering every frame; measured mid-session it was a real `webgl` context at
@@ -4108,16 +4108,16 @@ plane when the Step 5 curve changed — which is what the previous item fixes.
 rail toggle has nothing to toggle and is retired from the mode. Compare's own oracle section was
 rewritten around the mode: it checks the two panes are side by side and even, that the sidebar
 and rail are gone, that the label flips both ways, and that returning preserves the step and the
-construction. (The "no rail" part of that is superseded by ADR-109, which puts a control strip
+construction. (The "no rail" part of that is superseded by ADR-186, which puts a control strip
 back deliberately.)
 **Status:** Active
 
 ---
 
-## ADR-109: Compare Mode builds its own layout, and carries the drivers that make it worth using
+## ADR-186: Compare Mode builds its own layout, and carries the drivers that make it worth using
 
 **Date:** 2026-08-03
-**Context:** Two faults in ADR-108's Compare Mode. Entering it with the lesson's thumbnail
+**Context:** Two faults in ADR-185's Compare Mode. Entering it with the lesson's thumbnail
 minimized opened it with no drawing at all; and with no controls in it, a learner could compare
 two pictures but change nothing, which is most of the point.
 
@@ -4139,13 +4139,13 @@ two pictures but change nothing, which is most of the point.
 
 **Consequences:** the `thumb-min` rules needed `:not(.compare-split)`, since a minimized
 thumbnail is a lesson state that must not reach into this mode. The rail's `grid-area: rail` had
-been deleted along with its other rules in ADR-108, so without it the strip auto-placed into the
+been deleted along with its other rules in ADR-185, so without it the strip auto-placed into the
 left column and sat under one pane instead of both — the oracle now asserts it spans from the
 3-D pane's left edge to the sheet's right edge, that it carries exactly the cone and the cut, and
 that moving the tilt from inside the strip redraws the sheet.
 **Status:** Active
 
-## ADR-110: Compare Mode is driven by the TILT alone
+## ADR-187: Compare Mode is driven by the TILT alone
 
 **Date:** 2026-08-03
 **Context:** Compare Mode's strip carried "slide it past the tip" beside the tilt. Which conic a
@@ -4177,7 +4177,7 @@ control cannot undo. The oracle sweeps the tilt and demands all four conics stil
 cone's own generator, and a coarse sweep steps straight over it.
 **Status:** Active
 
-## ADR-111: The oblong method's rays stop at the point they produce, and arrive one at a time
+## ADR-188: The oblong method's rays stop at the point they produce, and arrive one at a time
 
 **Date:** 2026-08-03
 **Context:** A review of the rectangular (oblong) method against the standard classroom
@@ -4185,9 +4185,9 @@ demonstration. Five corrections, all to the sequence and the annotation — no g
 
 **Decision:**
 
-- **Each connecting ray terminates at the crossing it makes**, and goes no further. ADR-104 had
+- **Each connecting ray terminates at the crossing it makes**, and goes no further. ADR-181 had
   carried them on to the edge of the rectangle as dashed projection lines; drawn out, that was
-  clutter. This is NOT a reversal of ADR-104's finding — the complaint there was that the ray
+  clutter. This is NOT a reversal of ADR-181's finding — the complaint there was that the ray
   stopped SHORT of the crossing, at the axis division, so it never reached the point it was said
   to produce. Ending exactly ON the crossing fixes that without the extension.
 - **The rays arrive one division at a time**, the left half finished before the right begins —
@@ -4201,14 +4201,14 @@ demonstration. Five corrections, all to the sequence and the annotation — no g
   because it is literally the same role.
 
 **Consequences:** `exitBox()` and the `projection` role are no longer used by any layout. The
-helper is deleted; the role and its pen stay, and the role-coverage oracle's orphan check (ADR-104)
+helper is deleted; the role and its pen stay, and the role-coverage oracle's orphan check (ADR-181)
 is what protects them if a construction starts emitting them again. The oracle now asserts each
 ray's far end IS one of the crossings — not merely that it is short — that exactly two lines
 arrive per stage, that stages 5–7 are the left half and 8–10 the right, and that the numbering is
 balanced above and below the axis.
 **Status:** Active
 
-## ADR-112: A ray goes dashed where it crosses the centre line, and one half is mirrored on
+## ADR-189: A ray goes dashed where it crosses the centre line, and one half is mirrored on
 
 **Date:** 2026-08-03
 **Context:** Two more refinements to the oblong method after review.
@@ -4218,7 +4218,7 @@ balanced above and below the axis.
 - **A connecting ray is solid only as far as the centre line.** The part carried on into the
   opposite half is a thin dashed projection line, breaking exactly ON the axis — which is the
   drawing convention for a line continued past the view it belongs to. This puts the
-  `projection` role back into service: ADR-111 left it emitted by nothing, and the part of a ray
+  `projection` role back into service: ADR-188 left it emitted by nothing, and the part of a ray
   beyond the axis is precisely what it was defined for.
 - **Only the LEFT half is walked by hand.** Its three rays arrive one division at a time; the
   right half is then mirrored onto the drawing in a single step. Once the learner has built one
@@ -4239,7 +4239,7 @@ that the single mirror step adds six of each and is the exact reflection of what
 drawn.
 **Status:** Active
 
-## ADR-113: The tangent method is built from divisions, not points — and says so
+## ADR-190: The tangent method is built from divisions, not points — and says so
 
 **Date:** 2026-08-03
 **Context:** Review of the parabola's tangent method. The controls described it as something it
@@ -4271,7 +4271,7 @@ now is. Geometry is untouched: the oracle asserts the parabola is identical at 4
 divisions, to 1e-9 over every sampled point.
 **Status:** Active
 
-## ADR-114: The curve is TRACED on, and the oblong's rays arrive one line at a time
+## ADR-191: The curve is TRACED on, and the oblong's rays arrive one line at a time
 
 **Date:** 2026-08-03
 **Context:** Two final requests. The oblong method still put two rays on the paper per press,
@@ -4294,7 +4294,7 @@ stepping onto the last stage traces the curve; switching method, opening the she
 problem shows a finished drawing finished. Anything that is not "one more stage of this
 construction" cancels a trace in progress and shows the curve whole.
 
-**Reversing a previous refusal.** ADR-112 declined a fade on the grounds that the sheet renders
+**Reversing a previous refusal.** ADR-189 declined a fade on the grounds that the sheet renders
 from a pure stage function with no timeline. That was the right call for a fade — but the reveal
 asked for here is not a fade: it is a geometric cut, `partialOf()` returning the SAME points up
 to the one the pencil has reached, so the animation lives in one number passed to the renderer
@@ -4306,15 +4306,15 @@ for all six curve shapes including the four-arc one.
 asserted from the pure oracle rather than by sampling pixels. Measured in the browser, the
 crimson pixel count climbs 257 → 341 → 1482 → 2732 → 3500 across the trace and then holds, with
 every construction line, label and plotted point still on the sheet.
-**Status:** Amended by ADR-115 — the oblong's left half now takes twelve presses rather than six,
+**Status:** Amended by ADR-192 — the oblong's left half now takes twelve presses rather than six,
 and the trace fires on the stage that DRAWS the curve rather than on the last stage.
 
-## ADR-115: The hyperbola is a section, not a construction; and the trace asks the layout
+## ADR-192: The hyperbola is a section, not a construction; and the trace asks the layout
 
 **Date:** 2026-08-04
 **Context:** A review round with five items — three UI, two animation. The two that needed a
 decision rather than an edit were the syllabus scope of the hyperbola, and why the tangent
-method alone still popped its curve into existence after ADR-114 said none of them would.
+method alone still popped its curve into existence after ADR-191 said none of them would.
 
 **Decision:**
 
@@ -4325,7 +4325,7 @@ method alone still popped its curve into existence after ADR-114 said none of th
   six named cuts, still classified from the live cone by `classifySection()`, still carries its
   §6.8 vocabulary on the terms sheet, and the sheet still draws it from the focus-and-directrix
   definition whenever the plane makes one. What left is "how to construct a hyperbola", nothing
-  else. This is narrower than ADR-100's "nothing is removed", which was about the tiers WITHIN a
+  else. This is narrower than ADR-177's "nothing is removed", which was about the tiers WITHIN a
   curve the module teaches; a curve the module does not ask to be constructed is a different
   question, and the honest answer to it is a shorter list rather than a longer one.
 - **Step 6's hyperbola tier is off** (`ENABLED_TIERS` in `src/problems.js`). Three of exercises
@@ -4335,7 +4335,7 @@ method alone still popped its curve into existence after ADR-114 said none of th
 - **The curve trace asks the LAYOUT which stage draws the curve**, instead of assuming it is the
   last one. That assumption held for twelve of the thirteen constructions and failed for the
   tangent method, whose envelope is drawn at stage 6 and whose focus and directrix are marked at
-  stage 7 — so ADR-114's trace fired one stage late and the curve simply appeared, which is the
+  stage 7 — so ADR-191's trace fired one stage late and the curve simply appeared, which is the
   inconsistency this round reported. `stageDrawsCurve()` compares two pure display lists and asks
   which stage first carries an `outline` item. No per-method table to fall out of step with one.
 - **Every connecting line of the oblong's first half arrives on its own press** — twelve, four
@@ -4356,13 +4356,13 @@ curve stage (6) is NOT its last (7) — a regression back to the last-stage rule
 quietly. Measured in the browser: the tangent method's curve climbs 9 → 287 → 606 → 874 → 1190
 → 1490 → 1544 px across the trace and holds; the oblong adds ~600–700 px on each of its twelve
 first-half presses, then 7,700 at once for the mirrored half.
-**Status:** Amended by ADR-116 — the oblong's twelve first-half presses became six, split across
+**Status:** Amended by ADR-193 — the oblong's twelve first-half presses became six, split across
 the construction's two families rather than run as one long sequence.
 
-## ADR-116: One pacing rule for every construction, and a stage list that can be sized
+## ADR-193: One pacing rule for every construction, and a stage list that can be sized
 
 **Date:** 2026-08-04
-**Context:** ADR-115 gave the oblong method seventeen presses and the review called it what it
+**Context:** ADR-192 gave the oblong method seventeen presses and the review called it what it
 was — thorough and repetitive. The same round reported that the tangent method still put its
 chords down in two lumps, and that "Show its three properties" left the drawing broken.
 
@@ -4417,7 +4417,7 @@ pixels — rather than against a reading taken earlier in the session, which is 
 first-paint label metrics that make any sheet's first render differ from its settled one.
 **Status:** Active
 
-## ADR-117: Every step draws its own sheet, and Step 6 borrows the cut rather than taking it
+## ADR-194: Every step draws its own sheet, and Step 6 borrows the cut rather than taking it
 
 **Date:** 2026-08-04
 **Context:** Step 6 asks the learner to name an unnamed cut, and the drawing sheet beside it was
@@ -4459,7 +4459,7 @@ pixels: Step 6 differs from Step 5, follows five distinct cuts across six deals,
 to the construction, and Step 5 returns exactly as it was left.
 **Status:** Active
 
-## ADR-118: A construction opens on its given data, and the sheet gets a drafting vocabulary
+## ADR-195: A construction opens on its given data, and the sheet gets a drafting vocabulary
 
 **Date:** 2026-08-04
 **Context:** Step 5 opened on the finished figure — the answer on the paper before the question —
@@ -4476,7 +4476,7 @@ The same review asked for better drafting quality across every construction.
   method starts swinging arcs at stage 1, so it waits too (0); the rectangle, oblong and
   parallelogram methods are handed their frame (1); the arc method is given both foci and the
   constant sum (1); the tangent method is given its base and abscissa and nothing else (0 — see
-  ADR-119); the focus-directrix construction is given an axis, a directrix and a focus (2). Opening
+  ADR-196); the focus-directrix construction is given an axis, a directrix and a focus (2). Opening
   everything at stage 0 would have shown the oblong method a bare pair of axes and called it the
   given data of a rectangular construction.
 - **Keyed on the REQUEST, not on whether the id changed.** Pressing "Ellipse" when the ellipse is
@@ -4494,7 +4494,7 @@ The same review asked for better drafting quality across every construction.
   first wanting a spot clear of the construction fan as well, then settling for one clear of the
   linework that must never be covered. Dropping the caption instead would be worse on a figure
   like the oblong method, where the fan leaves almost no clear paper, and the paper halo from
-  ADR-116 keeps it readable either way. Plotted points are drawn a size up from marks that merely
+  ADR-193 keeps it readable either way. Plotted points are drawn a size up from marks that merely
   locate things, since a plotted point IS the answer at that spot.
 
 **Consequences:** the dock's invitation changes with the sheet — "The given data is set out, ready
@@ -4508,12 +4508,12 @@ the concentric method opens with no circles, the oblong with its rectangle and n
 tangent method with its base and axis and neither tangent. Measured: the oblong opens at 2,768
 inked px and finishes at 10,105; the sheet carries seven distinct ink bands where the three
 weights and the curve separate cleanly.
-**Status:** Amended by ADR-119 — the tangent method's opening stage moved from 2 to 0.
+**Status:** Amended by ADR-196 — the tangent method's opening stage moved from 2 to 0.
 
-## ADR-119: A triangle can look like a frame and still be the construction
+## ADR-196: A triangle can look like a frame and still be the construction
 
 **Date:** 2026-08-04
-**Context:** ADR-118 opened the tangent method on stage 2, its two tangents joined, on the
+**Context:** ADR-195 opened the tangent method on stage 2, its two tangents joined, on the
 reasoning that the triangle AEB is the frame the construction is built inside — the same reading
 that gives the oblong method its rectangle. The review came back: that is an advanced stage of
 the construction, and the method was the only one still not starting from its beginning.
@@ -4537,7 +4537,7 @@ opens at 1,775 inked px against 2,811 before, and the first three presses read "
 axis", "The two tangents", "Divide them".
 **Status:** Active
 
-## ADR-120: The sheet is docked beside the solid in Steps 4 and 6, not floated over it
+## ADR-197: The sheet is docked beside the solid in Steps 4 and 6, not floated over it
 
 **Date:** 2026-08-04
 **Context:** A design critique of the whole surface scored it 30/40 and named this as the biggest
@@ -4553,7 +4553,7 @@ except the boxes sit beside each other rather than one over the other.
 
 - **Scoped inside the viewport, not at the body.** Compare Mode's `body.compare-split` is the
   same relationship one level up, but it collapses the wizard, and a guided step that hides its
-  own step card strands the learner (ADR-102). Docking inside `#sim-viewport` leaves the lesson
+  own step card strands the learner (ADR-179). Docking inside `#sim-viewport` leaves the lesson
   column untouched, which is what made this the missing third layout rather than a reuse.
 - **Structural at the breakpoints, per the product register.** Two columns at ≥1100px, stacked
   rows at 768–1099px, and **the float is deliberately kept below 768px**: docking there hands the
@@ -4576,13 +4576,13 @@ section 7, which measures the overlapping AREA of the two panes rather than chec
 rule-based test would pass a layout that merely moved the float somewhere else. Measured: **0 px²
 overlap** at 1440, 1024 and 900; minimize returns the column (541px → 964px); Step 5 and Compare
 Mode still report their own layout classes.
-**Status:** Superseded by ADR-125 (2026-08-05). The occlusion this fixed was real and the fix
+**Status:** Superseded by ADR-202 (2026-08-05). The occlusion this fixed was real and the fix
 worked, but the cost was a thumbnail that measured 420 × 320 on four steps and 403 × 876 on two,
 and consistency of the chrome was judged the more important property by the product owner. The
 docked mode, its `--sheet-col` / `--sheet-row` tokens and its `.vp-note` re-anchors were deleted
 outright. Do not reinstate it; if the occlusion is to be addressed again, reframe the camera.
 
-## ADR-121: One loud action per step, and no message outlives the step that raised it
+## ADR-198: One loud action per step, and no message outlives the step that raised it
 
 **Date:** 2026-08-04
 **Context:** The same critique's second P1. DESIGN.md §5.1 already commits to "Primary: Technical
@@ -4633,7 +4633,7 @@ after the proof completes, one on Step 6, and the Step-2 note cleared on arrival
 
 ---
 
-## ADR-122: Dimensioning teaches on five figures, and the figure is data
+## ADR-199: Dimensioning teaches on five figures, and the figure is data
 
 **Date:** 2026-08-04
 **Context:** Experienced Engineering Graphics lecturers reviewed Module 1 Topic 1.1. Their finding
@@ -4671,7 +4671,7 @@ the architecture and the graphics engine must not change.
   `dimensionRig.js`, which was hardcoded to the Guide Plate's feature names, now loops over
   `figure.features` with a branch per kind. Nothing else in the pipeline moved: same solid
   construction, same winding convention, same authored-linework batches, same render order, same
-  two-linework-systems switch of ADR-081.
+  two-linework-systems switch of ADR-136.
 - **`toWorld` stays ONE fixed mm→world map for every figure.** Two sheets of a comparison must be
   in the same space, so per-figure framing lives in `figure.frame` and touches the CAMERA only.
   `HALF_DEPTH` likewise stays a constant sheet plane while `halfDepthOf(figure)` gives each solid
@@ -4701,10 +4701,10 @@ being one rig, one renderer and one interaction set fed different data.
 
 ---
 
-## ADR-123: On a phone the sheet is the other VIEW, not a window on this one
+## ADR-200: On a phone the sheet is the other VIEW, not a window on this one
 
 **Date:** 2026-08-05
-**Context:** The third P1 of the same design critique that produced ADR-120 and ADR-121: *the sim
+**Context:** The third P1 of the same design critique that produced ADR-197 and ADR-198: *the sim
 is unusable at phone width, not merely degraded.* Measured at 360 × 640 before this change: the
 viewport took a fixed 42% slice (269 px), the drawing sheet floated as a 70%-height bottom sheet
 over it (96,769 px² of overlap, the solid left an 81 px sliver), and what remained for the step
@@ -4720,7 +4720,7 @@ The platform contract is explicit that the < 768 px notice **advises and never b
 
 **Decision:**
 
-- **Below 768 px the sheet is not a window at all — it is the other view.** ADR-120 established
+- **Below 768 px the sheet is not a window at all — it is the other view.** ADR-197 established
   that two subjects each get their own rect rather than one being parked on the other; a phone has
   no second rect to give, so the honest form of the same judgement is one pane at a time.
   `body.sheet-solo` (set by `syncSheetDock()`, the same one line of truth that sets
@@ -4777,7 +4777,7 @@ unchanged in behaviour (nav still one row at 460 px, no new body class at boot).
 
 ---
 
-## ADR-123: A comparison sheet is a (layout, method) PAIR, and the method is allowed to show nothing
+## ADR-200: A comparison sheet is a (layout, method) PAIR, and the method is allowed to show nothing
 
 **Date:** 2026-08-05
 **Context:** Engineering Graphics lecturers asked that Step 4 of Module 1 Topic 1.1 teach the two
@@ -4839,14 +4839,14 @@ measured afterwards).
 
 ---
 
-## ADR-124: Docking is for the two steps that have two subjects, and the set has to be READ
+## ADR-201: Docking is for the two steps that have two subjects, and the set has to be READ
 
 **Date:** 2026-08-05
 **Context:** Reported as a thumbnail-height regression: on Steps 1, 2, 3, 4 and 6 the drawing sheet
 filled the viewport's height (403 × 876 at 1440 × 900) instead of staying the compact floating
 panel Step 5 shows (420 × 320). Two separate things were tangled in that report.
 
-ADR-120's decision text, and the docstring on `syncSheetDock()` itself, both say docking is for
+ADR-197's decision text, and the docstring on `syncSheetDock()` itself, both say docking is for
 **Step 4 and Step 6** — "the steps that show both and give neither the bench". The implementation
 never looked at the stage:
 
@@ -4859,7 +4859,7 @@ side-reference the learner opened themselves with the Compare chip; docking hand
 to something nobody asked to be given equal billing. That half of the report is a straight
 implementation bug against a written decision.
 
-The other half is not a regression. Steps 4 and 6 dock by design, and that IS ADR-120 — the fix
+The other half is not a regression. Steps 4 and 6 dock by design, and that IS ADR-197 — the fix
 for the design critique's P1, *"the sheet occludes the cone"*. Reverting them would have put the
 sheet back on the top-right quadrant of the box the camera had framed the cone into, at the two
 steps where the proof plays on the apex and the learner has to read a cut.
@@ -4869,12 +4869,12 @@ steps where the proof plays on the apex and the learner has to read a cut.
 - **`DOCK_STAGES = new Set([4, 6])` is the whole of the judgement, and `syncSheetDock()` reads it.**
   A rule that lives only in a docstring is not a rule. Steps 1–3 now float the sheet at exactly the
   box Step 5 gives its thumbnail — same width, same height, same anchor, same corner.
-  *(Overtaken within the day: ADR-125 removed the docked mode entirely, so `DOCK_STAGES` no longer
+  *(Overtaken within the day: ADR-202 removed the docked mode entirely, so `DOCK_STAGES` no longer
   exists. The rule this ADR established — put the set in the condition, not the docstring — stands
   as RULES §3.65 and is what the next layout mode has to obey.)*
 - **Steps 4 and 6 keep the docked column.** Confirmed with the reporter after the alternatives were
-  laid out. ADR-120 stands unamended; this ADR corrects how it was applied, not what it decided.
-  *(Reversed the same day — see ADR-125. The reporter came back asking for Steps 4 and 6 to match
+  laid out. ADR-197 stands unamended; this ADR corrects how it was applied, not what it decided.
+  *(Reversed the same day — see ADR-202. The reporter came back asking for Steps 4 and 6 to match
   as well, which is their call to make and was made with the trade on the table.)*
 - **One compact box serves every step that has one.** The only thing a step changes is what is
   drawn inside it — which is what the report asked for, and is now true for the five steps that
@@ -4891,11 +4891,11 @@ one, and the box never exceeds its 420 × 320 cap, so resizing cannot stretch it
 
 ---
 
-## ADR-125: One thumbnail box for every step; the docked mode is deleted, not narrowed
+## ADR-202: One thumbnail box for every step; the docked mode is deleted, not narrowed
 
 **Date:** 2026-08-05
-**Supersedes:** ADR-120
-**Context:** Reported twice. ADR-124 fixed the first half — Steps 1–3 were docking when ADR-120's
+**Supersedes:** ADR-197
+**Context:** Reported twice. ADR-201 fixed the first half — Steps 1–3 were docking when ADR-197's
 own text scoped docking to Steps 4 and 6 — and the reporter was asked directly whether Steps 4 and
 6 should keep the docked column, with the occlusion trade laid out. They chose to keep it, then
 came back and asked for those two to match Step 5 as well. That is theirs to decide, and it was
@@ -4918,7 +4918,7 @@ overrode it, and that was `body.sheet-docked`.
   two sizing systems in the file, which is how this drifted in the first place.
 - **`syncSheetDock()` keeps only `sheet-solo`.** That is not a second size: below 768px there is no
   room for a card and a solid at once, so the sheet becomes the other VIEW and the pane behind it
-  stops painting (ADR-123). The function no longer reads the stage at all, because no step has a
+  stops painting (ADR-200). The function no longer reads the stage at all, because no step has a
   box of its own any more.
 - **What this gives back is measured and printed, not asserted away.** On Steps 4 and 6 the card
   again sits over the box the camera framed the cone into. Section 7 prints that overlap as a
@@ -4945,7 +4945,7 @@ at the bottom using ADR-000.*
 
 ---
 
-## ADR-126: A drawing gets a second look before it is inked, and only the annotation may move
+## ADR-203: A drawing gets a second look before it is inked, and only the annotation may move
 
 **Status:** Accepted (2026-08-06)
 **Context:** `graphics_module_1_topic_1_1_dimensioning`
@@ -5055,7 +5055,7 @@ the hotspots would point at nothing.
 
 ---
 
-## ADR-127: A topic that teaches the DRAWING authors its linework; only the 3-D solid is generated
+## ADR-204: A topic that teaches the DRAWING authors its linework; only the 3-D solid is generated
 
 **Date:** 2026-08-06
 **Decision:** In `graphics_module_2_topic_0_introduction_to_orthographic_projection`, each of the
@@ -5068,7 +5068,7 @@ lines for every circular and symmetrical feature, and correct trimming where a b
 of the plate it sits on — on non-convex machined parts with blind bores and obround slots. The
 platform has hit this before and answered it the same way: `graphics_module_1_topic_1_1_dimensioning`
 reuses `meshAnalyzer` + `lineDrawer` for LIVE camera-dependent classification of the 3-D part while
-its front elevation keeps **authored** linework (ADR-081). Authored linework is also the only form
+its front elevation keeps **authored** linework (ADR-136). Authored linework is also the only form
 in which the textbook's own figure can be transcribed, which is what the syllabus asks the learner
 to reproduce. The two halves cannot drift apart unnoticed: both are declared in one object, in the
 same millimetres, and the frames that relate them are stated once at the top of the file.
@@ -5092,7 +5092,7 @@ the LAYOUT rather than the linework, so a mis-authored internal edge is caught b
 
 ---
 
-## ADR-128: A view button lands in a real orthographic projection, not a perspective picture of one
+## ADR-205: A view button lands in a real orthographic projection, not a perspective picture of one
 
 **Date:** 2026-08-06
 **Decision:** The four principal directions in Topic 0 render through an **orthographic** camera,
@@ -5131,7 +5131,7 @@ and main.js renders with that. The morph must be stamped LAST each frame, after 
 
 ---
 
-## ADR-129: The projectors fade; the datum does not — and the stage list is derived from the linework
+## ADR-206: The projectors fade; the datum does not — and the stage list is derived from the linework
 
 **Date:** 2026-08-06
 **Decision:** Step 2's reveal is a list of stages **derived** from the layers each view actually
@@ -5143,7 +5143,7 @@ replays, and never moves the camera.
 **Why:** Three separate things, each learned the hard way here.
 *Derived, not tabulated:* the Stepped Block has no circular feature anywhere and hidden detail in
 one view only, so it has 8 stages where the Bearing Block has 13. A fixed table would have given it
-five stages that draw nothing and say nothing, which is the pacing failure ADR-116 already
+five stages that draw nothing and say nothing, which is the pacing failure ADR-193 already
 recorded — and one wrong entry in such a table is invisible until someone watches that one object.
 Asking the layout which layers a view carries needs no table to keep in step (RULES.md §3.52).
 *The datum is not a projector:* the XY line is where the HP meets the VP. It is what the plan is
@@ -5159,7 +5159,7 @@ animation shows them the same thing at the same speed and makes them wait for it
 - *Fade them the moment the next view starts.* The projectors for the plan are still the reason the
   plan is where it is while the plan is being drawn. Tying the fade to "the view this group serves
   now has its own outline" is the statement that is actually true.
-- *One press per line.* Seventeen presses that mostly say nothing new — ADR-116's finding, applied
+- *One press per line.* Seventeen presses that mostly say nothing new — ADR-193's finding, applied
   before repeating it.
 **Consequences:** Nothing may index into the stage list by number; main.js asks a stage which view
 it belongs to and turns the solid to match. The oracle asserts the derivation directly (8 stages for
@@ -5168,7 +5168,7 @@ the block, more for the bearing block) rather than a magic total.
 
 ---
 
-## ADR-130: The Front arrow takes the guidance accent — the one named exception to Chrome-Only Blue
+## ADR-207: The Front arrow takes the guidance accent — the one named exception to Chrome-Only Blue
 
 **Date:** 2026-08-06
 **Decision:** `graphics_module_2_topic_0_introduction_to_orthographic_projection` draws the textbook's
@@ -5204,7 +5204,7 @@ same mark, it takes this role; if it wants accent for anything else, that needs 
 
 ---
 
-## ADR-131: Topic 0's sheet is blank paper, and the learner picks which side view it carries
+## ADR-208: Topic 0's sheet is blank paper, and the learner picks which side view it carries
 
 **Date:** 2026-08-06
 **Decision:** Two changes to Step 2, taken together. The sheet draws the object and nothing else —
@@ -5252,7 +5252,7 @@ rest of this ADR stands.
 
 ---
 
-## ADR-132: The sizes go on the SOLID, from the sheet's own data, one view at a time
+## ADR-209: The sizes go on the SOLID, from the sheet's own data, one view at a time
 
 **Date:** 2026-08-06
 **Decision:** `graphics_module_2_topic_0_introduction_to_orthographic_projection` gains a third
@@ -5282,7 +5282,7 @@ Three sub-decisions carry the weight:
   Step 1's object is unverifiable until Step 2, which is a step away and about something else.
 - *Author a second, 3-D-specific dimension set.* Duplicate data that can disagree with the drawing
   of the same part - the defect the single registry exists to prevent.
-- *Show every view's set at once.* Rejected on the grounds ADR-129 rejected a fixed stage list:
+- *Show every view's set at once.* Rejected on the grounds ADR-206 rejected a fixed stage list:
   more marks is not more teaching.
 **Consequences:** The framing box is recomputed to include the layer, before the flight that uses
 it - a dimension hangs a lane and a half outboard of the face it measures, and framing the solid
@@ -5360,7 +5360,7 @@ depth, not the box maximum. On the parts that were already right it returns the 
 
 ---
 
-## ADR-133: A construction ends on its curve; an optional element belongs to its own control
+## ADR-210: A construction ends on its curve; an optional element belongs to its own control
 
 **Date:** 2026-08-08
 **Decision:** The tangent method's stage list ends on the ENVELOPE. It runs nine stages at the
@@ -5399,21 +5399,21 @@ written procedure count, not the playback length, which varies with the division
 
 ---
 
-## ADR-134: The parabola is traced clockwise, because that is the way a hand draws it
+## ADR-211: The parabola is traced clockwise, because that is the way a hand draws it
 
 **Date:** 2026-08-08
 **Decision:** The tangent method's `curvePts` are reversed. The envelope is traced from the foot of
-the double ordinate, round the vertex, up to its head — clockwise on screen. *(Amended by ADR-138:
+the double ordinate, round the vertex, up to its head — clockwise on screen. *(Amended by ADR-215:
 the foot is now A and the head B, so that trace reads A → B.)*
-**Why:** `parabolaPts()` samples y from −yMax upward, and the sheet is y-DOWN (ADR-083), so the
-pencil started at the TOP of the base and swept anticlockwise. ADR-114's reveal exists to show the
+**Why:** `parabolaPts()` samples y from −yMax upward, and the sheet is y-DOWN (ADR-138), so the
+pencil started at the TOP of the base and swept anticlockwise. ADR-191's reveal exists to show the
 curve being drawn the way a hand would draw it; a hand working a parabola of this shape comes up
 out of the base, and the reveal was showing the opposite. This is the same class of correction as
 the reveal itself: the geometry was right and the PERFORMANCE of it was not.
 **Alternatives rejected:**
 - *Swap the roles of A and B.* Would relabel the drawing. A is the chapter's upper end of the
   double ordinate and the numbering of the divided tangents follows it; renaming the ends to fix a
-  playback direction changes what the figure says. **Superseded by ADR-138**, which does swap them —
+  playback direction changes what the figure says. **Superseded by ADR-215**, which does swap them —
   as coordinates, not captions — on the ground that a curve drawn from B to A on a figure labelled A
   first asks the learner to read the construction backwards.
 - *Reverse inside `parabolaPts()`.* That helper is shared with the parallelogram and rectangle
@@ -5428,7 +5428,7 @@ built the other way up.
 
 ---
 
-## ADR-135: The problem library is filtered by METHOD, because that is the axis the syllabus cuts on
+## ADR-212: The problem library is filtered by METHOD, because that is the axis the syllabus cuts on
 
 **Date:** 2026-08-08
 **Decision:** `src/problems.js` gains a third filter, `ENABLED_METHODS`, holding the three
@@ -5440,11 +5440,11 @@ The library now deals seven: three chapter exercises and the four new ones.
 Parabola- Tangent method only"*, and neither existing axis can express that. `ENABLED_TIERS` cuts
 by CURVE, and the ellipse tier holds two syllabus constructions and four beyond them.
 `EXCLUDED_TYPES` cuts by problem KIND, and 'given-dimensions' straddles the line — it covers the
-oblong method and the offset method alike. ADR-098 already named these three as the syllabus tier
+oblong method and the offset method alike. ADR-175 already named these three as the syllabus tier
 of the CONSTRUCTION picker; this makes the problem library agree with it.
 Two sub-decisions:
 - **Filtered, not deleted.** The excluded exercises stay in `PROBLEMS` verbatim, exactly as the
-  four hyperbola ones have since ADR-115. This file is the chapter, the topic README and CLAUDE.md
+  four hyperbola ones have since ADR-192. This file is the chapter, the topic README and CLAUDE.md
   both promise all fifteen, and widening the list is a one-line change if the scope moves.
 - **The four new problems are a separate, labelled block.** They are not chapter exercises and are
   not presented as such. They differ from the chapter's in kind as well as origin: each states its
@@ -5464,7 +5464,7 @@ flagged: dropping either set is a content call, not a code one. `enabledProblems
 
 ---
 
-## ADR-136: The named construction may be selected for the learner; no measured quantity may
+## ADR-213: The named construction may be selected for the learner; no measured quantity may
 
 **Date:** 2026-08-08
 **Decision:** Loading a problem arms `methodArmed`, and on the learner's FIRST arrival at Step 5
@@ -5483,7 +5483,7 @@ Three sub-decisions:
   is matched by the state it loads into, and asserts that the check is not vacuous by confirming
   that at least one WOULD be on the defaults.
 - **At Step 5, not at load.** Steps 1–4 re-derive the sheet's CURVE from the live cut
-  (`syncSheetToCut`, ADR-117), so a method chosen at load would be left beside a curve that had
+  (`syncSheetToCut`, ADR-194), so a method chosen at load would be left beside a curve that had
   drifted away from it, and Step 5's picker would show the wrong curve's list.
 - **Once.** A learner who then picks a different construction is exploring, and re-asserting the
   problem's choice under them would be the sim arguing with the person using it.
@@ -5498,7 +5498,7 @@ re-entrant pass returns early. `RULES.md` §6.2 is amended rather than withdrawn
 **Status:** Active
 ---
 
-## ADR-137 — A staged construction's frame is pinned to the FINISHED figure, not to the stage on screen
+## ADR-214 — A staged construction's frame is pinned to the FINISHED figure, not to the stage on screen
 
 **Date:** 2026-08-09
 **Status:** Active
@@ -5511,11 +5511,11 @@ fresh rebuild instead of continuing from the previous step state", to be fixed b
 
 **That cause does not exist in this codebase and could not.** The 2-D sheet is a display list, not
 a scene graph: `layoutFor(mode, conic)` returns typed primitives plus an analytic bbox, and
-`drawSheet()` is the ONE renderer, repainting the whole list every frame (ADR-084, ADR-118). There
+`drawSheet()` is the ONE renderer, repainting the whole list every frame (ADR-139, ADR-195). There
 are no geometry groups on the sheet to re-instantiate, no clear to suppress, and no second drawing
 mode to switch out of — every stage already redraws all of the linework before it, which is the
 "preserve everything previously drawn" the report asks for. The reveal is a trim on path length
-(`curveReveal`, ADR-114) applied by that same renderer, so the last stage runs the identical code
+(`curveReveal`, ADR-191) applied by that same renderer, so the last stage runs the identical code
 path as the eight before it.
 
 The jump is real. It is a change of SCALE.
@@ -5557,14 +5557,14 @@ sheet is laid out for the finished drawing from stage 1, which is what a drafter
 - *Also reserve the tangent and normal at BOTH ends of the curve, so that dragging P could not move
   the frame either.* Tried and measured: it widens the frame to 258 × 187 mm and took the 1124 × 565
   pane from 1.9 px/mm to **1.1**, under the 1.3 px/mm gate at which `drawSheet` drops every caption
-  (ADR-092). A construction with no names on it is worse than one that resizes while a slider is
+  (ADR-169). A construction with no names on it is worse than one that resizes while a slider is
   being dragged. P moving the frame is pre-existing behaviour and is left alone; the reported defect
   is the STAGE change, and stages are not something the learner is dragging.
 - *Shorten the directrix to ±0.5 · AB so it stops level with A and B.* Hides the symptom by damaging
   the drawing: a directrix that ends level with the base reads as a chord of the figure rather than
   as the line the whole curve is measured against.
 - *Draw the directrix from stage 0, invisibly, to reserve the room.* A construction may not draw
-  what it has not yet found (ADR-118/ADR-119), and an invisible item is a lie in the display list
+  what it has not yet found (ADR-195/ADR-196), and an invisible item is a lie in the display list
   that `describeAt()` and the annotation oracle would both trip over.
 - *Ease the scale change instead of jumping it.* Makes a 16 % rescale of a technical drawing take
   longer. It should not rescale.
@@ -5585,12 +5585,12 @@ to find.
 
 ---
 
-## ADR-138: A is the FOOT of the double ordinate, so the envelope is drawn A → B
+## ADR-215: A is the FOOT of the double ordinate, so the envelope is drawn A → B
 
 **Date:** 2026-08-09
-**Status:** Active. Amends ADR-134.
+**Status:** Active. Amends ADR-211.
 
-**Context:** ADR-134 reversed the tangent method's trace so the pencil comes up out of the base —
+**Context:** ADR-211 reversed the tangent method's trace so the pencil comes up out of the base —
 clockwise, the way a hand works a parabola of this shape — and explicitly declined to swap A and B,
 on the ground that renaming a figure's endpoints to fix a playback direction changes what the figure
 says. The reveal was then correct and the labelling was left alone.
@@ -5603,7 +5603,7 @@ at B" — and then watches the curve arrive at A last. The two orders disagree.
 **Decision:** swap the coordinates.
 
 ```js
-const A = pt(abs, dOrd / 2);    // the FOOT of the double ordinate — +y is down (ADR-083)
+const A = pt(abs, dOrd / 2);    // the FOOT of the double ordinate — +y is down (ADR-138)
 const B = pt(abs, -dOrd / 2);   // its head
 ```
 
@@ -5623,7 +5623,7 @@ chord are identical to floating point. What changes is which end each name is at
 therefore which end the construction is described as starting from.
 
 **Alternatives rejected:**
-- *Reverse the trace back to B → A and keep A at the top.* Undoes ADR-134. A hand does not draw this
+- *Reverse the trace back to B → A and keep A at the top.* Undoes ADR-211. A hand does not draw this
   curve downward into the base.
 - *Swap only the two `label()` calls.* The request explicitly ruled it out, and rightly: the tangent
   AE, its numbering and the chords are all derived from the point named A, so moving the caption
@@ -5633,9 +5633,9 @@ therefore which end the construction is described as starting from.
 - *Keep both and add an option.* Two ways to label one figure is two figures to verify, for a
   question the chapter answers once.
 
-**Consequences:** ADR-134 stands — the direction is still clockwise, still reversed at the layout
+**Consequences:** ADR-211 stands — the direction is still clockwise, still reversed at the layout
 that owns the figure, still not inside `parabolaPts()`, which the parallelogram and rectangle
-parabolas share. RULES §6.30's closing clause, "never by renaming the drawing's own endpoints", is
+parabolas share. RULES §6.34's closing clause, "never by renaming the drawing's own endpoints", is
 narrowed: it forbids renaming as a way to FAKE a direction, not naming the ends to match one. The
 narration in `conicData.js` reads "from A round the vertex up to B" and is checked against the
 drawing by the oracle, as the two modules cannot import each other. Four assertions cover it: A at
@@ -5644,7 +5644,7 @@ construction line struck from each of them.
 
 ---
 
-## ADR-139: A scroll is a zoom. Only a drag is a turn.
+## ADR-216: A scroll is a zoom. Only a drag is a turn.
 
 **Date:** 2026-08-09
 **Status:** Active. Applies to `graphics_module_2_topic_0_introduction_to_orthographic_projection`;
@@ -5706,13 +5706,13 @@ pane-width off centre.
 
 ---
 
-## ADR-140: A re-frame is a MOVE. There is no instant target change the learner cannot see
+## ADR-217: A re-frame is a MOVE. There is no instant target change the learner cannot see
 
 **Date:** 2026-08-09
 **Status:** Active. Applies to `graphics_module_2_topic_0_introduction_to_orthographic_projection`;
 binding platform-wide as RULES §5.22 (amended) and §5.23.
 
-**Context.** Pressing a direction was reported as jumping. ADR-139 had already established that
+**Context.** Pressing a direction was reported as jumping. ADR-216 had already established that
 `controls.target` must follow the content, and that a flight lerps position and target together on
 an eased curve from the pose it is leaving — so on paper the transition was already exactly what a
 smooth transition is supposed to be, and every assertion about the settled view passed.
@@ -5761,7 +5761,7 @@ point AT the target is unaffected, and the target is precisely what moved.
 - *Disable damping for the duration of the flight.* Already equivalent: `main.js` skips
   `controls.update()` entirely while the rig is flying, so the damping loop is inert, and `settle()`
   flushes it with damping off on landing. Adding a second switch for the same effect is noise.
-- *Leave the target alone when idle.* Reintroduces the ADR-139 zoom drift.
+- *Leave the target alone when idle.* Reintroduces the ADR-216 zoom drift.
 - *Re-frame after the flight instead of before it.* The flight would then be aimed at the framing it
   is leaving and would land wrong, which is a worse fault than a jump and a harder one to see.
 
@@ -5773,12 +5773,12 @@ whose dimension set does not change — which is exactly the population that nev
 
 ---
 
-## ADR-141: ⌀ or R is a fact about the VIEW, not about the part
+## ADR-218: ⌀ or R is a fact about the VIEW, not about the part
 
 **Date:** 2026-08-09 (amended 2026-08-09)
 **Status:** Active, with decision 2 REPLACED — see the amendment at the end. Applies to
 `graphics_module_2_topic_0_introduction_to_orthographic_projection`; binding platform-wide as
-RULES §6.31/§6.32.
+RULES §6.35/§6.36.
 
 **Context.** The topic's circular sizes were hand-typed strings in the registry — `'Ø30'`, `'Ø50'`,
 `'Ø18 slot'` — and two of them were wrong. Both were wrong in the same way: the author wrote down
@@ -5872,7 +5872,7 @@ In code this is one `note`-shaped object with two extra fields: `k: 'dia'`, and 
 second arrowhead. Both renderers' existing leader functions draw it, each with one guarded line for
 the extra head; there is no separate diameter path in either medium, and no `diameterDim()`.
 
-Consequence for §6.32's oracle, all measured rather than assumed: the two heads are 2r apart, both
+Consequence for §6.36's oracle, all measured rather than assumed: the two heads are 2r apart, both
 on the circle and collinear with the elbow (that IS "passes through the centre"); a radius carries
 no `head2`; the symbol and the kind of mark must agree; every leader is three points with a
 horizontal last leg; exactly one value sits one lift above each shelf and none is turned; an

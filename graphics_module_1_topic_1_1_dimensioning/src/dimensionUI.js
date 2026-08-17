@@ -6,7 +6,7 @@
 // `sim` controller and this module only calls through it (ADR-007 star rule /
 // RULES.md §3.6).
 //
-// Layering: leaf module. It imports the topic's PURE DATA catalogues (ADR-078) and no
+// Layering: leaf module. It imports the topic's PURE DATA catalogues (ADR-133) and no
 // behavioural sibling — not the rig, not the label layer, not main.js. The one exception is
 // `fitDecision` from dimensionDraw: it is a pure function of a number, not a renderer, and
 // it exists so the control and the drawing can never disagree about which termination the

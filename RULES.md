@@ -115,13 +115,13 @@ Every rule is formatted:
 > nearest SIBLING topic when the boilerplate lacks a layer the new topic needs (the Module-3
 > Problem Library + wired Compare card). Either way, **re-copy every shared engine file from
 > `Module2/src/`** (and any ported leaf from its origin topic) and **verify byte-identity with
-> `md5sum` before writing a line of topic code**. *(ADR-082)*
+> `md5sum` before writing a line of topic code**. *(ADR-137)*
 > Reason: cutting from a sibling starts at chrome parity and makes the delta reviewable; the
 > md5 check is what neutralises the "topics carry stale shared files" hazard (§1.8) that makes
 > sibling-cutting dangerous in the first place.
 
 > **§1.16 ❌ NEVER** carry a shared engine file a topic does not import ("it might be useful
-> later"). Omit it, and say in the topic's `CLAUDE.md` which shared files it does carry. *(ADR-082)*
+> later"). Omit it, and say in the topic's `CLAUDE.md` which shared files it does carry. *(ADR-137)*
 > Reason: an unused copy is a drift surface (§1.4 obliges you to re-copy fixes into it) with no
 > upside — `graphics_module_3_topic_2_2_conic_sections` carries only `cone.js` of the five
 > generators for exactly this reason.
@@ -230,7 +230,7 @@ Every rule is formatted:
 > no DOM, no Three.js objects, no behaviour — as the same sibling-importable category as
 > `genericSolid.js`, and say so in the topic's `CLAUDE.md`. **❌ NEVER** extend that licence to a
 > BEHAVIOURAL leaf (a rig, a renderer, a label layer, a stepper): those still never import one
-> another. *(ADR-078, extends ADR-007)*
+> another. *(ADR-133, extends ADR-007)*
 > Reason: a content-heavy topic (`graphics_module_1_topic_1_1_dimensioning` carries six textbook
 > catalogues) cannot hang every table off the orchestrator without turning `main.js` into a content
 > file — but the thing §3.6 protects is the behaviour graph, not the constants.
@@ -356,23 +356,23 @@ Every rule is formatted:
 > may use the clipper purely to EXTRACT the section curve (drawing the loop on an intact solid and
 > lifting the cap out as the section face) and discard the sliced geometry. **❌ NEVER** assume a
 > topic that imports `sectionCut.js` truncates its solid — check what it does with the result.
-> *(ADR-085, ADR-058)*
+> *(ADR-140, ADR-058)*
 > Reason: Sections of Solids teaches the solid left after the cut; Conic Sections teaches the
 > curve, and truncating there would discard the very nappe a hyperbola needs.
 
 > **§3.35 ✅ DO** dispose a clipper result the scene never receives BY HAND, immediately, at the
 > call site — the `rebuild()` disposal contract (§3.3) can only free what is parented into
-> `shapeGroup`. *(ADR-085, ADR-004)*
+> `shapeGroup`. *(ADR-140, ADR-004)*
 
 > **§3.36 ✅ DO** give a 3-D label a LEADER LINE ending on the feature it names, and anchor the
 > pill along the CAMERA's right/up axes so it stays clear of the silhouette at every orbit angle.
-> **❌ NEVER** park a label at a fixed world point and hope it misses the solid. *(ADR-087)*
+> **❌ NEVER** park a label at a fixed world point and hope it misses the solid. *(ADR-164)*
 > Reason: a pill on its own reads as a word floating near the solid — the learner has to guess
 > which part it means — and a world anchor that clears the silhouette from the default camera
 > swings straight across it the moment the view turns.
 
 > **§3.37 ✅ DO** hide a label with the geometry it names. **❌ NEVER** leave a caption describing
-> something that is no longer on screen. *(ADR-087)*
+> something that is no longer on screen. *(ADR-164)*
 > Reason: "Lower nappe" with no upper nappe present names a distinction the learner cannot see.
 > In Conic Sections both nappe labels leave with the second half; the visibility flag that drives
 > the mesh drives the label.
@@ -382,7 +382,7 @@ Every rule is formatted:
 > from explicit segment geometry, using the PLATFORM's constants (Foundations' chain 0.34 · 0.12 ·
 > 0.07 · 0.12 with 0.35 overshoot; Module 2's hidden 0.12 / 0.08, world units at 10 mm/unit).
 > **❌ NEVER** leave an axis invisible inside its own solid, and
-> never reach for `LineDashedMaterial` where the dash length is a drawing decision. *(ADR-087)*
+> never reach for `LineDashedMaterial` where the dash length is a drawing decision. *(ADR-164)*
 > Reason: an axis a learner cannot see is an axis the topic has not taught, and centre lines are
 > not omitted in engineering drawings because material is in the way. Explicit segments also
 > sidestep the `computeLineDistances()` trap that renders dashes solid (§3.17).
@@ -390,26 +390,26 @@ Every rule is formatted:
 > **§3.39 ✅ DO** place Canvas2D captions through a collision pass — measure, try where authored,
 > step along a fixed ladder of alternatives, drop only as a last resort — in priority order, with
 > the finished curve treated as an obstacle. **❌ NEVER** assume a construction stays legible
-> because its captions are legible one at a time. *(ADR-087, and §5.20's small-sheet suppression)*
+> because its captions are legible one at a time. *(ADR-164, and §5.20's small-sheet suppression)*
 > Reason: a nomenclature figure carries a dozen names round one curve. Because a caption CAN be
 > dropped, the linework must carry the figure on its own — never let a construction depend on its
 > labels to be readable.
 
 > **§3.40 ✅ DO** build a solid's edge overlay AFTER any cut has been applied, and measure its
 > centre line from the geometry that survived. **❌ NEVER** outline the shape the generator made
-> when the shape on screen is the shape the clipper left. *(ADR-088)*
+> when the shape on screen is the shape the clipper left. *(ADR-165)*
 > Reason: a truncated nappe has a different silhouette from a whole one, and an axis drawn to the
 > uncut height hangs in the empty space where the removed material used to be.
 
 > **§3.41 ✅ DO** give a topic whose subject is the CURVE a ghost of the material its cut removed
 > when it truncates a solid. **❌ NEVER** assume "truncate like the reference topic" is complete —
-> check what is left at the extremes of the sliders. *(ADR-088, answering ADR-085)*
+> check what is left at the extremes of the sliders. *(ADR-165, answering ADR-140)*
 > Reason: at a steep tilt the kept half of a double cone is a stump no learner would call a cone,
 > and a hyperbola's second branch leaves with the nappe that carried it.
 
 > **§3.42 ✅ DO** derive a 2-D sheet's subject from the 3-D state it is a view OF, and say in one
 > place which steps the link holds for. **❌ NEVER** let a topic's two panes be driven by
-> independent controls that can disagree about what is being taught. *(ADR-088)*
+> independent controls that can disagree about what is being taught. *(ADR-165)*
 > Reason: in Conic Sections the section's eccentricity is `sin θ ÷ sin g` — one line of the
 > chapter's own trigonometry. Without it a learner could set the cut to a hyperbola and watch the
 > sheet go on drawing an ellipse, which is two lessons in one window. The link is released only
@@ -417,7 +417,7 @@ Every rule is formatted:
 
 > **§3.43 ✅ DO** teach a piece of apparatus WHERE THE TEXTBOOK DEFINES IT before the topic uses
 > it to measure. **❌ NEVER** open a step by handing the learner a construction element the
-> chapter derived earlier and the simulation skipped. *(ADR-089)*
+> chapter derived earlier and the simulation skipped. *(ADR-166)*
 > Reason: Conic Sections used the focus and the directrix from §6.3 onward while §6.2 — where a
 > sphere inscribed in the cone produces both — was missing entirely, so the two most important
 > objects in the chapter arrived as unexplained givens. A syllabus audit is the cheapest way to
@@ -426,14 +426,14 @@ Every rule is formatted:
 
 > **§3.44 ✅ DO** give a staged reveal that crosses panes ONE index, and say in the readout which
 > pane the current stage is happening in. **❌ NEVER** run two independent reveal controls for
-> what is one explanation. *(ADR-089)*
+> what is one explanation. *(ADR-166)*
 > Reason: Step 4's answer starts on the solid and finishes on the paper. Two buttons would make
 > it two lessons; a single "4 of 10 · The focus (on the cone)" keeps it one, and tells the
 > learner where to look — which a 3-D reveal narrated in a side panel otherwise never does.
 
 > **§3.45 ✅ DO** give a topic's DEGENERATE cases their own output, and derive which case is live
 > from the scene AFTER the geometry stage has run. **❌ NEVER** clamp a derived quantity into the
-> range a model can draw and let the drawing stand. *(ADR-090)*
+> range a model can draw and let the drawing stand. *(ADR-167)*
 > Reason: a circle is e = 0, which no focal-polar conic model can express; clamping it to the
 > slider's floor drew a visible ellipse next to a 3-D circle. A cut through the apex is not a
 > locus at all. Both are named sections of the chapter, both had a correct drawing available, and
@@ -441,19 +441,19 @@ Every rule is formatted:
 
 > **§3.46 ✅ DO** report the quantities the syllabus asks the learner to MEASURE, and say where on
 > the drawing each is read. **❌ NEVER** ship a construction that draws the answer and leaves the
-> number unstated. *(ADR-091)*
+> number unstated. *(ADR-168)*
 > Reason: six of Chapter 6's fifteen exercises end in "measure", "determine", "find" or "locate".
 > A drawing that contains the answer without stating it cannot be checked, and a problem hint in
 > this very topic already promised a measurement the sheet did not make.
 
 > **§3.49 ✅ DO** let the learner drive a step that PROVES something: one press, one idea, and a
 > Back that restores the previous state without replaying it. **❌ NEVER** put an explanation on
-> a timer. *(ADR-095)*
+> a timer. *(ADR-172)*
 > Reason: a proof the learner cannot stop is a film. Disable the forward control while a stage
 > is still animating, so nothing can be skipped past half-drawn, and never disable Back.
 
 > **§3.50 ✅ DO** measure a geometric claim before "fixing" what it looks like. **❌ NEVER**
-> adjust geometry to match an expectation about the picture. *(ADR-095)*
+> adjust geometry to match an expectation about the picture. *(ADR-172)*
 > Reason: Conic Sections' tangent plane appears to cut its focal sphere because it does — the
 > plane contains the circle in which the sphere touches the CONE, so it meets the sphere in that
 > same circle, and the two can only be tangent on a degenerate cone. The fix was the
@@ -461,7 +461,7 @@ Every rule is formatted:
 > in place of a misread.
 
 > **§3.51 ✅ DO** remove a visual misreading by not DRAWING the part that causes it. **❌ NEVER**
-> reach for depth/blend/offset tricks to hide a real intersection. *(ADR-096)*
+> reach for depth/blend/offset tricks to hide a real intersection. *(ADR-173)*
 > Reason: a plane that genuinely meets a sphere in a circle will read as a slice however it is
 > sorted or blended, because the intersection is there. Drawn as an annulus starting at that
 > circle, none of the plane is inside the sphere, and the true relationship — the ball resting in
@@ -469,21 +469,21 @@ Every rule is formatted:
 
 > **§3.52 ✅ DO** give two different relationships two different stages, and say what makes them
 > different. **❌ NEVER** show two tangencies, two projections or two constructions at once and
-> leave the learner to sort out which is which. *(ADR-097)*
+> leave the learner to sort out which is which. *(ADR-174)*
 > Reason: Conic Sections showed the sphere's contact with the CONE (a circle) in the same stage as
 > the plane laid through it, so the circle read as the plane's own contact. Separated — the ring
 > with the reason it is a ring, then the single point with "against the flat cut it is different"
 > — the contrast becomes the lesson instead of the obstacle.
 
 > **§3.53 ✅ DO** derive a staged sequence's landmarks from the sequence itself. **❌ NEVER**
-> hard-code "the last stage is index 5". *(ADR-097)*
+> hard-code "the last stage is index 5". *(ADR-174)*
 > Reason: this topic's proof has been renumbered twice, and both times a literal index silently
 > pointed at the wrong stage — once fading the cone out early, once cutting the circle's shorter
 > proof off before the stage that explains it.
 
 > **§3.54 ✅ DO** audit a topic against the SYLLABUS document as well as the textbook, and say
 > which of the two a given feature serves. **❌ NEVER** assume the textbook chapter and the
-> examinable scope are the same thing. *(ADR-098)*
+> examinable scope are the same thing. *(ADR-175)*
 > Reason: course 1003 scopes Conic Sections to three constructions and says "only" twice; the
 > chapter works fifteen. Measured against the chapter this topic looked complete while the three
 > examinable constructions were the only ones with no teaching apparatus — and the one that HAD
@@ -491,13 +491,13 @@ Every rule is formatted:
 
 > **§3.55 ✅ DO** carry a UI highlight across a repaint by a STABLE key, not by an object
 > reference. **❌ NEVER** hand a display-list item back to the UI and expect it to survive.
-> *(ADR-098)*
+> *(ADR-175)*
 > Reason: `drawCompare()` rebuilds the display list on every paint, so a stored item is stale the
 > moment the highlight it triggers repaints — and the guard that keeps the cursor's own hover
 > honest then drops it without a word.
 
 > **§3.47 ✅ DO** caption every element the syllabus gives a NAME to, on the figure that draws it.
-> **❌ NEVER** leave a named construction element on a sheet as unlabelled linework. *(ADR-092)*
+> **❌ NEVER** leave a named construction element on a sheet as unlabelled linework. *(ADR-169)*
 > Reason: both of an ellipse's auxiliary circles were drawn as dashed circles with no caption at
 > all — a term the learner can see, cannot name and cannot look up. Assert the full set in the
 > LAYOUT, not on the canvas: the placement pass is allowed to drop a caption it cannot fit, and
@@ -505,14 +505,14 @@ Every rule is formatted:
 
 > **§3.48 ✅ DO** draw a property the syllabus states, exactly, so the figure is the proof.
 > **❌ NEVER** illustrate a claim with geometry that only approximately satisfies it, and never
-> draw a marked point beyond the extent of the curve the figure actually plots. *(ADR-093)*
+> draw a marked point beyond the extent of the curve the figure actually plots. *(ADR-170)*
 > Reason: §6.6's parabola properties are exact, so a correct figure demonstrates them in a way
 > the textbook page cannot. A first version of property 3 marked a point at t = 2.2 on a curve
 > drawn only to t = 1.8 — a claim about a point that was not on the drawing.
 
 > **§3.51 ✅ DO** cut a syllabus scope at the exact thing the syllabus excludes, and prove the cut
 > is that wide.
-> **❌ NEVER** widen a scope removal into the subject matter that surrounds it. *(ADR-115)*
+> **❌ NEVER** widen a scope removal into the subject matter that surrounds it. *(ADR-192)*
 > Reason: Course 1003 excludes CONSTRUCTING a hyperbola, not the hyperbola. Removing §6.9's three
 > methods must leave Step 3's six named cuts, `classifySection()`, the §6.8 terminology sheet and
 > the focus-and-directrix sheet completely alone — so the oracle asserts both halves: that no
@@ -521,7 +521,7 @@ Every rule is formatted:
 
 > **§3.52 ✅ DO** derive an animation's trigger from the display list it animates.
 > **❌ NEVER** key a drawing animation to a stage INDEX when what it depends on is what that stage
-> draws. *(ADR-115)*
+> draws. *(ADR-192)*
 > Reason: the curve trace fired on the last stage, which is the curve stage for twelve of thirteen
 > constructions. The tangent method draws its envelope at stage 6 and marks its focus and
 > directrix at 7, so its curve appeared whole and the trace ran a stage later against nothing new.
@@ -530,7 +530,7 @@ Every rule is formatted:
 
 > **§3.53 ✅ DO** pace a staged construction by asking what its UNIT OF UNDERSTANDING is and what
 > is merely that unit reflected — one press for the first, one press for the whole of the second.
-> **❌ NEVER** reach for the finest grain available and call it teaching. *(ADR-116)*
+> **❌ NEVER** reach for the finest grain available and call it teaching. *(ADR-193)*
 > Reason: giving the oblong method one press per line made seventeen stages, of which eleven said
 > nothing the previous one had not. It has TWO symmetries — its fan is upper/lower and its
 > connections are left/right — so the rule applies twice, three presses and a mirror each, and
@@ -540,7 +540,7 @@ Every rule is formatted:
 
 > **§3.54 ✅ DO** make a control that changes what is on screen say which way it will go, and give
 > it the way back.
-> **❌ NEVER** ship a one-way door whose only exit is a different control. *(ADR-116)*
+> **❌ NEVER** ship a one-way door whose only exit is a different control. *(ADR-193)*
 > Reason: "Show its three properties" only ever turned them on. The sheet could be recovered by
 > nudging any other control, so the code looked complete and every oracle passed — but a learner
 > pressing the same button again saw nothing happen and reported the drawing as broken. A view
@@ -550,7 +550,7 @@ Every rule is formatted:
 > **§3.55 ✅ DO** give every lesson step its own content in a shared pane, and let a step that
 > only DISPLAYS derived state derive it per paint instead of committing it.
 > **❌ NEVER** let one step's pane inherit the step before it, and never widen a state coupling to
-> reach a step that merely needs to draw. *(ADR-117)*
+> reach a step that merely needs to draw. *(ADR-194)*
 > Reason: a `stage >= 5` in the sheet's mode meant Step 6 opened on Step 5's finished construction
 > — a solved drawing beside a question about the same solid. The obvious repair, widening the
 > "sheet follows the cut" coupling to include Step 6, would have written the quiz's cut into the
@@ -559,14 +559,14 @@ Every rule is formatted:
 
 > **§3.56 ✅ DO** withhold, in an assessment step, exactly the annotation that states the answer.
 > **❌ NEVER** re-use a taught step's figure in a step that asks the learner to produce what that
-> figure says. *(ADR-117)*
+> figure says. *(ADR-194)*
 > Reason: three of §6.1's six sheets carry a caption naming the section, which is teaching in
 > Steps 1–4 and the answer key in Step 6. Mark those captions and gate them, rather than dropping
 > the whole figure or hand-building a second one — the drawing is still the right picture, and
 > everything it MEASURES stays.
 
 > **§3.59 ~~✅ DO~~ WITHDRAWN** — allocate space to every pane a step treats as a subject.
-> *(ADR-120, superseded by ADR-125 on 2026-08-05.)* The occlusion it describes was real: Steps 4
+> *(ADR-197, superseded by ADR-202 on 2026-08-05.)* The occlusion it describes was real: Steps 4
 > and 6 printed "Watch the cone" beside a card covering the apex. But the docked column it
 > prescribed gave the same panel two sizes across one lesson, and the product owner chose a
 > consistent thumbnail over an unobstructed solid with the trade on the table. The surviving rule
@@ -574,7 +574,7 @@ Every rule is formatted:
 > per-step sizing mode.
 
 > **§3.66 ✅ DO** give a repeated piece of chrome ONE box, and let only its contents vary by step.
-> **❌ NEVER** add a second sizing mode for a panel that already has one. *(ADR-125)*
+> **❌ NEVER** add a second sizing mode for a panel that already has one. *(ADR-202)*
 > Reason: `#compare-card` had exactly one rule sizing it, and one body class overriding that rule on
 > two steps — enough to make the same thumbnail 420 × 320 on four steps and 403 × 876 on two, and
 > to make three separate bug reports. When a panel looks wrong on some steps, find the override and
@@ -585,14 +585,14 @@ Every rule is formatted:
 
 > **§3.61 ✅ DO** keep ONE loud action per step, and move the accent when the step's action
 > changes rather than lighting both candidates.
-> **❌ NEVER** put two controls in the primary treatment on one panel. *(ADR-121, DESIGN.md §5.1)*
+> **❌ NEVER** put two controls in the primary treatment on one panel. *(ADR-198, DESIGN.md §5.1)*
 > Reason: Step 4 shipped two identical blue "Next" buttons a few hundred pixels apart, one walking
 > a stage of the proof and one abandoning it. DESIGN.md already said "the one loud action per
 > step", so this was drift against a written rule. Assert it by COUNTING visible, enabled primaries
 > on the panel — checking one button's class passes a second primary added somewhere else.
 
 > **§3.62 ✅ DO** retire a transient message when the step that raised it ends.
-> **❌ NEVER** rely on a hold timer to keep an instruction from outliving its context. *(ADR-121)*
+> **❌ NEVER** rely on a hold timer to keep an instruction from outliving its context. *(ADR-198)*
 > Reason: the flow note and the onboarding chip both auto-dismiss after 4.5 seconds, which reads as
 > safe until a learner presses Next twice in three. Step 2's note names a control Step 3 does not
 > have. A hold is for how long a message is worth reading, not for whether it is still true.
@@ -600,7 +600,7 @@ Every rule is formatted:
 > **§3.65 ✅ DO** put the set of steps a layout mode applies to in the CODE, and let the function
 > read it.
 > **❌ NEVER** leave "this is for Steps 4 and 6" in a docstring while the condition tests only
-> whether the pane is open. *(ADR-124, correcting how ADR-120 was applied)*
+> whether the pane is open. *(ADR-201, correcting how ADR-197 was applied)*
 > Reason: `syncSheetDock()` said "Step 4 and Step 6" in its own docstring and in its ADR, and then
 > docked on every step that had the sheet open — so Steps 1–3 handed half the bench to a
 > side-reference the learner had opened themselves, on steps whose subject is the solid alone. A
@@ -610,7 +610,7 @@ Every rule is formatted:
 
 > **§3.63 ✅ DO** give a narrow screen a DIFFERENT layout, not a scaled one — and size a panel
 > from what it has to hold, never as a percentage of the screen.
-> **❌ NEVER** float one pane over another at a width that cannot hold two. *(ADR-123)*
+> **❌ NEVER** float one pane over another at a width that cannot hold two. *(ADR-200)*
 > Reason: a fixed 42% viewport slice plus a 70%-height floating sheet left a 360 × 640 phone with
 > 96,769 px² of overlap and a 99 px scroll port — one line — with the step's only action 130 px
 > below its fold. A percentage shrinks with the screen; the copy in the panel does not. Below the
@@ -622,7 +622,7 @@ Every rule is formatted:
 > **§3.64 ✅ DO** gate touch-target sizing on the POINTER, and let a cramped row wrap rather than
 > taking width from the viewport to fit it.
 > **❌ NEVER** infer the input method from the screen width, or let a fixed banner cover the sim
-> it is advising about. *(ADR-123)*
+> it is advising about. *(ADR-200)*
 > Reason: a touch laptop at 1440 px needs the 44 px floor and a phone with a stylus does not lose
 > it at 360, so the floor belongs in `@media (pointer: coarse)`. `.card__nav` wanted 261 px in a
 > 193 px card and clipped Next off the edge; wrapping costs a row, while raising the wizard's
@@ -631,7 +631,7 @@ Every rule is formatted:
 > (`body.notice-up` / `--notice-h`) or it paints over the sheet's own Minimize button.
 
 > **§3.60 ✅ DO** re-check caption fit whenever a drawing pane changes proportion.
-> **❌ NEVER** assume one margin serves both axes. *(ADR-120)*
+> **❌ NEVER** assume one margin serves both axes. *(ADR-197)*
 > Reason: captions hang sideways further than they hang up and down. A square-ish pane hides that
 > because height binds the scale first and leaves width to spare; making the pane tall and narrow
 > made width binding and clipped "Axis" at the edge on the first frame. The analytic bbox measures
@@ -664,7 +664,7 @@ Every rule is formatted:
 
 > **§3.57 ✅ DO** open a step-by-step procedure on its GIVEN DATA, and name that opening state per
 > procedure rather than assuming it is the first stage.
-> **❌ NEVER** show the finished result before the learner has asked for it. *(ADR-118)*
+> **❌ NEVER** show the finished result before the learner has asked for it. *(ADR-195)*
 > Reason: Step 5 opened on the completed construction, so pressing "Draw it step by step" looked
 > like it started from the middle of a drawing already done. And "given data" is not stage 0: the
 > concentric method's two circles are the construction, while the oblong method's rectangle is the
@@ -674,7 +674,7 @@ Every rule is formatted:
 
 > **§3.58 ✅ DO** give a technical drawing a closed vocabulary of line weights and dash patterns,
 > and let annotation prefer clear paper while never being dropped for want of it.
-> **❌ NEVER** add a dash pattern or a weight that means nothing the existing ones do not. *(ADR-118)*
+> **❌ NEVER** add a dash pattern or a weight that means nothing the existing ones do not. *(ADR-195)*
 > Reason: eight dash patterns had accumulated on one sheet and six of them were arbitrary; BIS
 > gives a drawing a chain line and a short dash, and that was all this topic ever needed. Weight
 > is the drafting variable for importance — same ink, three strengths — not a second palette.
@@ -683,7 +683,7 @@ Every rule is formatted:
 
 > **§3.67 ✅ DO** render a view a topic NAMES as an orthographic view through an orthographic
 > camera, reached by the `projectionMorphK` morph (§5.18). **❌ NEVER** present a perspective
-> picture under the name of a principal view. *(ADR-128)*
+> picture under the name of a principal view. *(ADR-205)*
 > Reason: perspective draws a boss's top as an ellipse, near edges longer than far ones, and no true
 > size anywhere — the definition of what an orthographic view is not. A topic whose step says "this
 > is the elevation" and then shows perspective has taught the opposite of its own sentence, in the
@@ -691,7 +691,7 @@ Every rule is formatted:
 > measured-drawing topic; it never allowed a single perspective one.
 
 > **§3.68 ✅ DO** fit a principal view to the two box half-extents that direction actually projects.
-> **❌ NEVER** frame a named view from the bounding SPHERE. *(ADR-128, refining §5.4)*
+> **❌ NEVER** frame a named view from the bounding SPHERE. *(ADR-205, refining §5.4)*
 > Reason: a sphere's radius is the box half-DIAGONAL. An 83 × 44 × 37 part is 51 mm by that measure
 > and 22 mm across in its own right side view, so the sphere fit puts the subject of the view in the
 > middle of the frame as a speck. A pictorial pose is the one case where the sphere is right, because
@@ -699,9 +699,9 @@ Every rule is formatted:
 
 > **§3.69 ✅ DO** derive a staged reveal's stage list from the content each stage would draw, and
 > keep a drawing's DATUM out of the group that fades. **❌ NEVER** give every view a fixed set of
-> stages, and never let a Back replay the animation it is undoing. *(ADR-129, applying §3.52/§3.49)*
+> stages, and never let a Back replay the animation it is undoing. *(ADR-206, applying §3.52/§3.49)*
 > Reason: an object with no circular feature has no centre-line stage, and a fixed four-per-view
-> table hands it stages that draw nothing — ADR-116's pacing failure, reintroduced. The XY line is
+> table hands it stages that draw nothing — ADR-193's pacing failure, reintroduced. The XY line is
 > where the HP meets the VP and stays on a finished sheet; it was inside the projector group and
 > faded out with it, leaving a first-angle drawing with nothing to be first-angle about. A group's
 > opacity cannot be undone by a child, so the fix is which group the datum is IN, not a further rule
@@ -709,7 +709,7 @@ Every rule is formatted:
 
 > **§3.70 ✅ DO** teach a convention at the level the topic is FOR, and leave the apparatus that
 > derives it to the topic that derives it. **❌ NEVER** put HP / VP / XY / quadrant apparatus on a
-> beginner's first drawing. *(ADR-131)*
+> beginner's first drawing. *(ADR-208)*
 > Reason: Topic 0's job is "here is what a multiview drawing looks like"; the two hinged planes are a
 > different lesson, and a learner meeting both at once loses the one they came for. The convention is
 > still taught — as the observable consequence (the plan goes below, each side view crosses over)
@@ -718,7 +718,7 @@ Every rule is formatted:
 
 > **§3.71 ✅ DO** put a drawing CONVENTION in one function when two renderers draw it, not just its
 > constants. **❌ NEVER** let one medium turn its dimension values along their lines while another
-> lays the same values flat. *(ADR-132 amended)*
+> lays the same values flat. *(ADR-209 amended)*
 > Reason: aligned dimensioning is not a property of paper — it is how a value is written against the
 > line it measures — so a sheet and a solid showing one dimension set have to agree about the turn as
 > well as about the number. Sharing `DIM_STYLE` was not enough: both renderers still carried their
@@ -730,7 +730,7 @@ Every rule is formatted:
 
 > **§3.72 ✅ DO** hang a label on the MARK it names, at a fixed fraction of that mark's own size.
 > **❌ NEVER** settle a collision between two annotation layers by measuring one and pushing the other
-> further out — and never by handing one leaf a reference to the other. *(ADR-132, amended twice)*
+> further out — and never by handing one leaf a reference to the other. *(ADR-209, amended twice)*
 > Reason: the Front label and the overall length were both parked on the paper under the part, so
 > they collided, and the first fix measured the dimension layer's box in the orchestrator and dropped
 > the label below it. The collision went away and the label went with it, out into clear paper with
@@ -764,7 +764,7 @@ Every rule is formatted:
 
 > **§4.5a ✅ DO** bind any viewport use of the accent to a token ROLE with exactly ONE consumer, and
 > name it in an ADR. **❌ NEVER** widen such a role to a second consumer without a new one.
-> *(ADR-130, qualifying §4.5)*
+> *(ADR-207, qualifying §4.5)*
 > Reason: §4.5 exists so a learner can tell "the UI is guiding me" from "this is the domain content".
 > A viewing-direction arrow — the textbook's `F` mark — is guidance that happens to live in the
 > viewport, in the same category as the accent `.vp-hint` chips already there, and drawing it in ink
@@ -899,7 +899,7 @@ Every rule is formatted:
 > Reason: the reserved wizard otherwise cramps each pane and gates the live controls (and any
 > construction launcher) away from the dual view.
 
-> **§5.16a ✅ DO** dock ONLY the value drivers of the pane the rail serves — the sibling
+> **§5.16b ✅ DO** dock ONLY the value drivers of the pane the rail serves — the sibling
 > Module-3 topic docks two groups (`['shape', 'section']`), and Conic Sections docks two
 > (`['cone', 'section']`). **❌ NEVER** dock a topic's whole control set: `#workbench-rail` is a
 > single wrapping row on the split grid's `auto` row, sized by its content against the viewport's
@@ -914,7 +914,7 @@ Every rule is formatted:
 > give the docked rail a shadow — **re-parent** the existing nodes (one source of truth) and
 > separate the rail with a hairline only (Flat-Ink). *(ADR-021, ADR-037)*
 
-> **§5.18 SCOPE (ADR-078):** this rule binds a topic that HAS both cameras. A topic whose subject is
+> **§5.18 SCOPE (ADR-133):** this rule binds a topic that HAS both cameras. A topic whose subject is
 > a measured drawing may run on a **single orthographic camera** with no perspective camera at all
 > (`graphics_module_1_topic_1_1_dimensioning`) — there is then no hand-off to morph, and adding a
 > perspective camera merely to satisfy the rule would introduce a projection the lesson must never
@@ -980,7 +980,7 @@ Every rule is formatted:
 
 > **§5.21 ✅ DO** treat a SCROLL as a zoom and a DRAG as a turn, and detect the drag as pointer
 > movement with one pointer down. **❌ NEVER** leave a latched view — or hand an orthographic view back
-> to perspective — on `OrbitControls`' `start` event. *(ADR-139)*
+> to perspective — on `OrbitControls`' `start` event. *(ADR-216)*
 > Reason: `OrbitControls` fires `start` for the wheel exactly as it does for a drag, so a listener
 > that treats `start` as "the learner is turning the object" fires on every scroll. In a topic whose
 > principal views carry their own projection and their own annotation set, that one event changed
@@ -990,7 +990,7 @@ Every rule is formatted:
 > the test is one pointer and not merely "a pointer is down".
 
 > **§5.22 ✅ DO** move `controls.target` with the content whenever the framing changes, and flush the
-> controls with damping temporarily OFF when a flight lands or a pose is snapped. *(ADR-139)*
+> controls with damping temporarily OFF when a flight lands or a pose is snapped. *(ADR-216)*
 > Reason: orbit AND zoom both pivot on the target, so a target left on the previous object's centre
 > turns the next scroll into a sideways drag of the part across the pane — the fault is invisible
 > until someone zooms. And `controls.update()` with damping on spends whatever inertia the last drag
@@ -999,14 +999,14 @@ Every rule is formatted:
 > it lands. One update with damping off discards the residue instead of applying it; restore the
 > setting immediately so the next real drag still eases.
 >
-> *Amended 2026-08-09 (ADR-140):* move it, but **❌ NEVER set it in one step.** An instant target
+> *Amended 2026-08-09 (ADR-217):* move it, but **❌ NEVER set it in one step.** An instant target
 > change is a visible jump in every form. Re-aim alone and the camera swings about a fixed eye;
 > translate the eye with it to hold the offset and the whole scene slides across the pane by the
 > parallax of the move. Ease the target onto the new centre when the camera is idle, and let a
 > flight cancel that ease and carry the target itself when one is starting.
 
 > **§5.23 ✅ DO** measure a transition FRAME BY FRAME when the complaint is that it jumps. **❌ NEVER**
-> accept correct end states as evidence that the motion between them was continuous. *(ADR-140)*
+> accept correct end states as evidence that the motion between them was continuous. *(ADR-217)*
 > Reason: a flight can begin with a teleport and still land exactly where it should, so every
 > assertion about the settled view passes while the defect is plainly visible. Track one DOM node
 > that is glued to the model, sample its pane position every animation frame, and compare each frame
@@ -1024,7 +1024,7 @@ Every rule is formatted:
 
 > **§6.2 ❌ NEVER** auto-fill answers — loading a problem resets to defaults and routes to the
 > dial-able step; the student dials, the check lights green. *(ADR-015)*
-> **Amended by ADR-136:** "answer" means a MEASURED quantity — a length, an angle, a ratio.
+> **Amended by ADR-213:** "answer" means a MEASURED quantity — a length, an angle, a ratio.
 > A construction the statement NAMES IN WORDS ("using concentric circle method") may be selected
 > for the learner, once, on their first arrival at the step that offers it; finding it in a picker
 > is transcription, not drawing. Whatever else that commit sets must land AWAY from the target —
@@ -1083,7 +1083,7 @@ Every rule is formatted:
 > needs a `Mesh` and breaks its single-`LineSegments2` disposal contract). Dimension linework reads
 > `--color-ink`; CSS2D labels read `--font-mono` / `--text-xs`. *(ADR-041, ADR-016)*
 >
-> **Carve-out (ADR-079):** this rule governs dimensions that are *incidental* to another lesson.
+> **Carve-out (ADR-134):** this rule governs dimensions that are *incidental* to another lesson.
 > `graphics_module_1_topic_1_1_dimensioning` **teaches** termination geometry, so it draws the five
 > styles to its own master reference instead — open head at ≈15° included angle and 3–4 mm long drawn
 > thick (the textbook's class-work default, §4.5 item 2); closed / closed-and-filled heads 3–4 long ×
@@ -1106,51 +1106,51 @@ Every rule is formatted:
 > discipline ("just don't author them") — both vanish silently when tiers are reshuffled.
 > *(ADR-062, ADR-069)*
 
-> **§6.23 ✅ DO** keep the platform's `1 world unit = 10 mm` (§6.8) for anything that enters the 3D
+> **§6.27 ✅ DO** keep the platform's `1 world unit = 10 mm` (§6.8) for anything that enters the 3D
 > scene. A topic whose 2D construction NEVER enters the scene **may** store its sheet state in
 > millimetres instead (`graphics_module_3_topic_2_2_conic_sections`) — but then **❌ NEVER** convert
 > inside the pure engine leaf: convert once, at the control, and state each bag's unit in exactly
-> one place. *(ADR-083, ADR-018)*
+> one place. *(ADR-138, ADR-018)*
 > Reason: the chapter quotes millimetres, so storing world units would leave the data layer, the
 > dock, the self-check targets and the textbook statement disagreeing by a factor of ten; but a
 > conversion buried in the engine puts the same factor somewhere no author will look.
 
-> **§6.24 ✅ DO** build a multi-construction drawing engine as ONE pure leaf where each layout
+> **§6.28 ✅ DO** build a multi-construction drawing engine as ONE pure leaf where each layout
 > returns a **display list** of typed primitives plus its own analytic bbox, rendered by a SINGLE
-> renderer. **❌ NEVER** give a construction its own drawing path. *(ADR-084, ADR-066)*
+> renderer. **❌ NEVER** give a construction its own drawing path. *(ADR-139, ADR-066)*
 > Reason: twelve immediate-mode routines are twelve chances for the thin-construction /
 > heavy-answer line vocabulary to drift.
 
-> **§6.25 ✅ DO** prove every construction with a Node oracle before shipping it — each plotted
+> **§6.29 ✅ DO** prove every construction with a Node oracle before shipping it — each plotted
 > point must satisfy its own curve (PF = e·PQ, `x²/a² ± y²/b² = 1`, a zero discriminant for an
-> envelope, a constant sum / difference / product). Re-run it after touching a layout. *(ADR-084,
+> envelope, a constant sum / difference / product). Re-run it after touching a layout. *(ADR-139,
 > ADR-019)*
 > Reason: a wrong construction still draws a plausible curve — both defects found this way were
 > invisible on screen.
 
-> **§6.26 ✅ DO** put a control in the ONE guided step whose question it answers, and hide it
+> **§6.30 ✅ DO** put a control in the ONE guided step whose question it answers, and hide it
 > everywhere else. **❌ NEVER** show a learner the whole parameter set of a topic at once because
-> every parameter is real. *(ADR-086, PRODUCT.md §1/§2)*
+> every parameter is real. *(ADR-141, PRODUCT.md §1/§2)*
 > Reason: the persona is the struggling first-year. A panel offering eleven construction methods
 > before the learner knows why a parabola differs from an ellipse is CAD software with a syllabus
 > attached — the failure the Conic Sections redesign was written to undo.
 
-> **§6.27 ✅ DO** report a phenomenon in plain words BEFORE naming it, and keep the textbook
+> **§6.31 ✅ DO** report a phenomenon in plain words BEFORE naming it, and keep the textbook
 > statement for the step that introduces the name. **❌ NEVER** open with the formal definition.
-> *(ADR-086)*
+> *(ADR-141)*
 > Reason: "a closed oval that still closes up" is something a learner can check against the screen;
 > "a section plane inclined to the axis and cutting all the generators" is something they can only
 > take on trust. A data-layer entry that names a phenomenon should therefore carry BOTH forms —
 > `ConicSection`'s `seen` / `name` / `rule` triple is the pattern.
 
-> **§6.28 ✅ DO** let a teaching step MOVE the model for the learner (a guided tour that travels the
+> **§6.32 ✅ DO** let a teaching step MOVE the model for the learner (a guided tour that travels the
 > cutting plane, a construction that plays stage by stage), and narrate what changed. **❌ NEVER**
 > let that shortcut reach an assessed answer — the Problem Library's checked targets stay
-> hand-dialled. *(ADR-086, scoping ADR-063)*
+> hand-dialled. *(ADR-141, scoping ADR-063)*
 
-> **§6.29 ✅ DO** end a staged construction on the stage that completes its CURVE, and gate every
+> **§6.33 ✅ DO** end a staged construction on the stage that completes its CURVE, and gate every
 > optional element on its own control instead. **❌ NEVER** let a stage double as the reveal for a
-> toggle. *(ADR-133)*
+> toggle. *(ADR-210)*
 > Reason: the tangent method's tenth stage also let `showTangent` through, so the tangent and normal
 > arrived on the last press of "Next line" as if they were a step of the construction — while the
 > two sibling syllabus methods ended on "join the curve". The test is not "is this element
@@ -1158,8 +1158,8 @@ Every rule is formatted:
 > What a construction is ASKED to produce is not optional and does not leave — Example 6.8's focus
 > and directrix moved onto the envelope stage rather than off the sheet.
 
-> **§6.31 ✅ DO** choose ⌀ or R from the SWEEP THE VIEW DRAWS, and pass that sweep to the helper
-> that writes the label. **❌ NEVER** type the symbol by hand from what the feature is. *(ADR-141)*
+> **§6.35 ✅ DO** choose ⌀ or R from the SWEEP THE VIEW DRAWS, and pass that sweep to the helper
+> that writes the label. **❌ NEVER** type the symbol by hand from what the feature is. *(ADR-218)*
 > Reason: the rule (BIS SP 46 / ISO 129-1) is about the paper, not the part. A 50 mm boss on a
 > 40 mm-deep plate is a cylinder, and the plan can only draw the 148 deg of it that stands proud of
 > the plate's edges — so the plan's label is R25, not ⌀50, however cylindrical the thing is. Because
@@ -1177,35 +1177,35 @@ Every rule is formatted:
 > value along the slant instead was tried and is worse: turned text over a hatch of linework, in a
 > topic whose subject is reading a drawing.
 
-> **§6.32 ✅ DO** test a label against the view's own primitives. **❌ NEVER** assert it against the
-> authored label. *(ADR-141)*
+> **§6.36 ✅ DO** test a label against the view's own primitives. **❌ NEVER** assert it against the
+> authored label. *(ADR-218)*
 > Reason: `⌀30` where the registry says `⌀30` proves nothing about the drawing. A complete circle is
 > the one thing a `circle` primitive draws, so a ⌀ must have one under it at that exact centre and
 > radius and an R must not; and an R's arrowhead must sit within a tenth of a millimetre of drawn
 > outline or edge linework — which is how the Cylindrical Block's boss was caught pointing its
 > leader at 225 deg, into the part of the circle the plan trims away.
 
-> **§6.30 ✅ DO** trace a revealed curve in the direction a hand would draw it, and check the
-> direction as a signed sweep about the figure's own centroid. *(ADR-134, ADR-114)*
+> **§6.34 ✅ DO** trace a revealed curve in the direction a hand would draw it, and check the
+> direction as a signed sweep about the figure's own centroid. *(ADR-211, ADR-191)*
 > Reason: the sheet is y-DOWN, so a sampler that runs y upward traces anticlockwise on screen. Two
 > endpoints are not enough to prove a direction; a reversal that fixed only the ends would pass.
 > Reverse the ORDER at the layout that owns the figure, never inside a shared point sampler.
 > Renaming the endpoints is not a substitute for reversing the trace — but once the trace is right,
-> NAME the ends to agree with it: ADR-138 swapped the tangent method's A and B as coordinates so the
+> NAME the ends to agree with it: ADR-215 swapped the tangent method's A and B as coordinates so the
 > curve that is drawn foot-to-head is also described A → B. Swap the points, never the captions; the
 > tangents, divisions and chords are derived from the points, and a caption-only swap leaves "the
-> tangent at A" struck from the other end of the base. *(ADR-138)*
+> tangent at A" struck from the other end of the base. *(ADR-215)*
 
-> **§6.31 ✅ DO** filter a problem library on the axis the SYLLABUS cuts on, and add that axis if
-> none of the existing ones fits. **❌ NEVER** delete the excluded problems. *(ADR-135, ADR-115)*
+> **§6.35 ✅ DO** filter a problem library on the axis the SYLLABUS cuts on, and add that axis if
+> none of the existing ones fits. **❌ NEVER** delete the excluded problems. *(ADR-212, ADR-192)*
 > Reason: Course 1003 names three CONSTRUCTIONS. The tier axis cuts by curve and the type axis cuts
 > by problem kind, and neither can express "these three methods only" — so `ENABLED_METHODS` is a
 > third one-line lever beside them. A filter is reversible for the next course; a deletion is not,
 > and the exercise list is the chapter.
 
-> **§6.32 ✅ DO** pin a staged construction's FRAME to its finished figure whenever a late stage
+> **§6.36 ✅ DO** pin a staged construction's FRAME to its finished figure whenever a late stage
 > reaches further than an early one. **❌ NEVER** let a drawing's scale be measured from the stage
-> that happens to be on screen. *(ADR-137, ADR-053)*
+> that happens to be on screen. *(ADR-214, ADR-053)*
 > Reason: the sheet locks its millimetre scale to the layout's analytic bbox, so a stage that adds a
 > longer line rescales EVERYTHING drawn before it, in one frame. The tangent method's directrix runs
 > to ±0.6·AB where its base stops at ±0.5, and in a 1124 × 565 pane the double ordinate — 120 mm at
@@ -1326,7 +1326,7 @@ Every rule is formatted:
 - ❌ Widen a syllabus scope cut into the surrounding subject, or key a drawing animation to a stage index rather than to what that stage draws. *(§3.51, §3.52)*
 - ❌ Pace a construction at the finest grain available instead of at its unit of understanding, or ship a control that turns something on with no way to turn it off. *(§3.53, §3.54)*
 - ❌ Let a shared pane inherit the previous step's content, or show an assessment step the caption that names its own answer. *(§3.55, §3.56)*
-- ❌ Assume one margin serves both axes after a drawing pane changes proportion. *(§3.60; §3.59 withdrawn by ADR-125)*
+- ❌ Assume one margin serves both axes after a drawing pane changes proportion. *(§3.60; §3.59 withdrawn by ADR-202)*
 - ❌ Add a second sizing mode for a panel that already has one, or narrow an override instead of deleting it. *(§3.66)*
 - ❌ Ship two primary buttons on one panel, or let a transient message outlive the step that raised it. *(§3.61, §3.62)*
 - ❌ Float one pane over another at a width that cannot hold two, or size a panel as a percentage of the screen. *(§3.63)*
@@ -1355,7 +1355,7 @@ Every rule is formatted:
 - ❌ Use a per-frame exponential camera follow, or run tight-fit and push-back in one rebuild. *(§5.2, §5.3)*
 - ❌ Reintroduce the persistent dual-pane PiP/`swap()`, or show a snapshot in the Compare card. *(§5.11, §5.14)*
 - ❌ Put a CSS `transform` on `#sim-viewport`/`#canvas-area`/`body`. *(§5.13)*
-- ❌ Dock a topic's whole control set into `#workbench-rail` — it is sized against the viewport's row, so extra groups eat the 3D pane. *(§5.16a)*
+- ❌ Dock a topic's whole control set into `#workbench-rail` — it is sized against the viewport's row, so extra groups eat the 3D pane. *(§5.16b)*
 - ❌ Mirror the workbench rail controls instead of re-parenting, or give the docked rail a shadow. *(§5.17)*
 - ❌ Hard-swap perspective↔orthographic cameras in one frame instead of the `projectionMorphK` morph. *(§5.18)*
 
@@ -1366,13 +1366,13 @@ Every rule is formatted:
 - ❌ Revert the Lines sim to six fixed cases, or rename "line AB"/"end A"/"Point P". *(§6.13, §6.15)*
 - ❌ "Fix" 2D projectors to dashed, dots to crosses, or 3D projectors to solid. *(§6.18)*
 
-- ❌ Show every parameter of a topic at once, or name a phenomenon before the learner has seen it. *(§6.26, §6.27)*
-- ❌ Convert units inside a pure engine leaf, or leave a state bag's unit unstated. *(§6.23)*
-- ❌ Give one construction its own drawing path, or ship a construction no oracle has proved. *(§6.24, §6.25)*
-- ❌ Let a construction stage double as the reveal for a toggle, or trace a curve backwards. *(§6.29, §6.30)*
-- ❌ Type ⌀ or R by hand, or check a label against the registry instead of against the linework. *(§6.31, §6.32)*
-- ❌ Delete problems to narrow a library's scope, when a filter axis would say the same thing. *(§6.31)*
-- ❌ Measure a staged drawing's frame from the stage on screen, when a later stage reaches further. *(§6.32)*
+- ❌ Show every parameter of a topic at once, or name a phenomenon before the learner has seen it. *(§6.30, §6.31)*
+- ❌ Convert units inside a pure engine leaf, or leave a state bag's unit unstated. *(§6.27)*
+- ❌ Give one construction its own drawing path, or ship a construction no oracle has proved. *(§6.28, §6.29)*
+- ❌ Let a construction stage double as the reveal for a toggle, or trace a curve backwards. *(§6.33, §6.34)*
+- ❌ Type ⌀ or R by hand, or check a label against the registry instead of against the linework. *(§6.35, §6.36)*
+- ❌ Delete problems to narrow a library's scope, when a filter axis would say the same thing. *(§6.35)*
+- ❌ Measure a staged drawing's frame from the stage on screen, when a later stage reaches further. *(§6.36)*
 
 **Cross-module / docs**
 - ❌ Fix a shared file directly in a topic folder, or infer the master from a `topic_N` number. *(§1.3, §1.7)*

@@ -16,10 +16,10 @@
 //      MILLIMETRES, not world units: the 2D construction never enters the 3D scene, and
 //      every textbook figure in the chapter is quoted in mm ("FA = 50 mm", "major axis
 //      150 mm"), so storing mm keeps the dock, the data layer and the exam paper in one
-//      unit. See root DECISIONS.md ADR-083.
+//      unit. See root DECISIONS.md ADR-138.
 //
 // Layering (CLAUDE.md): a pure-data catalogue — the sibling-importable category RULES.md
-// §3.6a defines (ADR-078). `problems.js` imports it for its targets; every behavioural
+// §3.6a defines (ADR-133). `problems.js` imports it for its targets; every behavioural
 // leaf receives its values through the injected controller instead.
 
 // ============================================================================
@@ -31,7 +31,7 @@
  * Fig. 6.1 uses.
  *
  * Each entry carries the same idea three times over, in the order a learner should meet it
- * (PRODUCT.md's Orient → Intuition → Problem-solving arc, ADR-086):
+ * (PRODUCT.md's Orient → Intuition → Problem-solving arc, ADR-141):
  *   `seen`  — what is on screen, in everyday words, with no name attached. This is what
  *             Step 2 reports while the learner is still just tilting the plane.
  *   `name`  — the engineering name, introduced only in Step 3, once the shape has been
@@ -100,7 +100,7 @@ export const SECTION_TOUR = Object.freeze([
  *
  * These drive Step 3's "show me" chips, which the sim animates to. They are a teaching
  * demonstration, not an answer shortcut: the learner has already swept the tilt by hand in
- * Step 2, and Step 6 asks them to predict a cut with no chips on screen (ADR-086).
+ * Step 2, and Step 6 asks them to predict a cut with no chips on screen (ADR-141).
  *
  * @param {string} key            A {@link ConicSection} key.
  * @param {number} generatorDeg   From {@link generatorAngleDeg}.
@@ -246,7 +246,7 @@ export function focalSphereFor({ angleDeg, offset, generatorDeg, height }) {
 
 /**
  * How big to draw the two planes of the proof, and — for the tangent plane — where to START
- * drawing it (ADR-096).
+ * drawing it (ADR-173).
  *
  * The tangent plane is the plane of the circle in which the sphere touches the CONE, so it
  * meets the sphere in exactly that circle: any quad drawn across it passes through the ball and
@@ -423,7 +423,7 @@ export const METHODS = Object.freeze([
     label: 'Tangent method',
     example: 'Example 6.8',
     // The chapter's terms first, with the names a drawing office actually uses beside them
-    // (ADR-113) — a learner meets both on the same control.
+    // (ADR-190) — a learner meets both on the same control.
     dim1: { label: 'Double ordinate / base', min: 60, max: 200, step: 1, unit: 'mm', value: 120 },
     dim2: { label: 'Abscissa / axis', min: 30, max: 160, step: 1, unit: 'mm', value: 90 },
     // This construction is built from EQUAL DIVISIONS of the two tangents, not from plotted
@@ -456,7 +456,7 @@ export const METHODS = Object.freeze([
     dim2: { label: 'Axis', min: 30, max: 160, step: 1, unit: 'mm', value: 96 },
   },
 
-  // ---- Hyperbola (§6.9) — DELIBERATELY ABSENT (ADR-115) ----------------------------------
+  // ---- Hyperbola (§6.9) — DELIBERATELY ABSENT (ADR-192) ----------------------------------
   // Course 1003, Module II teaches the hyperbola as a SECTION of the cone and does not ask for
   // its construction, so §6.9's three constructions (Examples 6.13–6.15) are not offered. The
   // hyperbola itself is untouched: it is still one of Step 3's six named cuts, still classified
@@ -465,7 +465,7 @@ export const METHODS = Object.freeze([
 ]);
 
 /**
- * THE SYLLABUS SCOPE, and the methodology card each construction opens with (ADR-098).
+ * THE SYLLABUS SCOPE, and the methodology card each construction opens with (ADR-175).
  *
  * Course 1003, Module II names three constructions and says "only" twice:
  *   *"Ellipse - Rectangular Method & Concentric Circle Method only, Parabola- Tangent method
@@ -559,15 +559,15 @@ export const METHOD_INFO = Object.freeze({
     principle: 'The drop from the tangent goes as the SQUARE of the division — 1, 4, 9, 16.',
     steps: 6,
   },
-  // §6.9's three methodology cards go with the constructions they described (ADR-115).
+  // §6.9's three methodology cards go with the constructions they described (ADR-192).
 });
 
 /**
  * CHANGE 3 / CHANGE 8 — the constructions of one curve, split into the tier the syllabus names
- * and everything else (ADR-100). Within the two curves the module TEACHES nothing is removed: a
+ * and everything else (ADR-177). Within the two curves the module TEACHES nothing is removed: a
  * Diploma student needs to know which one to practise, and a B.Tech student or a self-learner
  * needs the rest of §6.5 and §6.7 to still be there. §6.9's three are a different matter — they
- * construct a curve this module does not ask to be constructed, and are gone (ADR-115).
+ * construct a curve this module does not ask to be constructed, and are gone (ADR-192).
  *
  * `eccentricity` belongs to every curve — the focus-directrix construction draws all three, the
  * hyperbola included — so it appears in each list rather than being owned by one.
@@ -576,10 +576,10 @@ export const METHOD_INFO = Object.freeze({
  * @returns {{syllabus: Array<object>, additional: Array<object>}} METHODS entries, in chapter order.
  */
 /**
- * The construction a curve should OPEN on (ADR-102). Every curve used to open on the general
+ * The construction a curve should OPEN on (ADR-179). Every curve used to open on the general
  * focus-directrix construction, which is not what a Diploma student is examined on: the ellipse
  * and the parabola each have a syllabus method, and landing anywhere else makes the learner hunt
- * for the one that matters. The hyperbola is not offered for construction at all (ADR-115), but
+ * for the one that matters. The hyperbola is not offered for construction at all (ADR-192), but
  * it still ARRIVES here from Steps 1–4 whenever the cut makes one, and the general method is what
  * draws it — it works for all three curves and needs no extra given.
  *
@@ -589,7 +589,7 @@ export const METHOD_INFO = Object.freeze({
 /**
  * The constructions that actually draw a tangent and normal at the marked point. The others
  * ignore `showTangent` and `pointT` entirely, so offering those controls beside them is
- * offering a control that does nothing (ADR-102).
+ * offering a control that does nothing (ADR-179).
  */
 const TANGENT_METHODS = Object.freeze(['eccentricity', 'ellipse-concentric', 'ellipse-oblong',
   'ellipse-arcs', 'parabola-tangent']);
@@ -605,7 +605,7 @@ const TANGENT_METHODS = Object.freeze(['eccentricity', 'ellipse-concentric', 'el
  * The constructions that actually read the shared `points` slider. The rest fix their own
  * division count — the oblong and parallelogram methods at the textbook's "say 4", the
  * concentric method at twelve, the offset method at 4² — and the tangent method carries its own
- * (ADR-113). A slider that moves nothing is worse than an absent one.
+ * (ADR-190). A slider that moves nothing is worse than an absent one.
  */
 const DIVISION_METHODS = Object.freeze(['eccentricity', 'ellipse-arcs', 'parabola-rectangle',
   'parabola-parallelogram']);
@@ -652,7 +652,7 @@ function methodsForCurve(curve) {
  * It used to be whichever method happened to be listed first, and the sim itself opened on the
  * general focus-directrix construction for every curve. Neither is what a Diploma student is
  * examined on: the ellipse and the parabola each have a construction the syllabus NAMES, and
- * landing anywhere else makes the learner hunt for the one that matters (ADR-102). The
+ * landing anywhere else makes the learner hunt for the one that matters (ADR-179). The
  * hyperbola has no syllabus construction at all, so it keeps the general one — the method that
  * works for all three and needs no extra given.
  *
@@ -683,7 +683,7 @@ export function defaultEccentricityFor(curve) {
 
 /**
  * @typedef {Object} ConicState  The 2D sheet's state. Millimetres and degrees throughout
- *   (ADR-083). Lives in main.js beside ShapeData, like {@link SectionState}.
+ *   (ADR-138). Lives in main.js beside ShapeData, like {@link SectionState}.
  * @property {number} e         Eccentricity (§6.3). Drives the curve in the locus and
  *   eccentricity-method modes.
  * @property {number} fa        Distance of the focus from the directrix, mm (the "FA" of
@@ -702,7 +702,7 @@ export function defaultEccentricityFor(curve) {
  * @property {boolean} showAll  Locus mode: draw all three curves together (Fig. 6.3).
  * @property {boolean} showTangent  Draw the tangent and normal at P.
  * @property {boolean} showNames    Step 4: swap the locus sheet for the terminology figure.
- *   Off by default — the phenomenon first, its vocabulary on request (ADR-086).
+ *   Off by default — the phenomenon first, its vocabulary on request (ADR-141).
  * @property {number} buildStage    How far the eccentricity construction has been drawn,
  *   0–{@link BUILD_STAGES}. Step 5 plays it through one stage at a time, so the learner
  *   watches the construction happen instead of meeting it finished.
@@ -725,13 +725,13 @@ export const BUILD_STAGES = Object.freeze([
 ]);
 
 /**
- * STEP 4 — the six stages of the proof (ADR-095).
+ * STEP 4 — the six stages of the proof (ADR-172).
  *
  * The chapter derives the focus and the directrix ON THE SOLID (§6.2 items 1-4) and only then
  * measures with them (§6.3). This list is that derivation, cut into the seven moments a learner
  * can take one at a time.
  *
- * TWO SEPARATE TANGENCIES, TWO SEPARATE STAGES (ADR-097). The sphere touches the CONE along a
+ * TWO SEPARATE TANGENCIES, TWO SEPARATE STAGES (ADR-174). The sphere touches the CONE along a
  * circle and the CUTTING PLANE at a single point, and those are different facts about different
  * pairs of objects. Shown together they read as one muddled claim, and the name "tangent plane"
  * makes it worse — that plane is named for the cone it touches, not for the ball. So the ring
@@ -747,7 +747,7 @@ export const BUILD_STAGES = Object.freeze([
  * Indexes are the values of `conicState.proofStage`.
  */
 /**
- * THE THREE CONSTRUCTIONS THE SYLLABUS NAMES, staged the way a teacher draws them (ADR-098).
+ * THE THREE CONSTRUCTIONS THE SYLLABUS NAMES, staged the way a teacher draws them (ADR-175).
  *
  * Course 1003, Module II scopes Conic Sections to exactly these: *"Ellipse - Rectangular Method
  * & Concentric Circle Method only, Parabola- Tangent method only"*. Every one of them was already
@@ -764,7 +764,7 @@ export const BUILD_STAGES = Object.freeze([
  * drawing, and the engine imports nothing (CLAUDE.md). It appears with the divisions it labels
  * and leaves once the curve is joined, so the finished figure is clean.
  */
-// Twelve stages (ADR-116). Each of the construction's two families is taught the same way: the
+// Twelve stages (ADR-193). Each of the construction's two families is taught the same way: the
 // part a learner has to understand arrives one line per press, and the part that is only its
 // reflection arrives whole. The rays from C split UPPER / lower — C sits at the top, so the upper
 // fan is the one it draws — and the connecting lines split LEFT / right. Seventeen presses of it
@@ -798,7 +798,7 @@ const ELLIPSE_CONCENTRIC_STAGES = Object.freeze([
 ]);
 
 /**
- * The tangent method's stages (ADR-116) — the only list in the topic that is a FUNCTION of the
+ * The tangent method's stages (ADR-193) — the only list in the topic that is a FUNCTION of the
  * drawing rather than a constant, because the only thing that varies is how many chords there
  * are, and the learner sets that on a slider (4–12 divisions, so 3–11 chords).
  *
@@ -807,7 +807,7 @@ const ELLIPSE_CONCENTRIC_STAGES = Object.freeze([
  * individually-drawn chords instead would either dead-press at four divisions (three chords
  * cannot be split into "three by hand, then the rest") or bunch them at twelve.
  *
- * The list ENDS on the envelope (ADR-133): nine stages at the default seven divisions, not ten.
+ * The list ENDS on the envelope (ADR-210): nine stages at the default seven divisions, not ten.
  * The focus and the directrix are what Example 6.8 asks this construction to produce, so they
  * arrive with the curve; the tangent and normal at P are an optional element and belong to their
  * own toggle, exactly as they do in the concentric and oblong methods.
@@ -838,7 +838,7 @@ function parabolaTangentStages(divisions = 7) {
 }
 
 /**
- * How many of the tangent method's chords are drawn one at a time (ADR-116).
+ * How many of the tangent method's chords are drawn one at a time (ADR-193).
  *
  * `conicEngine.js` gates the DRAWING on the same rule. The two modules cannot import each other
  * — both are pure leaves that import nothing (CLAUDE.md) — so the rule is stated in both and the
@@ -864,7 +864,7 @@ function tangentDivisions(dim3) {
  * Which stage list a construction plays, and where its numbering lives. `null` for the nine
  * constructions that have no staged playback — they are beyond the syllabus and draw whole.
  */
-// ---- The ten constructions beyond the syllabus, staged the same way (ADR-100) -------------
+// ---- The ten constructions beyond the syllabus, staged the same way (ADR-177) -------------
 // Every method animates its OWN procedure. A learner who picks the four-centre method and is
 // shown the concentric-circle animation has been told something false about what they drew.
 
@@ -922,9 +922,9 @@ const PARABOLA_OFFSET_STAGES = Object.freeze([
   { label: 'Join the curve', say: 'Join the offset ends freehand through V for the required parabola.' },
 ]);
 
-// §6.9's three stage lists left with the constructions they narrated (ADR-115).
+// §6.9's three stage lists left with the constructions they narrated (ADR-192).
 
-// An entry is a stage list, or a FUNCTION of the conic state returning one (ADR-116). Only the
+// An entry is a stage list, or a FUNCTION of the conic state returning one (ADR-193). Only the
 // tangent method needs the second form: how many chords it draws is on a slider.
 export const METHOD_PLAYBACK = Object.freeze({
   'ellipse-oblong': ELLIPSE_OBLONG_STAGES,
@@ -940,7 +940,7 @@ export const METHOD_PLAYBACK = Object.freeze({
 
 /**
  * The stage a construction OPENS on — its given data set out, and nothing constructed from it
- * (ADR-118).
+ * (ADR-195).
  *
  * Step 5 used to open on the finished figure, which put the answer on the paper before the
  * question and made "Draw it step by step" look like it was starting from the middle. It now
@@ -973,7 +973,7 @@ const SETUP_STAGE = Object.freeze({
   'parabola-rectangle': 1,
   'parabola-parallelogram': 1,
   'parabola-offset': 1,
-  // Not 2 (ADR-119). Opening on the joined tangents looked like a frame, because a triangle
+  // Not 2 (ADR-196). Opening on the joined tangents looked like a frame, because a triangle
   // reads as one — but AE and BE are the first thing this construction DOES, and E is produced
   // by the step before them. Its givens are the double ordinate and the abscissa, nothing else.
   'parabola-tangent': 0,
@@ -987,7 +987,7 @@ export function setupStageFor(method) {
  * The stages for one construction, or `null` where it has none.
  *
  * `conic` is optional and only the tangent method reads it — its chord count is on a slider, so
- * its stage list has to be sized to the drawing (ADR-116). Omitting it gives that method's list
+ * its stage list has to be sized to the drawing (ADR-193). Omitting it gives that method's list
  * at the default division count, which is what a caller asking "is this method staged at all?"
  * wants; a caller that indexes the list must pass the state.
  *
@@ -1052,7 +1052,7 @@ export const PROOF_STAGES = Object.freeze([
 /**
  * §6.6's three properties of the parabola — "some of the important properties mentioned below
  * will be useful in the construction of a parabola" — each drawn rather than written, one at a
- * time (ADR-093). The sub-tangent and sub-normal (properties 4 and 5) are already captioned on
+ * time (ADR-170). The sub-tangent and sub-normal (properties 4 and 5) are already captioned on
  * the terminology sheet, where they belong to a point P; these three are about the curve as a
  * whole and need a figure of their own.
  *
@@ -1080,7 +1080,7 @@ export function defaultConicState() {
     fa: 50,
     curve: CurveType.Ellipse,
     // The curve's own recommended construction — for the ellipse, the one the syllabus names
-    // (ADR-102). The other twelve are one select away.
+    // (ADR-179). The other twelve are one select away.
     method: 'ellipse-concentric',
     dim1: 120,
     dim2: 80,
@@ -1094,12 +1094,12 @@ export function defaultConicState() {
     showNames: false,
     buildStage: BUILD_STAGES.length - 1, // Step 5's "Draw it step by step" rewinds to 0
     // Step 4 opens on the CURVE ALONE and reveals the apparatus from there, so the sheet's
-    // first frame is recognisably the slice the learner just made (ADR-088).
+    // first frame is recognisably the slice the learner just made (ADR-165).
     locusStage: 0,
-    // Which of Step 4's six proof stages the learner has walked to (ADR-095). It never
+    // Which of Step 4's six proof stages the learner has walked to (ADR-172). It never
     // advances by itself: Back and Next are the only things that move it.
     proofStage: 0,
-    // WHAT THE LIVE CUT IS, as the sheet must draw it (ADR-090): 'conic' | 'circle' |
+    // WHAT THE LIVE CUT IS, as the sheet must draw it (ADR-167): 'conic' | 'circle' |
     // 'triangle' | 'none'. Three of §6.1's six sections are not plane conics, and the sheet
     // draws each of them as itself rather than substituting a curve the cone does not have.
     // `cutA`/`cutB` carry that section's own dimensions in mm — the circle's radius; the
@@ -1107,7 +1107,7 @@ export function defaultConicState() {
     cutKind: 'conic',
     cutA: 0,
     cutB: 0,
-    // §6.6's three properties, shown on request and one at a time (ADR-093). `propsOpen` swaps
+    // §6.6's three properties, shown on request and one at a time (ADR-170). `propsOpen` swaps
     // the sheet for their figure; `propStage` is which of the three is drawn.
     propsOpen: false,
     propStage: 0,

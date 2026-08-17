@@ -1,7 +1,7 @@
 // The shape symbols (Module 1 Topic 1.1 — Dimensioning), Step 5.
 //
 // PURE DATA LEAF (ADR-007 / RULES.md §3.6) apart from the pure-data `dimensionData.js`
-// import (ADR-078).
+// import (ADR-133).
 //
 // While dimensioning, you say what SHAPE the feature is as well as how big it is, because it
 // improves how the drawing reads. There are five recommended symbols, and they go in FRONT of

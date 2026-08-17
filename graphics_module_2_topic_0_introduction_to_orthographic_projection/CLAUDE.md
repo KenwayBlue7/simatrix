@@ -19,7 +19,7 @@ re-explained.
 
 ## Deliberately OUT of scope
 Third-angle projection (named in Step 2's glossary, never drawn) · **the HP/VP/XY apparatus and
-the four quadrants** (ADR-131 — that is `graphics_module_1_topic_2_spatial_framework`'s lesson;
+the four quadrants** (ADR-208 — that is `graphics_module_1_topic_2_spatial_framework`'s lesson;
 here first angle is taught as its observable consequence) · inclined or tilted solids · sections ·
 auxiliary views · missing-view problems · a problem library, answer checking or scoring · teaching
 the dimensioning *rules*. The sheet dimensions correctly to BIS Type B in the
@@ -51,7 +51,7 @@ that was not legible on the printed scan carries a `// chosen` comment at its de
 An **Engineering Graphics** topic, so it consumes the shared EG root docs. Before any task that
 touches shared behaviour, UI patterns or cross-module consistency, read:
 - `../ARCHITECTURE.md` — system map, component breakdown, data flow
-- `../DECISIONS.md` — why key decisions were made (ADR log; this topic adds **ADR-127**…**ADR-132**)
+- `../DECISIONS.md` — why key decisions were made (ADR log; this topic adds **ADR-204**…**ADR-209**)
 - `../RULES.md` — what you must and must not do (enforcement; this topic adds **§3.67**–**§3.70** and **§4.5a**)
 - `../DESIGN.md` — colour tokens, typography, component standards (the single platform design system)
 - `../PRODUCT.md` — who it is for, features, accessibility commitments
@@ -61,7 +61,7 @@ component styling and UI/UX. Never hard-code design values in CSS or JS — cons
 This topic **adds no token and invents no UI pattern**: wizard, rail, step card, segmented control,
 checkbox, radio, hint callout, term popover, mobile notice and reset confirm are all platform
 components. It does take ONE named colour exception — the Front arrow on `--color-accent` inside
-the viewport, bound to the single-consumer `guide` role (ADR-130, RULES.md §4.5a).
+the viewport, bound to the single-consumer `guide` role (ADR-207, RULES.md §4.5a).
 It carries **no** local `DESIGN.md` / `PRODUCT.md` copy (RULES.md §1.14).
 
 **Scope boundary:** this module produces a self-contained Three.js payload — the 3D viewport plus
@@ -109,9 +109,9 @@ generator, no `meshAnalyzer.js`, no `iShape.js`, no `problems.js`.
 - **`src/dimensions3d.js`** — leaf. BIS Type-B dimensions on the SOLID, so Step 1 can be checked
   against the textbook. Reads the SAME `objectData.dims` the sheet draws and lifts each 2-D view
   frame onto the matching face; draws the set for the direction the camera is at, and no other.
-  Open 3:1 chevrons keep it one `LineSegments2` (ADR-132). Never author a second dimension set for
+  Open 3:1 chevrons keep it one `LineSegments2` (ADR-209). Never author a second dimension set for
   it — the registry is the one source, and `DIM_STYLE` there is the one set of BIS numbers. The
-  heads are 3:1 and must stay so: ADR-079's 15° heads are scoped to the topic that TEACHES
+  heads are 3:1 and must stay so: ADR-134's 15° heads are scoped to the topic that TEACHES
   termination geometry, and RULES.md §6.19's default governs incidental dimensions like these.
 - **`src/projectionSheet.js`** — leaf. The first-angle SVG sheet: layout, the derived projection
   lines and 45° mitre, the aligned Type-B dimensions, and the staged reveal. Its stage list is
@@ -128,7 +128,7 @@ generator, no `meshAnalyzer.js`, no `iShape.js`, no `problems.js`.
   is a fixed-duration eased flight, never a teleport.
 - **`src/tokens.js`** — STATELESS shared util (RULES.md §3.6a): token → role → `THREE.Color`, plus
   the named line weights. The `guide` role (`--color-accent`) is the topic's one named exception to
-  Chrome-Only Blue and has exactly ONE consumer, the Front arrow (ADR-130, RULES.md §4.5a). Do not
+  Chrome-Only Blue and has exactly ONE consumer, the Front arrow (ADR-207, RULES.md §4.5a). Do not
   add a second.
 - **`src/stepper.js`**, **`src/terms.js`**, **`src/onboarding.js`**, **`src/anim.js`** — the
   platform leaves.
@@ -151,14 +151,14 @@ generator, no `meshAnalyzer.js`, no `iShape.js`, no `problems.js`.
 - Step 2 opens on a **blank sheet**, never on the finished drawing (RULES.md §3.57). Forward
   animates and is disabled while a stage is still drawing; **Previous never replays and never moves
   the camera** (§3.49).
-- The sheet carries **no XY line, no plane tags, no quadrant apparatus** (ADR-131). The XY ordinate
+- The sheet carries **no XY line, no plane tags, no quadrant apparatus** (ADR-208). The XY ordinate
   still exists in `projectionSheet.js`'s layout maths as the datum every view is placed against —
   it is simply not drawn. Do not "restore" it.
 - The **side view is the learner's choice** and lives in `main.js`'s state, not in the data, so a
   rebuild cannot revert it. Changing it rewinds the reveal to blank paper, because it changes the
   derived stage list. The **Dimensions switch deliberately does NOT** — it is visibility only
   (`sheet.setDimensions()`), so it can be thrown mid-construction. It used to be a `layout()` input
-  and that inverted the control: turning dimensions on made the drawing vanish (ADR-131, amended).
+  and that inverted the control: turning dimensions on made the drawing vanish (ADR-208, amended).
 - **Camera flights are arcs about the target, never chords.** Left and Right are 180° apart, so
   lerping positions runs the eye through the object. Do not "simplify" `arcBetween()` back.
 - The **Left/Right cameras are correct and have been measured** (Stepped Block: treads visible from
@@ -186,7 +186,7 @@ generator, no `meshAnalyzer.js`, no `iShape.js`, no `problems.js`.
   along its own dimension line, sits one 3.2 mm lift above it, and is turned into the half-circle
   that reads from the bottom edge or the right-hand edge. It applies to the SOLID as much as to the
   sheet — "a CSS2D label is billboarded, so the rotation is about paper" was the reasoning behind
-  the defect, not behind the design (ADR-132 amended). Two things that look like exceptions and are
+  the defect, not behind the design (ADR-209 amended). Two things that look like exceptions and are
   not: a **leader's note stays level**, because a note is written along its horizontal landing in
   both systems; and the turn on the solid is a **constant**, because the layer is only drawn for the
   direction the camera is AT, where the view's own frame lands on the screen square.
@@ -219,14 +219,14 @@ generator, no `meshAnalyzer.js`, no `iShape.js`, no `problems.js`.
   middle, out to the elbow, an arrowhead at each end of the diameter). A **radius starts ON the arc**
   and never reaches the centre, because a line across the middle would say diameter. The geometry
   states the measurement; the shelf keeps what the learner reads off the feature. Test against the
-  view's primitives, never against the authored label (RULES.md §6.31/§6.32, ADR-141).
+  view's primitives, never against the authored label (RULES.md §6.35/§6.36, ADR-218).
 - **`controls.target` is EASED onto new content, never assigned.** A view change rebuilds the
   annotation layer before the flight starts, so the content box moves; setting the target in one step
   swung the camera in a single frame and was the whole of the "view switching jumps" report.
   `focusOn()` tweens it over 260 ms and `flyToNamed()` cancels that tween and carries the target
   itself. Holding the eye-to-target offset instead does NOT help — the eye has still moved, so the
   scene slides by the parallax. Prove a transition by sampling it per FRAME, not by checking where it
-  landed (RULES.md §5.22/§5.23, ADR-140).
+  landed (RULES.md §5.22/§5.23, ADR-217).
 - Read all colours from CSS custom properties at runtime (through `tokens.js` in JS, `var(--…)` in
   the sheet's CSS); never hard-code hex. Blue stays in the chrome only.
 - The sheet is authored and laid out in **millimetres** and fitted with one `viewBox`, so a real

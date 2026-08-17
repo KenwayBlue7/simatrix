@@ -7,7 +7,7 @@
 // the topic's other renderer (`dimensionDraw.js`, which paints into a WebGL scene) is not
 // reused here — the two answer different questions.
 //
-// WHAT IT IS NOT. There is no layout pass (ADR-126) behind this file. Every annotation is
+// WHAT IT IS NOT. There is no layout pass (ADR-203) behind this file. Every annotation is
 // placed by hand in `reviewFigures.js`, because half of these sheets are DELIBERATELY badly
 // laid out and a pass whose whole job is to un-crowd a drawing would quietly repair the
 // lesson. `verify/reviewfigures.mjs` measures the finished SVG instead — the corrected sheets

@@ -1,7 +1,7 @@
 // The drawings themselves (Module 1 Topic 1.1 — Dimensioning).
 //
 // PURE DATA LEAF (ADR-007 / RULES.md §3.6) apart from the pure-data `dimensionData.js`
-// import (ADR-078): every export here is a plain object or a function of plain objects.
+// import (ADR-133): every export here is a plain object or a function of plain objects.
 // It owns nothing in the scene — `dimensionDraw.js` turns these specs into linework.
 //
 // What lives here:

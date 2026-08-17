@@ -169,7 +169,7 @@ function frontFaceAnchor(bounds, centre, solid) {
  * draughtsman called the front. It sits clear of the object at +z, points back at the front face
  * along -z, and is labelled with a live DOM node (RULES.md §3.27) rather than a baked sprite.
  *
- * COLOUR — a named exception to the Chrome-Only Blue Rule (RULES.md §4.5, ADR-130). The arrow is
+ * COLOUR — a named exception to the Chrome-Only Blue Rule (RULES.md §4.5, ADR-207). The arrow is
  * not domain geometry and carries no engineering meaning: it is an INSTRUCTION to the learner
  * about where to stand, the same category as the accent `.vp-hint` chips that already float in
  * this viewport. Reading it as ink would make it a feature of the part, which it is not. Nothing

@@ -208,7 +208,7 @@ graphics_module_1_topic_1_1_dimensioning/
     ├── dimensionDraw.js        the BIS dimension renderer: specs → linework + label anchors
     ├── dimensionLayout.js      PURE — the annotation layout pass: works out where every
     │                           stroke and value will land, finds the pairs closer than 3 mm,
-    │                           and moves the lower-priority one clear (ADR-126)
+    │                           and moves the lower-priority one clear (ADR-203)
     ├── dimensionLabels.js      CSS2D values and the draggable pills of Step 2
     ├── dimensionSteps.js       PURE DATA — step copy, glossary, §4.6 checklist, §4.5 system
     ├── dimensionRules.js       PURE DATA — Step 2's rule/violation pairs + placement checks
@@ -225,7 +225,7 @@ graphics_module_1_topic_1_1_dimensioning/
     └── terms.js                the glossary popover singleton
 ```
 
-**Two decisions worth knowing before you edit anything** (both recorded as ADR-078 in
+**Two decisions worth knowing before you edit anything** (both recorded as ADR-133 in
 `../DECISIONS.md`):
 
 - **One orthographic camera, no perspective camera, no projection morph.** This topic *is* a
@@ -233,7 +233,7 @@ graphics_module_1_topic_1_1_dimensioning/
   dual-camera morph governs moving *between* a perspective view and an ortho quick-view;
   with no perspective camera in the scene there is no such hand-off to make. Orbit stays
   live — the same parallel camera swings round the part.
-- **Two linework systems, chosen by the camera pose** (ADR-081). The **front elevation** draws
+- **Two linework systems, chosen by the camera pose** (ADR-136). The **front elevation** draws
   the topic's own authored linework — a drawing is a fixed agreed projection, and which of its
   lines are dashed is a draughting decision the lesson argues about. Turn the part and the
   **live classifier** takes over: `meshAnalyzer.js` + `lineDrawer.js`, copied from Foundations,
@@ -294,7 +294,7 @@ authority for this topic. Do not "tidy" a gap back in.
 
 Likewise, the arrowhead proportions are the textbook's own (Figs. 4.5–4.6 and §4.5 item 2:
 open head, included angle ≈15°, length 3–4 mm, drawn thick), not the platform's 3:1 default —
-see ADR-079, and do not "fix" them back.
+see ADR-134, and do not "fix" them back.
 
 ---
 

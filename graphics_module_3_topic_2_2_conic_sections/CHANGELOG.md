@@ -3,9 +3,9 @@
 Notable changes to this topic. (The sibling topic's history was intentionally not carried over —
 this changelog starts fresh at the build, per MODULE-STARTER §3.2.)
 
-## 2026-08-09 — The tangent method's frame stops moving; its labels are set outward (ADR-137)
+## 2026-08-09 — The tangent method's frame stops moving; its labels are set outward (ADR-214)
 
-**1. Fixed: the drawing rescaled on the final step (ADR-137).**
+**1. Fixed: the drawing rescaled on the final step (ADR-214).**
 - The report: "a noticeable visual jump/glitch in the final (freehand) step ONLY in the Tangent
   Method", with the cause given as a fresh rebuild or a second drawing mode, to be fixed by
   suppressing `scene.clear()` and not re-instantiating geometry groups.
@@ -49,7 +49,7 @@ this changelog starts fresh at the build, per MODULE-STARTER §3.2.)
 - Not changed, because it was not broken: **"Draw it step by step" already starts from the given
   data alone.** Probed on the shipped page — the first frame reads `1 of 9 · The given sizes` with
   the same 2963-px ink as arrival: the axis, the double ordinate, the abscissa and V/A/B/C, and
-  nothing constructed. That is ADR-118/ADR-119 working. The tangent method's triangle looks like a
+  nothing constructed. That is ADR-195/ADR-196 working. The tangent method's triangle looks like a
   frame and is not one, because E at its apex has to be found first.
 
 **3. Changed: every point name on the tangent method is set OUTWARD from the figure.**
@@ -63,8 +63,8 @@ this changelog starts fresh at the build, per MODULE-STARTER §3.2.)
 - Font sizes were already correct and are untouched: `labelWeight()` infers them from the text, so
   the division numbers are the bold size and the point names the size below it.
 
-**4. Changed: A is the FOOT of the double ordinate and B its head (ADR-138).**
-- ADR-134 reversed the trace so the pencil comes up out of the base, and deliberately left the
+**4. Changed: A is the FOOT of the double ordinate and B its head (ADR-215).**
+- ADR-211 reversed the trace so the pencil comes up out of the base, and deliberately left the
   labelling alone. That made the drawing read **B → A**: the curve began at B and finished at A,
   while every sentence describing the construction names A first — "draw the double ordinate AB",
   "tangents to the parabola at A and at B". The two orders disagreed.
@@ -92,9 +92,9 @@ this changelog starts fresh at the build, per MODULE-STARTER §3.2.)
 and all geometry. `parabolaPts()` is unchanged, `f = (dOrd²)/(16·abs)` is unchanged, and the
 envelope still satisfies y² = 4f·x to 1e-9. All five oracles green.
 
-## 2026-08-08 — Tangent method ends on its curve, traced clockwise; the library is cut to the syllabus (ADR-133 … ADR-136)
+## 2026-08-08 — Tangent method ends on its curve, traced clockwise; the library is cut to the syllabus (ADR-210 … ADR-213)
 
-**1. The tangent method is nine steps, not ten (ADR-133).**
+**1. The tangent method is nine steps, not ten (ADR-210).**
 - Changed: the construction now **ENDS on the envelope**. The tenth stage is gone; the focus and
   the directrix — what Example 6.8 asks this method to LOCATE — are drawn on the envelope stage
   with the curve.
@@ -107,17 +107,17 @@ envelope still satisfies y² = 4f·x to 1e-9. All five oracles green.
   named in `METHOD_INFO`'s `output`, and are asked for by name in a shipped exercise. Deleting the
   tenth stage outright would have deleted the answer to the question.
 - Note: this cost the oracle its witness that "the stage that draws the curve" and "the last stage"
-  are different things (ADR-115's trigger). The witness moved to the focus-directrix construction
+  are different things (ADR-192's trigger). The witness moved to the focus-directrix construction
   — curve at stage 6, tangent and normal at 7 — and a new assertion pins the tangent method's curve
   to its own last stage, so the tenth cannot come back unnoticed.
 - Note: `METHOD_INFO['parabola-tangent'].steps` still reads 7. It is the chapter's written
   procedure count, not the playback length, which is a function of the divisions slider.
 
-**2. The parabola is traced clockwise (ADR-134).**
+**2. The parabola is traced clockwise (ADR-211).**
 - Changed: `parabolaTangent()` reverses its `curvePts`. The reveal now runs from **B at the foot of
   the double ordinate, round the vertex, up to A** — clockwise on screen, the way a hand moves
   through a curve of this shape.
-- Root cause: `parabolaPts()` samples y from −yMax upward and the sheet is y-DOWN (ADR-083), so the
+- Root cause: `parabolaPts()` samples y from −yMax upward and the sheet is y-DOWN (ADR-138), so the
   pencil started at the TOP of the base and swept anticlockwise.
 - Untouched: the geometry. Same samples, same focal length, same envelope, same bbox, same analytic
   scale — order only. The oracle re-checks every reversed point against y² = 4f·x, and checks the
@@ -126,7 +126,7 @@ envelope still satisfies y² = 4f·x to 1e-9. All five oracles green.
 - Not done: reversing inside `parabolaPts()` (shared with two parabolas that open the other way up)
   or swapping the labels A and B (that would relabel the drawing).
 
-**3. The Problem Library is cut to the syllabus (ADR-135).**
+**3. The Problem Library is cut to the syllabus (ADR-212).**
 - Added: `ENABLED_METHODS` in `src/problems.js` — a **third filter axis**, holding
   `ellipse-concentric`, `ellipse-oblong` and `parabola-tangent`. `enabledProblems()` now deals only
   problems whose `target.method` is one of the three, so the focus-and-directrix exercises (which
@@ -137,7 +137,7 @@ envelope still satisfies y² = 4f·x to 1e-9. All five oracles green.
 - Removed from the DEAL, not from the file: the three eccentricity-method exercises and the
   parallelogram, intersecting-arc, rectangle, parabola-parallelogram and offset ones. All fifteen
   chapter exercises stay in `src/problems.js` verbatim, exactly as the four hyperbola ones have
-  since ADR-115. Widening the list is a one-line change.
+  since ADR-192. Widening the list is a one-line change.
 - Added: the **four syllabus practice problems**, verbatim as set — concentric circle method at
   100 × 70 and 120 × 80, rectangular method at 100 × 70 and 120 × 80 — in their own labelled block,
   each with the three-step hint scaffold and a target that maps straight onto the construction.
@@ -147,7 +147,7 @@ envelope still satisfies y² = 4f·x to 1e-9. All five oracles green.
   concentric, 120 × 80 rectangular). The chapter's versions ask for a tangent, a normal or a
   located point on top of the same figure. Dropping either set is a content call.
 
-**4. A loaded problem selects the construction it names (ADR-136, amending RULES §6.2).**
+**4. A loaded problem selects the construction it names (ADR-213, amending RULES §6.2).**
 - Added: `armMethodForStep5()` in `src/problemLibrary.js`. Loading a problem arms it; on the
   learner's **first arrival at Step 5** it selects the construction the statement names in words,
   once, and then hands the picker back.
@@ -155,7 +155,7 @@ envelope still satisfies y² = 4f·x to 1e-9. All five oracles green.
   `ellipse-concentric` defaults to 120 × 80, which is one of the practice answers exactly —
   committing the method with its defaults would have lit the self-check green on load.
 - At Step 5 rather than at load, because Steps 1–4 re-derive the sheet's CURVE from the live cut
-  (`syncSheetToCut`, ADR-117) and would leave the method beside a curve that had drifted.
+  (`syncSheetToCut`, ADR-194) and would leave the method beside a curve that had drifted.
 - RULES §6.2 is amended, not withdrawn: **a measured quantity is never auto-filled; the named
   construction is.** Verified in the browser — the picker shows "Concentric (auxiliary) circles"
   and the self-check still reads "Still to match: major axis and minor axis."
@@ -167,7 +167,7 @@ the tangent with the toggle off; it arrives with the curve when on; the focus an
 with the envelope; the trace is clockwise). `verify/shipped-module.mjs` counts seven cards and
 asserts none names a construction outside the syllabus.
 
-## 2026-08-05 (c) — One thumbnail box on every step; the docked mode is deleted (ADR-125, supersedes ADR-120)
+## 2026-08-05 (c) — One thumbnail box on every step; the docked mode is deleted (ADR-202, supersedes ADR-197)
 
 - Changed: **Steps 4 and 6 now show the thumbnail at exactly the box Step 5 uses** — 420 × 320,
   same anchor, same radius, same shadow, same minimize/restore. Requested twice; asked and
@@ -177,15 +177,15 @@ asserts none names a construction outside the syllabus.
   element (`#compare-card`), one sizing rule (`.compare-card[data-size="compact"]`). Step 5 never
   sized it differently — `body.drawing-main` SWAPS which pane is large and which is the card and
   leaves the card's own rules alone. Exactly one thing overrode that rule: `body.sheet-docked`,
-  ADR-120's full-height column for Steps 4 and 6.
+  ADR-197's full-height column for Steps 4 and 6.
 - Removed: the docked mode **outright**, rather than scoped smaller. Eleven `body.sheet-docked`
   rules across three media queries, the `--sheet-col` / `--sheet-row` tokens, the two `#view-box`
   re-rects, the shadow suppression, and the four `.vp-note` / `.vp-hint` re-anchors that existed
   only to dodge a column. `syncSheetDock()` keeps only `sheet-solo` (the phone's one-pane-at-a-time
-  mode, ADR-123) and no longer reads the stage at all. Narrowing the override, or adding a third
+  mode, ADR-200) and no longer reads the stage at all. Narrowing the override, or adding a third
   selector to defeat it, would have left two sizing systems in the file — which is the defect.
 - Accepted, knowingly: on Steps 4 and 6 the card sits over the box the camera framed the cone into
-  again. That was ADR-120's whole reason for existing. Section 7 now **prints that overlap as a
+  again. That was ADR-197's whole reason for existing. Section 7 now **prints that overlap as a
   `note` line on every run** instead of asserting it away, so the trade stays visible. If it is
   addressed later, reframe the camera — do not re-add a per-step sizing mode.
 - Changed: `verify/interaction.mjs` section 7 rewritten from "Steps 4 and 6 dock" to "every step's
@@ -194,27 +194,27 @@ asserts none names a construction outside the syllabus.
   would pass a second mode introduced under another name. Verified at 1920 × 1200, 1440 × 900 and
   1100 × 800.
 
-## 2026-08-05 (b) — The sheet floats at one compact size on every step that has a thumbnail (ADR-124)
+## 2026-08-05 (b) — The sheet floats at one compact size on every step that has a thumbnail (ADR-201)
 
 - Fixed: **Steps 1, 2 and 3 stretched the drawing sheet to the full height of the viewport**
-  (403 × 876 at 1440 × 900) instead of the compact 420 × 320 panel Step 5 shows. ADR-120 and the
+  (403 × 876 at 1440 × 900) instead of the compact 420 × 320 panel Step 5 shows. ADR-197 and the
   `syncSheetDock()` docstring both say docking is for Steps 4 and 6 — "the steps that show both and
   give neither the bench" — but the condition never read the stage: it docked whenever the sheet
   was open and compact. On Steps 1–3 the cone is the sole subject and the sheet is an optional
   side-reference the learner opened themselves with the Compare chip, so docking handed half the
   bench to something nobody asked to be given equal billing. `DOCK_STAGES = new Set([4, 6])` is now
   the whole of that judgement, and the function reads it.
-- Unchanged, deliberately: **Steps 4 and 6 keep the docked column.** That is ADR-120, the fix for
+- Unchanged, deliberately: **Steps 4 and 6 keep the docked column.** That is ADR-197, the fix for
   the design critique's P1 "the sheet occludes the cone" — the float sat on the apex the Step-4
   proof inscribes the focal sphere at, and on the cut Step 6 asks the learner to read. Confirmed
-  with the reporter after the alternatives were laid out; ADR-120 stands unamended.
+  with the reporter after the alternatives were laid out; ADR-197 stands unamended.
 - Verified: at 1920 × 1200, 1440 × 900, 1280 × 720 and 1100 × 800, Steps 1, 2, 3 and 5 agree on the
   thumbnail rect to the pixel, and it never exceeds its 420 × 320 cap — so resizing cannot stretch
   it. `verify/interaction.mjs` section 7 asserts that as an EQUALITY against Step 5's thumbnail
   rather than as "not docked", because the claim is that one box serves them all and a class check
   would pass a third size introduced somewhere else.
 
-## 2026-08-05 — The phone gets its own layout, not a shrunken desktop one (ADR-123)
+## 2026-08-05 — The phone gets its own layout, not a shrunken desktop one (ADR-200)
 
 - Fixed: **the sim was unusable at phone width, not merely degraded.** At 360 × 640 the viewport
   took a fixed 42% slice, the drawing sheet floated as a 70%-height bottom sheet over it
@@ -260,7 +260,7 @@ asserts none names a construction outside the syllabus.
   govern the Three.js tweens. `src/anim.js` checks it and lands a tween on its final value
   immediately, and every camera swing and curve trace goes through that one helper.
 
-## 2026-08-04 (f) — One loud action per step; messages retire with their step (ADR-121)
+## 2026-08-04 (f) — One loud action per step; messages retire with their step (ADR-198)
 
 - Fixed: **Step 4 carried two identical blue "Next" buttons** a few hundred pixels apart, one
   walking a stage of the proof and one leaving the step and abandoning it. DESIGN.md §5.1 already
@@ -293,7 +293,7 @@ asserts none names a construction outside the syllabus.
 - Added: oracle section 8 counts VISIBLE, ENABLED primary buttons per step rather than checking one
   button's class — a class check would pass a second primary added elsewhere on the panel.
 
-## 2026-08-04 (e) — The sheet is docked beside the solid, not floated over it (ADR-120)
+## 2026-08-04 (e) — The sheet is docked beside the solid, not floated over it (ADR-197)
 
 - Changed: **Steps 4 and 6 dock the drawing sheet beside the cone instead of floating it over.**
   Both steps relate a solid to its drawing, so both are subjects; the sheet was a 420 x 320 card
@@ -325,7 +325,7 @@ asserts none names a construction outside the syllabus.
   at 1440, 1024 and 900, and the sheet gains a full-height column (781px against 320px), which
   raises its px-per-mm.
 
-## 2026-08-04 (d) — Open on the given data; a drafting vocabulary (ADR-118)
+## 2026-08-04 (d) — Open on the given data; a drafting vocabulary (ADR-195)
 
 - Changed: **every construction opens on its GIVEN DATA, never on its answer.** Step 5 showed the
   finished figure on arrival, which put the answer on the paper before the question and made
@@ -363,7 +363,7 @@ asserts none names a construction outside the syllabus.
   openings the review named are checked against what is actually on the sheet.
 - Unchanged: every construction, every coordinate, the animation order and the mathematics.
 
-## 2026-08-04 (c) — Every step draws its own sheet (ADR-117)
+## 2026-08-04 (c) — Every step draws its own sheet (ADR-194)
 
 - Fixed: **Step 6 was showing Step 5's engineering drawing.** The sheet's mode said `stage >= 5`,
   so the construction simply ran on into the step that asks the learner to name an unnamed cut —
@@ -394,7 +394,7 @@ asserts none names a construction outside the syllabus.
 - Unchanged: Step 5's layout, Compare mode, Switch view, Minimize/Restore, the animation system,
   every construction and every coordinate.
 
-## 2026-08-04 (b) — One pacing rule everywhere; the properties toggle back (ADR-116)
+## 2026-08-04 (b) — One pacing rule everywhere; the properties toggle back (ADR-193)
 
 - Changed: **one pacing rule, applied to every construction** — teach the part that must be
   understood one press at a time, mirror the part that is only its reflection in a single step.
@@ -436,7 +436,7 @@ asserts none names a construction outside the syllabus.
   stage list and the drawing agree at every division count — the two live in modules that cannot
   import each other, so their agreement is the thing worth proving.
 
-## 2026-08-04 — Hyperbola out of scope; the tangent method's curve is traced (ADR-115)
+## 2026-08-04 — Hyperbola out of scope; the tangent method's curve is traced (ADR-192)
 
 - Removed: **the three §6.9 constructions of the hyperbola** — foci and difference, ordinate and
   abscissa, asymptotes and a point — with their methodology cards, stage lists and layout
@@ -450,7 +450,7 @@ asserts none names a construction outside the syllabus.
   answered with the constructions just removed, so dealing them would set a problem the dock
   cannot express. All fifteen stay in `src/problems.js` verbatim — `ENABLED_TIERS` decides which
   are dealt, and putting `'hyperbola'` back restores all four.
-- Fixed: **the tangent method now traces its curve on like every other construction.** ADR-114
+- Fixed: **the tangent method now traces its curve on like every other construction.** ADR-191
   fired the trace on the LAST stage, which is the curve stage for twelve of the thirteen but not
   for this one: its envelope is drawn at stage 6 and its focus and directrix are marked at 7, so
   the curve appeared whole and the trace ran a stage later against nothing new. `stageDrawsCurve()`
@@ -468,7 +468,7 @@ asserts none names a construction outside the syllabus.
   driven off `METHODS` itself, so "every construction ends with a traced curve" is asked of every
   construction there is — and asserts the tangent method's curve stage is not its last one.
 
-## 2026-08-03 (o) — The curve is traced on, and the oblong's rays arrive one at a time (ADR-114)
+## 2026-08-03 (o) — The curve is traced on, and the oblong's rays arrive one at a time (ADR-191)
 
 - Changed: **one ray per stage on the oblong's left half** — six presses instead of three, so
   every line arrives on its own. The right half is still mirrored on in a single step. Fourteen
@@ -481,7 +481,7 @@ asserts none names a construction outside the syllabus.
 - The trace fires on ARRIVAL at the last stage, never on display: switching method or opening the
   sheet still shows a finished drawing finished, and anything that is not "one more stage of this
   construction" cancels a trace in progress.
-- Note: ADR-112 declined a *fade* because the sheet renders from a pure stage function. This is
+- Note: ADR-189 declined a *fade* because the sheet renders from a pure stage function. This is
   not a fade — it is a geometric cut returning the same points up to the one the pencil has
   reached, so the layouts stay pure and the animation is one number passed to the renderer.
 - Verification: the oracle checks the geometry without a canvas — nothing at 0, exactly half the
@@ -489,7 +489,7 @@ asserts none names a construction outside the syllabus.
   six curve shapes. In the browser the curve's pixel count climbs 257 → 3500 across the trace and
   then holds, with every construction line, label and point still on the sheet.
 
-## 2026-08-03 (n) — The tangent method is built from divisions, and says so (ADR-113)
+## 2026-08-03 (n) — The tangent method is built from divisions, and says so (ADR-190)
 
 Parabola tangent method only. Terminology, controls and pacing — geometry untouched.
 
@@ -510,13 +510,13 @@ Parabola tangent method only. Terminology, controls and pacing — geometry unto
 - Verification: the parabola is identical at 4 and at 12 divisions, to 1e-9 over every sampled
   point.
 
-## 2026-08-03 (m) — Dashed past the centre line, and one half mirrored on (ADR-112)
+## 2026-08-03 (m) — Dashed past the centre line, and one half mirrored on (ADR-189)
 
 Rectangular (oblong) method only. Presentation and animation — geometry untouched.
 
 - Changed: **a connecting ray is solid only as far as the centre line**, and the part carried on
   into the opposite half is a thin dashed projection line, breaking exactly on the axis. This
-  puts the `projection` role back into service — ADR-111 had left it emitted by nothing, and the
+  puts the `projection` role back into service — ADR-188 had left it emitted by nothing, and the
   part of a ray beyond the axis is what it was defined for.
 - Changed: **only the left half is walked by hand.** Its three rays arrive one division at a
   time; the right half is then mirrored on in a single step. Thirteen stages down to eleven.
@@ -528,11 +528,11 @@ Rectangular (oblong) method only. Presentation and animation — geometry untouc
   at y = 0 from both sides; the mirror step asserted to be the exact reflection of the half
   already drawn.
 
-## 2026-08-03 (l) — The oblong method matches the classroom demonstration (ADR-111)
+## 2026-08-03 (l) — The oblong method matches the classroom demonstration (ADR-188)
 
 Rectangular (oblong) method only. Sequence and annotation — no geometry, no other construction.
 
-- Changed: **each connecting ray stops at the crossing it makes.** ADR-104 carried them on to the
+- Changed: **each connecting ray stops at the crossing it makes.** ADR-181 carried them on to the
   rectangle's edge as dashed projection lines; drawn out that was clutter. Not a reversal of that
   finding — the original complaint was that the ray stopped SHORT of the crossing; ending exactly
   on it fixes that without the extension.
@@ -545,7 +545,7 @@ Rectangular (oblong) method only. Sequence and annotation — no geometry, no ot
 - Removed: `exitBox()`, now unused. The `projection` role and its pen stay; the role-coverage
   oracle's orphan check is what protects them if a construction emits them again.
 
-## 2026-08-03 (k) — Compare Mode is driven by the tilt alone (ADR-110)
+## 2026-08-03 (k) — Compare Mode is driven by the tilt alone (ADR-187)
 
 - Removed: **"slide it past the tip" from Compare Mode.** Which conic a cut makes is the tilt's
   doing; sliding the plane along its normal moves the same curve up and down the cone without
@@ -562,7 +562,7 @@ Rectangular (oblong) method only. Sequence and annotation — no geometry, no ot
 - Verification: the oracle counts VISIBLE sliders (3, not 4) and sweeps the tilt to demand all
   four conics still appear, asking for the parabola by name since it is a single angle.
 
-## 2026-08-03 (j) — Compare Mode builds its own layout, and carries the drivers (ADR-109)
+## 2026-08-03 (j) — Compare Mode builds its own layout, and carries the drivers (ADR-186)
 
 - Fixed: **entering Compare Mode with the thumbnail minimized opened it with no drawing.** It now
   always builds both panes — the lesson's thumbnail state is remembered, cleared on the way in,
@@ -575,7 +575,7 @@ Rectangular (oblong) method only. Sequence and annotation — no geometry, no ot
 - Fixed: the rail's `grid-area` had been deleted with its other rules last round, so the strip
   auto-placed into the left column and sat under one pane instead of both.
 
-## 2026-08-03 (i) — Compare is a mode again; Switch view is Step 5's alone (ADR-108)
+## 2026-08-03 (i) — Compare is a mode again; Switch view is Step 5's alone (ADR-185)
 
 - Changed: **Compare enters a dedicated comparison mode** — 3-D left, drawing right, evenly
   split — and the button becomes **Back to 3D**. Returning changes only the layout: step, curve,
@@ -591,14 +591,14 @@ Rectangular (oblong) method only. Sequence and annotation — no geometry, no ot
 - Note: the thumbnail was never a static preview. It is the live WebGL canvas, measured at
   418x318 with the render loop running; what was stale was the scene behind it.
 
-## 2026-08-03 (h) — Step 4 explains where the four names come from (ADR-107)
+## 2026-08-03 (h) — Step 4 explains where the four names come from (ADR-184)
 
 Step 4 said why the curve changes, never why the curves are called what they are.
 
 - Added: **the four named cuts, in Step 4 too** — built from `sim.sectionTour()` and pressed
   through `sim.tourCut()`, the same catalogue and call Step 3 uses. No second tour.
 - Added: **a live eccentricity badge** beside the tilt slider. The value is the real one for the
-  cut on the bench (e = sin θ ÷ sin g, ADR-088), not a number looked up from the curve's name.
+  cut on the bench (e = sin θ ÷ sin g, ADR-165), not a number looked up from the curve's name.
 - Added: **a four-row reference card** — e = 0 · 0 < e < 1 · e = 1 · e > 1 — with the row the cut
   is currently in highlighted, and a sentence per curve that changes with the cut.
 - Which of the four the badge names comes from `classifySection()`, the classifier the rest of
@@ -609,9 +609,9 @@ Step 4 said why the curve changes, never why the curves are called what they are
   highlighted row and the chip's pressed state agree, and that the badge's number appears in the
   ratio the step already quotes.
 
-## 2026-08-03 (g) — Compare opens a menu; Switch view swaps (ADR-106)
+## 2026-08-03 (g) — Compare opens a menu; Switch view swaps (ADR-183)
 
-Seventh review. ADR-105 got the geometry right and left the chrome wrong.
+Seventh review. ADR-182 got the geometry right and left the chrome wrong.
 
 - Changed: **the main view has no title bar and no window controls.** It is the panel; only the
   thumbnail is a window. The head is hidden rather than removed — the same element is the
@@ -627,7 +627,7 @@ Seventh review. ADR-105 got the geometry right and left the chrome wrong.
   oracle section, which guarded the rail starving the viewport, was re-aimed at the layout that
   ships rather than deleted.
 
-## 2026-08-03 (f) — Step 5 IS Step 4, with the primary view swapped (ADR-105)
+## 2026-08-03 (f) — Step 5 IS Step 4, with the primary view swapped (ADR-182)
 
 Sixth review. Step 5 had become a different interface; this removes it.
 
@@ -649,7 +649,7 @@ Sixth review. Step 5 had become a different interface; this removes it.
 - Fixed: the full-bleed drawing sits at `--z-compare` and covered the Compare cluster at
   z-index 4.
 
-## 2026-08-03 (e) — The oblong method mirrors its fan (ADR-104)
+## 2026-08-03 (e) — The oblong method mirrors its fan (ADR-181)
 
 Fifth review, of the rectangular (oblong) ellipse. Sequence and visualization only — the
 divisions, the intersections and the curve are untouched.
@@ -667,12 +667,12 @@ divisions, the intersections and the curve are untouched.
   enclosing rectangle, so the analytic bbox — and the sheet scale — never shifts.
 - **Fixed a rendering bug this uncovered:** `ROLE_ORDER` did not list the new `projection` role,
   so none of it was painted. It did not list `plot` either, so the points the concentric-circle
-  construction plots had been unpainted since ADR-102. Both were invisible in a way nothing could
+  construction plots had been unpainted since ADR-179. Both were invisible in a way nothing could
   catch — the display list was right and the pen table had entries, but the oracles inspected
   layouts rather than pixels. A missing role now fails a test: every role any layout emits is
   swept and checked against what the renderer will actually paint.
 
-## 2026-08-03 (d) — One viewport control, and thumbnails minimize (ADR-103)
+## 2026-08-03 (d) — One viewport control, and thumbnails minimize (ADR-180)
 
 Fourth review. Step 5's viewport had four floating controls and a Hide that could not be undone.
 
@@ -693,7 +693,7 @@ Fourth review. Step 5's viewport had four floating controls and a Hide that coul
   element still reports one — which is why the blank bench passed. It now checks visibility, and
   the minimize assertions demand the large viewer and Compare both survive.
 
-## 2026-08-03 (c) — Step 5's dock becomes a hierarchy (ADR-102)
+## 2026-08-03 (c) — Step 5's dock becomes a hierarchy (ADR-179)
 
 Third review. The headline report was that problem mode broke the construction.
 
@@ -702,7 +702,7 @@ Third review. The headline report was that problem mode broke the construction.
   methods. Step 5's dock had grown to **2140 px of content in a 588 px scroller**, putting "Draw
   it step by step" ~850 px below the fold; a problem's statement header pushed it 254 px further.
   The learner saw a panel with no playback control and concluded the animation was gone. The
-  regression was mine — ADR-100 put the curve picker, the method list and a seven-row methodology
+  regression was mine — ADR-177 put the curve picker, the method list and a seven-row methodology
   card above the playback.
 - Fixed by ordering and subtraction: curve → method → that method's givens → drawing controls →
   reference; the methodology card moved below the controls that act; controls a construction
@@ -716,7 +716,7 @@ Third review. The headline report was that problem mode broke the construction.
 - Fixed: a hidden `.toggle` stayed visible — a class's `display` beats the UA `[hidden]` rule.
 - Fixed: the canvas kept a mid-transition width after a pane swap.
 
-## 2026-08-03 (b) — Concentric circles: both circles numbered, crossings named (ADR-101)
+## 2026-08-03 (b) — Concentric circles: both circles numbered, crossings named (ADR-178)
 
 Second review with the Engineering Graphics professor. Notation only — the division, projection
 and ellipse geometry are untouched, and no other construction was modified.
@@ -733,7 +733,7 @@ and ellipse geometry are untouched, and no other construction was modified.
   and sit on their own circles, that Pk is the crossing of outer k with inner k′, that every
   named point satisfies the ellipse, and that no other construction picked up the notation.
 
-## 2026-08-03 — Step 5 becomes the drawing workspace (ADR-100)
+## 2026-08-03 — Step 5 becomes the drawing workspace (ADR-177)
 
 Acting on an Engineering Graphics professor's review of the shipped topic. Steps 1–4 and Step 6
 are untouched.
@@ -760,7 +760,7 @@ are untouched.
   never removes linework, that the first stage has no curve and the last one does. That caught two
   constructions which dropped their numbered points when the first pair of arcs was struck.
 
-## 2026-08-02 (c) — The sheet draws like a teacher (ADR-099)
+## 2026-08-02 (c) — The sheet draws like a teacher (ADR-176)
 
 - Changed: **the focus-directrix construction opens with one line.** It used to open on "The
   frame" — axis, directrix and focus all at once, none of them introduced. Eight stages now:
@@ -804,11 +804,11 @@ the design system. Every defect was in what this topic adds on top of it.
   nine controls tracked through play → pause, **none moves.**
 - Fixed: the syllabus badge wrapped to two lines with "Example 6.3" stranded; it fits one line.
 - Verified and deliberately unchanged: the floating drawing-sheet window is rule-for-rule
-  identical to the goldens; the single `.vlabel` difference is ADR-087's hover affordance; and
+  identical to the goldens; the single `.vlabel` difference is ADR-164's hover affordance; and
   the `def-tangent` "overflow" a first probe reported is a `position: fixed` tooltip sitting at
   `opacity: 0` — not clipping.
 
-## 2026-08-02 — The syllabus's own three, drawn line by line (ADR-098)
+## 2026-08-02 — The syllabus's own three, drawn line by line (ADR-175)
 
 The official syllabus turned up (`../1003.pdf`). Module II scopes this topic to three
 constructions and says "only" twice. All three were already correct; none of them could be
@@ -836,7 +836,7 @@ does not ask for.
   both ellipse constructions and the foot of the abscissa in the tangent method; O is the centre.
   The Engineering Terms panel is what made the error visible.
 
-## 2026-08-01 (h) — Two tangencies, two stages (ADR-097)
+## 2026-08-01 (h) — Two tangencies, two stages (ADR-174)
 
 The geometry is unchanged again. What changed is that the proof stops asking the learner to hold
 two different facts apart on their own.
@@ -863,7 +863,7 @@ two different facts apart on their own.
   asserts the separation itself — the ring named with no point marker present, the point named
   with the ring's pill withdrawn, and the tangent plane's name explained.
 
-## 2026-08-01 (g) — Tangency you cannot misread (ADR-096)
+## 2026-08-01 (g) — Tangency you cannot misread (ADR-173)
 
 The geometry is unchanged and re-verified; only the drawing changed.
 
@@ -887,7 +887,7 @@ The geometry is unchanged and re-verified; only the drawing changed.
   tangent to the sphere to 1e-9, the tangent plane meets it in exactly the contact ring, and the
   drawn annulus starts at that ring and stays finite.
 
-## 2026-08-01 (f) — Step 4 became a proof you walk (ADR-095)
+## 2026-08-01 (f) — Step 4 became a proof you walk (ADR-172)
 
 - Changed: **six stages, one press each.** The cutting plane · the ball and the ONE point where
   it meets the cut · that point named the focus · the ring where the ball touches the CONE and
@@ -918,7 +918,7 @@ The geometry is unchanged and re-verified; only the drawing changed.
 - Fixed: `simAPI.reset()` still cleared the reveal timer the redesign deleted, so resetting from
   Step 4 threw a ReferenceError. Found by the shipped-module oracle.
 
-## 2026-08-01 (e) — The rest of the hyperbola, and the thirteenth construction (ADR-094)
+## 2026-08-01 (e) — The rest of the hyperbola, and the thirteenth construction (ADR-171)
 
 Phases 6 and 7 — the last unticked lines of the audit's coverage matrix.
 
@@ -942,7 +942,7 @@ Phases 6 and 7 — the last unticked lines of the audit's coverage matrix.
   showing beside a hyperbola. The oracles assert rendered height now, not the attribute, because
   the attribute was telling the truth and the page was not.
 
-## 2026-08-01 (d) — The missing names, and the parabola's own three (ADR-092, ADR-093)
+## 2026-08-01 (d) — The missing names, and the parabola's own three (ADR-169, ADR-170)
 
 Phases 4 and 5 of the roadmap.
 
@@ -969,7 +969,7 @@ Phases 4 and 5 of the roadmap.
   point at t = 2.2 on a curve plotted only to t = 1.8 — a claim about a point the drawing did
   not contain.
 
-## 2026-08-01 (c) — The sheet became a worksheet (ADR-091)
+## 2026-08-01 (c) — The sheet became a worksheet (ADR-168)
 
 Phase 3 of the roadmap: wherever the chapter asks the learner to measure, determine, find or
 locate something, the simulation now reports it.
@@ -992,7 +992,7 @@ locate something, the simulation now reports it.
   against the drawn curve's longest chord, the latus rectum against 4·VF, a² = b² + c² at every
   ellipse construction, and exercise 1's own 30 / 20 / 120 mm read out of the results block.
 
-## 2026-08-01 (b) — The sheet draws what the cut IS (ADR-090)
+## 2026-08-01 (b) — The sheet draws what the cut IS (ADR-167)
 
 Phase 2 of the roadmap: the two correctness defects the audit found, where the 3-D pane and the
 drawing sheet described different things.
@@ -1020,7 +1020,7 @@ drawing sheet described different things.
   two equal, and that both degenerate messages appear; the interaction oracle drives the tilt to
   0° and the offset to the apex on the live page and reads the dock back.
 
-## 2026-08-01 — Where the focus and the directrix come from (ADR-089)
+## 2026-08-01 — Where the focus and the directrix come from (ADR-166)
 
 Phase 1 of the syllabus-audit roadmap: §6.2 items 1–4, the chapter's own bridge from the solid
 to the curve, which this topic had skipped entirely.
@@ -1056,7 +1056,7 @@ to the curve, which this topic had skipped entirely.
   the live DOM; `verify/shipped-module.mjs` rebuilds the apparatus 40 times and holds the GPU
   buffer count flat.
 
-## 2026-07-31 (b) — The cut is real, and the two panes became one model (ADR-088)
+## 2026-07-31 (b) — The cut is real, and the two panes became one model (ADR-165)
 
 - Added: a **“Cut the cone” checkbox**, the reference topic's own interaction
   (`graphics_module_3_topic_1_sections_of_solids` `#tgl-section`). Unticked, the double cone is
@@ -1064,12 +1064,12 @@ to the curve, which this topic had skipped entirely.
   that is how you aim a knife, and the readout says what this cut *would* leave. Ticked, the
   clipper runs. Steps 3 onward tick it themselves; Step 2, where cutting is the lesson, leaves it
   to the learner.
-- Changed: **the cone is now truncated for real**, superseding ADR-085. Each nappe's geometry is
+- Changed: **the cone is now truncated for real**, superseding ADR-140. Each nappe's geometry is
   swapped for the clipper's result and its cap becomes material group 1 in the section token — the
   reference topic's pattern — so the section face is a real face of a real solid: lit like the rest,
   depth-sorted like the rest, visible from every angle. The old translucent-cone-plus-floating-cap
   arrangement made the face read as a stain and cost correct depth sorting.
-- Added: a faint **ghost of the material the cut removed**. ADR-085 kept the solid whole because
+- Added: a faint **ghost of the material the cut removed**. ADR-140 kept the solid whole because
   truncation hides the nappe a hyperbola needs; the ghost answers that instead — at a steep tilt
   the kept half is otherwise a stump no learner would call a cone, and the second branch leaves
   with the nappe that carried it. §6.1's own pictorials still read.
@@ -1112,7 +1112,7 @@ to the curve, which this topic had skipped entirely.
   one, the sheet follows the cut, Step 4's answer arrives in stages with its vocabulary held back,
   and the sheet explains itself under the cursor.
 
-## 2026-07-31 — Labels become drawing annotations; the axis is drawn to convention (ADR-087)
+## 2026-07-31 — Labels become drawing annotations; the axis is drawn to convention (ADR-164)
 
 - Fixed: the axis was invisible. It was a dashed line inside an opaque solid, so §6.1's central
   term could not be seen at all. It is now drawn as a proper centre line — a chain-line stub where
@@ -1158,7 +1158,7 @@ to the curve, which this topic had skipped entirely.
   about one run in two under SwiftShader while the product was behaving correctly. It now polls for
   the result.
 
-## 2026-07-30 — Sequenced as a lesson (ADR-086)
+## 2026-07-30 — Sequenced as a lesson (ADR-141)
 
 - Changed: the six steps are now a story — meet the cone · cut it · six cuts, six curves · why they
   differ · drawing it on paper · your turn — and every control moved to the step whose question it
@@ -1188,7 +1188,7 @@ to the curve, which this topic had skipped entirely.
   caption is nine millimetres of drawing, so the annotation was becoming the figure.
 - Fixed: the teaching prose was lifted out of the two `[data-ctrl]` wrappers that dock into the
   workbench rail — prose inside a docked wrapper is height taken from the 3D pane (RULES.md
-  §5.16a). Rail 317 px against the reference topic's 324.
+  §5.16b). Rail 317 px against the reference topic's 324.
 
 ## 2026-07-29 — UI parity pass against the Module-3 reference topics
 
@@ -1200,7 +1200,7 @@ to the curve, which this topic had skipped entirely.
   (`['cone', 'section']`), mirroring the sibling topic's `['shape', 'section']`. Measured against
   that topic afterwards: identical wizard / viewport / card / rail boxes, identical canvas sizing,
   no overflow and no overlap at 1440×900, 1280×720 and the 700 px mobile stack.
-  Recorded as RULES.md §5.16a.
+  Recorded as RULES.md §5.16b.
 - Fixed: the `.vp-hint` rule (the orbit chip and the contextual spotlight) had been swallowed
   whole when this topic's `index.html` was derived from the sibling's — a lazy regex ate past the
   block it was meant to remove. Both chips were rendering as full-width `position: static` blocks
@@ -1235,14 +1235,14 @@ to the curve, which this topic had skipped entirely.
   drawing for the sheet. One focal-polar model derives the vertex, centre, second focus and
   directrix, latus rectum, axes and asymptotes of all three curves; four sheet modes (locus,
   terminology, eccentricity construction, the other methods) and eleven construction builders
-  return a typed display list plus the analytic bbox that locks the millimetre scale (ADR-084).
+  return a typed display list plus the analytic bbox that locks the millimetre scale (ADR-139).
 - Added: `src/conicData.js` — the pure catalogue: the six section planes with the chapter's own
   defining rules, `classifySection()` judged against the cone's LIVE generator angle, the eleven
   methods with the dimensions each is given, and the two topic-local state shapes.
 - Added: the 3D half — a double cone assembled in the orchestrator from two copies of the restored
   `cone.js`, with topic-1's `sectionCut.js` used as a curve EXTRACTOR: the solid stays whole, its
   section loop is drawn on it as a fat `Line2`, and the clipper's cap becomes the section face
-  (ADR-085). The plane's offset is measured from the apex, so offset 0 IS section plane FF.
+  (ADR-140). The plane's offset is measured from the apex, so offset 0 IS section plane FF.
 - Added: the Problem Library with all fifteen chapter exercises verbatim, grouped by curve, with
   three scaffolded hints each and a never-auto-fill self-check (±0.02 on the eccentricity, ±0.5 on
   every millimetre and degree). Nothing is stamped in on load — every checked quantity is one the
@@ -1250,7 +1250,7 @@ to the curve, which this topic had skipped entirely.
 - Added: CSS2D anatomy labels for §6.1's vocabulary (apex, axis, generator, base, both nappes, the
   apex angle), shown on Step 1 only and freed by the disposal traversal.
 - Changed: sheet quantities are stored in MILLIMETRES rather than the platform's world units — the
-  construction never enters the 3D scene and every figure in the chapter is quoted in mm (ADR-083).
+  construction never enters the 3D scene and every figure in the chapter is quoted in mm (ADR-138).
 - Removed: the four non-cone generators, `genericSolid.js` and `meshAnalyzer.js` from the scaffold —
   nothing here imports them, and an unused copy of a shared file is a drift surface with no upside.
 - Removed: the dormant quick-view and connector-line chrome inherited from the scaffold (markup +

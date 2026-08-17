@@ -44,7 +44,7 @@ Topics 2 and 3 share **seven byte-identical leaf files** (verified by MD5, §11.
 ```
 SImatrix/
 ├── ARCHITECTURE.md              root platform docs (see §13 — Module 4 is NOT registered here)
-├── DECISIONS.md                 root ADR log (ADR-001 … ADR-141)
+├── DECISIONS.md                 root ADR log (ADR-001 … ADR-218)
 ├── RULES.md                     root enforcement rules
 ├── DESIGN.md                    the single platform design system
 ├── PRODUCT.md                   audience, features, accessibility commitments
@@ -1729,7 +1729,7 @@ User Action → simController method → state mutation → rebuild()
 | File | Size | What it is |
 |---|---|---|
 | `ARCHITECTURE.md` | 61 KB | System map — an annotated directory tree of every module and topic, plus component breakdown and data flow |
-| `DECISIONS.md` | 444 KB | The ADR log — **ADR-001 … ADR-141**, 142 entries |
+| `DECISIONS.md` | 444 KB | The ADR log — **ADR-001 … ADR-218**, 142 entries |
 | `RULES.md` | 99 KB | Enforcement rules, numbered `§1.x` … `§8.x`, each citing the ADR it comes from, plus a "never do" summary list |
 | `DESIGN.md` | 48 KB | The single platform design system — colour tokens, typography, component standards |
 | `PRODUCT.md` | 23 KB | Audience, features, accessibility commitments |
@@ -1809,7 +1809,7 @@ This is the single most consequential documentation finding, and it should be un
 
 **The claims:**
 - Topic 2's `CLAUDE.md`: *"this topic adds **ADR-043**…**ADR-051**"* and *"adds **§3.33**–**§3.41**, **§4.21**"*.
-- Topic 3's `CLAUDE.md`: *"this topic adds **ADR-052**…**ADR-059**"* and *"adds **§4.22**–**§4.23**, **§6.21**–**§6.26**"*.
+- Topic 3's `CLAUDE.md`: *"this topic adds **ADR-052**…**ADR-059**"* and *"adds **§4.22**–**§4.23**, **§6.21**–**§6.30**"*.
 - Topic 3's `CLAUDE.md` also states: *"the topic is registered in `../ARCHITECTURE.md` §2."*
 
 **What is actually in the root documents [CONFIRMED]:**
@@ -1823,7 +1823,7 @@ This is the single most consequential documentation finding, and it should be un
 | ADR-055 | Module 2's Compare scroll-zoom |
 | §3.33 / §3.33a | *retired 2026-07-21* — scissored viewport regions |
 | §3.34–§3.41 | `sectionCut.js` loops, 3D label leaders, centre lines, Canvas2D caption collision, ghost material |
-| §6.21–§6.26 | Syllabus problem-KIND exclusions, multi-construction drawing engines, Node oracles |
+| §6.21–§6.30 | Syllabus problem-KIND exclusions, multi-construction drawing engines, Node oracles |
 | §3.27a, §4.21, §4.22, §4.23 | **not present** in root `RULES.md` |
 
 `grep "module_4" ARCHITECTURE.md` returns exactly one hit — line 80, and it is inside the entry for `graphics_module_2_topic_0_introduction_to_orthographic_projection`, recording that *that* topic was cut **from** Topic 2. **No Module-4 topic has its own entry in `ARCHITECTURE.md`.** `grep -i isometric DECISIONS.md` returns one hit, a passing mention at line 3495 in a Conic Sections ADR.
@@ -2521,7 +2521,7 @@ Only items verifiable from the code or the existing documentation. Ordered by li
 **5. Topic 3 places figure titles by a fixed formula.** **[CONFIRMED]**
 `main.js:221`: `0.12 * h + 0.55`. Topic 2's `CHANGELOG.md` documents three failed modelling approaches before it replaced exactly this with per-frame measurement, with the measured gap improving from 96–148 px to 22–44 px. `geometryFactory.topHalfExtent()` — the helper needed — is exported and unused.
 
-**6. The ADR and RULES citations in the Module-4 `CLAUDE.md` files do not resolve against the root documents.** **[CONFIRMED]** — see §13.4 for the full evidence. ADR-043…ADR-059 and §3.33–§3.41 / §6.21–§6.26 are all occupied by other modules in the root files, and §3.27a / §4.21 / §4.22 / §4.23 do not exist there at all.
+**6. The ADR and RULES citations in the Module-4 `CLAUDE.md` files do not resolve against the root documents.** **[CONFIRMED]** — see §13.4 for the full evidence. ADR-043…ADR-059 and §3.33–§3.41 / §6.21–§6.30 are all occupied by other modules in the root files, and §3.27a / §4.21 / §4.22 / §4.23 do not exist there at all.
 
 **7. No Module-4 topic is registered in `ARCHITECTURE.md`.** **[CONFIRMED]**
 `grep "module_4" ARCHITECTURE.md` returns one hit, inside another topic's entry. Topic 3's `CLAUDE.md` claims *"the topic is registered in `../ARCHITECTURE.md` §2"*; it is not.

@@ -9,9 +9,9 @@
 //         analytic clipper, ADR-058, ported verbatim) is used here as a CURVE EXTRACTOR
 //         rather than as a truncator: the solid is left whole and its section loop is
 //         drawn on it as a fat crimson curve with the cut face capped — the chapter's own
-//         Fig. 6.2 pictorials (ADR-085).
+//         Fig. 6.2 pictorials (ADR-140).
 //   2D  — the Compare sheet, where `conicEngine.js` draws the locus definition, the
-//         nomenclature, and the twelve constructions (ADR-084).
+//         nomenclature, and the twelve constructions (ADR-139).
 //
 // Layering (CLAUDE.md): leaf modules never import each other; they hang off this file.
 // Both topic-local state bags — the cutting plane and the conic sheet — live HERE beside
@@ -337,10 +337,10 @@ function rebuild(shapeData) {
   }
   onboarding?.setSolidPresent(shapeData !== null);
   // The sheet's subject is a READING of the scene that was just built — including whether the
-  // plane hit anything, which only the clipper knows (ADR-090). Derived here, once, so no
+  // plane hit anything, which only the clipper knows (ADR-167). Derived here, once, so no
   // caller can forget it and leave the two panes disagreeing.
   syncSheetToCut();
-  // Step 6 draws the cut WITHOUT committing it (ADR-117), so nothing above repaints the sheet for
+  // Step 6 draws the cut WITHOUT committing it (ADR-194), so nothing above repaints the sheet for
   // it. The plane moves under the learner there — a dealt question, a nudged slider — and a
   // thumbnail that did not follow would be showing a cut that is no longer on the bench.
   if (stage === 6 && compareOpen) drawCompare();
@@ -466,7 +466,7 @@ function buildSectionPlaneWorld(apex) {
  *                              its cap becomes material group 1 in the section token, so the
  *                              cut face is a real face of a real solid: correctly depth-sorted,
  *                              lit like the rest, and visible from every angle without a
- *                              transparency trick (ADR-088, superseding ADR-085).
+ *                              transparency trick (ADR-165, superseding ADR-140).
  *
  * The clipper's own welded `loops` output is still drawn over the cap as a fat crimson curve —
  * that is the conic this chapter is about, and it deserves engineering answer weight.
@@ -495,7 +495,7 @@ function applySection(cone, data) {
       // — there the solid left behind IS the lesson — but here the curve is, and §6.1's own
       // pictorials (Fig. 6.2) show every section on a whole cone. Without it a steep cut can
       // leave a stump the learner cannot recognise as a cone at all, and a hyperbola's second
-      // branch disappears with the nappe that carried it (ADR-088).
+      // branch disappears with the nappe that carried it (ADR-165).
       cone.group.add(removedGhost(mesh));
 
       // The swap happens BEFORE the mesh reaches the scene, so the rebuild disposal contract
@@ -643,7 +643,7 @@ function addSectionPlaneVisual(plane, data) {
 // section plane IS the directrix. Everything here is that paragraph, drawn.
 //
 // The maths is `focalSphereFor()` in the pure data layer, solved in the V.P.
-// (ADR-089); this function only places it. The apparatus is drawn in the
+// (ADR-166); this function only places it. The apparatus is drawn in the
 // projection teal used nowhere else in this topic, so it reads as an instrument
 // the way the crimson cutting plane does — and the two things it PRODUCES are
 // drawn in the sheet's own mark colour, because they are the same focus and the
@@ -655,7 +655,7 @@ let lastFocal = null;
 
 /**
  * The live parts of Step 4's proof, kept by name so a stage's animation can fade or grow ONE
- * of them per frame without rebuilding the scene (ADR-095). Cleared by rebuild(), which is
+ * of them per frame without rebuilding the scene (ADR-172). Cleared by rebuild(), which is
  * also what makes a stale tween harmless: it writes into an object nothing renders any more.
  */
 let focalParts = {};
@@ -677,14 +677,14 @@ const PROOF_OPACITY = Object.freeze({
 });
 
 /**
- * Build Step 4's proof at the current stage, and ONLY that stage's objects (ADR-095). The
+ * Build Step 4's proof at the current stage, and ONLY that stage's objects (ADR-172). The
  * scene never carries an object the stage on screen is not talking about.
  *
  *   0  the cutting plane alone      3  against the CUT: one point, and it is the focus
  *   1  the ball, wedged in         4  the plane through the ring (the tangent plane)
  *   2  against the CONE: a ring    5  the directrix   ·   6  the bridge, onto the paper
  *
- * The two tangencies are two stages, deliberately (ADR-097): sphere-to-cone is a CIRCLE and
+ * The two tangencies are two stages, deliberately (ADR-174): sphere-to-cone is a CIRCLE and
  * sphere-to-cut is a POINT, and each is drawn while nothing else is claiming attention.
  *
  * @param {{group:THREE.Group, apex:THREE.Vector3, lower:THREE.Mesh, upper:THREE.Mesh}} cone
@@ -755,7 +755,7 @@ function addFocalSphereVisuals(cone, data) {
   focalParts.dot = dot;
 
   // A soft glow behind the marker — a second, larger sphere at low opacity, which is how a
-  // point reads as LIT on a flat-shaded scene with no post-processing to bloom it (ADR-096).
+  // point reads as LIT on a flat-shaded scene with no post-processing to bloom it (ADR-173).
   const glow = new THREE.Mesh(
     new THREE.SphereGeometry(dotR * 2.4, 16, 12),
     new THREE.MeshBasicMaterial({
@@ -784,7 +784,7 @@ function addFocalSphereVisuals(cone, data) {
   group.add(halo);
   focalParts.halo = halo;
 
-  // A small square of the CUTTING plane, centred on that point (ADR-096). This is the topic's
+  // A small square of the CUTTING plane, centred on that point (ADR-173). This is the topic's
   // one true point-tangency — the sphere rests on this plane at a single point, the way a ball
   // rests on a table — and a patch you can take in at a glance says so far better than the
   // full-size translucent plane behind it, which reads as scenery.
@@ -830,7 +830,7 @@ function addFocalSphereVisuals(cone, data) {
   // --- Stage 2 · the ring where the sphere touches the CONE ------------------------
   // NOT a point. §6.2: the sphere touches the CONE in a circle, and the tangent plane is the
   // plane containing that circle — so it necessarily passes THROUGH the ball, meeting it in
-  // the very ring it is named for. That is the definition, not a rendering fault (ADR-095):
+  // the very ring it is named for. That is the definition, not a rendering fault (ADR-172):
   // the distance from the ball's centre to this plane is t·sin²α while its radius is t·sinα,
   // and those are equal only for a degenerate cone. The ball is dimmed as the plane arrives,
   // and the ring is drawn heavy and depth-free, so what reads is the ring the two SHARE.
@@ -850,7 +850,7 @@ function addFocalSphereVisuals(cone, data) {
     focalParts.ring = ringLine;
     // Named on the stage that explains it, and only there: from stage 4 on, the subject is the
     // PLANE through this ring, and two pills on one circle is the conflation this split exists
-    // to end (ADR-097).
+    // to end (ADR-174).
     if (shown === 2) {
       // LEFT, like every other pill in this step: the drawing-sheet card owns the right of the
       // viewport from Step 4 on, and a label behind it names nothing.
@@ -864,7 +864,7 @@ function addFocalSphereVisuals(cone, data) {
   if (shown >= 4) {
     const ringY = apexY + focal.contact.y;
     // The tangent plane, perpendicular to the axis (§6.2 item 1), drawn as an ANNULUS whose
-    // inner edge IS the ring (ADR-096). A quad across this plane necessarily passes through the
+    // inner edge IS the ring (ADR-173). A quad across this plane necessarily passes through the
     // ball — the plane meets the sphere in that very circle — and reads as a slice however it is
     // blended, depth-sorted or offset. An annulus starting at the circle puts NOTHING inside the
     // ball's silhouette: the ball sits in the hole, resting on the rim all the way round, which
@@ -916,7 +916,7 @@ function addFocalSphereVisuals(cone, data) {
   attachLeaders(group, Math.max(0.045, (data.baseLength / 2) * 0.035));
   shapeGroup.add(group);
 
-  // Everything ELSE that is on screen (ADR-096). The tangency stages have one relationship to
+  // Everything ELSE that is on screen (ADR-173). The tangency stages have one relationship to
   // show and a whole cut cone in front of it — the edge overlays, the section curve, the ghost
   // of the removed material and the axis are all full-strength ink competing with a translucent
   // ball. They are collected here, AFTER the rest of the build, and stood down by the phase pass
@@ -962,7 +962,7 @@ function applyProofPhase() {
   const p = focalParts;
 
   // The cone steps back TWICE: while the two tangency stages are being read, so the ball and
-  // the plane are all there is to look at (ADR-096), and again at the bridge, for good.
+  // the plane are all there is to look at (ADR-173), and again at the bridge, for good.
   // Stages 1-4 are the construction on the ball; the scene stands down for all of them.
   const tangency = stage >= 1 && stage <= 4;
   const quiet = tangency ? PROOF_OPACITY.coneQuiet : 1;
@@ -1001,7 +1001,7 @@ function applyProofPhase() {
 
   // The point of contact, and the ring pulsing out of it while the stage that CLAIMS it is up.
   // The point of contact belongs to stage 3. It is ABSENT at stage 2 — that stage is about the
-  // ring, and a second highlight on screen is exactly the conflation being untangled (ADR-097).
+  // ring, and a second highlight on screen is exactly the conflation being untangled (ADR-174).
   const claiming = stage === 3;
   p.dot.material.opacity = stage < 3 ? 0 : stage === 3 ? fade : 1;
   p.dot.visible = stage >= 3;
@@ -1211,7 +1211,7 @@ function annotate(text, tip, target, side, lift, reach, through = false) {
 /**
  * Name the parts of the cone §6.1's opening paragraph defines — apex, base, axis,
  * generator, nappe — and nothing else. Any term belonging to a later step is introduced
- * by that step (ADR-086 · RULES.md §6.27).
+ * by that step (ADR-141 · RULES.md §6.31).
  *
  * Label visibility follows GEOMETRY visibility: "nappe" only means something when the
  * double cone is on screen, so both nappe labels leave with the second half.
@@ -1483,7 +1483,7 @@ function buildScene(container) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(w, h, false);
   renderer.shadowMap.enabled = false; // no cast shadows (CLAUDE.md visual style)
-  // The canvas lives in a BOX inside the pane rather than in the pane itself (ADR-105). Step 5
+  // The canvas lives in a BOX inside the pane rather than in the pane itself (ADR-182). Step 5
   // shrinks that box to the thumbnail rect and lets the drawing fill the pane behind it; the
   // pane keeps its place in the flex row either way, which is what stops the step panel from
   // being uncovered and then covered by the full-bleed drawing.
@@ -1588,7 +1588,7 @@ function stopLoop() {
 
 function handleResize(container) {
   // Always measure the BOX the canvas is in, never the pane around it: in Step 5 the pane is
-  // full width and the box is the thumbnail (ADR-105).
+  // full width and the box is the thumbnail (ADR-182).
   const target = viewBox ?? container;
   const w = target.clientWidth;
   const h = target.clientHeight;
@@ -1620,7 +1620,7 @@ function setupMobileNotice() {
   // The banner is fixed to the top of the iframe, so it SITS ON the sim rather than beside it
   // — and at 390px it covered 66px of a 287px viewport, which is where the drawing sheet's own
   // Minimize button lives. An advisory that hides the control it is advising about is worse
-  // than no advisory (ADR-123). The body reserves its measured height for as long as it is up,
+  // than no advisory (ADR-200). The body reserves its measured height for as long as it is up,
   // and hands it straight back on Dismiss. Measured rather than assumed: the copy wraps to two
   // lines on a 320px screen and to one at 767px.
   const reserve = () => {
@@ -1658,7 +1658,7 @@ function setupWizardToggle() {
 // ============================================================================
 // Compare view + 50/50 workbench (ADR-012 / ADR-037, the sibling topics' port).
 // The right pane is the 2D drawing sheet: drawCompare() sizes the canvas and
-// delegates every curve and construction line to src/conicEngine.js (ADR-084).
+// delegates every curve and construction line to src/conicEngine.js (ADR-139).
 // Pan (ADR-054) and wheel zoom (ADR-055) are pure post-multipliers over the
 // fixed intrinsic frame (ADR-053 pattern).
 // ============================================================================
@@ -1668,7 +1668,7 @@ const COMPARE_DEFAULT_SIZE = 'expanded';
 let compareCard = null;
 let compareCanvas = null;
 let compareChip = null;
-/** The sized box holding the WebGL canvas and its label overlay (ADR-105). */
+/** The sized box holding the WebGL canvas and its label overlay (ADR-182). */
 let viewBox = null;
 let compareOpen = false;      // the card is shown at all (compact OR expanded)
 let compareSize = 'compact';  // 'compact' | 'expanded'
@@ -1677,11 +1677,11 @@ let workbenchOpen = false;
  *  differ whenever the learner expands to the workbench or the viewport is too narrow for it. */
 let sheetPrimary = false;
 let sheetPrimaryOn = false;
-/** Which pane leads Step 5's workspace: 'drawing' (the default) or 'cone' (ADR-102). */
+/** Which pane leads Step 5's workspace: 'drawing' (the default) or 'cone' (ADR-179). */
 let paneFocus = 'drawing';
-/** Is the THUMBNAIL (whichever pane is currently small) collapsed to its chip? (ADR-103) */
+/** Is the THUMBNAIL (whichever pane is currently small) collapsed to its chip? (ADR-180) */
 let thumbMin = false;
-/** What that state was when Compare Mode was entered, so leaving restores it (ADR-109). */
+/** What that state was when Compare Mode was entered, so leaving restores it (ADR-186). */
 let thumbMinBeforeCompare = false;
 /** Drag-to-pan offset (CSS px, ADR-054) applied on top of the fixed intrinsic frame. */
 let comparePanX = 0;
@@ -1717,7 +1717,7 @@ function enterWorkbench() {
   if (workbenchOpen) return;
   workbenchOpen = true;
 
-  // Compare Mode's control strip (ADR-109): the cone and the cut, docked beneath both panes so
+  // Compare Mode's control strip (ADR-186): the cone and the cut, docked beneath both panes so
   // the learner can change the solid and watch BOTH pictures answer. The wrappers are MOVED,
   // not copied — same elements, same listeners, same state; `driverHomes` remembers where each
   // came from so exiting puts it back exactly.
@@ -1764,7 +1764,7 @@ function exitWorkbench() {
 }
 
 /**
- * Step 5's drawing workspace (ADR-100): the sheet becomes the LEFT and primary pane at roughly
+ * Step 5's drawing workspace (ADR-177): the sheet becomes the LEFT and primary pane at roughly
  * two thirds of the bench, and the cone shrinks to a live reference on the right. By Step 5 the
  * learner has finished with the solid — the question is no longer what the curve is but how it
  * is drawn — so the pane that answers it should be the one they can see.
@@ -1793,8 +1793,8 @@ function syncPaneFocus() {
 }
 
 /**
- * The thumbnail has ONE box on every step, and no step gets a sizing mode of its own (ADR-125,
- * superseding ADR-120).
+ * The thumbnail has ONE box on every step, and no step gets a sizing mode of its own (ADR-202,
+ * superseding ADR-197).
  *
  * There is a single card element, `#compare-card`, and its rect comes from a single rule,
  * `.compare-card[data-size="compact"]`. Step 5 does not size it differently — `body.drawing-main`
@@ -1803,12 +1803,12 @@ function syncPaneFocus() {
  * shared component: the component was always shared, and the fix was to delete the one mode that
  * had been overriding it.
  *
- * That mode was ADR-120's `body.sheet-docked`, a full-height column on Steps 4 and 6. It is gone.
+ * That mode was ADR-197's `body.sheet-docked`, a full-height column on Steps 4 and 6. It is gone.
  * Deleting the override is the fix; adding a third selector to defeat it would have been the bug.
  *
  * What survives here is `sheet-solo`, which is NOT a second size — below 768px there is no room
  * for a card and a solid at once, so the sheet becomes the other VIEW and the pane behind it stops
- * painting (ADR-123). `thumb-min` is what takes it away again, which is how the corner cluster's
+ * painting (ADR-200). `thumb-min` is what takes it away again, which is how the corner cluster's
  * Restore chip becomes the switch.
  */
 function syncSheetDock() {
@@ -1817,7 +1817,7 @@ function syncSheetDock() {
 }
 
 /**
- * Which view is the main one. The Compare menu is a view SELECTOR and nothing else (ADR-105):
+ * Which view is the main one. The Compare menu is a view SELECTOR and nothing else (ADR-182):
  * it swaps which pane is full-bleed and which floats over it, and never replaces the interface.
  * Step 4 and Step 5 are the same layout — Step 5 simply starts on the other one.
  *
@@ -1860,9 +1860,9 @@ function remeasureAfterReflow() {
  *  always has a cone on screen, so the sheet is meaningful from boot. */
 function updateCompareChip() {
   // Every transition that changes which views are on screen comes through here, so this is
-  // where the sheet's docked/floating state is settled too (ADR-120).
+  // where the sheet's docked/floating state is settled too (ADR-197).
   syncSheetDock();
-  // Compare names the ACTION (ADR-108): it enters the side-by-side comparison, and once there
+  // Compare names the ACTION (ADR-185): it enters the side-by-side comparison, and once there
   // it is the way back to the lesson.
   const inCompare = compareSize === 'expanded';
   compareChip?.setAttribute('aria-pressed', String(inCompare));
@@ -1870,7 +1870,7 @@ function updateCompareChip() {
   if (chipLabel) chipLabel.textContent = inCompare ? 'Back to 3D' : 'Compare';
 
   // Switch view has no job before Step 5: until then the lesson decides which view leads, and
-  // Compare is the one control a learner needs. It is Step 5's own control (ADR-108).
+  // Compare is the one control a learner needs. It is Step 5's own control (ADR-185).
   const switchBtn = document.getElementById('switch-view');
   if (switchBtn) switchBtn.hidden = !sheetPrimaryOn || inCompare;
 
@@ -1889,7 +1889,7 @@ function updateCompareChip() {
   }
 }
 
-/** Collapse the current thumbnail to its chip, or bring it back (ADR-103). */
+/** Collapse the current thumbnail to its chip, or bring it back (ADR-180). */
 function setThumbMinimized(on) {
   if (thumbMin === on) return;
   thumbMin = on;
@@ -1916,7 +1916,7 @@ const compare = {
     if (compareCard) compareCard.hidden = false;
     // Step 5 has its own two-pane workspace, so reopening the sheet there must return to IT,
     // not to the 50/50 workbench — which collapses the wizard and moves Step 5's own controls
-    // into the rail, leaving the learner with no way to play the construction (ADR-102).
+    // into the rail, leaving the learner with no way to play the construction (ADR-179).
     const fallback = sheetPrimary || !isWorkbenchViewport() ? 'compact' : COMPARE_DEFAULT_SIZE;
     applyCompareSize(size || fallback);
     // Redraw EXPLICITLY on every open. Nothing repaints the sheet while it is closed, so its
@@ -1974,7 +1974,7 @@ function setupCompareCard() {
   compareCanvas = document.getElementById('compare-canvas');
   // The Step 5 workspace animates its column widths, and `remeasureAfterReflow` runs two frames
   // in — while the transition is still moving. Without this the canvas keeps whatever width it
-  // had mid-flight and the drawing is left scaled to a pane that no longer exists (ADR-102).
+  // had mid-flight and the drawing is left scaled to a pane that no longer exists (ADR-179).
   document.body.addEventListener('transitionend', (ev) => {
     if (ev.target === document.body && ev.propertyName === 'grid-template-columns') {
       handleResize(viewport);
@@ -1982,7 +1982,7 @@ function setupCompareCard() {
     }
   });
 
-  // COMPARE MODE (ADR-108). Compare is a MODE toggle: it puts the 3-D on the left and the
+  // COMPARE MODE (ADR-185). Compare is a MODE toggle: it puts the 3-D on the left and the
   // sheet on the right, side by side and nothing else, so a learner can watch the plane drive
   // the drawing. Pressing it again comes straight back to the lesson — same step, same curve,
   // same sliders, same camera. Only the layout changes.
@@ -1993,12 +1993,12 @@ function setupCompareCard() {
       if (thumbMinBeforeCompare) setThumbMinimized(true);
       announce('Back to the lesson.');
     } else {
-      // Compare Mode ALWAYS builds both panes (ADR-109). Whether the lesson's thumbnail was
+      // Compare Mode ALWAYS builds both panes (ADR-186). Whether the lesson's thumbnail was
       // minimized, hidden or closed is a fact about the lesson, not about this mode — it is
       // remembered, cleared, and handed back on the way out.
       thumbMinBeforeCompare = thumbMin;
       setThumbMinimized(false);
-      // The tilt is the ONLY plane control in this mode (ADR-110), and a plane sitting on the
+      // The tilt is the ONLY plane control in this mode (ADR-187), and a plane sitting on the
       // apex makes an isosceles triangle at EVERY tilt — no conic is reachable and there is no
       // longer a control to escape with. Lift it just clear of the tip, which is the one state
       // change entering Compare Mode may make, and only from a state its own control cannot
@@ -2021,7 +2021,7 @@ function setupCompareCard() {
     updateCompareChip();
   });
 
-  // Minimize is the thumbnail's ONLY control (ADR-115), from either head; one chip brings it
+  // Minimize is the thumbnail's ONLY control (ADR-192), from either head; one chip brings it
   // back, exactly where it was. Close is gone from both heads — it collapsed the same thumbnail
   // to the same chip, so it was a second button for one outcome, and having it there is what
   // made a reference view read as a window to be managed.
@@ -2038,7 +2038,7 @@ function setupCompareCard() {
   });
 
 
-  // ISSUE 5 (ADR-106) — the Fullscreen control is gone from the thumbnail: Compare and Switch
+  // ISSUE 5 (ADR-183) — the Fullscreen control is gone from the thumbnail: Compare and Switch
   // view both promote a view to the full main panel, so expanding a card said nothing new. The
   // compare-split workbench remains in the code but no longer has a UI entry point.
 
@@ -2127,17 +2127,17 @@ function setupComparePan() {
  * Which sheet the current step draws. The lesson only reaches the sheet at Step 4, and each
  * later step swaps ONE thing about it: Step 4 explains the curve (and, on request, names its
  * parts), Step 5 constructs it, Step 6 keeps whatever construction Step 5 left up while the
- * learner works in 3D (ADR-086).
+ * learner works in 3D (ADR-141).
  */
 function sheetMode(state = conicState) {
   // §6.6's properties take the sheet over while they are being shown, and only for the curve
-  // they belong to (ADR-093).
+  // they belong to (ADR-170).
   if (state.propsOpen && state.curve === 'Parabola') return 'props';
   // Step 5 is the construction — and Step 5 ALONE. Step 6 asks the learner to name a cut, so its
-  // sheet is that cut, not the drawing left over from the step before it (ADR-117).
+  // sheet is that cut, not the drawing left over from the step before it (ADR-194).
   if (stage === 5) return state.method === ECCENTRICITY_METHOD ? 'eccentricity' : 'methods';
   // While the sheet draws the cut it draws what the cut IS, and three of §6.1's six
-  // sections are not plane conics (ADR-090). The terminology sheet is a conic's own figure, so
+  // sections are not plane conics (ADR-167). The terminology sheet is a conic's own figure, so
   // it too waits for a cut that has one.
   if (sheetDrawsCut()) {
     const kind = state.cutKind ?? 'conic';
@@ -2179,7 +2179,7 @@ function drawCompare() {
   ctx.fillStyle = cssVar('--color-paper');
   ctx.fillRect(0, 0, w, h);
 
-  // Every step draws from ITS OWN sheet state (ADR-117), never from whatever the step before it
+  // Every step draws from ITS OWN sheet state (ADR-194), never from whatever the step before it
   // left behind. For Steps 1–5 that is the stored state; for Step 6 it is the live cut, derived
   // fresh on every paint so the thumbnail tracks the plane as the question is dealt.
   const source = sheetSourceState();
@@ -2193,13 +2193,13 @@ function drawCompare() {
   // clip against its edge.
   // The terminology figure carries the longest captions in the topic — "Auxiliary circle ·
   // minor diameter" is 32 characters hung off the left of the drawing — so it gets a wider
-  // band than the constructions, whose captions are short (ADR-092).
+  // band than the constructions, whose captions are short (ADR-169).
   const marginScale = layout.mode === 'terms' ? 0.16 : 0.11;
   const marginPx = Math.min(110, Math.max(40, Math.round(Math.min(w, h) * marginScale)));
   // …and captions hang SIDEWAYS further than they hang up and down: "Axis", "Directrix, DD",
   // "Double ordinate (base) 120" all run off the ends of the linework, while nothing much runs
   // off the top. A square-ish pane hides that, because height binds the scale first and leaves
-  // width to spare. A tall narrow one does not — docking the sheet into its own column (ADR-120)
+  // width to spare. A tall narrow one does not — docking the sheet into its own column (ADR-197)
   // made width the binding constraint and clipped "Axis" at the edge on the very first frame.
   // So the horizontal band carries a few characters' worth of extra room.
   const marginX = Math.min(140, marginPx + Math.round(parseFloat(sheetFont()) * 2.4));
@@ -2240,7 +2240,7 @@ function drawCompare() {
     curve: cssVar('--color-section-face'),
     mark: cssVar('--color-conic-mark'),
     // The sheet's own background, so a caption can clear the paper behind itself and stay
-    // legible where it has to cross linework (ADR-116). Not a new colour — the same token the
+    // legible where it has to cross linework (ADR-193). Not a new colour — the same token the
     // canvas was filled with two calls up.
     paper: cssVar('--color-paper'),
     font: sheetFont(),
@@ -2248,18 +2248,18 @@ function drawCompare() {
     showConstruction: source.showConstruction !== false,
     // Step 6's question IS "which section is this", so until the learner commits, the sheet may
     // draw the cut but must not name it — three of the six sheets say what they are in words
-    // (ADR-117). Once an answer is in, the dock has already said the name, so the caption may.
+    // (ADR-194). Once an answer is in, the dock has already said the name, so the caption may.
     anonymous: stage === 6 && !quiz.chosen,
     highlight: sheetHover,
     // Only while the learner is actually walking a construction: a finished drawing is never
-    // dimmed (ADR-099).
+    // dimmed (ADR-176).
     stepping: buildPlayed && buildStagesFor(conicState.method) !== null,
     reveal: curveReveal,
   });
 }
 
 // ============================================================================
-// Sheet hover (ADR-088) — pointing at a line on the drawing says what it is FOR.
+// Sheet hover (ADR-165) — pointing at a line on the drawing says what it is FOR.
 // The engine owns the vocabulary (it drew the captions); this end owns the DOM.
 // ============================================================================
 
@@ -2268,7 +2268,7 @@ let sheetView = null;
 let sheetLayout = null;
 /**
  * What the last paint MEASURED — the quantities this construction yields, which the dock lists
- * beside it (ADR-091). Every exercise in the chapter that ends in "measure", "determine",
+ * beside it (ADR-168). Every exercise in the chapter that ends in "measure", "determine",
  * "find" or "locate" is asking for one of these; a drawing that contains the answer without
  * stating it leaves the learner guessing at what they were meant to read off.
  * @type {Array<{label:string, value:number, unit:string, from:string}>}
@@ -2335,7 +2335,7 @@ function setupSheetHover() {
 // ============================================================================
 
 // ============================================================================
-// The two panes are ONE model (ADR-088). The curve on the drawing sheet is the
+// The two panes are ONE model (ADR-165). The curve on the drawing sheet is the
 // curve of the cut in the viewport, so any change to the cone or to the plane
 // carries straight through to the sheet — the learner never has to relate two
 // independent pictures for themselves.
@@ -2356,7 +2356,7 @@ function sheetFollowsCut() {
 
 /**
  * Re-derive what the SHEET is drawing from the live cut, so the two panes can never disagree
- * about what has been cut (ADR-090). Three of §6.1's six sections are not plane conics, and a
+ * about what has been cut (ADR-167). Three of §6.1's six sections are not plane conics, and a
  * focal-polar model asked to draw one of them draws something that is not on the cone at all:
  *
  *   circle          e = 0 — the model's radius collapses. The sheet draws the TRUE circle, at
@@ -2367,7 +2367,7 @@ function sheetFollowsCut() {
  *   plane clear     Nothing has been cut, and the sheet says so instead of holding the last
  *                   curve it had.
  *
- * Everything else is a conic, and its eccentricity is `sin θ ÷ sin g` as before (ADR-088),
+ * Everything else is a conic, and its eccentricity is `sin θ ÷ sin g` as before (ADR-165),
  * clamped to the range the sheet's model can draw.
  *
  * Called at the END of rebuild(), because two of the three cases can only be settled once the
@@ -2375,7 +2375,7 @@ function sheetFollowsCut() {
  */
 /** Set when the cut has become a DIFFERENT KIND of section, so the proof has to start again:
  *  a learner who slides an ellipse into an apex cut should be told the first thing about the
- *  new cut, not left on stage 5 of a proof that no longer applies (ADR-095). */
+ *  new cut, not left on stage 5 of a proof that no longer applies (ADR-172). */
 let proofResync = false;
 
 function syncSheetToCut() {
@@ -2388,7 +2388,7 @@ function syncSheetToCut() {
 /**
  * What the sheet WOULD be drawing if it were showing the live cut — the same derivation
  * {@link syncSheetToCut} commits, lifted out so a step can DRAW the cut without writing it into
- * the sheet state (ADR-117).
+ * the sheet state (ADR-194).
  *
  * Step 6 needs exactly that. Its thumbnail must show the cut it has just dealt, but Step 5 owns
  * `e`, `curve` and the given dimensions, and a learner stepping 5 → 6 → 5 must find their
@@ -2446,7 +2446,7 @@ function commitDerivedSheet(next) {
 }
 
 /**
- * The state the SHEET is drawn from, which is not always the sheet's stored state (ADR-117).
+ * The state the SHEET is drawn from, which is not always the sheet's stored state (ADR-194).
  *
  * Every step owns its own sheet content. Steps 1–4 and Step 6 show the live cut; Step 5 shows the
  * construction the learner is building. The difference between the two halves is where the
@@ -2473,7 +2473,7 @@ const ECC_SLIDER_MAX = 2.5;
 
 /**
  * Called by stepper.js on every step change (the sibling topics' setStage seam). The scene
- * follows the story rather than waiting to be configured (ADR-086):
+ * follows the story rather than waiting to be configured (ADR-141):
  *
  *   Step 1  whole cone, parts named, no plane in sight.
  *   Step 2  the plane arrives and cuts — the step IS the cut, so there is no on/off toggle
@@ -2501,7 +2501,7 @@ function setStage(step) {
   // The PLANE belongs to Step 2 onward — its arrival is what Step 2 means. Whether it
   // actually CUTS is the learner's own decision in Step 2 ("Cut the cone", the reference
   // topic's interaction); from Step 3 the lesson needs a cut on screen to talk about, so
-  // the steps that demonstrate turn it on themselves (RULES.md §6.28).
+  // the steps that demonstrate turn it on themselves (RULES.md §6.32).
   const wantPlane = stage >= 2;
   const wantCut = stage >= 3;
   let dirty = false;
@@ -2515,7 +2515,7 @@ function setStage(step) {
     }
   }
   if (wantCut && !sectionState.cut) { sectionState.cut = true; dirty = true; }
-  // Step 4 opens on the CURVE ALONE and reveals the apparatus from there (ADR-088/089), so
+  // Step 4 opens on the CURVE ALONE and reveals the apparatus from there (ADR-165/089), so
   // rewind BOTH acts of the reveal before the rebuild that will draw them.
   if (stage === 4 && previous !== 4) conicState = { ...conicState, locusStage: 0, proofStage: 0 };
   // The anatomy labels belong to Step 1 only and the focal sphere to Step 4 only — rebuild so
@@ -2535,7 +2535,7 @@ function setStage(step) {
     faceTheSection();               // look at the cut square-on first…
     compare.show('compact');        // …then the same shape appears on paper
     flowNote('The same cut, seen face-on — and now the same outline drawn on paper.');
-    // …but on a phone the sheet IS the viewport (ADR-123), and opening it on arrival would
+    // …but on a phone the sheet IS the viewport (ADR-200), and opening it on arrival would
     // replace the cone the step just swung the camera round to, before the learner has read a
     // word of the step. So it opens minimized: the chip in the corner says what it brings
     // back, and the switch is theirs to make. Wider than that, both panes are on screen and
@@ -2543,9 +2543,9 @@ function setStage(step) {
     if (!isWorkbenchViewport()) setThumbMinimized(true);
   }
   // Step 5 is the drawing workspace: the sheet takes the bench and the cone becomes a live
-  // reference beside it (ADR-100). Step 6 hands the bench back — its question is about the
+  // reference beside it (ADR-177). Step 6 hands the bench back — its question is about the
   // solid again. Re-applying the current size is what mounts or unmounts the grid.
-  // ARRIVING at Step 5 clears the paper back to the construction's given data (ADR-118). A
+  // ARRIVING at Step 5 clears the paper back to the construction's given data (ADR-195). A
   // learner who steps out and back must not find the answer waiting for them, and "Draw it step
   // by step" must never look like it is starting from the middle of a finished drawing.
   if (stage === 5 && previous !== 5) {
@@ -2560,7 +2560,7 @@ function setStage(step) {
   }
   if (compareOpen) drawCompare();
 
-  // Which viewport controls belong to this step is part of the step (ADR-108): Switch view is
+  // Which viewport controls belong to this step is part of the step (ADR-185): Switch view is
   // Step 5's alone, and nothing else syncs it when the step changes without opening the sheet.
   updateCompareChip();
 
@@ -2652,7 +2652,7 @@ function faceTheFocalSphere() {
 
 // ============================================================================
 // The teaching motions. Each one exists so the learner WATCHES a cause produce
-// its effect instead of reading that it would (ADR-086): the plane travels to a
+// its effect instead of reading that it would (ADR-141): the plane travels to a
 // named cut, and the construction draws itself one stage at a time.
 // ============================================================================
 
@@ -2667,7 +2667,7 @@ const ECCENTRICITY_METHOD = 'eccentricity';
  *
  * @param {string} key  A {@link ConicSection} key.
  */
-/** The in-flight plane move, so a later action can supersede it (ADR-110). Each frame of it
+/** The in-flight plane move, so a later action can supersede it (ADR-187). Each frame of it
  *  calls rebuild(), so under a slow renderer it runs well past its 700 ms of tween time — long
  *  enough for a press to land mid-flight and be undone by its onComplete. */
 let tourTween = null;
@@ -2701,7 +2701,7 @@ function tourCut(key) {
 }
 
 // ============================================================================
-// STEP 4 — the proof, walked by hand (ADR-095).
+// STEP 4 — the proof, walked by hand (ADR-172).
 //
 // It does not play. Each press of Next reveals exactly one idea and then waits;
 // Back restores the previous stage exactly, with no animation to sit through
@@ -2776,7 +2776,7 @@ function setProofStage(index, { animate = true } = {}) {
   proofTween?.cancel?.();
 
   // The bridge is the LAST stage, whichever index that is: the degenerate cuts run shorter
-  // proofs, and a hard-coded index would fade the cone out on the wrong one (ADR-097).
+  // proofs, and a hard-coded index would fade the cone out on the wrong one (ADR-174).
   const last = stages.length - 1;
   conicState = { ...conicState, proofStage: at, locusStage: stage.sheet };
   // The apparatus lives in the scene graph, so the stage change is a geometry change.
@@ -2843,12 +2843,12 @@ let propTimer = null;
 
 /**
  * Step 5's "Show its three properties" — §6.6's list, drawn one at a time on a parabola of the
- * learner's own focal distance (ADR-093). The chapter states them in a sentence each and uses
+ * learner's own focal distance (ADR-170). The chapter states them in a sentence each and uses
  * them in the constructions that follow; a sentence is not a reason to believe a claim about a
  * curve, and each of these three is exact, so the figure IS the proof.
  */
 function playParabolaProps() {
-  // A TOGGLE, not a one-way door (ADR-116). It used to only ever turn the properties ON: the sole
+  // A TOGGLE, not a one-way door (ADR-193). It used to only ever turn the properties ON: the sole
   // way back to the construction was to nudge some other control, which is why pressing it a
   // second time appeared to leave the drawing broken — nothing had put the sheet back.
   if (conicState.propsOpen) { closeParabolaProps(); return; }
@@ -2876,7 +2876,7 @@ function playParabolaProps() {
  * Put the sheet back on the construction — pressing the control again, or any control that
  * changes what is being drawn.
  *
- * This is a VIEW toggle and nothing more (ADR-116): `propsOpen` is the only field it touches, so
+ * This is a VIEW toggle and nothing more (ADR-193): `propsOpen` is the only field it touches, so
  * `sheetMode()` falls back to the construction and the layout is rebuilt from state that was
  * never disturbed. The construction stage, the given dimensions, the tangent toggle and the
  * chosen method all come back exactly as they were, because none of them ever left.
@@ -2901,7 +2901,7 @@ function closeParabolaProps({ notify = true } = {}) {
 /**
  * ms each construction stage holds before the next is drawn. Deliberately unhurried: a learner
  * copying the construction onto paper has to see every line go down, and the syllabus's own
- * assessment is a drawing paper (ADR-098). Pause exists for when even this is too fast.
+ * assessment is a drawing paper (ADR-175). Pause exists for when even this is too fast.
  */
 const BUILD_DWELL = 2200;
 let buildTimer = null;
@@ -2948,7 +2948,7 @@ function toggleBuildPause() {
  * Abandon any running or paused construction playback. Changing the construction MUST do this:
  * a timer left pending from the previous method fires later and walks the new drawing back to
  * an early stage, so the learner lands mid-construction of a drawing they never asked to play
- * (ADR-100).
+ * (ADR-177).
  */
 function stopBuildPlayback() {
   cancelCurveReveal();
@@ -2957,7 +2957,7 @@ function stopBuildPlayback() {
   buildPlayed = false;
 }
 
-/** How much of the finished curve has been traced, 0..1 (ADR-114). 1 whenever nothing is
+/** How much of the finished curve has been traced, 0..1 (ADR-191). 1 whenever nothing is
  *  being drawn, so a figure that is simply shown is shown whole. */
 let curveReveal = 1;
 let revealTween = null;
@@ -2969,7 +2969,7 @@ let revealTween = null;
  * ends by joining the curve — but not for the tangent method, whose envelope is drawn at stage 6
  * and whose focus and directrix are marked at stage 7. There the trace fired one stage too late
  * and the curve simply appeared, which is exactly the inconsistency the review reported
- * (ADR-115). Asking the LAYOUT instead needs no per-method table and cannot fall out of step
+ * (ADR-192). Asking the LAYOUT instead needs no per-method table and cannot fall out of step
  * with one: whichever stage first carries an `outline` item is the stage that draws the curve.
  *
  * Both layouts are pure, so this costs two display lists on a stage change and nothing else.
@@ -2986,7 +2986,7 @@ function stageDrawsCurve(conic, stage) {
 }
 
 /**
- * Trace the finished curve on, at a constant speed, the way a pencil would (ADR-114). Called
+ * Trace the finished curve on, at a constant speed, the way a pencil would (ADR-191). Called
  * when a construction ARRIVES at its last stage — never when a drawing is merely displayed, so
  * switching method or opening the sheet still shows the curve whole and at once.
  */
@@ -3123,7 +3123,7 @@ window.simAPI = {
     sectionState = defaultSectionState(); // section plane off + defaults (topic-local)
     conicState = defaultConicState();     // Example 6.1's own data
     conicState.method = ECCENTRICITY_METHOD; // Step 5 opens on the general construction
-    // …and on its GIVEN DATA, not its answer (ADR-118), so Reset leaves the same clean sheet
+    // …and on its GIVEN DATA, not its answer (ADR-195), so Reset leaves the same clean sheet
     // that arriving at Step 5 does.
     conicState.buildStage = setupStageFor(ECCENTRICITY_METHOD);
     quiz = { answer: null, chosen: null, right: 0, asked: 0 };
@@ -3193,7 +3193,7 @@ const simController = {
         next.curve = curveForEccentricity(next.e);
       }
     }
-    // ASKING for a construction clears the paper back to its given data (ADR-118) — its frame,
+    // ASKING for a construction clears the paper back to its given data (ADR-195) — its frame,
     // never its answer. Keyed on the REQUEST, not on whether the id changed: pressing "Ellipse"
     // when the ellipse is already up, or re-picking the construction already selected, is a
     // learner saying "start this one", and leaving the finished figure on the paper is what made
@@ -3207,13 +3207,13 @@ const simController = {
       next.curve = curveForEccentricity(next.e);
     }
     // Any edit that changes WHAT IS DRAWN takes the sheet back from §6.6's properties — they
-    // are an aside about the parabola, not a mode to get stuck in (ADR-093).
+    // are an aside about the parabola, not a mode to get stuck in (ADR-170).
     if (partial.propsOpen === undefined
       && Object.keys(partial).some((k) => k !== 'propStage')) {
       closeParabolaProps({ notify: false });   // this commit notifies once, at its end
       next.propsOpen = false;
     }
-    // The tangent method sizes its stage list to its division count (ADR-116), so lowering the
+    // The tangent method sizes its stage list to its division count (ADR-193), so lowering the
     // slider can leave the current stage past the end of the new list — a stage number the dock
     // cannot narrate and the layout reads as "finished". Clamp it back onto the shortened list.
     const nowStaged = buildStagesFor(next.method, next);
@@ -3227,7 +3227,7 @@ const simController = {
       clearTimeout(buildTimer); // a manual step takes over from any running playback
       buildPaused = false;
       // Stepping ONTO the stage that draws the curve traces it on; stepping anywhere else shows
-      // a finished drawing finished (ADR-114).
+      // a finished drawing finished (ADR-191).
       if (partial.buildStage !== conicState.buildStage
         && stageDrawsCurve(next, partial.buildStage)) startCurveReveal();
       else cancelCurveReveal();
@@ -3249,7 +3249,7 @@ const simController = {
 
   /**
    * The named elements the sheet is currently drawing, for the Engineering Terms panel
-   * (ADR-098). Hovering one drives the SAME `sheetHover` the cursor drives, so there is one
+   * (ADR-175). Hovering one drives the SAME `sheetHover` the cursor drives, so there is one
    * highlight path and `drawHighlight()` is not duplicated.
    */
   sheetTerms: () => (compareOpen && sheetLayout ? sheetTerms(sheetLayout) : []),
@@ -3266,7 +3266,7 @@ const simController = {
   },
 
   /**
-   * What the drawing on the sheet MEASURES (ADR-091) — the quantities the chapter's exercises
+   * What the drawing on the sheet MEASURES (ADR-168) — the quantities the chapter's exercises
    * ask the learner to determine, read off the construction that is actually on screen. Empty
    * while the sheet is closed: these are the drawing's answers, and there is no drawing.
    */
@@ -3279,7 +3279,7 @@ const simController = {
   /**
    * The stages of the construction CURRENTLY selected, and the playback that draws them one at
    * a time (Step 5). One playback system, four constructions: the focus-directrix method and
-   * the three the syllabus names (ADR-098). Empty for the nine that draw whole.
+   * the three the syllabus names (ADR-175). Empty for the nine that draw whole.
    */
   buildStages: () => (buildStagesFor(conicState.method, conicState) ?? []).map((s, i) => ({ index: i, ...s })),
   buildPaused: () => buildPaused,
@@ -3291,7 +3291,7 @@ const simController = {
 
   /**
    * Step 4's proof: its stages, which one is showing, whether its animation is still running,
-   * and the one way to move it. It never advances by itself (ADR-095).
+   * and the one way to move it. It never advances by itself (ADR-172).
    */
   proofStages,
   proofStage: proofStageNow,
@@ -3353,7 +3353,7 @@ const simController = {
 
   /** Which step is showing. The dock reads it to decide what a control is allowed to say
    *  yet — Step 2 reports the cut in plain words, Step 3 adds its name, and Step 6 keeps
-   *  the name back until the learner has committed to an answer (ADR-086). */
+   *  the name back until the learner has committed to an answer (ADR-141). */
   stage: () => stage,
 
   /** Route through the single reset path (re-syncs the wizard + announces). */
@@ -3433,7 +3433,7 @@ function init() {
       if (compareOpen) drawCompare(); // the split resizes the stage with the viewport
     }).observe(container);
 
-    // Crossing the two-pane threshold is a change of LAYOUT MODE, not of size (ADR-123): above
+    // Crossing the two-pane threshold is a change of LAYOUT MODE, not of size (ADR-200): above
     // it the sheet docks beside the solid, below it the two share one viewport and the learner
     // switches. The observer above only sees the viewport's own box, which does not move when a
     // rotated phone flips which of those applies, so the mode is re-derived from the query

@@ -157,7 +157,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
     focalSphereFor({ angleDeg: 45, offset: 0, generatorDeg: g, height: cone.height }) === null);
 }
 
-// ---- 4c. The three sections that are NOT plane conics get their own sheet (ADR-090) ----
+// ---- 4c. The three sections that are NOT plane conics get their own sheet (ADR-167) ----
 {
   const sheet = (over) => layoutFor(over.cutKind === 'none' ? 'nothing' : over.cutKind,
     { ...defaultConicState(), ...over });
@@ -197,7 +197,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
     && texts(none).some((t) => /nothing is cut/.test(t)));
 }
 
-// ---- 4d. The reported measurements are the drawing's own (ADR-091) --------------
+// ---- 4d. The reported measurements are the drawing's own (ADR-168) --------------
 // Every exercise that ends in "measure", "determine", "find" or "locate" is answered by the
 // results block, so each number is checked against the geometry the sheet actually plotted —
 // never against the formula that produced it.
@@ -267,7 +267,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
     ok(`${method}: the drawn curve is big enough to read that focus on`, far > f, `${far.toFixed(1)} > ${f.toFixed(1)}`);
   }
 
-  // §6.9's three constructions are OUT OF SCOPE for this module (ADR-115), so the tests that
+  // §6.9's three constructions are OUT OF SCOPE for this module (ADR-192), so the tests that
   // measured them have gone with them. What is proved instead is that they are really gone —
   // and, below, that the hyperbola itself is untouched everywhere it still belongs.
   // §6.8: the asymptotes cut the auxiliary circle ON the directrix. Drawn on the terms sheet,
@@ -304,7 +304,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
   }
 }
 
-// ---- 4e. The terminology figure names every term the chapter defines (ADR-092) ---
+// ---- 4e. The terminology figure names every term the chapter defines (ADR-169) ---
 // §6.2's twelve terms plus §6.4's and §6.8's own lists. The audit found four of them drawn but
 // UNCAPTIONED — a term the learner can see and cannot look up.
 {
@@ -334,7 +334,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
     !par.some((t) => /^Centre|Major axis|Transverse/.test(t)));
 }
 
-// ---- 4f. §6.6's three properties are DRAWN TRUE, not illustrated (ADR-093) -------
+// ---- 4f. §6.6's three properties are DRAWN TRUE, not illustrated (ADR-170) -------
 // Each stage claims something exact about the parabola. The figure is only worth showing if
 // the geometry on it actually satisfies the claim, so each is measured off the display list.
 {
@@ -401,7 +401,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
     !!dia && near(dia.a.x, M2.x, 1e-9));
 }
 
-// ---- 4g. The four-centre approximation is an APPROXIMATION, drawn correctly (ADR-094) ----
+// ---- 4g. The four-centre approximation is an APPROXIMATION, drawn correctly (ADR-171) ----
 // §6.5 item 8. It must touch the true ellipse at all four axis ends, span exactly the two
 // given axes, and be built from four arcs that JOIN — a construction whose arcs do not meet
 // draws a lozenge, which is what a first version of it did.
@@ -429,7 +429,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
     L.items.some((i) => i.k === 'label' && /not a true ellipse/.test(i.text)));
 }
 
-// ---- 4h. The proof's two planes, and what they may touch (ADR-096) --------------
+// ---- 4h. The proof's two planes, and what they may touch (ADR-173) --------------
 // The visualisation rests on two claims, and both are checked here rather than by eye.
 {
   const cone = { baseLength: 3, height: 3 };
@@ -465,7 +465,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
   }
 }
 
-// ---- 4i. Step 4's sheet names all five, and the FOCUS is unmissable (ADR-097) ----
+// ---- 4i. Step 4's sheet names all five, and the FOCUS is unmissable (ADR-174) ----
 {
   const at = (locusStage) => layoutFor('locus', { ...defaultConicState(), locusStage })
     .items.filter((i) => i.k === 'label').map((i) => i.text);
@@ -490,7 +490,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
       && Math.abs(i.c.x - full.model.focus.x) < 1e-9));
 }
 
-// ---- 4j. The three syllabus constructions are STAGED (ADR-098) ------------------
+// ---- 4j. The three syllabus constructions are STAGED (ADR-175) ------------------
 // Course 1003, Module II: "Ellipse - Rectangular Method & Concentric Circle Method only,
 // Parabola- Tangent method only". Those three, and only those three, had to gain a staged
 // form. What is asserted here is what makes a staged construction trustworthy: it only ever
@@ -538,7 +538,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
       nums(last) === 0, `${nums(last)} left`);
   }
 
-  // Since ADR-100 EVERY construction animates its own procedure — a learner who picks the
+  // Since ADR-177 EVERY construction animates its own procedure — a learner who picks the
   // four-centre method and is shown the concentric-circle animation has been told something
   // false about what they drew. Beyond-syllabus methods are marked by their BADGE, not by
   // being denied the playback. The same invariants are demanded of all ten.
@@ -564,7 +564,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
     ok(`…and the first stage of ${id} has no curve yet`,
       !at(0).items.some((i) => (i.k === 'poly' || i.k === 'arc') && i.role === 'outline'));
   }
-  // Restaged to eight beginner steps (ADR-099): the axis, the fixed line and the fixed point
+  // Restaged to eight beginner steps (ADR-176): the axis, the fixed line and the fixed point
   // now arrive one at a time instead of as one finished frame.
   ok('the focus-directrix construction keeps its own stages',
     (buildStagesFor('eccentricity') ?? []).length === 8);
@@ -573,7 +573,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
 
 
 
-// ---- 4n. Every role a layout emits is one the renderer actually paints (ADR-104) ---------
+// ---- 4n. Every role a layout emits is one the renderer actually paints (ADR-181) ---------
 // A role that is missing from ROLE_ORDER is dropped silently: the display list is correct, the
 // pen table has an entry for it, and nothing reaches the canvas. That happened twice — `plot`
 // and `projection` — so it is now checked rather than noticed.
@@ -598,14 +598,14 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
   ok('every role any layout emits is one the renderer paints', orphans.length === 0,
     orphans.map(([r, where]) => `${r} (first in ${where})`).join(', '));
   // Both special roles are in service: `plot` marks the points a construction produces, and
-  // `projection` is the dashed part of a ray carried past the centre line (ADR-112).
+  // `projection` is the dashed part of a ray carried past the centre line (ADR-189).
   ok('…and the sweep actually saw both special roles',
     seen.has('plot') && seen.has('projection'), [...seen.keys()].join(','));
 }
 
 
 
-// ---- 4p. Every construction ends by TRACING its curve (ADR-114) --------------------------
+// ---- 4p. Every construction ends by TRACING its curve (ADR-191) --------------------------
 // The reveal is a rendering concern, but the property that matters is geometric: the traced
 // part must be the SAME path, cut short — never a redrawn or simplified one.
 {
@@ -643,11 +643,11 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
     }
   }
 
-  // WHERE the trace is triggered from (ADR-115). main.js used to fire it on the LAST stage,
+  // WHERE the trace is triggered from (ADR-192). main.js used to fire it on the LAST stage,
   // which is the same stage for most constructions but not for all of them — so those curves
   // simply appeared. The trigger now asks the layout which stage introduces the `outline`, and
   // this proves the two are different things for at least one real method, so a regression back
-  // to "last stage" cannot pass silently. The witness used to be the tangent method; ADR-133 made
+  // to "last stage" cannot pass silently. The witness used to be the tangent method; ADR-210 made
   // its envelope its last stage, so it is now the focus-directrix construction, whose curve is
   // drawn at stage 6 and whose tangent and normal are stage 7.
   const curveStage = (id) => {
@@ -669,7 +669,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
     curveStage('eccentricity') === 6 && buildStagesFor('eccentricity').length - 1 === 7,
     `curve at ${curveStage('eccentricity')}, last is ${buildStagesFor('eccentricity').length - 1}`);
 
-  // ADR-133 — the tangent method now ENDS on its curve. Nine stages at the default seven
+  // ADR-210 — the tangent method now ENDS on its curve. Nine stages at the default seven
   // divisions, the last of them the envelope, and the focus and directrix on it rather than on a
   // tenth. This is the assertion that fails if the tangent stage is ever put back.
   ok('the tangent method ends on the stage that draws its curve',
@@ -678,7 +678,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
     `curve at ${curveStage('parabola-tangent')} of ${buildStagesFor('parabola-tangent').length - 1}`);
 }
 
-// ---- 4t. A construction OPENS on its given data, never on its answer (ADR-118) ------------
+// ---- 4t. A construction OPENS on its given data, never on its answer (ADR-195) ------------
 // Step 5 used to open on the finished figure, which put the answer on the paper before the
 // question. Every construction now opens on the drawing a learner would have in front of them
 // before the first step — and what counts as 'given' differs by method, so it is checked per
@@ -740,7 +740,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
   ok('…and without its numbered divisions',
     !opening('ellipse-oblong').items.some((i) => i.k === 'label' && /^\d+['′]?$/.test(i.text)));
   // Tangent: its givens are the double ordinate and the abscissa. E and the two tangents are the
-  // first things it DOES, so neither is on the paper before the animation starts (ADR-119). A
+  // first things it DOES, so neither is on the paper before the animation starts (ADR-196). A
   // triangle reads as a frame, which is exactly why opening on one looked wrong to a draughtsman.
   ok('the tangent method opens with neither of its tangents drawn',
     opening('parabola-tangent').items.filter((i) => i.k === 'line' && i.role === 'construction').length === 0);
@@ -750,7 +750,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
     opening('parabola-tangent').items.filter((i) => i.k === 'line'
       && (i.role === 'mark' || i.role === 'axis')).length === 2);
 }
-// ---- 4s. A sheet that NAMES its section says so, so a quiz can withhold it (ADR-117) ------
+// ---- 4s. A sheet that NAMES its section says so, so a quiz can withhold it (ADR-194) ------
 // Three of §6.1's six cuts are not plane conics and their sheets say what they are in words.
 // That is right in the taught half and wrong in Step 6, where naming the section IS the
 // question. The captions that name one are marked, so `drawSheet`'s `anonymous` option can
@@ -792,7 +792,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
   ok('…and only Step 5 paints the construction',
     /if \(stage === 5\) return state\.method === ECCENTRICITY_METHOD/.test(mainSrc));
 }
-// ---- 4r. Drafting legibility: what is set heavy, and what is not (ADR-116) ----------------
+// ---- 4r. Drafting legibility: what is set heavy, and what is not (ADR-193) ----------------
 // The numbering a construction is built on and the letters that name its points are the two
 // things a learner hunts for on a dense sheet, so both are set heavier than the rest. The
 // classification is inferred from the caption, so it is checked against the captions the
@@ -830,7 +830,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
   ok('the sheet renderer is given the paper colour to clear behind captions',
     /paper:\s*cssVar\('--color-paper'\)/.test(mainSrc));
 }
-// ---- 4q. §6.9's constructions are out of scope, and only they are (ADR-115) --------------
+// ---- 4q. §6.9's constructions are out of scope, and only they are (ADR-192) --------------
 // The hyperbola is still one of §6.1's six cuts and still drawn from the focus-and-directrix
 // definition whenever the plane makes one. What left the module is "how to construct one".
 {
@@ -859,7 +859,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
     `${hypCurve.length} outline piece(s), ${hypCurve[0]?.pts?.length ?? 0} points`);
 }
 
-// ---- 4o. The tangent method: its own divisions, chords in two halves (ADR-113) -----------
+// ---- 4o. The tangent method: its own divisions, chords in two halves (ADR-190) -----------
 {
   const m = METHODS.find((x) => x.id === 'parabola-tangent');
   ok('the tangent method names both terms for each given',
@@ -873,7 +873,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
       dim3: divisions, buildStage, showTangent: false });
   const chords = (L) => L.items.filter((i) => i.k === 'line' && i.role === 'construction').length - 2;
 
-  // The chords are paced the same way every construction in this topic is (ADR-116): the first
+  // The chords are paced the same way every construction in this topic is (ADR-193): the first
   // half one per press, the second half whole. The stage list is a FUNCTION of the division
   // count, so this is checked across the slider's whole range rather than at one setting.
   const stagesAt = (d) => buildStagesFor('parabola-tangent', { ...defaultConicState(), dim3: d });
@@ -882,7 +882,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
     const half = tangentFirstHalf(d);
     const total = d - 1;
     // 4 set-up + `half` chord stages + 1 mirror + 1 envelope. NOT a further stage for the focus
-    // and directrix: they arrive with the curve, and the tangent belongs to its toggle (ADR-133).
+    // and directrix: they arrive with the curve, and the tangent belongs to its toggle (ADR-210).
     if (stagesAt(d).length !== 4 + half + 2) { sized = false; worstD ??= d; }
 
     // One chord per press through the first half, then the rest together.
@@ -926,8 +926,8 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
 
   // `dim3` is ONE field shared by every construction that takes a third given, and it holds 70
   // by default — the parallelogram method's included angle. Unclamped, a sheet built straight
-  // from the default state drew a sixty-nine-chord tangent construction (ADR-116).
-  // ADR-133 — the tangent belongs to its toggle, not to a stage. Walk the WHOLE stage list with
+  // from the default state drew a sixty-nine-chord tangent construction (ADR-193).
+  // ADR-210 — the tangent belongs to its toggle, not to a stage. Walk the WHOLE stage list with
   // the toggle off: no stage may put a tangent or a normal on the paper. With it on, they appear
   // once the curve does, and not before — there is nothing to touch until the envelope is drawn.
   const tangentDrawn = (L) => L.items.some((i) => i.k === 'label' && /^(Tangent, TT|Normal, NN)$/.test(i.text));
@@ -948,7 +948,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
     marks(at(lastStage)) === 2 && marks(at(lastStage - 1)) === 0,
     `${marks(at(lastStage))} at ${lastStage}, ${marks(at(lastStage - 1))} before it`);
 
-  // ADR-134 — the envelope is traced CLOCKWISE, the way a hand moves through this curve. The
+  // ADR-211 — the envelope is traced CLOCKWISE, the way a hand moves through this curve. The
   // sheet is y-DOWN, so the drawn path has to start at the FOOT of the double ordinate (+y),
   // round the vertex, and finish at its head (−y). Checked as a signed area sweep about the
   // figure's own centroid rather than on two endpoints, so a reversed middle cannot slip past.
@@ -966,7 +966,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
     sweep > 0 && traced[0].y > 0 && traced[traced.length - 1].y < 0,
     `sweep ${(sweep * 180 / Math.PI).toFixed(0)}°, y ${traced[0].y.toFixed(1)} → ${traced[traced.length - 1].y.toFixed(1)}`);
 
-  // ADR-138 — A is the FOOT of the double ordinate and B its head. Read off the COORDINATES the
+  // ADR-215 — A is the FOOT of the double ordinate and B its head. Read off the COORDINATES the
   // layout carries, not off the captions: a swap done in the labelling alone would leave the
   // tangent AE, its divisions and the chords hanging off the wrong ends, and would still pass a
   // check that only looked at which letter is drawn where. The sheet is y-DOWN, so the foot is +y.
@@ -992,7 +992,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
   ok('…and reversing it changed the order and nothing else',
     traced.every((p) => Math.abs((p.y * p.y) / (4 * ((120 * 120) / (16 * 90))) - p.x) < 1e-9));
 
-  // ADR-137 — the FRAME is pinned to the finished figure, so the sheet's scale cannot change
+  // ADR-214 — the FRAME is pinned to the finished figure, so the sheet's scale cannot change
   // between stages. The sheet locks its millimetre scale to this bbox (ADR-053), and the last
   // stage draws the one thing that reaches past A and B: the directrix, at ±0.6·AB against their
   // ±0.5. Measured on the shipped page, the drawing held a 729 × 431 px ink box through stages
@@ -1018,7 +1018,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
   // deliberately does: reserving the tangent at both ends of the curve instead would widen the
   // frame to 258 × 187 mm and drop the drawing to 1.1 px/mm in a 1124 × 565 pane, under the
   // 1.3 px/mm gate below which every caption is dropped. Stages must not move the frame; a slider
-  // the learner is dragging is allowed to (ADR-137).
+  // the learner is dragging is allowed to (ADR-214).
   let tangentDrift = [];
   for (const t of [0, 0.25, 0.5, 0.75, 1]) {
     const seen = new Set();
@@ -1050,7 +1050,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
     mismatch.length === 0, mismatch.join(','));
 }
 
-// ---- 4m. The oblong method: each half by hand, its reflection whole (ADR-111/112/116) ---
+// ---- 4m. The oblong method: each half by hand, its reflection whole (ADR-188/112/116) ---
 {
   const A2 = 120; const B2 = 80;
   const at = (buildStage) => layoutFor('methods',
@@ -1061,7 +1061,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
   const same = (p, q) => Math.abs(p.x - q.x) < 1e-9 && Math.abs(p.y - q.y) < 1e-9;
   const key = (l) => `${l.a.x},${l.a.y},${l.b.x},${l.b.y}`;
 
-  // The stage plan (ADR-116): 0–2 set the figure up; 3–5 draw the rays from C, one numbered
+  // The stage plan (ADR-193): 0–2 set the figure up; 3–5 draw the rays from C, one numbered
   // point per press, on the UPPER sides of both halves; 6 mirrors that fan down about the major
   // axis; 7–9 draw the connections of the LEFT half, one numbered point per press; 10 mirrors
   // the right half about the minor axis; 11 joins the curve.
@@ -1173,7 +1173,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
   ok('…and the finished drawing is clean of numbering', texts(at(CURVE), /^\d+'?$/).length === 0);
 }
 
-// ---- 4l. Concentric circles: BOTH circles numbered, and the crossings named (ADR-101) ----
+// ---- 4l. Concentric circles: BOTH circles numbered, and the crossings named (ADR-178) ----
 // The method IS the correspondence between the two circles — outer 4 and inner 4′ produce P4 —
 // so a drawing that numbers only the outer circle hides the very thing it exists to show.
 {
@@ -1246,7 +1246,7 @@ ok('e>1 hyperbola', curveForEccentricity(1.5) === 'Hyperbola');
 }
 
 
-// ---- 4k. The focus-directrix construction builds up ONE reference at a time (ADR-099) ----
+// ---- 4k. The focus-directrix construction builds up ONE reference at a time (ADR-176) ----
 // The frame used to open with the axis, the directrix and the focus already drawn — the single
 // hardest thing for a beginner to read. Each now arrives on its own stage, and every stage's
 // wording is checked for the jargon it was rewritten to remove.
@@ -1361,7 +1361,7 @@ const residual = (pts, f) => pts.reduce((w, p) => Math.max(w, Math.abs(f(p))), 0
   ok('parabola-parallelogram draws a curve', (L.curvePts?.length ?? 0) > 100, `pts=${L.curvePts?.length}`);
   ok('parabola-parallelogram bbox finite', Number.isFinite(L.bbox.minX) && Number.isFinite(L.bbox.maxY));
 }
-// §6.9's three constructions are gone (ADR-115), and with them the proofs that each of
+// §6.9's three constructions are gone (ADR-192), and with them the proofs that each of
 // their plotted points satisfied its own hyperbola. The hyperbola AS A CURVE is still proved
 // below and in section 4a — only the three constructions of it have left the module.
 
@@ -1400,7 +1400,7 @@ for (const e of [0.5, 1, 1.8]) {
   ok(`pointOnConic e=${e}`, worst < 1e-6, `worst=${worst.toExponential(2)}`);
 }
 
-// ---- 8. The problem library is inside the syllabus, and pre-solves nothing (ADR-135/129) ---
+// ---- 8. The problem library is inside the syllabus, and pre-solves nothing (ADR-212/129) ---
 {
   const dealt = enabledProblems();
   const outside = dealt.filter((p) => !ENABLED_METHODS.includes(p.target.method));
@@ -1437,7 +1437,7 @@ for (const e of [0.5, 1, 1.8]) {
     dealt.length === 7 && groupByTier(dealt).length === 2,
     `${dealt.length} problems, ${groupByTier(dealt).length} groups`);
 
-  // ADR-136 — the construction is selected for the learner, and the dimension sliders land at
+  // ADR-213 — the construction is selected for the learner, and the dimension sliders land at
   // their FLOOR so that selecting it can never hand over a figure. `ellipse-concentric` is why
   // this is checked rather than assumed: its authored defaults are 120 × 80, which is one of the
   // practice answers exactly, so loading with the method's own defaults would have lit green.

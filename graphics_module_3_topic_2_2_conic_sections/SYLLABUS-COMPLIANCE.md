@@ -66,14 +66,14 @@ methods and a zero discriminant for the tangent method's envelope, to 1e-9. All 
 Problem Library exercise (`ellipse-oblong-120-80`, `ellipse-auxiliary-100-70`,
 `parabola-tangent-110-80`) with scaffolded hints and a check that auto-fills no measured quantity.
 
-**The library is now scoped to the syllabus (ADR-135).** `ENABLED_METHODS` deals only problems
+**The library is now scoped to the syllabus (ADR-212).** `ENABLED_METHODS` deals only problems
 answered with the three constructions above, so the focus-and-directrix, parallelogram,
 intersecting-arc, rectangle and offset exercises no longer surface — they remain in
 `src/problems.js` verbatim, and widening the list restores them. Four practice questions for the
 three syllabus methods are added beside them (concentric 100 × 70 and 120 × 80, rectangular
 100 × 70 and 120 × 80), which is what takes the dealt total to seven. Loading any of them selects
 the named construction on first arrival at Step 5 and leaves every dimension to the learner
-(ADR-136).
+(ADR-213).
 
 ---
 
@@ -176,7 +176,7 @@ Ordered by syllabus impact. Each phase leaves the topic shippable.
 `src/cone.js`, `src/iShape.js`, `src/shapeData.js`, `src/anim.js` (byte-identical to Module 2 —
 RULES.md §1.3–1.4) · `src/sectionCut.js` (verbatim, ADR-058) · `src/stepper.js` (the six steps) ·
 `src/problems.js`, `src/problemLibrary.js` (practice already covers all three) · `src/onboarding.js`
-· `src/terms.js` · `meta.json` · the whole Step 1–4 concept path and the ADR-089…097 apparatus.
+· `src/terms.js` · `meta.json` · the whole Step 1–4 concept path and the ADR-166…174 apparatus.
 
 No ADR is superseded. No rendering, camera, orchestrator, state or drawing-sheet system changes.
 

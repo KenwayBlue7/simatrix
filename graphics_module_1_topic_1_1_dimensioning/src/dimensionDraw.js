@@ -23,7 +23,7 @@
 //   • Only one arrowhead is needed for a radius                           (§4.1, rule 6)
 //
 // Layering (ADR-007 / RULES.md §3.6): leaf module. Imports THREE, the fat-line addons, and
-// the pure-data `dimensionData.js` (ADR-078). It owns no DOM: the numeric text is handed
+// the pure-data `dimensionData.js` (ADR-133). It owns no DOM: the numeric text is handed
 // back as anchors for `dimensionLabels.js` to render as CSS2D nodes (RULES.md §3.27).
 
 import * as THREE from 'three';

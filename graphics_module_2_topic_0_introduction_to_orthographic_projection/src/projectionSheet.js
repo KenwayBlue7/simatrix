@@ -25,7 +25,7 @@
 // being shown what a finished multiview drawing looks like and how it is built up, and a beginner
 // meeting HP/VP/XY in the same breath as their first drawing is being asked to learn two things at
 // once. The XY ordinate still EXISTS in the layout maths below, as the datum every view is placed
-// against — it is simply not drawn (ADR-131).
+// against — it is simply not drawn (ADR-208).
 //
 // The crossover is not a rule to memorise, it is what the planes do. The object sits between the
 // observer and the plane, so the view from the right lands on the plane BEYOND the object's left,
@@ -517,7 +517,7 @@ export function initProjectionSheet(mount, { prefersReducedMotion = false } = {}
       if (key === 'front') {
         // Blank paper: the enclosing rectangle of the elevation and nothing else. The XY ordinate
         // is still the datum the layout above places every view against — it is simply not drawn
-        // (see the header note; ADR-131).
+        // (see the header note; ADR-208).
         emitPrim(gC, ox, oy, {
           k: 'poly', pts: [[b.minX, b.minY], [b.maxX, b.minY], [b.maxX, b.maxY], [b.minX, b.maxY]], close: true,
         }, 'construction', true);

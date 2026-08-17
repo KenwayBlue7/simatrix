@@ -83,20 +83,20 @@ C:\xampp\htdocs\Simatrix\
 │                                              camera rig; anim.js re-copied from Module2/ and
 │                                              md5-verified. Leaves: objectData (the four parts
 │                                              from Chapter 19 pp. 252-254 — 3D part specs PLUS
-│                                              authored 2D view linework, ADR-127), objectRig (one
+│                                              authored 2D view linework, ADR-204), objectRig (one
 │                                              switch over `extrude`/`lathe`), projectionSheet
 │                                              (the sheet, laid out in MILLIMETRES with one
 │                                              viewBox, deriving its projectors, its 45° mitre and
-│                                              its whole stage list from the views — ADR-129),
+│                                              its whole stage list from the views — ADR-206),
 │                                              cameraRig, uiManager, orthoSteps. NOTE: it carries
 │                                              the platform's DUAL-CAMERA pair and lands every
 │                                              principal view in a true ORTHOGRAPHIC projection via
 │                                              the §5.18 morph — free orbit is perspective, a named
-│                                              view is not (ADR-128). No meshAnalyzer, no
+│                                              view is not (ADR-205). No meshAnalyzer, no
 │                                              projectionDrawer, no shape generators, no Problem
 │                                              Library. One Node oracle in verify/ asserts the
 │                                              first-angle LAYOUT out of the live SVG. See root
-│                                              DECISIONS.md ADR-127..129.
+│                                              DECISIONS.md ADR-204..206.
 │
 ├── graphics_module_2_topic_1_introduction\    DEPLOYED COPY of Module2, scoped down
 │                                              to "Introduction to Solids" — a 3D
@@ -126,11 +126,11 @@ C:\xampp\htdocs\Simatrix\
 │                                              Foundations' meshAnalyzer + lineDrawer for LIVE
 │                                              camera-dependent edge classification while the
 │                                              front elevation keeps its authored linework
-│                                              (ADR-081); curriculum-audited and remediated
+│                                              (ADR-136); curriculum-audited and remediated
 │                                              (2026-07-27 — see CURRICULUM-AUDIT.md in the
 │                                              topic, its standing academic checklist; the
 │                                              production/authoring workflow is the one item
-│                                              deliberately deferred, ADR-080). Sits immediately
+│                                              deliberately deferred, ADR-135). Sits immediately
 │                                              after Topic 1
 │                                              (Foundations): that topic teaches what the LINES
 │                                              mean, this one how a drawing states SIZE and
@@ -159,7 +159,7 @@ C:\xampp\htdocs\Simatrix\
 │                                              ORTHOGRAPHIC camera — no perspective camera, no
 │                                              projection morph — and NO occlusion raycaster or
 │                                              three-mesh-bvh; the linework is authored, so
-│                                              nothing is camera-dependent. (ADR-078, ADR-079.)
+│                                              nothing is camera-dependent. (ADR-133, ADR-134.)
 │
 ├── graphics_module_1_topic_2_spatial_framework\ MODULE-1 SUBJECT ("Spatial Framework" —
 │                                              Quadrants + First-angle combined into one
@@ -288,46 +288,46 @@ C:\xampp\htdocs\Simatrix\
 │                                              textbook Chapter 6 in SIX guided steps — the
 │                                              double cone, its six section planes, the FOCAL
 │                                              SPHERE that produces the focus and the directrix
-│                                              on the solid (§6.2, ADR-089), the conic as a
+│                                              on the solid (§6.2, ADR-166), the conic as a
 │                                              locus, the nomenclature, the eccentricity
 │                                              construction, and the other twelve constructions.
 │                                              Syllabus-audited 2026-08-01 against the chapter
-│                                              itself; ADR-089 to ADR-094 close the gaps it
+│                                              itself; ADR-166 to ADR-171 close the gaps it
 │                                              found.
 │                                              Scaffolded from the SIBLING topic above rather
 │                                              than template_starter/, with every shared engine
 │                                              file re-copied from Module2/ and md5-verified
-│                                              (ADR-082); it carries ONLY cone.js of the five
+│                                              (ADR-137); it carries ONLY cone.js of the five
 │                                              generators. A new pure leaf src/conicEngine.js
-│                                              (ADR-084) owns all plane-curve mathematics and the
+│                                              (ADR-139) owns all plane-curve mathematics and the
 │                                              Canvas2D sheet: one focal-polar model for all
 │                                              three curves, four sheet modes, twelve
 │                                              constructions, one renderer over a typed display
 │                                              list; sheet state is stored in MILLIMETRES, not
-│                                              world units (ADR-083). src/conicData.js is the
+│                                              world units (ADR-138). src/conicData.js is the
 │                                              pure catalogue (the six planes + their rules,
 │                                              classifySection() judged against the LIVE
 │                                              generator angle, the method table). Topic-1's
 │                                              sectionCut.js is ported verbatim but used as a
 │                                              CURVE EXTRACTOR — the cone is never cut away
-│                                              (ADR-085). The problem library ships all fifteen
+│                                              (ADR-140). The problem library ships all fifteen
 │                                              chapter exercises verbatim and stamps NOTHING on
 │                                              load. Sequenced as a LESSON, not exposed as a
-│                                              parameter set (ADR-086), and its labels are
+│                                              parameter set (ADR-141), and its labels are
 │                                              drawing ANNOTATIONS — leader lines, screen-space
 │                                              anchors, a concealed axis drawn to convention,
 │                                              and a collision pass on the sheet's captions
-│                                              (ADR-087). The cut is the LEARNER's (a "Cut the
+│                                              (ADR-164). The cut is the LEARNER's (a "Cut the
 │                                              cone" checkbox, the reference topic's
 │                                              interaction) and truncates for real, with the
 │                                              removed material kept as a ghost; the drawing
 │                                              sheet draws the curve of the LIVE cut,
-│                                              e = sin θ / sin g, for Steps 1-4 (ADR-088,
-│                                              superseding ADR-085). FOUR Node oracles live in
+│                                              e = sin θ / sin g, for Steps 1-4 (ADR-165,
+│                                              superseding ADR-140). FOUR Node oracles live in
 │                                              verify/ (tooling, excluded from the ZIP): the
 │                                              mathematics, the shipped module, the
 │                                              annotations and the interactions. See root
-│                                              DECISIONS.md ADR-082..088.
+│                                              DECISIONS.md ADR-137..141 and ADR-164..165.
 │
 └── (src_csharp\)                              Old C# Unity prototype. NOT documented
                                                here. (Not present in the working tree
@@ -339,7 +339,7 @@ and `graphics_module_2_topic_2_simple_positions` are **deployed copies** of Modu
 for a specific teaching topic. **`graphics_module_2_topic_0_introduction_to_orthographic_projection`
 is NOT one of them** — despite the `module_2` prefix it is a standalone topic on the orchestrator
 PATTERN, cut from the Module-4 sibling, sharing no engine file with the master except `anim.js`
-(ADR-127; RULES.md §1.7 — the topic number never encodes lineage). Changes originate in Module 2 first and are then
+(ADR-204; RULES.md §1.7 — the topic number never encodes lineage). Changes originate in Module 2 first and are then
 copied/adapted into a topic folder. There is no automated sync — the copies are full
 duplications of the source (confirmed: many files are byte-for-byte identical between
 the master and the copies, which is only possible with manual copying). The two

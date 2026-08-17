@@ -16,8 +16,8 @@ This topic consumes the single root copies. **Never** create a local `DESIGN.md`
 `PRODUCT.md` here (RULES.md §1.14, ADR-028).
 
 - `../ARCHITECTURE.md` — what the platform is
-- `../DECISIONS.md` — why (the ADR log; this topic is **ADR-078**, **ADR-079**, **ADR-081**,
-  **ADR-122**, **ADR-123** and **ADR-126**)
+- `../DECISIONS.md` — why (the ADR log; this topic is **ADR-133**, **ADR-134**, **ADR-136**,
+  **ADR-199**, **ADR-200** and **ADR-203**)
 - `../RULES.md` — the enforcement checklist
 - `../DESIGN.md` — the shared design system and token table
 - `../PRODUCT.md` — the platform product contract
@@ -36,7 +36,7 @@ in the copy and in the source comments (§4.1 … §4.6, Figs. 4.1–4.34) are t
   included angle ≈15°, length 3–4 mm, drawn with a thick line; closed/filled heads 3–4 long ×
   1.5–2 wide; oblique strokes at 45°; dots ≈1.5 mm. These deliberately differ from the
   platform's default 3:1 head (RULES.md §6.19) because this topic *teaches* the proportion —
-  see **ADR-079**, and do **not** "fix" them back.
+  see **ADR-134**, and do **not** "fix" them back.
 - The **symbol set is the chapter's, not ISO's**, and it is **five**: ø, R, Sø, SR, □. The
   slot, chamfer, countersink and chord/arc are dimensioned by the chapter but are NOT
   recommended symbols, and Step 5 keeps them in a separate group saying so. Chapter 4 defines
@@ -120,7 +120,7 @@ Every feature is real geometry — the countersink a true 90° cone, the seat a 
 bowl — so the 3-D view never exposes a drawn-on lie. The solid is one manifold, hard-edged,
 non-indexed mesh (RULES.md §3.14, §3.29).
 
-## Architecture (ADR-078)
+## Architecture (ADR-133)
 
 Two departures from Topic 1, both deliberate:
 
@@ -140,13 +140,13 @@ Geometry still changes only inside `rebuild()` (RULES.md §3.1).
 **Leaf layering.** The topic's *pure-data* modules (`dimensionData`, `dimensionSteps`,
 `dimensionRules`, `dimensionSymbols`, `dimensionExamples`, `dimensionAnimations`,
 `dimensionLayout`, `reviewFigures`) carry no behaviour and no scene objects, and are importable
-by any leaf — the `genericSolid.js` exception of RULES.md §3.6, recorded in ADR-078. The
+by any leaf — the `genericSolid.js` exception of RULES.md §3.6, recorded in ADR-133. The
 **behavioural** leaves (`dimensionRig`, `dimensionDraw`, `dimensionLabels`, `dimensionUI`) never
 import one another. `dimensionDraw` imports `dimensionLayout`, which is the one data leaf that
 also owns maths — see below. `reviewFigureSvg` imports `reviewFigures` and nothing else: it
 emits an SVG string and touches neither the DOM nor Three.js, so it stays measurable in Node.
 
-## The annotation layout pass (ADR-126)
+## The annotation layout pass (ADR-203)
 
 `dimensionLayout.js` is a second look at every drawing, run inside `draw()` before a single
 stroke is emitted. It works out where every projection line, dimension line, arrow head, arc,
@@ -260,7 +260,7 @@ in the explanation card, in `.detail__alias`, and nowhere else. So Method-2 is
 **Unidirectional**, with *(also called upright)* under it — never "Upright" on the control. A
 learner who leaves knowing only the friendly word has been taught a term they cannot use.
 
-## TWO linework systems, chosen by the pose (ADR-081)
+## TWO linework systems, chosen by the pose (ADR-136)
 
 The topic draws the part's edges two different ways and swaps between them in
 `main.js`'s `applyViewMode()`:
@@ -314,7 +314,7 @@ compensate; do not "tidy" it, and do not reach for `DoubleSide` to fix a dark fa
 ## Two things about the AUTHORED linework that depend on the POSE
 
 Both are switched by `rig.setViewMode('front'|'rear'|'free')` from `main.js`'s `applyViewMode()`.
-Neither is per-edge classification — nothing is recomputed while orbiting, so ADR-078 stands.
+Neither is per-edge classification — nothing is recomputed while orbiting, so ADR-133 stands.
 
 - **The spigot's two long edges are a SILHOUETTE.** They are the sides of the rectangle in an
   axial view and a false crease down a smooth cylinder in any other, so they show only in the
@@ -550,7 +550,7 @@ one step buried the pairs that do the teaching. Step 6 is now **passive and inst
 > x = 80 (45 of rise over 45/tan 60°); Fig. 4.28's ø20 hole is centred ON the R20 corner's own
 > centre. Change a link and you must change the overall, and then it is not the chapter's figure.
 
-> **⚠️ THE `wrong` SETS MUST STAY WRONG.** They take no part in the ADR-126 layout pass — nothing
+> **⚠️ THE `wrong` SETS MUST STAY WRONG.** They take no part in the ADR-203 layout pass — nothing
 > here goes near it — and `verify/reviewfigures.mjs` reports them without counting them. A fault
 > sheet "fixed" to clear the verifier has had its lesson deleted. Same reasoning as Step 2's ten
 > broken rules.

@@ -16,7 +16,7 @@
 // ever auto-filled — not one of the dimensions the statement quotes: unlike the two sibling
 // topics, every quantity here IS dial-able, so injecting any of them would hand over part
 // of the answer. The one thing that IS set for the learner is the CONSTRUCTION the statement
-// names in words, on first arrival at Step 5 (armMethodForStep5, ADR-136) — and it lands the
+// names in words, on first arrival at Step 5 (armMethodForStep5, ADR-213) — and it lands the
 // dimension sliders at their floor precisely so that selecting it can never pre-solve a
 // figure. Driven by sim.onStateChange, which main.js fires at the end of every commit (the
 // one seam every parameter change passes through).
@@ -120,7 +120,7 @@ export function initProblemLibrary(sim) {
 
   /**
    * Select the construction the statement NAMES, once, on the learner's first arrival at Step 5
-   * (ADR-136).
+   * (ADR-213).
    *
    * Every statement in the syllabus practice set says which method to use in words — "using
    * concentric circle method", "by rectangular method" — so hunting for it in the picker is
@@ -131,7 +131,7 @@ export function initProblemLibrary(sim) {
    * which is one of the practice problems' answers exactly.
    *
    * It fires at Step 5 rather than on load because Steps 1–4 re-derive the sheet's CURVE from the
-   * live cut (`syncSheetToCut`, ADR-117), which would leave a curve and a method that disagree.
+   * live cut (`syncSheetToCut`, ADR-194), which would leave a curve and a method that disagree.
    * And it fires ONCE: after it, the picker is the learner's.
    */
   function armMethodForStep5() {
@@ -260,7 +260,7 @@ export function initProblemLibrary(sim) {
     // Single reset path (CLAUDE.md): defaults + Step 1. No MEASURED quantity from the
     // statement is stamped in — every one of them is dial-able, so injecting any would
     // pre-solve part of the answer (RULES.md §6.2). The named CONSTRUCTION is a different
-    // thing and is selected on arrival at Step 5 (armMethodForStep5, ADR-136).
+    // thing and is selected on arrival at Step 5 (armMethodForStep5, ADR-213).
     sim.reset();
     methodArmed = !!problem.target.method;
     evaluate();  // ensure the status is painted even if no subscriber ran yet
@@ -418,7 +418,7 @@ export function initProblemLibrary(sim) {
   hintBtn?.addEventListener('click', onHintBtn, listen);
 
   // Drive the self-check off the single state-change seam. The step change is a state change
-  // too, which is what lets the construction be selected on arrival at Step 5 (ADR-136) without
+  // too, which is what lets the construction be selected on arrival at Step 5 (ADR-213) without
   // this leaf reaching into the orchestrator's stepper.
   const unsubscribe = sim.onStateChange(() => {
     armMethodForStep5();

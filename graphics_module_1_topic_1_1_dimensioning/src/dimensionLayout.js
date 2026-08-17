@@ -46,7 +46,7 @@
 // `reviewFigureSvg.js`, which shares no code with the renderer this pass feeds.)
 //
 // Layering (ADR-007 / RULES.md §3.6): PURE LEAF. Imports only the pure-data `dimensionData.js`
-// (ADR-078). No THREE, no DOM, no scene. `dimensionDraw.js` imports the geometry helpers,
+// (ADR-133). No THREE, no DOM, no scene. `dimensionDraw.js` imports the geometry helpers,
 // `SPACING` and `TERMINATION` from here so the boxes this module reasons about and the strokes
 // that module emits can never be computed two different ways.
 

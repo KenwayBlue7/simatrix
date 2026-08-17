@@ -148,7 +148,7 @@ the chamfer removed, straight through the one place the inclined dimension can p
 part it springs off the real top corners, crosses nothing, and gives the sheet the top-edge
 weight it was missing. The ø24 note was shortened so its lettering stays inside the outline.
 
-**Added `src/dimensionLayout.js` (ADR-126) — the general pass, not a fix for one figure.** Before
+**Added `src/dimensionLayout.js` (ADR-203) — the general pass, not a fix for one figure.** Before
 a single stroke is emitted it works out where every projection line, dimension line, arrow head,
 arc, leader and value will fall, finds the pairs closer than 3 mm — one letter height, §4.5's own
 lower bound — and moves the lower-priority one clear. Five knobs, each a freedom the chapter
@@ -573,7 +573,7 @@ the fixes it turned up. Four root causes, not four symptoms.
   solid where you can see it and dashed where the metal is in the way, not a flat tangle of
   lines. Same mechanism as Foundations' X-ray. Disabled in the elevation, where there is nothing
   to reveal and the chip says so.
-- **Decided (ADR-081):** this supersedes **ADR-078 point 2** only. That point argued nothing here
+- **Decided (ADR-136):** this supersedes **ADR-133 point 2** only. That point argued nothing here
   was camera-dependent — true of a topic with one fixed elevation, and untrue the moment the 3-D
   view became an inspection. Points 1 and 3 stand: still one orthographic camera, still no
   projection morph, still sibling-importable pure-data catalogues.
@@ -608,7 +608,7 @@ the fixes it turned up. Four root causes, not four symptoms.
   a SILHOUETTE, which belongs to one direction of sight — correct as the sides of the rectangle
   in the elevation, wrong as a line down a smooth cylinder in a pictorial. They are now their own
   batch, shown only in an axial view. A named-pose switch, not per-edge classification: nothing
-  is recomputed on orbit, so ADR-078 stands.
+  is recomputed on orbit, so ADR-133 stands.
 - **Fixed (graphics): "Turn over" did not turn the countersink over.** The far-side countersink
   was drawn dashed no matter which way the plate faced, so turning it over showed the near face
   still reading as hidden detail — contradicting the chip's own promise and the rule Step 2
@@ -773,12 +773,12 @@ faults on one part) and the ten exercise parts, which the deferred workflow cove
     behind its own key interaction.
   - `src/main.js` — orchestrator: one orthographic camera, the single `rebuild()` geometry
     path, the `redraw()` spec funnel, the two-sheet before/after compare, `window.simAPI`.
-- **Decided (ADR-078):** one orthographic camera and no projection morph (a dimension only
+- **Decided (ADR-133):** one orthographic camera and no projection morph (a dimension only
   measures truly under parallel projection, so there is no perspective camera to hand off
   from); no occlusion raycaster and no `three-mesh-bvh` (nothing here is camera-dependent);
   and the topic's pure-data catalogues are sibling-importable, the `genericSolid.js` exception
   of RULES.md §3.6.
-- **Decided (ADR-079):** termination proportions follow the textbook's Figs. 4.5–4.6 and §4.5
+- **Decided (ADR-134):** termination proportions follow the textbook's Figs. 4.5–4.6 and §4.5
   item 2 — open head at ≈15° included angle, 3–4 mm long, drawn thick — rather than the
   platform's default 3:1 head (RULES.md §6.19), because this topic *teaches* the proportion
   and must show the figure the student's book shows.

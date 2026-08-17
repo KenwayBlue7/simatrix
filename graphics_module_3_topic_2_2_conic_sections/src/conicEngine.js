@@ -1,4 +1,4 @@
-// Conic-curve engine — the pure 2D sheet leaf (root DECISIONS.md ADR-084, the ADR-066
+// Conic-curve engine — the pure 2D sheet leaf (root DECISIONS.md ADR-139, the ADR-066
 // pattern applied to this topic).
 //
 // Owns ALL of the plane-curve mathematics and the Canvas2D construction drawing for the
@@ -21,7 +21,7 @@
 // SHEET SPACE: millimetres, x along the conic's axis, **y grows DOWN** (matching canvas),
 // so main.js's project() needs no flip and "above the axis" is negative y. Millimetres,
 // not world units, because the construction never enters the 3D scene and every figure in
-// the chapter is quoted in mm (ADR-083).
+// the chapter is quoted in mm (ADR-138).
 //
 // Output is a DISPLAY LIST, not immediate drawing: each layout returns `items` (typed
 // primitives) plus the analytic `bbox` that locks the sheet scale. drawSheet() is the one
@@ -38,10 +38,10 @@
 const OUTLINE_PX = 2.25;
 const THIN_PX = 1;
 /** Engineering projection lines: thinner than construction, and lightened rather than recoloured
- *  so the sheet keeps ONE construction grey instead of gaining a second one (ADR-104). */
+ *  so the sheet keeps ONE construction grey instead of gaining a second one (ADR-181). */
 const HAIR_PX = 0.75;
 const PROJECTION_ALPHA = 0.5;
-/** Working lines sit a shade back from the given frame they are drawn inside (ADR-118). */
+/** Working lines sit a shade back from the given frame they are drawn inside (ADR-195). */
 const AUXILIARY_ALPHA = 0.82;
 /** The one short-dash pattern on this sheet. The chain line [10, 3, 2, 3] is the other, and
  *  between them they are the whole dashed vocabulary a BIS drawing needs. */
@@ -115,7 +115,7 @@ const label = (p, text, dx = 6, dy = -6, role = 'mark') => ({ k: 'label', p, tex
  * Mark a caption as one that NAMES the section — "Circle · e = 0 · no directrix", "Isosceles
  * triangle · not a curve". Three of §6.1's six cuts are not plane conics, and their sheets say
  * so in words, which is right in the taught half and wrong in Step 6, where naming the section
- * IS the question being asked (ADR-117). `drawSheet`'s `anonymous` option drops exactly these
+ * IS the question being asked (ADR-194). `drawSheet`'s `anonymous` option drops exactly these
  * and leaves everything measured — the radius, the base, the generator — in place.
  */
 const naming = (it) => ({ ...it, naming: true });
@@ -283,7 +283,7 @@ function tangentNormalItems(model, at) {
 function frameItems(model, { axisFrom, axisTo, span, showVertex = true, axisLabel = true, reveal = 9 }) {
   // `reveal` lets a staged construction bring the three references in one at a time — the axis,
   // then the fixed line, then the fixed point — instead of starting with all three already
-  // drawn, which is the single hardest frame for a beginner to read (ADR-099).
+  // drawn, which is the single hardest frame for a beginner to read (ADR-176).
   const items = [
     line(pt(axisFrom, 0), pt(axisTo, 0), 'axis', [10, 3, 2, 3]),
   ];
@@ -313,7 +313,7 @@ function frameItems(model, { axisFrom, axisTo, span, showVertex = true, axisLabe
 
 /**
  * Step 4's sheet. `conic.locusStage` says how much of the apparatus may be drawn, and the
- * order is the order the SOLID derived it in (ADR-095) — nothing appears on paper before the
+ * order is the order the SOLID derived it in (ADR-172) — nothing appears on paper before the
  * 3-D proof has explained it:
  *
  *   0 the curve · 1 the focus · 2 the directrix · 3 P with PF and PQ · 4 the ratio
@@ -347,7 +347,7 @@ function locusLayout(conic) {
   items.push(label(pt(axisEnd(model), 0), 'Axis', -2, -8, 'axis'));
   // The FOCUS first: the proof found it first, on the solid, where the ball touched the cut.
   // Ringed as well as dotted, and captioned with the chapter's own letter, so a learner reading
-  // "measure PF" can find F without hunting (ADR-097).
+  // "measure PF" can find F without hunting (ADR-174).
   if (stage >= 1) {
     items.push(dot(model.focus));
     items.push(circle(model.focus, 0.055 * conic.fa, 'mark'));
@@ -587,7 +587,7 @@ function mirrorAbout(pts, xc) {
 /**
  * The construction, built in the chapter's own stages. `conic.buildStage` gates how much of
  * it is on the sheet, so Step 5 can play it through one stage at a time and the learner
- * watches the drawing happen instead of meeting it finished (ADR-086). An absent
+ * watches the drawing happen instead of meeting it finished (ADR-141). An absent
  * `buildStage` draws everything, which is what the problem library and the oracles want.
  *
  * Stage 0 frame · 1 vertex · 2 scale · 3 points · 4 curve · 5 tangent (conicData's
@@ -600,7 +600,7 @@ function eccentricityLayout(conic) {
   const span = 1.25 * curveHalfHeight(model);
   const stage = conic.buildStage ?? 7;
   // Where the CURRENT stage's linework starts. Everything before it is context and is drawn
-  // back; everything from it on is what this stage just added (ADR-099).
+  // back; everything from it on is what this stage just added (ADR-176).
   let freshFrom = 0;
   const startOfStage = (n) => { if (stage === n) freshFrom = items.length; };
   const items = frameItems(model, {
@@ -716,7 +716,7 @@ export function rationalise(e, maxDen = 9) {
 // ============================================================================
 // MODE 'methods' — the eight remaining constructions, §6.5.2–5 and §6.7.2–5. One
 // builder each; all of them return the same display list, so the renderer never
-// learns a method's name. §6.9's three are absent by syllabus scope (ADR-115).
+// learns a method's name. §6.9's three are absent by syllabus scope (ADR-192).
 // ============================================================================
 
 /** Larger than any stage index: an absent `buildStage` draws the finished figure. */
@@ -738,7 +738,7 @@ function methodsLayout(conic) {
   const build = METHOD_BUILDERS[conic.method] ?? ellipseConcentric;
   const built = build(conic);
   // A builder MAY pin its own frame, and one that does wins over the ink it happens to have drawn
-  // (ADR-137): the sheet's scale comes from this bbox (ADR-053), so a construction whose last
+  // (ADR-214): the sheet's scale comes from this bbox (ADR-053), so a construction whose last
   // stage reaches further than its earlier ones would otherwise rescale the whole drawing mid-
   // playback. Builders that return no bbox keep the old behaviour — `finish()` measures the items.
   return finish('methods', built.items, built.model ?? null, built.curvePts,
@@ -864,11 +864,11 @@ function ellipseConcentric(conic) {
   const a = conic.dim1 / 2;
   const b = conic.dim2 / 2;
   const O = pt(0, 0);
-  // Staged the way it is drawn (ADR-098). An absent buildStage is the finished figure, which is
+  // Staged the way it is drawn (ADR-175). An absent buildStage is the finished figure, which is
   // what the Problem Library and the oracles read.
   const stage = conic.buildStage ?? LAST_STAGE;
   // Numbering lives from the divisions it labels until the curve is joined, so the finished
-  // drawing is clean (ADR-098). No playback running = the finished drawing.
+  // drawing is clean (ADR-175). No playback running = the finished drawing.
   const numbers = conic.buildStage !== undefined && stage >= 3 && stage < 6;
   const items = [
     line(pt(-a - 8, 0), pt(a + 8, 0), 'axis', [10, 3, 2, 3]),
@@ -883,7 +883,7 @@ function ellipseConcentric(conic) {
   if (stage >= 2) items.push(circle(O, b, 'construction'));   // the minor (inner) circle
 
   // The projected points are named only on the stage that PRODUCES them, so the finished
-  // drawing stays clean the same way the division numbering does (ADR-101).
+  // drawing stays clean the same way the division numbering does (ADR-178).
   const pNames = conic.buildStage !== undefined && stage === 5;
 
   // Divide the circles into 12 equal parts; through each outer point drop a parallel
@@ -901,7 +901,7 @@ function ellipseConcentric(conic) {
       }
       if (stage >= 5) items.push(dot(q, 'plot'));             // the point it produces
       // BOTH circles are numbered, k and k′ at the same radial position, because the whole
-      // method is the correspondence between them: 4 and 4′ are what produce P4 (ADR-101).
+      // method is the correspondence between them: 4 and 4′ are what produce P4 (ADR-178).
       // Each sits just OUTSIDE its own circle, pushed along its own radius.
       if (numbers) {
         items.push(radialLabel(outer, String(k + 1), t, 9));
@@ -953,7 +953,7 @@ function ellipseTangentItems(O, a, b, t) {
 
 // ---- Example 6.3, Fig. 6.7 — rectangular (oblong) method ----------------------
 /**
- * The oblong method's stage plan (ADR-116), named once so the layout and its narration cannot
+ * The oblong method's stage plan (ADR-193), named once so the layout and its narration cannot
  * drift apart. Both of the construction's families are taught the same way — the part that has
  * to be understood one line per press, the part that is only its reflection all at once:
  *
@@ -998,10 +998,10 @@ function ellipseOblong(conic) {
   const C = pt(0, -b); // top of the minor axis
   const D = pt(0, b);  // bottom of the minor axis
   // C and D are named in the stage text ("join C to each numbered point"), so they are named on
-  // the drawing too (ADR-111). Same styling as A, B and the rectangle's own corners.
+  // the drawing too (ADR-188). Same styling as A, B and the rectangle's own corners.
   items.push(label(C, 'C', -4, -8, 'axis'), label(D, 'D', -4, 16, 'axis'));
 
-  // Two families, each taught the same way (ADR-116): the part that has to be understood
+  // Two families, each taught the same way (ADR-193): the part that has to be understood
   // arrives one numbered point per press, the part that is only its reflection arrives whole.
   //
   //   the fan from C   one press per numbered point of the UPPER sides, then the lower half
@@ -1023,19 +1023,19 @@ function ellipseOblong(conic) {
       const below = pt(side * a, b * f);              // the same divisions, mirrored
       const onAxis = pt(side * a * (1 - f), 0);       // divisions of the half axis AO
       // The fan, then the SAME fan reflected — the figure is symmetrical about the major axis,
-      // and a learner should watch that symmetry happen rather than be handed it (ADR-104).
+      // and a learner should watch that symmetry happen rather than be handed it (ADR-181).
       if (stage >= fanStage(i)) items.push(line(C, onEdge, 'construction'));
       if (stage >= OBLONG_FAN_MIRROR) items.push(line(D, below, 'construction'));
 
-      // Each ray STOPS at the point it produces (ADR-111) — and it changes character where it
-      // crosses the centre line (ADR-112). Solid while it is still in its own half; a thin
+      // Each ray STOPS at the point it produces (ADR-188) — and it changes character where it
+      // crosses the centre line (ADR-189). Solid while it is still in its own half; a thin
       // dashed projection line for the part carried on into the opposite half, which is the
       // drawing convention for exactly that. The break is AT the axis, so the axis division is
       // where the two segments meet.
       const q = intersect(C, onEdge, D, onAxis);
       const qm = q ? pt(q.x, -q.y) : null;
       // The crossings, in the SAME marker the concentric-circle method uses for the points it
-      // plots: the curve's own colour, at full size (ADR-102). One press draws BOTH connections
+      // plots: the curve's own colour, at full size (ADR-179). One press draws BOTH connections
       // through a numbered point — the one above the axis and the one below — because a single
       // division of AO is one idea, not two.
       if (stage >= joinStage(side, i)) {
@@ -1046,7 +1046,7 @@ function ellipseOblong(conic) {
 
       if (numbers) {
         items.push(label(onEdge, `${i}`, side < 0 ? -12 : 6, 0, 'construction'));
-        // BOTH halves carry the numbering (ADR-111) — same text, same offsets, same styling.
+        // BOTH halves carry the numbering (ADR-188) — same text, same offsets, same styling.
         items.push(label(below, `${i}`, side < 0 ? -12 : 6, 0, 'construction'));
         items.push(label(onAxis, `${i}'`, -3, 16, 'construction'));
       }
@@ -1327,7 +1327,7 @@ function circleCross(c1, r1, c2, r2) {
 
 // ---- Example 6.8, Fig. 6.13 — parabola by the tangent method -----------------
 /**
- * The tangent method's stage plan (ADR-116, narrowed by ADR-133). Four stages set the figure up,
+ * The tangent method's stage plan (ADR-193, narrowed by ADR-210). Four stages set the figure up,
  * then the first half of the chords arrives one per press, then the second half — the reflection
  * of the first about the axis — arrives whole, and the LAST stage draws the envelope together
  * with the focus and the directrix Example 6.8 asks to be located.
@@ -1336,7 +1336,7 @@ function circleCross(c1, r1, c2, r2) {
  * that stage also let `showTangent` through — so the tangent and normal, which have their own
  * toggle, arrived as if they were a step of the construction. Nothing else in the syllabus tier
  * works that way: the concentric and oblong methods end on "join the curve" and leave every
- * optional element to its own control (ADR-133).
+ * optional element to its own control (ADR-210).
  *
  * `conicData.js` generates the NARRATION from the same rule. The two modules cannot import each
  * other (both are pure leaves that import nothing — CLAUDE.md), so the rule is stated twice and
@@ -1354,7 +1354,7 @@ const TANGENT_CHORDS_FROM = 4;
 const tangentDivisions = (dim3) => Math.min(12, Math.max(4, Math.round(dim3 ?? 7)));
 const tangentFirstHalf = (n) => Math.ceil((tangentDivisions(n) - 1) / 2);
 /** Half-length of the directrix, as a fraction of the double ordinate — the one thing this
- *  construction draws that reaches past A and B, so the frame has to know it too (ADR-137). */
+ *  construction draws that reaches past A and B, so the frame has to know it too (ADR-214). */
 const DIRECTRIX_HALF = 0.6;
 
 function parabolaTangent(conic) {
@@ -1362,9 +1362,9 @@ function parabolaTangent(conic) {
   const abs = conic.dim2;    // abscissa CV
   const V = pt(0, 0);
   const C = pt(abs, 0);
-  // A is the FOOT of the double ordinate and B its head (ADR-138). The sheet is y-DOWN, so +y is
+  // A is the FOOT of the double ordinate and B its head (ADR-215). The sheet is y-DOWN, so +y is
   // the bottom of the paper: A below the axis, B above it. Named this way round because the
-  // envelope is traced from A, round the vertex, up to B (ADR-134) — the hand starts at A, and a
+  // envelope is traced from A, round the vertex, up to B (ADR-211) — the hand starts at A, and a
   // curve that runs B → A on a drawing labelled A at the top asks the learner to read it
   // backwards. The two are coordinates, not captions: everything built from A and B — the
   // tangents AE and BE, their divisions, the chords, the dimension text on AB — follows from
@@ -1374,7 +1374,7 @@ function parabolaTangent(conic) {
   const E = pt(-abs, 0);     // CV produced to E with VE = CV
   const stage = conic.buildStage ?? LAST_STAGE;
 
-  // The construction's own division count (ADR-113): equal parts of the two tangents, which is
+  // The construction's own division count (ADR-190): equal parts of the two tangents, which is
   // what this method is built from — not a number of plotted points.
   const n = tangentDivisions(conic.dim3);
   const half = tangentFirstHalf(n);
@@ -1387,7 +1387,7 @@ function parabolaTangent(conic) {
     // Both names on the drawing, the chapter's and the drawing office's. AB is the RIGHT-hand
     // edge of the figure, so its dimension text is set inside the drawing rather than outboard
     // of it — outboard it ran off the sheet, since the analytic bbox measures geometry, not
-    // captions (ADR-113).
+    // captions (ADR-190).
     label(mid(A, B), `Double ordinate (base) ${dOrd.toFixed(0)}`,
       -8 - textWidthGuess(`Double ordinate (base) ${dOrd.toFixed(0)}`), -6),
     label(mid(V, C), `Abscissa (axis) ${abs.toFixed(0)}`, -18, 18, 'axis'),
@@ -1406,7 +1406,7 @@ function parabolaTangent(conic) {
   // parabola is the envelope those chords are tangent to. It has no construction POINTS:
   // the curve is found by touching the chords, which is what makes it worth watching.
   //
-  // The SAME pacing every construction in this topic uses (ADR-116): the first half of the
+  // The SAME pacing every construction in this topic uses (ADR-193): the first half of the
   // chords arrives one per press, so each is seen to land; the second half is the reflection of
   // the first about the axis and arrives whole. `tangentFirstHalf()` is shared with the stage
   // list, so the narration and the drawing cannot disagree about where the first half ends. The
@@ -1421,7 +1421,7 @@ function parabolaTangent(conic) {
       if (numbers) {
         // Off the tangent they divide, not on it: `dy: 0` set the baseline at the point, so the
         // number sat across the very line whose divisions it counts. AE is the LOWER tangent now
-        // that A is the foot of the base (ADR-138), so its numbers hang below it and BE's above —
+        // that A is the foot of the base (ADR-215), so its numbers hang below it and BE's above —
         // outward on each edge, mirrored about the axis like everything else here.
         items.push(label(p1, String(i), -12, 14, 'construction'));
         items.push(label(p2, `${i}'`, -12, -6, 'construction'));
@@ -1431,24 +1431,24 @@ function parabolaTangent(conic) {
 
   // y² = 4f·x through A: f = (dOrd/2)² / (4·abs).
   const f = (dOrd * dOrd) / (16 * abs);
-  // Traced CLOCKWISE (ADR-134): from A at the foot of the double ordinate, round the vertex, up
+  // Traced CLOCKWISE (ADR-211): from A at the foot of the double ordinate, round the vertex, up
   // to B. `parabolaPts` runs the other way — it samples y from −yMax up — and on a y-DOWN sheet
   // that starts at the HEAD of the base and sweeps anticlockwise, which is not the way a hand
   // moves through a curve of this shape. Reversing the sample order changes the order the points
-  // are visited and nothing else: the same points, the same f, the same envelope. Since ADR-138
+  // are visited and nothing else: the same points, the same f, the same envelope. Since ADR-215
   // the trace also runs A → B rather than B → A, because A and B are the swapped coordinates.
   const curvePts = parabolaPts(V, f, abs, 1).reverse();
   if (stage >= TANGENT_ENVELOPE) {
     items.push(poly(curvePts, 'outline'));
     // Example 6.8 is "draw the parabola and LOCATE ITS FOCUS AND DIRECTRIX", so the two arrive
     // WITH the curve rather than on a stage of their own — they are what this construction is
-    // asked to produce, not an optional extra (ADR-133).
+    // asked to produce, not an optional extra (ADR-210).
     items.push(dot(pt(f, 0)), label(pt(f, 0), 'Focus, F', 6, -8));
     items.push(line(pt(-f, -dOrd * DIRECTRIX_HALF), pt(-f, dOrd * DIRECTRIX_HALF), 'axis'));
     items.push(label(pt(-f, -dOrd * DIRECTRIX_HALF), 'Directrix, DD',
       -8 - textWidthGuess('Directrix, DD'), -6, 'axis'));
   }
-  // The tangent and normal at P belong to the "Show tangent" toggle ALONE (ADR-133). They are
+  // The tangent and normal at P belong to the "Show tangent" toggle ALONE (ADR-210). They are
   // gated on the curve being on the paper — there is nothing to touch before that — and never
   // on a stage of their own, so pressing Next can no longer draw them.
   if (stage >= TANGENT_ENVELOPE && conic.showTangent) {
@@ -1456,7 +1456,7 @@ function parabolaTangent(conic) {
   }
 
   // THE FRAME IS PINNED TO THE FINISHED FIGURE, not to what this stage happens to have drawn
-  // (ADR-137). The sheet's scale is locked by the layout's analytic bbox (ADR-053), so a stage
+  // (ADR-214). The sheet's scale is locked by the layout's analytic bbox (ADR-053), so a stage
   // that reaches further than the one before it rescales the WHOLE drawing — and this
   // construction's last stage does exactly that: the directrix runs to ±0.6·AB where every
   // earlier stage stopped at A and B, ±0.5·AB, taking the frame from 224 × 120 mm to 224 × 144.
@@ -1912,7 +1912,7 @@ function finish(mode, items, model = null, curvePts = null, bbox = null, results
 }
 
 /**
- * One quantity the finished drawing YIELDS, for the dock's results block (ADR-091). Every
+ * One quantity the finished drawing YIELDS, for the dock's results block (ADR-168). Every
  * exercise in the chapter that ends in "measure", "determine", "find" or "locate" is asking
  * for one of these, and a construction that draws the answer without stating it leaves the
  * learner to guess at what they were meant to read off.
@@ -1957,7 +1957,7 @@ function bboxOf(items) {
  * EVERY role a layout can emit must appear here: a role that is missing is not drawn at all,
  * silently, and nothing in the display list looks wrong. `plot` and `projection` were each
  * added to a builder and to the pen table without being added here, and neither reached the
- * canvas (ADR-104). The oracle now asserts this list covers the pen table.
+ * canvas (ADR-181). The oracle now asserts this list covers the pen table.
  */
 const ROLE_ORDER = ['projection', 'construction', 'axis', 'outline', 'plot', 'mark', 'label'];
 
@@ -1974,7 +1974,7 @@ export const PAINTED_ROLES = Object.freeze([...ROLE_ORDER]);
 export function drawSheet(ctx, view, layout, palette, options = {}) {
   // While a construction is being played, the line JUST drawn is the one to look at, and the
   // ones before it are context. Drawing the context back is what makes the eye follow the
-  // teacher's hand instead of scanning a finished drawing (ADR-099). `freshFrom` is the index
+  // teacher's hand instead of scanning a finished drawing (ADR-176). `freshFrom` is the index
   // the current stage's linework starts at; it is 0 when nothing is playing, so a finished
   // drawing is never dimmed.
   const freshFrom = options.stepping ? (layout.freshFrom ?? 0) : 0;
@@ -1983,7 +1983,7 @@ export function drawSheet(ctx, view, layout, palette, options = {}) {
   // The thin linework is what FOUND the answer, so it is on by default; being able to take
   // it away is how a learner checks they can still read the drawing without it.
   const showConstruction = options.showConstruction !== false;
-  // Three weights, so a learner can tell a given from a working line at a glance (ADR-118).
+  // Three weights, so a learner can tell a given from a working line at a glance (ADR-195).
   // Same ink throughout — this is line WEIGHT, the drafting variable, not a second palette:
   //   axis         centre lines and the given frame, at full strength
   //   construction the working lines that find the answer, a shade back from them
@@ -1993,11 +1993,11 @@ export function drawSheet(ctx, view, layout, palette, options = {}) {
     axis: { stroke: palette.construction, width: THIN_PX },
     outline: { stroke: palette.curve, width: OUTLINE_PX },
     mark: { stroke: palette.mark, width: MARK_PX },
-    // The points a construction PLOTS, in the curve's own colour (ADR-102). They used to be
+    // The points a construction PLOTS, in the curve's own colour (ADR-179). They used to be
     // thin grey like the scaffolding that found them, which is exactly backwards: these points
     // ARE the curve, and sharing its colour is what says so. Construction lines stay neutral.
     plot: { stroke: palette.curve, width: MARK_PX },
-    // Where a construction line CARRIES ON past the point it produced (ADR-104): same grey,
+    // Where a construction line CARRIES ON past the point it produced (ADR-181): same grey,
     // thinner and lightened, so it reads as a projection line and never competes with the curve.
     projection: { stroke: palette.construction, width: HAIR_PX, alpha: PROJECTION_ALPHA },
   };
@@ -2011,7 +2011,7 @@ export function drawSheet(ctx, view, layout, palette, options = {}) {
   // the figure at all survive; expanding the sheet brings the rest back.
   const roomy = view.pxPerMm >= 1.3;
 
-  // The finished curve can be TRACED rather than switched on (ADR-114): `reveal` is how much of
+  // The finished curve can be TRACED rather than switched on (ADR-191): `reveal` is how much of
   // it the pencil has covered. Measured along the path and shared across every outline piece in
   // order, so a figure drawn in four arcs is traced at one steady speed from end to end.
   const reveal = options.reveal ?? 1;
@@ -2052,7 +2052,7 @@ export function drawSheet(ctx, view, layout, palette, options = {}) {
 
 /**
  * Length of one outline item along its own path, in sheet millimetres — so a reveal can run at a
- * CONSTANT speed across a figure made of several pieces (ADR-114).
+ * CONSTANT speed across a figure made of several pieces (ADR-191).
  */
 function pathLength(it) {
   if (it.k === 'poly' && it.pts?.length > 1) {
@@ -2135,7 +2135,7 @@ function drawHighlight(ctx, view, it, palette) {
 }
 
 // ============================================================================
-// Hover explanations (ADR-088). The sheet is a drawing, not a picture: pointing
+// Hover explanations (ADR-165). The sheet is a drawing, not a picture: pointing
 // at a line on it should say what that line is FOR, in the words a teacher would
 // use. Matched on the caption the engine itself drew, so a construction can
 // never grow an element with no explanation attached — if it is labelled, it is
@@ -2176,13 +2176,13 @@ const SHEET_TIPS = Object.freeze([
   // A bare O is the centre in every construction that labels one; a bare C is NOT — in the two
   // ellipse constructions it is an end of the minor axis, and in the tangent method it is the
   // foot of the abscissa. The old blanket "C is the centre" was wrong wherever it now appears,
-  // and the Engineering Terms panel is what made that visible (ADR-098).
+  // and the Engineering Terms panel is what made that visible (ADR-175).
   [/^O$/, 'The centre of the curve — where its two axes cross.'],
 ]);
 
 /**
  * Every named element the CURRENT drawing actually contains, with the sentence that explains it
- * and the display-list item that highlights it (ADR-098). Derived from the drawing rather than
+ * and the display-list item that highlights it (ADR-175). Derived from the drawing rather than
  * from a fixed word list, so the panel can never offer a term this figure has not got — and
  * hovering one always lights something up.
  *
@@ -2266,10 +2266,10 @@ export function describeAt(view, layout, x, y) {
  *  then to the far side horizontally. */
 // Tried in order: where it was authored, then stepping away vertically, then sideways, then
 // the diagonals. The diagonals were added when captions began avoiding LINEWORK as well as one
-// another (ADR-116) — with more obstacles a purely vertical ladder ran out and dropped names
+// another (ADR-193) — with more obstacles a purely vertical ladder ran out and dropped names
 // that had a perfectly good corner to move into.
 /**
- * How heavily a caption is set, from the caption itself (ADR-116).
+ * How heavily a caption is set, from the caption itself (ADR-193).
  *
  * `'division'` — the numbering a construction is built on: 1, 2, 3 and their primed partners.
  * `'point'`    — a named point: A, B, C, V, F′, V₁. The shortest text on the sheet and the most
@@ -2324,14 +2324,14 @@ function drawLabels(ctx, view, layout, palette, roomy, showConstruction = true, 
   // answer the whole figure exists to produce. Its projected points become obstacles, so a
   // name is nudged off the curve the same way it is nudged off another name.
   const onCurve = [];
-  // …and since ADR-116 the same is true of the CENTRE LINES and the marked apparatus. Those are
+  // …and since ADR-193 the same is true of the CENTRE LINES and the marked apparatus. Those are
   // the lines a drawing is read from — the axes, the tangent, the normal, the directrix, the
   // latus rectum — so a caption sitting across one hides the thing it is naming. The dense
   // construction fan is deliberately NOT an obstacle: a figure like the oblong method leaves
   // almost no clear paper, and treating every thin line as blocking would drop most of the
   // numbering. Those are handled by the halo below instead.
   const OBSTACLE_ROLES = new Set(['outline', 'axis', 'mark']);
-  // Working lines are SOFT obstacles (ADR-118). A caption steps off one where it can, and
+  // Working lines are SOFT obstacles (ADR-195). A caption steps off one where it can, and
   // accepts sitting across it where it cannot — which on a figure like the oblong method is
   // often, since the fan leaves almost no clear paper. Dropping the caption instead would be
   // worse, and the halo keeps it readable either way.
@@ -2370,10 +2370,10 @@ function drawLabels(ctx, view, layout, palette, roomy, showConstruction = true, 
 
   // Division numbering carries the correspondence a construction is built on, so it is set a
   // little larger and bolder than the rest of the annotation — readable at a glance without
-  // becoming a second layer of drawing (ADR-102). Composed from the caller's own font.
+  // becoming a second layer of drawing (ADR-179). Composed from the caller's own font.
   //
   // The single-letter POINT names — A, B, C, V, F′, P — get the same treatment one step down
-  // (ADR-116). They are the shortest text on the sheet and the most looked-for: a learner
+  // (ADR-193). They are the shortest text on the sheet and the most looked-for: a learner
   // following a written procedure is hunting for the letter it names. Dimension captions keep
   // the base size; they are read once, in place, and enlarging them would crowd the drawing.
   //
@@ -2392,7 +2392,7 @@ function drawLabels(ctx, view, layout, palette, roomy, showConstruction = true, 
     const p = view.project(it.p);
     const w = ctx.measureText(it.text).width;
     // Two passes down the same ladder: the first wants a spot clear of the working lines too,
-    // the second settles for one clear of the linework that must never be covered (ADR-118).
+    // the second settles for one clear of the linework that must never be covered (ADR-195).
     // Same ordering either way, so a caption still lands as near to where it was authored as
     // the drawing allows.
     let box = null;
@@ -2407,7 +2407,7 @@ function drawLabels(ctx, view, layout, palette, roomy, showConstruction = true, 
     }
     if (!box) continue; // every alternative taken: a dropped caption beats an unreadable one
     placed.push(box);
-    // Clear the paper behind the text before setting it (ADR-116). This is what a drawing
+    // Clear the paper behind the text before setting it (ADR-193). This is what a drawing
     // office does with dimension text over hatching or a lattice of thin lines, and it is what
     // keeps the oblong method's numbering legible where it must sit across the fan. It is the
     // PAPER colour, so nothing is added to the palette — only the background showing through.
@@ -2430,7 +2430,7 @@ function drawItem(ctx, view, it, pen, palette) {
   ctx.lineWidth = style.width;
   ctx.setLineDash(it.dash ?? []);
   // Multiplied, not assigned: the caller may already have dimmed this item as earlier context
-  // while a construction plays (ADR-099), and a projection line inside that context is lighter
+  // while a construction plays (ADR-176), and a projection line inside that context is lighter
   // still. The caller resets the alpha before the next item.
   if (style.alpha !== undefined) ctx.globalAlpha *= style.alpha;
 
@@ -2476,7 +2476,7 @@ function drawItem(ctx, view, it, pen, palette) {
       const p = view.project(it.p);
       ctx.beginPath();
       // A plotted point IS the answer at that spot, so it is drawn a size up from the marks
-      // that merely locate things (ADR-118). Construction dots stay small — they are noted,
+      // that merely locate things (ADR-195). Construction dots stay small — they are noted,
       // not read off.
       const r = it.role === 'construction' ? DOT_PX * 0.7
         : it.role === 'plot' ? DOT_PX * 1.25

@@ -4,9 +4,9 @@
 // ADR-029): a thin `main.js` that owns the Three.js environment, the ONE rebuild() pipeline
 // and the disposal contract, with pure leaf modules hanging off it in a star. The leaves —
 // dimensionRig, dimensionDraw, dimensionLabels, dimensionUI and the pure-data catalogues —
-// never import one another (RULES.md §3.6, ADR-078).
+// never import one another (RULES.md §3.6, ADR-133).
 //
-// WHAT IS DIFFERENT FROM TOPIC 1, AND WHY (ADR-078):
+// WHAT IS DIFFERENT FROM TOPIC 1, AND WHY (ADR-133):
 //   • ONE ORTHOGRAPHIC CAMERA, no perspective camera and therefore no projection morph.
 //     This topic IS a drawing: a dimension only measures truly under parallel projection, so
 //     the sim never renders the part in perspective. RULES.md §5.18's dual-camera morph

@@ -30,7 +30,7 @@
   perspective view from the front draws a boss's top as an ellipse and no true size anywhere, which
   is every single thing an orthographic view is defined by NOT showing — a topic whose first claim
   is "this is the elevation" cannot present one. Free orbit is perspective, the four principal
-  directions are orthographic, and the transition is the morph. Recorded as **ADR-128**.
+  directions are orthographic, and the transition is the morph. Recorded as **ADR-205**.
 - **Changed** the rig's framing from a bounding-SPHERE fit to a projected-BOX one. A sphere's
   radius is the box half-diagonal: for the 83 × 44 × 37 bearing block that is 51 mm against an
   on-screen half-extent of 22 mm from the right, so the part read as a speck in its own view. Each
@@ -55,10 +55,10 @@
 ## 2026-08-06 (c) — Reworked for the beginner
 
 - **Step 1** — the textbook's **Front arrow** now stands in front of every object, labelled, in the
-  guidance accent (**ADR-130**); the object dropdown is a **2×2 grid** of buttons with no figure
+  guidance accent (**ADR-207**); the object dropdown is a **2×2 grid** of buttons with no figure
   numbers; a **Dimensions & Labels** switch hides and restores the arrow, its label and the sheet's
   dimensioning stage together. Every explanation rewritten in plain English.
-- **Step 2** — **blank paper**: no XY line, no HP/VP tags, no quadrant apparatus (**ADR-131**). The
+- **Step 2** — **blank paper**: no XY line, no HP/VP tags, no quadrant apparatus (**ADR-208**). The
   learner **chooses the side view** before construction and the sheet draws that one only. The
   transport moved to the bottom centre: `Previous / Draw next` over `Restart`.
 - **Verified, not changed:** the Left/Right cameras were not swapped. The Stepped Block is the
@@ -79,7 +79,7 @@
   direction, eased distance), with the ambiguous 180° axis CHOSEN as world up.
 - **Fixed: the Dimensions switch inverted its own meaning.** As a `layout()` input it rebuilt the
   stage list, so turning dimensions ON rewound the sheet to blank paper. Now always built, toggled
-  by visibility — throwable mid-construction without losing your place. ADR-131 amended.
+  by visibility — throwable mid-construction without losing your place. ADR-208 amended.
 - **Added:** a Dimensions chip at the viewport top-left, sharing one state with the card switch.
 - **Changed:** dropdown object picker (no figure numbers) · `Free Orbit` · transport reordered to
   `Restart | Draw next | Previous` with the status above · Front arrow slimmed to the construction
@@ -131,7 +131,7 @@
 - **The floating chip is now `Front`.** It enters the front view, mirrors the camera's state through
   `aria-pressed`, and pressing it again returns to free orbit. The **Front arrow exists only while
   the front view is active** - hidden in Top, Left, Right and free orbit (RULES.md 3.37).
-- **Added `src/dimensions3d.js`** (ADR-132): BIS Type-B dimensions on the 3-D solid, drawn from the
+- **Added `src/dimensions3d.js`** (ADR-209): BIS Type-B dimensions on the 3-D solid, drawn from the
   SAME `objectData.dims` the sheet uses, one view's set at a time on the face that view is taken of.
   Open 3:1 chevrons, so the layer stays one `LineSegments2` and one disposal path.
 - **`DIM_STYLE` moved into `objectData.js`** - the sheet and the 3-D layer draw one standard in two
@@ -147,10 +147,10 @@
   longer hides the sizes.
 - **The arrow rides with the MODEL**, not the camera: shown from any angle while its switch is on,
   free orbit included. Gating it to the front view put it in the one direction where it is
-  degenerate. ADR-132 amended.
+  degenerate. ADR-209 amended.
 - **Readability:** dimension linework draws with `depthTest: false` / `renderOrder = 2` and stands
   10 mm off the face, so an arrowhead is never half-swallowed by the part it measures.
-- **Arrowheads stay 3:1.** ADR-079's 15 degree heads are scoped to the topic that teaches
+- **Arrowheads stay 3:1.** ADR-134's 15 degree heads are scoped to the topic that teaches
   termination geometry; dimensions here are incidental, so RULES.md 6.19's default applies.
 
 ## 2026-08-06 (i) - BIS SP 46 line hierarchy at the benchmark's widths
@@ -193,7 +193,7 @@
 ## 2026-08-08 - One aligned system, in both media
 
 - **The solid's values were level while the sheet's were turned.** Two conventions on one dimension
-  set, which is the single thing BIS Method 1 forbids. ADR-132 had argued that a CSS2D label is
+  set, which is the single thing BIS Method 1 forbids. ADR-209 had argued that a CSS2D label is
   billboarded so "the rotation is about paper"; aligned is not about paper, it is about how a value
   is written against the line it measures.
 - **One placement function, `alignedDim()` in `objectData.js`.** It returns the dimension line's

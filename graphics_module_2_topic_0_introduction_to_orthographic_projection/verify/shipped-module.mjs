@@ -916,7 +916,7 @@ for (const id of ['cylblock', 'shaftsupport', 'bearingblock', 'block']) {
 }
 
 // --- 7a2. No dimension may sit on top of another ------------------------------------------------
-// The benchmark runs a full analytic clearance pass (ADR-126) because it lays out 27 drawings of a
+// The benchmark runs a full analytic clearance pass (ADR-203) because it lays out 27 drawings of a
 // far denser part. This topic lays out four, by hand, in fixed lanes — so it borrows the PRINCIPLE
 // rather than the pass: measure every value's box on the finished sheet and prove none of them
 // touch. A lane discipline nobody checks is a lane discipline that quietly rots.

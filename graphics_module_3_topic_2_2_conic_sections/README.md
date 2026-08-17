@@ -14,7 +14,7 @@ not work: the sim is ES modules, which need an origin. Hard-reload after an edit
 ## What the learner does
 
 The six steps are a story, and each one shows only the controls its own question needs
-(ADR-086 · RULES.md §6.26–§6.28). Nothing is named before it has been seen.
+(ADR-141 · RULES.md §6.30–§6.32). Nothing is named before it has been seen.
 
 | Step | Title | The chapter | What the learner does | Controls |
 |---|---|---|---|---|
@@ -27,11 +27,11 @@ The six steps are a story, and each one shows only the controls its own question
 
 The **Practice problems** entry (top of the step card) deals **seven** problems, grouped by curve:
 the three chapter exercises that are answered with the syllabus constructions, plus the four
-practice questions for those same three (ADR-135). All fifteen chapter exercises are still in
+practice questions for those same three (ADR-212). All fifteen chapter exercises are still in
 `src/problems.js` verbatim — `ENABLED_METHODS` decides which are dealt, and widening it is a
 one-line change. No measured quantity is ever auto-filled: the learner dials every dimension and
 the check recognises the match. The one thing that IS set for them is the construction the
-statement names in words, once, on their first arrival at Step 5 (ADR-136).
+statement names in words, once, on their first arrival at Step 5 (ADR-213).
 
 ---
 
@@ -55,7 +55,7 @@ src/
                     eccentricity, methods, props, circle, triangle, nothing), ten
                     constructions, one renderer. No DOM, no THREE, no imports.
   sectionCut.js     Topic-1's analytic single-plane clipper, verbatim (ADR-058). Truncates each
-                    nappe and supplies both the cap and the welded section loop (ADR-088).
+                    nappe and supplies both the cap and the welded section loop (ADR-165).
   cone.js           }
   iShape.js         } byte-identical to Module2/src/ — fix drift in the master, re-copy here.
   shapeData.js      }
@@ -84,7 +84,7 @@ same mesh turned 180° about X — so the two share an apex. Once the learner ti
 result, with the clipper's cap becoming material group 1 in the section token — the reference
 topic's own pattern, so the cut face is a real face of a real solid. The clipper's welded boundary
 loop is drawn over it as a fat `Line2`, and the material the cut removed is kept as a faint ghost
-so a steep tilt still reads as a cone and a hyperbola keeps its second branch (ADR-088).
+so a steep tilt still reads as a cone and a hyperbola keeps its second branch (ADR-165).
 
 **Where the focus and the directrix come from.** §6.2 defines both ON THE SOLID, and Step 4 shows
 it: `focalSphereFor()` (pure, in `conicData.js`) inscribes a sphere in the cone until it touches
@@ -93,7 +93,7 @@ contact with the cone, whose intersection with the cutting plane is the directri
 the V.P. as plane trigonometry, because the cutting plane is always perpendicular to it. Two cases
 are honest returns rather than special cases: the apex cut has no inscribed sphere at all, and the
 circle's tangent plane is PARALLEL to its cutting plane, which is why a circle has no directrix
-(ADR-089).
+(ADR-166).
 
 **The join between them.** The sheet is not a second picture: it draws the curve of the LIVE cut.
 `eccentricityForSection()` is the chapter's own identity re-expressed in the quantities this topic
@@ -140,13 +140,13 @@ node verify/proof.mjs            # Step 4's six proof stages, walked by hand (~5
    50 rapid rebuilds (the disposal contract, ADR-004/ADR-042). Anything that waits on a tween
    POLLS for the result; a fixed sleep against the 700 ms plane travel failed about one run in two
    under SwiftShader while the product was correct.
-3. **The annotations** (`verify/annotations.mjs`, ADR-087). Asserts that Step 1 names exactly
+3. **The annotations** (`verify/annotations.mjs`, ADR-164). Asserts that Step 1 names exactly
    §6.1's vocabulary and nothing else, that every label carries a plain-English sentence, that no
    two pills overlap and none leaves the pane across five orbit poses, that the tooltip waits for
    a deliberate hover, and that both nappe labels leave with the second half. It also writes
    screenshots to the OS temp directory for the linework an assertion cannot judge.
 
-4. **The interactions** (`verify/interaction.mjs`, ADR-088). Asserts the things a learner DOES:
+4. **The interactions** (`verify/interaction.mjs`, ADR-165). Asserts the things a learner DOES:
    that Step 2 offers the cut as a choice and ticking it changes what the readout describes, that
    tilting the cut changes what the sheet is drawing (and quotes it against the cone the learner
    shaped), that Step 4 opens on the curve alone and holds its vocabulary back until the reveal
@@ -160,7 +160,7 @@ All four were green at the time of writing; re-run them after touching `conicEng
 
 ## The teaching contract (read before changing a control)
 
-The topic is sequenced, not exposed (ADR-086). Three rules hold it together:
+The topic is sequenced, not exposed (ADR-141). Three rules hold it together:
 
 1. **A control lives in the one step whose question it answers.** If a new control does not help
    with the step's own objective, it does not belong on that panel — and probably not at all.
@@ -171,30 +171,30 @@ The topic is sequenced, not exposed (ADR-086). Three rules hold it together:
 3. **The sim may move the model to teach, never to answer.** Step 3's chips travel the plane and
    Step 5 plays the construction — but the Problem Library's checked targets stay hand-dialled
    (ADR-063 still holds for those).
-4. **A label is an annotation, not a word** (ADR-087). Add one only through `annotate()`, which
+4. **A label is an annotation, not a word** (ADR-164). Add one only through `annotate()`, which
    demands a leader target and a plain-English sentence; it leaves with the geometry it names, and
    it belongs to the one step that teaches it.
 
 ## Things not to "fix"
 
-- **No "parallel to a generator" preset in the Problem Library.** Step 3's chips demonstrate the six cuts; the library's checked answers are still dialled by hand (ADR-063, scoped by ADR-086).
+- **No "parallel to a generator" preset in the Problem Library.** Step 3's chips demonstrate the six cuts; the library's checked answers are still dialled by hand (ADR-063, scoped by ADR-141).
 - **The plane has no on/off toggle.** Step 2 switching it on IS the step.
 - **Step 4 does not draw the tangent and normal.** They belong to Step 5, where their toggle lives.
-- **The cone IS cut away, and the removed material is kept as a faint ghost.** The ghost is not decoration: without it a steep tilt leaves a stump no learner would call a cone, and a hyperbola's second branch leaves with the nappe that carried it (ADR-088, superseding ADR-085 · RULES.md §3.41).
+- **The cone IS cut away, and the removed material is kept as a faint ghost.** The ghost is not decoration: without it a steep tilt leaves a stump no learner would call a cone, and a hyperbola's second branch leaves with the nappe that carried it (ADR-165, superseding ADR-140 · RULES.md §3.41).
 - **`sectionState.enabled` and `sectionState.cut` are different things.** `enabled` means the plane is present and the guided step decides it; `cut` means the plane bites and the learner decides it. Do not collapse them.
-- **The sheet draws what the cut IS, and three of the six sections are not plane conics.** The circle gets a true circle at the cone's own radius there, the apex cut gets §6.1's isosceles triangle (or the single point, where the plane through the apex is flatter than the generators), and a plane clear of the cone gets a sheet that says so. `cutKind` is derived in `rebuild()`'s tail — after the clipper has reported — and the dock and the reveal branch on the same value, so the panes cannot disagree (ADR-090 · RULES.md §3.45).
-- **The three constructions the SYLLABUS names are staged; the other ten are not** (ADR-098 · RULES.md §3.54). Course 1003 scopes this topic to *"Ellipse – Rectangular Method & Concentric Circle Method only, Parabola- Tangent method only"*. Those three play stage by stage; the rest draw whole and carry a "Beyond the Diploma syllabus" badge. Do not stage the others without writing their teaching copy — stages are prose, not geometry.
+- **The sheet draws what the cut IS, and three of the six sections are not plane conics.** The circle gets a true circle at the cone's own radius there, the apex cut gets §6.1's isosceles triangle (or the single point, where the plane through the apex is flatter than the generators), and a plane clear of the cone gets a sheet that says so. `cutKind` is derived in `rebuild()`'s tail — after the clipper has reported — and the dock and the reveal branch on the same value, so the panes cannot disagree (ADR-167 · RULES.md §3.45).
+- **The three constructions the SYLLABUS names are staged; the other ten are not** (ADR-175 · RULES.md §3.54). Course 1003 scopes this topic to *"Ellipse – Rectangular Method & Concentric Circle Method only, Parabola- Tangent method only"*. Those three play stage by stage; the rest draw whole and carry a "Beyond the Diploma syllabus" badge. Do not stage the others without writing their teaching copy — stages are prose, not geometry.
 - **The Engineering Terms panel highlights by CAPTION, never by item reference** — `drawCompare()` rebuilds the display list every paint (RULES.md §3.55).
-- **The circle method (§6.5 item 7) is deliberately absent.** The chapter names it and gives no procedure; supplying one would be inventing syllabus rather than covering it (ADR-094). The four-centre approximation next to it IS implemented, because that one is a fixed classical construction.
-- **The sheet reports what it measures, and the numbers are the DRAWING's.** Every layout carries `results`, rendered as "What the drawing gives you" at the foot of Step 5 — the quantities six of the chapter's exercises ask the learner to determine, each with the lettering that says where to read it. Do not report a given back as though it were an answer: the parallelogram method's axes are not its conjugate diameters (ADR-091 · RULES.md §3.46).
-- **Step 4 never plays by itself** (ADR-095 · RULES.md §3.49). It is a proof the learner walks with Back and Next; Next is refused while a stage is animating, Back restores the previous stage without replaying it.
-- **The two tangencies get two stages, and must stay separate** (ADR-097 · RULES.md §3.52). Sphere-to-CONE is a circle; sphere-to-CUT is a point. Shown together the ring reads as the plane's own contact, which is exactly what the name "tangent plane" already invites. The ring is instrument teal, the focus is conic-mark plum — do not unify those colours.
+- **The circle method (§6.5 item 7) is deliberately absent.** The chapter names it and gives no procedure; supplying one would be inventing syllabus rather than covering it (ADR-171). The four-centre approximation next to it IS implemented, because that one is a fixed classical construction.
+- **The sheet reports what it measures, and the numbers are the DRAWING's.** Every layout carries `results`, rendered as "What the drawing gives you" at the foot of Step 5 — the quantities six of the chapter's exercises ask the learner to determine, each with the lettering that says where to read it. Do not report a given back as though it were an answer: the parallelogram method's axes are not its conjugate diameters (ADR-168 · RULES.md §3.46).
+- **Step 4 never plays by itself** (ADR-172 · RULES.md §3.49). It is a proof the learner walks with Back and Next; Next is refused while a stage is animating, Back restores the previous stage without replaying it.
+- **The two tangencies get two stages, and must stay separate** (ADR-174 · RULES.md §3.52). Sphere-to-CONE is a circle; sphere-to-CUT is a point. Shown together the ring reads as the plane's own contact, which is exactly what the name "tangent plane" already invites. The ring is instrument teal, the focus is conic-mark plum — do not unify those colours.
 - **Never hard-code a stage index.** The bridge is `stages.length − 1` and the circle's shorter proof ends at the stage carrying `sayFlat`, found by search. A literal index has silently pointed at the wrong stage twice (RULES.md §3.53).
-- **The tangent plane genuinely passes through the focal sphere, and that IS §6.2's definition** — it is the plane containing the circle in which the sphere touches the CONE, so it meets the sphere in that same circle. Do not "fix" it to touch at a point: the centre-to-plane distance is t·sin²α against a radius of t·sinα, equal only on a degenerate cone, and a sphere-tangent plane would move the directrix and break PF ÷ PQ = e (ADR-095/096 · RULES.md §3.50).
+- **The tangent plane genuinely passes through the focal sphere, and that IS §6.2's definition** — it is the plane containing the circle in which the sphere touches the CONE, so it meets the sphere in that same circle. Do not "fix" it to touch at a point: the centre-to-plane distance is t·sin²α against a radius of t·sinα, equal only on a degenerate cone, and a sphere-tangent plane would move the directrix and break PF ÷ PQ = e (ADR-172/096 · RULES.md §3.50).
 - **That is why it is drawn as an ANNULUS starting at the contact circle** (`tangentPatchFor()`): none of the drawn plane is inside the ball, so it cannot read as a slice. Do not replace it with a quad and reach for depthWrite/renderOrder/polygonOffset — the intersection is real and no render state hides it (RULES.md §3.51). The ONE point of contact in this topic is the ball against the CUTTING plane — the focus — and that is where the finite patch, the pulsing marker and the caption live.
-- **The sheet's eccentricity is derived, not dialled, in Steps 1–4.** `e = sin θ ÷ sin g` from the live cut (ADR-088). The dials return in Step 5, where the chapter gives *e* and the focal distance as data — the Problem Library needs them, and two exercises are unsolvable without the focal distance.
-- **The axis is drawn in every step, and shows through the solid.** It is a centre line, not a Step-1 annotation: chain-line stub outside the outline, short-dash hidden linework inside, at the platform's own constants. Do not "clean it up" out of Steps 2–6 (ADR-087, RULES.md §3.38).
+- **The sheet's eccentricity is derived, not dialled, in Steps 1–4.** `e = sin θ ÷ sin g` from the live cut (ADR-165). The dials return in Step 5, where the chapter gives *e* and the focal distance as data — the Problem Library needs them, and two exercises are unsolvable without the focal distance.
+- **The axis is drawn in every step, and shows through the solid.** It is a centre line, not a Step-1 annotation: chain-line stub outside the outline, short-dash hidden linework inside, at the platform's own constants. Do not "clean it up" out of Steps 2–6 (ADR-164, RULES.md §3.38).
 - **The sheet's caption pass may DROP a caption on a crowded figure.** By design — a name that cannot be placed clear of another name or of the finished curve is worse than absent. Never let a construction depend on a caption to be legible (§3.39).
-- **The sheet stores millimetres, the scene stores world units.** Deliberate (ADR-083); the dock converts, the engine never does.
+- **The sheet stores millimetres, the scene stores world units.** Deliberate (ADR-138); the dock converts, the engine never does.
 - **The Problem Library stamps nothing on load.** Every checked quantity is dial-able here, so injecting one would hand over part of the answer.
 - **Only the cone generator is present.** The other four Module-2 generators, `genericSolid.js` and `meshAnalyzer.js` were deliberately not copied in.

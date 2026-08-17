@@ -27,7 +27,7 @@
 //
 // ⚠️ THE `wrong` SETS ARE DELIBERATELY BAD AND MUST STAY BAD. Every fault in them is one the
 // chapter draws on purpose. Nothing here goes near `dimensionLayout.js` — that pass exists to
-// tidy a sheet, and tidying these would delete the lesson (same reasoning as ADR-126's note on
+// tidy a sheet, and tidying these would delete the lesson (same reasoning as ADR-203's note on
 // Step 2's ten broken rules).
 //
 // CO-ORDINATES are millimetres, y UP, origin at the part's bottom-left corner. `box` is the

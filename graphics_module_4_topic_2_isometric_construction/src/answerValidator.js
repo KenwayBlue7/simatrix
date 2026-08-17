@@ -80,7 +80,7 @@ function checkProjectionType(model, problem, plan) {
  * vertical AND axis horizontal) fixes the three overall sizes but not which edge is width and which
  * is height. The SET of sizes is invariant across the placements, so it is the set that is checked
  * (§6.4): a wrong size still fails, and either valid placement still passes. The test is on DATA
- * SHAPE — how many placements the question poses — never on which problem it is (§6.23).
+ * SHAPE — how many placements the question poses — never on which problem it is (§6.27).
  */
 function checkDimensions(model, problem, plan) {
   const want = problem.answerData?.bounds;

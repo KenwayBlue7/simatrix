@@ -7,7 +7,7 @@
 // with tolerances — it matches the RAW input the student dials and never auto-fills
 // anything.
 //
-// UNITS: sheet quantities are stored in MILLIMETRES (ADR-083), so every target below is
+// UNITS: sheet quantities are stored in MILLIMETRES (ADR-138), so every target below is
 // the number the statement itself quotes. The two exceptions are stated in the problem's
 // own hints: exercise 5 quotes the minor axis where the intersecting-arc construction is
 // given the SUM of the focal distances (the learner derives it), and exercise 9 quotes a
@@ -19,7 +19,7 @@
 // Chapter 6 declares no banned KIND of conics problem, so the list ships empty — an empty
 // filter is an honest "nothing excluded", not a missing mechanism.
 //
-// The axis that DOES cut here is the METHOD (ENABLED_METHODS, ADR-135): Course 1003 names
+// The axis that DOES cut here is the METHOD (ENABLED_METHODS, ADR-212): Course 1003 names
 // three constructions and says "only" twice, and neither the tier axis (which cuts by curve)
 // nor the type axis (which straddles the line) can express that. Everything the three cannot
 // answer — the focus-and-directrix exercises, the parallelogram, arc, rectangle and offset
@@ -41,7 +41,7 @@ export const TIERS = Object.freeze([
 /**
  * The single clone-scope switch — the tiers this build can actually solve.
  *
- * 'hyperbola' is OFF (ADR-115). Exercises 12–15 stay in PROBLEMS below, verbatim, because the
+ * 'hyperbola' is OFF (ADR-192). Exercises 12–15 stay in PROBLEMS below, verbatim, because the
  * chapter has them; three of them are answered with §6.9's constructions, and this module no
  * longer offers those, so dealing them would set a problem the dock cannot express. This is the
  * one-line lever the tier mechanism exists for — putting 'hyperbola' back restores all four.
@@ -61,7 +61,7 @@ export const ENABLED_TIERS = Object.freeze(['ellipse', 'parabola']);
 export const EXCLUDED_TYPES = Object.freeze([]);
 
 /**
- * THE SYLLABUS METHOD FILTER (ADR-135) — the constructions a dealt problem may be answered with.
+ * THE SYLLABUS METHOD FILTER (ADR-212) — the constructions a dealt problem may be answered with.
  *
  * Course 1003, Module II names three and says "only" twice: *"Ellipse - Rectangular Method &
  * Concentric Circle Method only, Parabola- Tangent method only"*. The tier axis above cannot
@@ -75,7 +75,7 @@ export const EXCLUDED_TYPES = Object.freeze([]);
  * not waved through.
  *
  * The excluded exercises STAY in PROBLEMS below, verbatim, exactly as the four hyperbola ones do
- * (ADR-115): the chapter has fifteen and this file is the chapter. Widening this list is the
+ * (ADR-192): the chapter has fifteen and this file is the chapter. Widening this list is the
  * one-line lever that brings any of them back.
  * @type {ReadonlyArray<string>}
  */
@@ -122,7 +122,7 @@ export const FIELD_LABELS = Object.freeze({
  */
 
 /**
- * The fifteen exercises of Chapter 6, verbatim, followed by the syllabus practice set (ADR-135).
+ * The fifteen exercises of Chapter 6, verbatim, followed by the syllabus practice set (ADR-212).
  * `enabledProblems()` decides which of them are dealt; nothing is deleted from here.
  * @type {ReadonlyArray<Problem>}
  */
@@ -328,7 +328,7 @@ export const PROBLEMS = Object.freeze([
     target: { curve: CurveType.Hyperbola, method: 'hyperbola-asymptotes', dim1: 75, dim2: 25, dim3: 40 },
   },
 
-  // ---- Syllabus practice set (ADR-135) --------------------------------------------------
+  // ---- Syllabus practice set (ADR-212) --------------------------------------------------
   // NOT chapter exercises — these are the plain drill questions for the three constructions
   // Course 1003, Module II names, added verbatim as set. Each one states its METHOD and both
   // AXES in the statement itself, so the learner never has to infer which construction is
@@ -390,7 +390,7 @@ export const PROBLEMS = Object.freeze([
 
 /**
  * Problems whose tier is enabled, whose type is not banned (the ADR-062 filter), and whose answer
- * uses one of the syllabus constructions (ADR-135).
+ * uses one of the syllabus constructions (ADR-212).
  */
 export function enabledProblems() {
   return PROBLEMS.filter(

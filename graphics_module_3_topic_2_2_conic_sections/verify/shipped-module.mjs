@@ -157,10 +157,10 @@ ok('sheet canvas painted', await evaluate(`(() => {
 })()`));
 
 // --- 4. Every construction draws, through the real select --------------------------
-// Since ADR-100 the list holds ONE curve's constructions at a time, the syllabus tier first.
+// Since ADR-177 the list holds ONE curve's constructions at a time, the syllabus tier first.
 // Walk both curves to see the whole catalogue: §6.5's four worked ellipse methods and its
 // four-centre approximation, §6.7's four, plus the general one on each. §6.9's three are out of
-// scope (ADR-115), so the picker offers two curves and the catalogue is ten, not thirteen.
+// scope (ADR-192), so the picker offers two curves and the catalogue is ten, not thirteen.
 const methods = [];
 for (const curve of ['Ellipse', 'Parabola']) {
   await evaluate(`[...document.querySelectorAll('#curve-picker button')].find(b => b.dataset.curve === '${curve}').click()`);
@@ -272,14 +272,14 @@ const truth = await evaluate(`(() => {
 await wait(300);
 ok('answering marks it and states the rule', /Correct|Not this time/.test(truth), truth.slice(0, 80));
 
-// --- 6a. The focal-sphere apparatus must not leak either (ADR-089) -----------------
+// --- 6a. The focal-sphere apparatus must not leak either (ADR-166) -----------------
 // Step 4's first act adds a sphere, a wireframe, a fat ring, a plane and a fat line to the
 // scene graph on EVERY rebuild, and the cut's tilt rebuilds. A sphere that is not disposed is
 // the fastest way there is to exhaust the context, so hammer it with the apparatus fully out.
 await evaluate('document.querySelector(\'#step-rail .rail__item[data-step="4"] .rail__btn\').click()');
 await wait(900);
 // Step 6 dealt a RANDOM cut, and three of §6.1's six sections have a shorter reveal than a
-// conic does (ADR-090) — the circle's ends on the cone and the apex cut has two stages. Pin an
+// conic does (ADR-167) — the circle's ends on the cone and the apex cut has two stages. Pin an
 // ordinary ellipse first, or this assertion is a coin toss.
 await quiet();   // Step 6's deal is a tween; setting the cut while it runs is a race
 await evaluate(`(() => {
@@ -290,7 +290,7 @@ await wait(800);
 ok('the cut is where the test put it',
   (await evaluate('document.getElementById("rng-cut-tilt").value')) === '35',
   `tilt = ${await evaluate('document.getElementById("rng-cut-tilt").value')}`);
-// Seven stages since ADR-097 split the two tangencies apart, so six presses.
+// Seven stages since ADR-174 split the two tangencies apart, so six presses.
 for (let i = 0; i < 6; i++) {
   await evaluate('document.getElementById("btn-proof-next").click()');
   await until('document.getElementById("btn-proof-next").disabled === false'
@@ -335,7 +335,7 @@ ok('GPU buffers flat across 40 rebuilds with the focal sphere out', netFocal ===
 // --- 6b. Promoting a view must not starve the other, or the page ------------------
 // The invariant this has always guarded: no control may collapse a pane to nothing or push the
 // document into a scrollbar. It used to be checked on the 50/50 workbench split, whose entry
-// point (the thumbnail's Fullscreen button) was removed in ADR-106 — so it is checked here on
+// point (the thumbnail's Fullscreen button) was removed in ADR-183 — so it is checked here on
 // the layout that actually ships: one full-bleed main view with the other floating over it.
 await evaluate(`document.querySelector('#step-rail .rail__item[data-step="5"] .rail__btn').click()`);
 await wait(1200);
@@ -386,8 +386,8 @@ ok('reset closes the sheet', await evaluate('document.getElementById("compare-ca
 // --- 8. Problem library ---------------------------------------------------------------
 await evaluate('document.getElementById("open-problem-library").click()');
 await wait(250);
-// Seven: three of the chapter's fifteen plus the four-question practice set (ADR-135). The
-// hyperbola tier is off (ADR-115), and ENABLED_METHODS keeps the deal to the three constructions
+// Seven: three of the chapter's fifteen plus the four-question practice set (ADR-212). The
+// hyperbola tier is off (ADR-192), and ENABLED_METHODS keeps the deal to the three constructions
 // Course 1003 names — so the focus-and-directrix, parallelogram, arc, rectangle and offset
 // exercises are filtered out. Every one of them is still in src/problems.js verbatim.
 ok('library lists the 7 problems the syllabus asks for',
@@ -397,7 +397,7 @@ ok('library groups by curve', (await evaluate('document.querySelectorAll(".probl
 ok('…and sets no problem it cannot answer',
   (await evaluate(`[...document.querySelectorAll('.problem-group')].every(g => !/hyperbola/i.test(g.textContent))`)) === true);
 // The three constructions, and nothing else: an eccentricity or offset-method card here would be
-// a problem the syllabus does not set (ADR-135).
+// a problem the syllabus does not set (ADR-212).
 ok('…and none of the cards asks for a construction outside the syllabus',
   (await evaluate(`[...document.querySelectorAll('.problem-card')]`
     + `.every(c => !/eccentricity|conjugate|intersecting arc|offset|rectangle method|parallelogram/i.test(c.textContent))`)) === true);

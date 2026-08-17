@@ -18,7 +18,7 @@ import { valueBoxes } from '../src/reviewFigureSvg.js';
 
 const ALL = process.argv.includes('--all');
 
-/** One letter height of air between two values, exactly as ADR-126 derives it. */
+/** One letter height of air between two values, exactly as ADR-203 derives it. */
 const CLEAR_MM = 2.0;
 
 /** A value may not sit on a stroke of the part itself. */
