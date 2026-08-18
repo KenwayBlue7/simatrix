@@ -184,6 +184,16 @@ let conRAF = null;    // the construction animation rAF handle (continuous playb
 // on continuous playback); stepCon() below is what starts one. ---
 let conStepper = null;
 let conNav = null; // { row, caption, backBtn, nextBtn } — built once by ensureConNav()
+// --- Construction-active pane ratio (RULES.md §5.16a amendment) — setConLayout() below toggles
+// body.con-active (30/70 columns) + claims rail-collapsed for the construction's duration (every
+// rail driver kills the construction on edit, so the rail has nothing live to show meanwhile).
+// conRailWasCollapsed remembers the learner's OWN #rail-toggle state from before a construction
+// claimed the rail's row, so teardown restores it instead of always un-collapsing.
+let conRailWasCollapsed = false;
+// conRailUserOverride: the learner clicked #rail-toggle THEMSELVES while a construction owned
+// the layout (setupRailToggle() below) — teardown then leaves the rail exactly as they left it
+// instead of discarding that override and restoring conRailWasCollapsed.
+let conRailUserOverride = false;
 
 // --- Show Method (ADR-165) — a full-viewport, beat-gated Back/Next walkthrough of the True-
 // Length construction, launched from Step 4 once folded. Re-parents the 2D sheet's EXISTING
@@ -1069,8 +1079,13 @@ function enterWorkbench() {
   document.body.classList.add('compare-split');
   // The rail toggle always defaults to shown on entry — a prior collapse from an earlier
   // split visit must not carry over, and the button's own facets need the same reset.
-  document.body.classList.remove('rail-collapsed');
-  syncRailToggleState(false);
+  // EXCEPT while a construction already claims the rail (RULES.md §5.16a amendment,
+  // setConLayout()) — re-entering the split mid-construction (e.g. Compare closed and
+  // reopened without tearing the construction down) must not hand the rail's row back while
+  // the ratio stays 30/70.
+  const conClaims = document.body.classList.contains('con-active');
+  document.body.classList.toggle('rail-collapsed', conClaims);
+  syncRailToggleState(conClaims);
 }
 
 /** Restore the floating layout: hand the drivers + construction launchers back to #controls
@@ -1116,6 +1131,11 @@ function setupRailToggle() {
     const collapsed = document.body.classList.toggle('rail-collapsed');
     syncRailToggleState(collapsed);
     announce(collapsed ? 'Controls rail hidden.' : 'Controls rail shown.');
+    // A manual click while a construction owns the layout (RULES.md §5.16a amendment,
+    // setConLayout()) is the learner overriding the auto-collapse on purpose — flag it so
+    // teardown leaves the rail exactly where the learner put it instead of discarding the
+    // override and restoring the PRE-construction snapshot.
+    if (document.body.classList.contains('con-active')) conRailUserOverride = true;
     // The rail's grid row (and its gap) drops out on collapse, so the viewport and 2D
     // drawing card grow into the reclaimed height — reuse the double-rAF reflow wait.
     remeasureAfterReflow();
@@ -1268,6 +1288,44 @@ function setConBtn(id, on) {
   b.setAttribute('aria-pressed', String(on));
 }
 
+/** Toggle the construction-active pane ratio (RULES.md §5.16a amendment): body.con-active
+ *  re-weights the split's columns 30/70 (index.html), and — since every rail driver kills the
+ *  construction on edit (teardownCon(), see the value-edit call site above) — also claims
+ *  rail-collapsed for the construction's duration so the reclaimed vertical space isn't wasted
+ *  on a rail with nothing live to show. #rail-toggle stays live throughout (it's a direct <body>
+ *  child, never hidden by rail-collapsed) so the learner can still pull the rail back at will:
+ *  a manual click on it while con-active is on sets conRailUserOverride (setupRailToggle()), and
+ *  teardown then leaves the rail exactly where the learner put it. Absent an override, their own
+ *  pre-construction collapse state is snapshotted here and restored on teardown instead of being
+ *  overwritten. Idempotent in both directions. */
+function setConLayout(on) {
+  const body = document.body;
+  const already = body.classList.contains('con-active');
+  if (on) {
+    if (!already) {
+      conRailWasCollapsed = body.classList.contains('rail-collapsed');
+      conRailUserOverride = false; // fresh construction — no override yet
+    }
+    body.classList.add('con-active', 'rail-collapsed');
+    syncRailToggleState(true);
+  } else {
+    if (!already) return; // nothing claimed the layout — nothing to restore
+    body.classList.remove('con-active');
+    if (!conRailUserOverride) {
+      body.classList.toggle('rail-collapsed', conRailWasCollapsed);
+      syncRailToggleState(conRailWasCollapsed);
+    } // else: leave rail-collapsed exactly as the learner's own click last left it
+    conRailUserOverride = false;
+  }
+  // The grid reflow isn't laid out on frame 1 (remeasureAfterReflow()'s own reasoning) — and the
+  // 3D pane just changed width, which handleResize() alone never re-frames the camera for
+  // (ADR-163's lesson: a pane that loses width keeps a camera fitted for its old width).
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    handleResize(viewport);
+    reframeIfClipped();
+  }));
+}
+
 /** Each launcher's own label swaps to its "Replay …" text once triggered, and back to its
  *  base text on teardown — there is no separate Replay button (ported from the old
  *  tl-replay/trace-replay pair). Labels live in the .btn__label span so the icon span is
@@ -1350,12 +1408,16 @@ function teardownCon() {
   setConBtn('btn-traces', false); setConBtn('btn-tl', false);
   setConLabel('btn-traces', false); setConLabel('btn-tl', false);
   conMode = null;
+  setConLayout(false); // release the 30/70 ratio + rail claim (RULES.md §5.16a amendment)
 }
 
 function enterCon(mode, build, btnId) {
   teardownCon();
   ensureCompareForCon();
   conMode = mode;
+  setConLayout(true); // claim the 30/70 ratio + collapse the rail (RULES.md §5.16a amendment) —
+                       // after ensureCompareForCon() (the cold path's enterWorkbench() would
+                       // otherwise force-reset rail-collapsed), before rebuild()/reframeIfClipped()
   rebuild();                       // repaint the clean base sheet (Compare is now open)
   conLeaf = build(resolveLine(currentData));
   compareSheet.mountConstruction(conLeaf.group);

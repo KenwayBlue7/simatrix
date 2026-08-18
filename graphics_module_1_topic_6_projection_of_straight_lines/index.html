@@ -607,6 +607,19 @@
       grid-template-areas: "view compare";
     }
 
+    /* ---- Construction-active pane ratio (RULES.md §5.16a amendment, ADR-168, 2026-08-17):
+       while a construction (True Length & Angles / Show Traces) is running INSIDE Compare
+       (ADR-165/166 — no second container), the 2D drawing is the deliverable and the 3D
+       pictorial is only the explanation beside it, so the split re-weights columns only —
+       same grid, same grid-template-areas, same three §5.13 cards — mirroring §5.16c's
+       body.method-split 3fr/7fr for the same "genuinely asymmetric job" reason. main.js
+       setConLayout() toggles this class off conMode (enterCon()/teardownCon()); it also
+       claims rail-collapsed (below) since every rail driver kills the construction on edit
+       (teardownCon()), so the rail has nothing live to show for the class's duration. */
+    body.compare-split.con-active {
+      grid-template-columns: 3fr 7fr;
+    }
+
     /* Step-through nav pill — the in-Compare twin of .method-bar. A direct <body> child (main.js
        ensureConNav()), positioned by the SAME CSS-Grid overlap idiom #rail-toggle already uses:
        it claims grid-area:compare alongside #compare-card and pins itself to that cell's bottom
@@ -2150,6 +2163,12 @@
       body.compare-split.rail-collapsed {
         grid-template-rows: minmax(0, 1fr) minmax(0, 1fr);
         grid-template-areas: "view" "compare";
+      }
+      /* Explicit equal-specificity reset (RULES.md §5.16a amendment): body.compare-split.con-active
+         (0-3-0) outranks the bare body.compare-split override above (0-2-0) regardless of source
+         order, so without this the desktop 30/70 would leak into the single-column restack. */
+      body.compare-split.con-active {
+        grid-template-columns: 1fr;
       }
 
       /* The panel now stacks BELOW the viewport, so the chevron points along that
