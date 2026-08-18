@@ -1,5 +1,204 @@
 # Changelog — Module 2, Topic 0: Introduction to Orthographic Projection
 
+## 2026-08-18 b — The column goes to the bench
+
+The Cylindrical Block was a cylinder parked on a rectangular plate. Fig. 19.20 shows one continuous
+solid, and it says so in all three printed views (`DECISIONS.md` ADR-227, RULES.md §6.40).
+
+### What the figure actually shows
+
+`√(25² − 20²) = 15` is where a Ø50 circle crosses the edges of a 40 deep plate, and that number is
+in every view:
+
+- **Elevation.** The plate's top face does not stop where the column's silhouette crosses it — it
+  runs on inboard, to ±15, and drops a **solid line** from there to the bench. That is the plate's
+  own front face ending against the column, and it exists only if the column is wider than the plate
+  is deep at that height. A seated boss leaves that face an unbroken 100 × 12 rectangle.
+- **Right side view.** A **plain 50 × 40 rectangle**, with the 40 deep plate drawn INSIDE it as a
+  40 × 12 panel split 12 | 16 | 12 by the prongs. The topic drew a step at y = 12. There is none.
+- **Plan.** The Ø50 circle is **complete**, the plate's edges running in and stopping on it. A
+  seated boss shows only the two arcs standing proud.
+
+### What changed
+
+- **The lathe starts at y = 0.** One line, and everything else follows from it.
+- **The plate is two pieces.** At |x| < 15 the column takes the plate's whole 40 mm of depth, so
+  nothing of the plate survives there — it is not one profile but two, each ending on an exact arc
+  of radius 25.
+- **No CSG.** The junction is analytic: the curve where the plate meets the column is a circle whose
+  radius is known before anything is built, so the profile is cheaper to write than a boolean is to
+  run. A mesh library would be a new CDN import and a second geometry system, tuned to a tolerance,
+  to compute a curve already in closed form.
+- **The views gained what they were missing** — four junction lines in the elevation, a plain
+  rectangle and a nested plate panel in the side view, two arcs completing the circle in the plan.
+- **`R25` is gone from the plan.** The plan draws 360°, not the 148° the symbol was chosen from.
+  ADR-218's rule is untouched; its worked example was the thing that was wrong, and it is amended
+  in place. The diameter is stated once, on the elevation, where the figure prints it.
+- Step 1's copy for the front and right directions rewritten: the tower runs down to the bench and
+  the plate is wrapped round it; from the right the whole outline is one plain rectangle.
+
+### What this cost, and it is worth naming
+
+The object had been audited twice. The second pass examined the pictorial **specifically** for a
+blend at the column root and pronounced it clean — correctly, there is no fillet. Diameter, height,
+bore and overhang were all checked and all right. Nobody asked where the bottom of the column was,
+because the model already had an answer and the answer looked plausible. A view answers the question
+you put to it and volunteers nothing.
+
+The corollary: ADR-221 and two changelogs claim the boss "overhangs the plate front and back and its
+underside hangs in clear air". There is no underside. Corrected.
+
+### Re-checked, unchanged
+
+Shaft Support (19.21) and Stepped Block (19.27) as before, and the Bearing Block (19.22) checked
+again for the same error — its plan shows both 11 mm lugs flush with the 44 deep base, and its right
+side view shows two bars at the base's outer edges. Nothing overhangs anything.
+
+### Verification
+
+263 → **264** assertions, all green. The new one has five clauses, one for each way the figure states
+the merge. Calibrated against the seated version, which fails every one: lathe from y = 12, one plate
+half, 0 of 4 junction lines, an eight-point stepped side outline, 0 of 2 plan arcs — and no ink on
+the bench at the column's radius, where the corrected solid has 328 vertices.
+
+## 2026-08-18 — The blends, and one claim that did not survive the figure
+
+A second pass over Chapter 19, on one question: which of these four castings is blended where its
+pieces meet? Answer: one of them, four times over (`DECISIONS.md` ADR-226, RULES.md §6.39). Nothing
+in the architecture changed and no geometry kind was added.
+
+### Shaft Support — Fig. 19.21
+
+The figure prints **R6 twice on its elevation**, each on a leader: one into the root of the upright,
+one onto the top corner of the base. Both features are drawn at both ends, so there are **four**
+blends, and every one runs the full 40 mm depth. All four were square.
+
+- **The two root fillets** are the corner of a square minus a quarter disc whose centre sits out in
+  the air at (±16, 26) — off the metal, which is what makes the surface concave.
+- **The two end rounds** eat 6 mm into the base's top face and 6 mm down its end face.
+- **The elevation is the only view any of them reaches.** From above and from the side they face the
+  observer edge-on, and the figure draws no runout line in either — so the plan is still the sharp
+  100 × 40 rectangle and the left side view is untouched.
+- **Eight pieces, not four.** A blend runs the DEPTH, so it is an arc in an elevation profile pushed
+  along z; a bolt hole is drilled DOWNWARDS, so it is a hole in a plan profile pushed along y. No one
+  extrusion is both. The two occupy disjoint stretches of the length — rounds at x = ±44…±50, holes
+  at ±24…±36 — so the solid divides between them and every seam lands on a plane both sides are flat
+  on. Two rounded end caps and two fillets along z, two feet and the bolted plate along y, the lug
+  along x as before.
+- **Its cost, stated.** Two pieces meeting on a plane both draw their edge there. At x = ±44 that
+  line is the round's own tangent on the top face, but 12 mm of it crosses front and back faces that
+  are genuinely flat. Removing it needs the base's top face to be one geometry end to end, which
+  needs the rounds and the holes in one extrusion, which is the thing that cannot be done.
+- **Dimensions.** Gained the figure's two `R6` leaders. The 60 mm bolt pitch became the figure's
+  **20 from the end of the casting**, which is the same hole in the sentence the figure uses. The
+  head radius lost its `// chosen` flag: the side view draws that arc tangent to the lug's two 40 mm
+  faces, so R20 is derived and the flag was a false claim of the kind ADR-221 caught twice.
+- Kept against the figure: the plan's bolt hole stays **Ø12**, not the `R6` the figure prints on it.
+  It is a complete circle in that view, and ADR-218 takes the notation from the sweep the view draws.
+
+### Cylindrical Block — Fig. 19.20 — no change
+
+Checked on the claim that the boss is filleted where it stands on its plate. **It is not**, and the
+printed views settle it where the pictorial cannot: the elevation meets the plate's top face at a
+square corner with no arc and no `R` note, and the plan draws exactly two circles, Ø50 and Ø30 — a
+blend at the boss root would be a third, larger one. What reads as a blend in 19.20(a) is the boss's
+own bottom rim. The boss is Ø50 and the plate only 40 deep, so 5 mm of it overhangs front and back
+and its underside hangs in clear air; in isometric that rim sweeps down past the plate's top face
+and tangentially into its front edge. The build already produced it. Fork re-measured at the same
+time — 18 deep, 16 wide, 12 mm prongs — and already correct.
+
+> **CORRECTED the next day (ADR-227).** No fillet, still true. But the column does not overhang an
+> underside — it runs to the BENCH, and the plate is merged onto it. See the entry above.
+
+### Stepped Block and Bearing Block — no change
+
+19.27 re-traced against its own isometric axes (120 × 90 × 64; the `100` on the length axis, so the
+full-height wall is 20 thick at one end; the two `30`s on the depth axis; `3×16` above a 16 slab).
+19.22's lugs meet its base square. Neither figure carries a blend anywhere.
+
+### Verification
+
+262 → **263** assertions, all green. The new one tests the sheet and the solid separately, because
+they can fail apart: an arc in `views.front` with a square solid behind it is a drawing of a part
+that was never built. Calibrated against the square version, which reports 4 square corners, 0 of
+the 4 arcs, and a solid still carrying its top corners at (±50, 20).
+
+## 2026-08-17 — Audited against Chapter 19, and corrected
+
+The four objects were checked against the figures they cite in *Intro To Machine Drawing*. All four
+differed from their figure. The textbook wins in every case (`DECISIONS.md` ADR-221, RULES.md
+§6.37); nothing in the architecture changed, and no renderer was added.
+
+### The audit, per object
+
+- **Cylindrical Block — Fig. 19.20.** The plate is **forked at both ends**: a slot 16 wide and 18
+  deep, through the full 12 mm thickness, leaving a 12 mm prong each side. It had been a plain
+  rectangle — and the fork is precisely the kind of shape only the plan can show, which is what this
+  object is in the topic for. Fixed in the geometry and in all three views: the plan turns the
+  corner at each notch, the elevation conceals each slot's end wall at 18 from the end, and the right
+  side view splits the plate 12 | 16 | 12 where the observer looks straight into it. Plan
+  dimensions gained the figure's 18, 12 and 12; the elevation gained **Ø50** and lost the 28, which
+  the figure does not print (40 and 12 give it). R25 in the plan is unchanged and still correct —
+  the plan draws 148° of that boss, and 148° of circle is an arc.
+- **Stepped Block — Fig. 19.24 → Fig. 19.27.** It had been built from the figure the chapter
+  captions *"A block"*. The only figure captioned *"A stepped block"* is **19.27**, a different
+  part: **120 × 90 × 64**, a base slab 16 thick, a full-height wall 20 wide along the right-hand
+  end, and in the remaining 100 a stair of three 30 mm treads climbing to the back, tops at
+  16 / 32 / 48 — the figure's own **3 × 16**. Rebuilt entirely: parts, three views, dimensions and
+  Step-1 copy.
+- **Shaft Support — Fig. 19.21.** Base thickness **12 → 20**, and the 8 mm underside relief between
+  two 12 mm feet is now there — the casting touches its seating at the two ends only. Bolt centres
+  moved to ±30 to match the plan. Dimensions rearranged onto the views the figure uses them on: the
+  plan carries its 12 | 28 | 20 | 12 chain, the side view its 20 / 24 / 8.
+- **Bearing Block — Fig. 19.22.** One misreading had propagated through the whole part: the figure's
+  **37 is the height to the bore centre**, dimensioned on the right side view from the seating up to
+  the centre line, and it had been taken as the overall height with every other size scaled down to
+  fit inside it. Corrected throughout — base **9 → 15**, bore **Ø20 → Ø24**, lug **32 long with an
+  R16 head → 48 with R24**, overall length **83 → 105** (48 + 35 to the arc centre, then R22),
+  overall height **37 → 61**. The slot's centre lines moved to the two cap centres, so the 18 that
+  measures them springs from something the view draws.
+
+### What the audit forced
+
+- **A mirror is not the other side view** (ADR-222, RULES.md §3.73). The sheet produced the
+  unauthored side view by reflecting the other one. Measured on the shipped sheet: the Stepped
+  Block's right side view drew its steps **dashed**, while the object's own Step-1 copy told the
+  learner that from the right nothing is in the way and every edge is solid. Reflecting linework
+  reflects which edges are DRAWN and says nothing about which are SEEN. Objects whose two sides
+  disagree now author both, `views.sideFlip` in the second view's own frame; the three symmetric
+  objects are untouched and still mirror.
+- **Ø on a view that draws no circle** (ADR-223, RULES.md §6.38). `acrossDia()` — a linear dimension
+  carrying the Ø prefix, its number derived from the radius. ADR-218 chooses Ø or R from the sweep
+  the view draws, and an elevation along a boss's side draws no sweep at all; without this the sheet
+  never states Ø50 anywhere, where the textbook prints it across the top of the boss.
+- **Views are spaced by what they put down** (ADR-224, RULES.md §3.74). The plan sat a fixed gap
+  below the elevation's OUTLINE, so Fig. 19.27's overall 120 — in a second lane behind the 100 — was
+  drawn along the plan's own top edge. The caption clearance had the inverse error, adding a value's
+  full height past the end of a dimension that faces ACROSS the sheet rather than along it.
+- **Triangulation seams on a non-convex end face** (ADR-225, RULES.md §3.75). `EdgesGeometry` hands
+  back three unpaired diagonals per cap for a six-point stair profile and none for a rectangle or a
+  triangle; winding makes no difference. They came back at full outline weight, ruled across the
+  Stepped Block's end. Filtered in `objectRig.js` against the profile that produced them.
+- Restored the viewport chip's band and the panel toggle's 2 mm nudge, both reverted by the
+  `origin/main` merge earlier the same day.
+
+### Verification
+
+`node verify/shipped-module.mjs` → **262 assertions, ALL GREEN** (was 250). Twelve added, each
+calibrated against what it replaced:
+
+- every size each figure prints is on the finished sheet — 12 / 15 / 14 / 10 values found, and
+  none of the sizes each object used to carry survives;
+- a Ø on a linear dimension spans exactly the diameter it names;
+- the Cylindrical Block is forked in all three views — 4/4 plan corners, 2/2 hidden slot ends,
+  2/2 prong edges;
+- the Stepped Block sees its steps from the left (5 solid, 0 dashed) and not from the right
+  (0 solid, 5 dashed);
+- its end face carries its own 10 edges and no seam — 13 with the filter removed.
+
+Before/after screenshots of all four objects (front, top, free orbit, finished sheet) were compared
+against the figures; the oracle caught none of the four collisions the pictures did.
+
 ## 2026-08-06 — Built
 
 - **Added** the topic: a two-step introduction to orthographic projection, the first thing a

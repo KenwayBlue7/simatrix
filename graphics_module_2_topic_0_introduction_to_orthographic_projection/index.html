@@ -223,11 +223,14 @@
     /* ---- Wizard hide/show toggle: floats over the canvas so it is reachable in both states. */
     .wizard-toggle {
       position: absolute;
-      /* NOT the .vp-controls 44px+space-3 clearance opposite it — this top-right toggle has
-         nothing above it, so it is decoupled from the left cluster's host-chrome-avoidance
-         logic entirely (platform Jul-16 regression fix). */
-      top: var(--space-3);
-      right: var(--space-3);
+      /* SAME BAND as the Dimensions chip opposite it: the two are the only things floating over
+         the viewport, and a pair of controls at the same height reads as one row rather than as
+         two independent decorations. Restored after a merge from origin/main took index.html back
+         to the pre-nudge version. */
+      top: calc(44px + var(--space-5));
+      /* Right-anchored, so moving the button LEFT means a LARGER `right`. 2 mm = 7.56 px at
+         96 dpi — the requested 0.2 cm, expressed in the unit the request was made in. */
+      right: calc(var(--space-3) + 2mm);
       z-index: 7; /* above the flow note (6), which is pointer-events:none and may pass under it */
       width: 44px;
       height: 44px;
@@ -1214,8 +1217,8 @@
     */
     .vp-controls {
       position: absolute;
-      top: calc(44px + var(--space-3)); /* current host-chrome clearance (DESIGN.md §5.12) */
-      left: var(--space-4);
+      top: calc(44px + var(--space-5)); /* host-chrome clearance (DESIGN.md §5.12), one step out */
+      left: calc(var(--space-4) + 2mm); /* the same 2 mm nudge the panel toggle opposite it takes */
       display: flex;
       gap: var(--space-2);
       z-index: 5;

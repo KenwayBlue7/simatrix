@@ -323,10 +323,17 @@ export function initProjectionSheet(mount, { prefersReducedMotion = false } = {}
     /** The two points a dimension mark actually reaches, whatever kind it is. */
     const dimSpan = (d) => (d.k === 'dim' ? [d.a, d.b] : [d.at, d.to]);
 
+    // A MIRROR IS THE OTHER SIDE VIEW ONLY WHERE THE PART IS SYMMETRIC ABOUT ITS MID-PLANE.
+    // Reflecting the linework reflects which edges are DRAWN, never which are seen: turn a stepped
+    // block round and the treads the tall end concealed come into plain sight, and no reflection of
+    // a dashed line makes it solid. An object whose two side views disagree authors the second one
+    // itself, in that view's own frame, as `views.sideFlip`, and it is used exactly as authored.
+    // The dimensions still mirror, because both side views have the same silhouette to hang them
+    // on — it is only the visibility of the interior that the reflection gets wrong.
     const views = {
       front: data.views.front,
       top: data.views.top,
-      side: data.views.side.map(flipPrim),
+      side: (mirrored && data.views.sideFlip) || data.views.side.map(flipPrim),
     };
     // ALWAYS built. Whether they are SHOWN is `setDimensions()`, a switch the learner can throw at
     // any moment — including mid-construction. Making it a layout input instead meant every flick
@@ -380,13 +387,57 @@ export function initProjectionSheet(mount, { prefersReducedMotion = false } = {}
       const outer = (a, b) => (away > 0 ? Math.max(a, b) : Math.min(a, b));
       let reach = away > 0 ? box.maxY : box.minY;
       for (const d of set) {
-        const ys = d.k === 'dim'
-          ? (({ A, B }) => [A[1], B[1]])(alignedDim(d))
-          : dimSpan(d).map(([, y]) => y);
-        reach = outer(reach, (away > 0 ? Math.max(...ys) : Math.min(...ys)) + away * VALUE_REACH);
+        // A LINEAR dimension's value stands beside its own line, not past the END of it, so the
+        // lift is taken where `alignedDim()` actually puts the text. Adding the lift to whichever
+        // end happens to be outermost pushes a caption a whole value-height clear of a dimension
+        // running the other way — a 30 mm tread measured UP the side of a plan does not reach any
+        // further DOWN the sheet than the plan's own bottom edge, and treating it as though it did
+        // put every one of the Stepped Block's three captions 7.4 mm out with nothing under them.
+        // A LEADER is different and keeps the lift: its value really does sit past its elbow.
+        let ys;
+        if (d.k === 'dim') {
+          const { A, B, textAt } = alignedDim(d);
+          ys = [A[1], B[1], textAt[1] + away * (DIM_STYLE.textHeight / 2)];
+        } else {
+          ys = dimSpan(d).map(([, y]) => y + away * VALUE_REACH);
+        }
+        reach = outer(reach, away > 0 ? Math.max(...ys) : Math.min(...ys));
       }
       // Clear air, then half the caption — it is anchored on its centre, not on its baseline.
       return reach + away * (CAPTION_AIR + CAPTION_HEIGHT / 2);
+    };
+
+    /**
+     * A view's box INCLUDING everything its dimensions put on the paper: the dimension line
+     * `alignedDim()` places, the value standing off it, and a leader's elbow with its shelf.
+     *
+     * `boxes` below is the LINEWORK alone, and that is the right thing to centre a caption on —
+     * but the wrong thing to space two views by. The Stepped Block's 120 rides a second lane under
+     * the elevation, and spacing the plan off the linework alone drew that dimension line straight
+     * along the plan's own top edge: two correct drawings, laid out into each other.
+     */
+    const markBox = (box, set) => {
+      const b = { minX: box.minX, maxX: box.maxX, minY: box.minY, maxY: box.maxY };
+      const eat = ([x, y]) => {
+        if (x < b.minX) b.minX = x;
+        if (x > b.maxX) b.maxX = x;
+        if (y < b.minY) b.minY = y;
+        if (y > b.maxY) b.maxY = y;
+      };
+      const half = DIM_STYLE.textHeight / 2;
+      for (const d of set) {
+        if (d.k === 'dim') {
+          const { A, B, textAt } = alignedDim(d);
+          eat(A); eat(B);
+          eat([textAt[0] - half, textAt[1] - half]);
+          eat([textAt[0] + half, textAt[1] + half]);
+        } else {
+          for (const p of dimSpan(d)) eat(p);
+          eat([d.to[0] - DIM_STYLE.leaderLand, d.to[1] - VALUE_REACH]);
+          eat([d.to[0] + DIM_STYLE.leaderLand, d.to[1] + VALUE_REACH]);
+        }
+      }
+      return b;
     };
 
     const boxes = {
@@ -394,18 +445,25 @@ export function initProjectionSheet(mount, { prefersReducedMotion = false } = {}
       top: bboxOf(views.top),
       side: bboxOf(views.side),
     };
+    const marks = {
+      front: markBox(boxes.front, dims.front),
+      top: markBox(boxes.top, dims.top),
+      side: markBox(boxes.side, dims.side),
+    };
     /** Which side of the elevation the chosen side view is drawn on (first angle). */
     const placement = FIRST_ANGLE_PLACEMENT[sideView];
 
     // View origins in sheet coordinates. The elevation defines the frame: it stands ON the XY line
-    // (y = 0) and is centred on x = 0 by the authoring convention.
+    // (y = 0) and is centred on x = 0 by the authoring convention. GAP is CLEAR PAPER between what
+    // two neighbouring views actually put down, dimensions included — never between their outlines
+    // with the dimensions left to fall where they may.
     const origins = {
       front: [0, 0],
-      top: [0, -(GAP + boxes.top.maxY)],
+      top: [0, marks.front.minY - GAP - marks.top.maxY],
       side: [
         placement === 'left'
-          ? boxes.front.minX - GAP - boxes.side.maxX
-          : boxes.front.maxX + GAP - boxes.side.minX,
+          ? marks.front.minX - GAP - marks.side.maxX
+          : marks.front.maxX + GAP - marks.side.minX,
         0,
       ],
     };

@@ -326,7 +326,12 @@ ok('...and the ones on vertical dimension lines really are turned',
 const FRONT_MARK_BAND = {
   front: { x: [0.30, 0.70], y: [0.20, 0.80] },
   top: { x: [0.30, 0.70], y: [0.55, 0.95] },
-  right: { x: [0.02, 0.45], y: [0.25, 0.75] },
+  // The right-hand band is the loosest of the three because the arrow is aimed at MATERIAL on the
+  // front face, and on a tall part with a thin base that material is low down: the Bearing Block
+  // is 61 mm high on a 15 mm base, so at its own mid-width the only front face there is belongs to
+  // the base, and the mark rides at 12% of the height. Viewed square-on that is off the bottom of
+  // a 0.75 band, and the mark is exactly where it should be.
+  right: { x: [0.02, 0.45], y: [0.25, 0.85] },
 };
 const frontMark = async () => JSON.parse(await evaluate(`(() => {
   const l = document.querySelector('#sim-viewport .vp-label--front');
@@ -912,9 +917,16 @@ for (const id of ['cylblock', 'shaftsupport', 'bearingblock', 'block']) {
   ok(`${id}: its internal visible geometry is on the sheet`,
     Number(authoredEdges) > 0 && !!ink.edge,
     `${authoredEdges} authored, ${ink.edge ? 'rendered' : 'NOT rendered'}`);
+  // The hidden layer is allowed to be ABSENT, and only for the reason the Stepped Block gives:
+  // seen from the left, every one of its edges is in plain view, so its default drawing has no
+  // dashed line anywhere on it. That is a fact about the object, not a missing layer — the same
+  // block flipped to its RIGHT side view is nothing but dashed lines, and the pair is asserted
+  // below. `edge` is still demanded outright; every object authors internal visible geometry.
   ok(`${id}: internal visible geometry outranks hidden and supporting lines`,
-    !!ink.edge && ink.edge.px > ink.hidden.px && ink.edge.px > ink.dimension.px,
-    ink.edge ? `edge ${ink.edge.px} / hidden ${ink.hidden.px} / thin ${ink.dimension.px}` : 'edge layer absent');
+    !!ink.edge && (!ink.hidden || ink.edge.px > ink.hidden.px) && ink.edge.px > ink.dimension.px,
+    ink.edge
+      ? `edge ${ink.edge.px} / hidden ${ink.hidden ? ink.hidden.px : 'none authored'} / thin ${ink.dimension.px}`
+      : 'edge layer absent');
 
   // Exactly one silhouette per view: the outer profile is authored as one closed loop, and a
   // second thing wearing the heavy weight would mean an internal feature had been mis-tagged.
@@ -1107,14 +1119,18 @@ for (const id of ['cylblock', 'shaftsupport', 'bearingblock']) {
     heads.got === heads.want, `${heads.got} of ${heads.want}`);
 }
 
-// The two labels that were wrong, named. A boss trimmed by the plate it stands on is an arc, and a
-// slot end is a semicircular cap, not a hole.
+// The label that was wrong, named. A slot end is a semicircular cap, not a hole.
 const labelsFor = async (id, view) => JSON.parse(await evaluate(`
   import('./src/objectData.js').then((m) =>
     JSON.stringify((m.getObject('${id}').dims['${view}'] || []).map((d) => d.text)))`));
 const cylTop = await labelsFor('cylblock', 'top');
-ok('the trimmed boss in the plan is R25, not a diameter',
-  cylTop.includes('R25') && !cylTop.some((t) => /50/.test(t)), cylTop.join(' '));
+// The Cylindrical Block's plan used to carry R25 on its column, and this line used to assert it.
+// The rule it came from is untouched — Ø or R follows the sweep the view draws — but the sweep was
+// misread: the plan draws the column's circle COMPLETE, not 148 deg of it, so R was the wrong
+// symbol taken from the wrong fact and the diameter belongs where the figure prints it, on the
+// elevation. What the plan must now carry on that column is NOTHING (ADR-227 amending ADR-218).
+ok('the plan states no size on the column, which the elevation already gives as a diameter',
+  !cylTop.some((t) => /25|50/.test(t)), cylTop.join(' ') || 'none');
 ok('...while the bore beside it, a full circle, keeps its 30 as a diameter',
   cylTop.some((t) => /^\u00d830$/.test(t)), cylTop.join(' '));
 const bearTop = await labelsFor('bearingblock', 'top');
@@ -1343,6 +1359,249 @@ ok('Back steps one stage without replaying', await evaluate(
   `document.querySelector('.psheet__stage--dimension').classList.contains('is-on') === false`));
 ok('…and Back is never disabled while there is something to undo',
   await evaluate('document.getElementById("stage-prev").disabled === false'));
+
+// --- 7f. TEXTBOOK FIDELITY ---------------------------------------------------------------------
+//
+// The four objects are the parts worked in Chapter 19, and the figures print their sizes. This
+// block asserts that every size the figure prints reaches the paper, per object, read off the
+// finished sheet rather than off the registry — the registry is what would be wrong.
+//
+// Calibrated against the geometry that preceded it, which is where each of these came from:
+//   cylblock       had no fork at all, so 18 and the two 12s did not exist, and the boss's size
+//                  was only ever available as R25 in the plan — no Ø50 anywhere on the sheet
+//   block          was Fig. 19.24 at 80 x 40 x 40; not one of 120 / 90 / 64 / 100 / 30 was on it
+//   shaftsupport   had a 12 mm base and no relief, so 20 and 8 were absent
+//   bearingblock   read the figure's 37 as an overall height and scaled the part to fit: 105, 15,
+//                  Ø24, R24, 48 and 35 were all absent, and 83 / 9 / Ø20 / R16 were there instead
+const FIGURE_SIZES = {
+  cylblock: ['100', '40', '12', '18', 'Ø50', 'Ø30'],
+  shaftsupport: ['100', '40', '20', '8', '12', '28', '24', '64', 'Ø24', 'Ø12', 'R20', 'R6'],
+  bearingblock: ['105', '44', '15', '48', '35', '18', '37', '11', '22', 'Ø24', 'R24', 'R9', 'R22'],
+  block: ['120', '90', '64', '100', '16', '30'],
+};
+const GONE = {
+  cylblock: ['R25'], shaftsupport: ['60'], block: ['80'], bearingblock: ['83', '9', 'Ø20', 'R16', '21'],
+};
+for (const id of ['cylblock', 'shaftsupport', 'bearingblock', 'block']) {
+  await pickObject(id);
+  await revealAll();
+  await wait(400);
+  const values = JSON.parse(await evaluate(`JSON.stringify(
+    [...document.querySelectorAll('#proj-sheet-stage .psheet__value')].map(t => t.textContent.trim()))`));
+  const missing = FIGURE_SIZES[id].filter((v) => !values.includes(v));
+  ok(`${id}: every size its figure prints is on the sheet`, missing.length === 0,
+    missing.length ? `missing ${missing.join(', ')}` : `${values.length} values`);
+  const stale = GONE[id].filter((v) => values.includes(v));
+  ok(`${id}: ...and none of the sizes it used to carry survive`, stale.length === 0,
+    stale.length ? `still there: ${stale.join(', ')}` : 'clean');
+}
+
+// A Ø ON A VIEW THAT DRAWS NO CIRCLE is the third form of the mark, and the number still has to
+// come from the geometry. Every value beginning Ø that is carried on a LINEAR dimension must span
+// exactly twice the radius it was built from. Before the Cylindrical Block's elevation carried
+// Ø50 there was no such dimension anywhere in the topic.
+const acrossDias = JSON.parse(await evaluate(`
+  import('./src/objectData.js').then(m => {
+    const out = [];
+    for (const o of m.OBJECTS) {
+      for (const view of ['front','top','side']) {
+        for (const d of (o.dims[view] ?? [])) {
+          if (d.k !== 'dim' || !d.text.startsWith('\\u00D8')) continue;
+          const span = Math.hypot(d.b[0]-d.a[0], d.b[1]-d.a[1]);
+          out.push({ id: o.id, view, text: d.text, span, dia: d.dia ?? null });
+        }
+      }
+    }
+    return JSON.stringify(out);
+  })`));
+const badDia = acrossDias.filter((d) => d.dia === null || Math.abs(d.span - 2 * d.dia) > 1e-6
+  || d.text !== 'Ø' + String(Math.round(2 * d.dia * 10) / 10));
+ok('a Ø on a linear dimension spans exactly the diameter it names',
+  acrossDias.length > 0 && badDia.length === 0,
+  acrossDias.length ? badDia.map((d) => `${d.id}/${d.view} ${d.text} spans ${d.span}`).join(' | ') || `${acrossDias.length} checked` : 'none found');
+
+// THE FORK IS IN ALL THREE VIEWS, or it is a shape the drawing does not describe. The plan has to
+// turn the corner at each notch, the elevation has to conceal each slot's end wall, and the right
+// side view has to split the plate into two prongs and a gap. Against the plain plate that was
+// there before, every one of the three counts was zero.
+const fork = JSON.parse(await evaluate(`
+  import('./src/objectData.js').then(m => {
+    const o = m.getObject('cylblock');
+    const near = (a, b) => Math.abs(a - b) < 0.01;
+    const plan = o.views.top.find(p => p.layer === 'outline').pts;
+    const corners = [[32,8],[32,-8],[-32,8],[-32,-8]]
+      .filter(([x,y]) => plan.some(([px,py]) => near(px,x) && near(py,y))).length;
+    const walls = o.views.front.filter(p => p.k === 'line' && p.layer === 'hidden'
+      && near(Math.abs(p.a[0]), 32) && near(p.a[0], p.b[0])).length;
+    const prongs = o.views.side.filter(p => p.k === 'line' && p.layer === 'edge'
+      && near(Math.abs(p.a[0]), 8) && near(p.a[0], p.b[0])).length;
+    return JSON.stringify({ corners, walls, prongs });
+  })`));
+ok('the Cylindrical Block is forked in the plan, the elevation and the side view',
+  fork.corners === 4 && fork.walls === 2 && fork.prongs === 2,
+  `plan corners ${fork.corners}/4, hidden slot ends ${fork.walls}/2, prong edges ${fork.prongs}/2`);
+
+// TWO SIDE VIEWS THAT DISAGREE. Seen from the left every step edge of the Stepped Block is in
+// plain view; seen from the right the wall conceals all three. A mirror cannot produce that, and
+// while the sheet mirrored one into the other the right side view drew its steps dashed — which is
+// what the object's own Step-1 copy says it must not do.
+const sides = JSON.parse(await evaluate(`
+  import('./src/objectData.js').then(m => {
+    const o = m.getObject('block');
+    const count = (set, layer) => (set ?? []).filter(p => p.layer === layer).length;
+    return JSON.stringify({
+      leftVisible: count(o.views.side, 'edge'), leftHidden: count(o.views.side, 'hidden'),
+      rightVisible: count(o.views.sideFlip, 'edge'), rightHidden: count(o.views.sideFlip, 'hidden'),
+    });
+  })`));
+ok('the Stepped Block sees its steps from the left and not from the right',
+  sides.leftVisible >= 5 && sides.leftHidden === 0
+  && sides.rightHidden >= 5 && sides.rightVisible === 0,
+  `left ${sides.leftVisible} solid / ${sides.leftHidden} dashed, `
+  + `right ${sides.rightVisible} solid / ${sides.rightHidden} dashed`);
+
+// NO TRIANGULATION SEAM ON A NON-CONVEX END FACE. The Stepped Block's left-hand end is the slab's
+// own face plus the stair profile above it: 4 + 6 real edges. `EdgesGeometry` cannot pair the ear
+// clipping of a non-convex lid and hands back three diagonals per cap on top of them, which is 13
+// segments in that plane rather than 10, ruled across the face at full outline weight.
+const seams = JSON.parse(await evaluate(`
+  Promise.all([import('three'), import('./src/objectRig.js'), import('./src/objectData.js')])
+    .then(([THREE, R, D]) => {
+      const rig = R.buildObject(D.getObject('block'), new THREE.Vector2(1440, 900));
+      const segs = [];
+      rig.group.traverse((n) => {
+        const p = n.geometry && n.geometry.attributes && n.geometry.attributes.instanceStart;
+        if (!p) return;
+        for (let i = 0; i < p.count; i++) {
+          segs.push([[p.getX(i), p.getY(i), p.getZ(i)],
+                     [n.geometry.attributes.instanceEnd.getX(i),
+                      n.geometry.attributes.instanceEnd.getY(i),
+                      n.geometry.attributes.instanceEnd.getZ(i)]]);
+        }
+      });
+      rig.dispose();
+      const minX = Math.min(...segs.flat().map(p => p[0]));
+      const onEnd = segs.filter(([a, b]) =>
+        Math.abs(a[0] - minX) < 1e-3 && Math.abs(b[0] - minX) < 1e-3).length;
+      return JSON.stringify({ total: segs.length, onEnd });
+    })`));
+ok('the Stepped Block\'s end face carries its own 10 edges and no triangulation seam',
+  seams.onEnd === 10, `${seams.onEnd} segments in that plane, of ${seams.total} on the solid`);
+
+// THE SHAFT SUPPORT IS BLENDED, IN THE PROFILE AND IN THE SOLID. The figure prints R6 twice on its
+// elevation — into the root of the lug and onto the top corner of the base — and both are drawn at
+// both ends, so there are FOUR of them and every one runs the full 40 mm depth. Against the square
+// version that was there before, all four square corners were present and no arc point was.
+//
+// Both halves of the claim are tested, because they can fail apart: an arc in `views.front` with a
+// square solid behind it is a drawing of a part that was never built, and the reverse is a part the
+// drawing does not describe. The four corner points are the exact ones the old outline carried.
+const blend = JSON.parse(await evaluate(`
+  Promise.all([import('three'), import('./src/objectRig.js'), import('./src/objectData.js')])
+    .then(([THREE, R, D]) => {
+      const o = D.getObject('shaftsupport');
+      const near = (a, b) => Math.abs(a - b) < 1e-4;
+      const pts = o.views.front.find(p => p.layer === 'outline').pts;
+      const has = (x, y) => pts.some(([px, py]) => near(px, x) && near(py, y));
+      const t = 6 / Math.SQRT2;
+      // Square corners the blends replaced, and the mid-point of each arc that replaced them.
+      const corners = [[-50, 20], [50, 20], [-10, 20], [10, 20]].filter(([x, y]) => has(x, y)).length;
+      const arcs = [[-44 - t, 14 + t], [44 + t, 14 + t], [-16 + t, 26 - t], [16 - t, 26 - t]]
+        .filter(([x, y]) => has(x, y)).length;
+
+      const rig = R.buildObject(o, new THREE.Vector2(1440, 900));
+      const ends = [];
+      rig.group.traverse((n) => {
+        const g = n.geometry, p = g && g.attributes && g.attributes.instanceStart;
+        if (!p) return;
+        for (let i = 0; i < p.count; i++) {
+          ends.push([p.getX(i), p.getY(i), p.getZ(i)]);
+          ends.push([g.attributes.instanceEnd.getX(i), g.attributes.instanceEnd.getY(i),
+                     g.attributes.instanceEnd.getZ(i)]);
+        }
+      });
+      rig.dispose();
+      // 1 world unit = 10 mm, and the part is symmetric so the re-centring moves nothing.
+      const at = (x, y) => ends.filter((e) => Math.abs(e[0] - x / 10) < 2e-3
+        && Math.abs(e[1] - y / 10) < 2e-3).length;
+      return JSON.stringify({
+        corners, arcs,
+        // Only the two ROUNDS are asked of the solid. The fillets butt against the lug and the
+        // plate, so the concave corner at (±10, 20) survives as an internal seam between the three
+        // pieces — buried in the material, and not a claim that the part is square there.
+        solidSquare: at(-50, 20) + at(50, 20),
+        solidArc: at(-44 - t, 14 + t) + at(44 + t, 14 + t) + at(-16 + t, 26 - t) + at(16 - t, 26 - t),
+      });
+    })`));
+ok('the Shaft Support carries its four R6 blends on the sheet and in the solid',
+  blend.corners === 0 && blend.arcs === 4 && blend.solidSquare === 0 && blend.solidArc >= 4,
+  `elevation: ${blend.corners} square corners left, ${blend.arcs}/4 arcs; `
+  + `solid: ${blend.solidSquare} square corners left, ${blend.solidArc} arc vertices`);
+
+// THE COLUMN GOES TO THE BENCH. The Cylindrical Block is not a boss parked on a plate: it is a Ø50
+// column standing on the seating for its whole 40 mm with a 100 × 40 × 12 plate merged onto it, and
+// all three printed views say so in a different way. Each of the five clauses below is one of those
+// ways, and against the seated version every one of them failed: the lathe began at y = 12, there
+// was ONE plate rather than two, the elevation drew nothing at the junction, the side view's
+// outline was an eight-point stepped profile, the plan carried no arcs inside its silhouette, and
+// no ink reached the bench at the column's radius.
+const merged = JSON.parse(await evaluate(`
+  Promise.all([import('three'), import('./src/objectRig.js'), import('./src/objectData.js')])
+    .then(([THREE, R, D]) => {
+      const o = D.getObject('cylblock');
+      const near = (a, b) => Math.abs(a - b) < 1e-6;
+
+      const lathe = o.parts.find((p) => p.k === 'lathe');
+      const halves = o.parts.filter((p) => p.k === 'extrude');
+      // Each half must reach the column and stop: its nearest point is exactly on the Ø50 wall.
+      const bites = halves.filter((p) =>
+        near(Math.min(...p.outline.map(([x, z]) => Math.hypot(x, z))), 25)).length;
+
+      // The elevation's junction: the top face carried on to ±15, and the front face ended there.
+      const fe = o.views.front.filter((p) => p.k === 'line' && p.layer === 'edge');
+      const hasSeg = (a, b) => fe.some((p) =>
+        (near(p.a[0], a[0]) && near(p.a[1], a[1]) && near(p.b[0], b[0]) && near(p.b[1], b[1]))
+        || (near(p.a[0], b[0]) && near(p.a[1], b[1]) && near(p.b[0], a[0]) && near(p.b[1], a[1])));
+      const junction = [[[-25, 12], [-15, 12]], [[15, 12], [25, 12]],
+                        [[-15, 0], [-15, 12]], [[15, 0], [15, 12]]]
+        .filter(([a, b]) => hasSeg(a, b)).length;
+
+      // The side view: a plain rectangle, ±25 by 0..40, and no step anywhere in it.
+      const so = o.views.side.find((p) => p.layer === 'outline').pts;
+      const xs = so.map((p) => p[0]); const ys = so.map((p) => p[1]);
+      const plain = so.length === 4 && near(Math.min(...xs), -25) && near(Math.max(...xs), 25)
+        && near(Math.min(...ys), 0) && near(Math.max(...ys), 40);
+
+      // The plan: the two arcs that complete the Ø50 circle, every point of them on that circle.
+      const arcs = o.views.top.filter((p) => p.k === 'poly' && p.layer === 'edge'
+        && p.pts.every(([x, y]) => Math.abs(Math.hypot(x, y) - 25) < 1e-6));
+
+      const rig = R.buildObject(o, new THREE.Vector2(1440, 900));
+      let onBench = 0;
+      rig.group.traverse((n) => {
+        const g = n.geometry, p = g && g.attributes && g.attributes.instanceStart;
+        if (!p) return;
+        for (let i = 0; i < p.count; i++) {
+          for (const e of [[p.getX(i), p.getY(i), p.getZ(i)],
+                           [g.attributes.instanceEnd.getX(i), g.attributes.instanceEnd.getY(i),
+                            g.attributes.instanceEnd.getZ(i)]]) {
+            // 1 world unit = 10 mm; the part is symmetric, so the re-centring moves nothing.
+            if (Math.abs(e[1]) < 1e-4 && Math.abs(Math.hypot(e[0], e[2]) - 2.5) < 1e-3) onBench++;
+          }
+        }
+      });
+      rig.dispose();
+      return JSON.stringify({
+        latheFrom: lathe.profile[0][1], halves: halves.length, bites,
+        junction, plain, arcs: arcs.length, onBench,
+      });
+    })`));
+ok('the Cylindrical Block\'s column stands on the bench and the plate is merged onto it',
+  merged.latheFrom === 0 && merged.halves === 2 && merged.bites === 2
+  && merged.junction === 4 && merged.plain && merged.arcs === 2 && merged.onBench > 0,
+  `lathe from y=${merged.latheFrom}, ${merged.halves} plate halves (${merged.bites} bitten), `
+  + `${merged.junction}/4 junction lines, side outline ${merged.plain ? 'plain' : 'STEPPED'}, `
+  + `${merged.arcs}/2 plan arcs, ${merged.onBench} ink vertices on the bench at Ø50`);
 
 // --- 8. Disposal: object changes must not leak GPU buffers (RULES.md §3.4) ---------------------
 await quiet();

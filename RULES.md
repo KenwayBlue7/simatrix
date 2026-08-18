@@ -778,6 +778,39 @@ Every rule is formatted:
 > units and not the pane's. Reach for composition when two layers genuinely describe different things
 > in the same place; a label that has drifted from its mark is not that case.
 
+> **§3.73 ✅ DO** author BOTH side views when a part's two sides do not show the same edges.
+> **❌ NEVER** produce the second one by mirroring the first. *(ADR-222)*
+> Reason: reflecting linework reflects which edges are DRAWN and says nothing about which are SEEN.
+> The Stepped Block's tall wall conceals all three treads from one side and none of them from the
+> other, and no reflection of a dashed line makes it solid — so the sheet drew the right side view's
+> steps hidden while the object's own Step-1 copy told the learner they would be plain. A mirror is
+> only the other side view where the part is symmetric about its mid-plane, which is a fact about the
+> part, not about the renderer. `objectData.js` carries `views.sideFlip` in the opposite view's own
+> frame for the objects that need it; dimensions still mirror, because both side views hang them on
+> the same silhouette.
+
+> **§3.74 ✅ DO** space two views by everything they PUT DOWN — dimension lines, values and leader
+> shelves included. **❌ NEVER** lay a sheet out from the outlines and let the dimensions fall where
+> they may. *(ADR-224)*
+> Reason: the gap between the elevation and the plan was measured between their linework boxes, so
+> the Stepped Block's overall length — riding a second lane because the 100 inside it takes the first
+> — was drawn along the plan's own top edge. Two individually correct drawings laid out into each
+> other. The same arithmetic in the other direction over-reached: a caption cleared its view by the
+> full height of a value belonging to a dimension measured ACROSS the sheet, which reaches no further
+> along the caption's axis than the view's own edge, and put all three of that object's headings 7 mm
+> out with nothing under them. Both are the same mistake — asking where a mark is without asking
+> which way it points.
+
+> **§3.75 ✅ DO** filter a non-convex extrusion's cap seams against the profile that produced it.
+> **❌ NEVER** trust `EdgesGeometry` to pair the triangles of an ear-clipped lid. *(ADR-225)*
+> Reason: measured, `EdgesGeometry` returns three unpaired diagonals per cap for a six-point stair
+> profile and none at all for a rectangle or a triangle; reversing the winding changes nothing. They
+> come back at the full outline weight, so a teaching solid grows lines its own drawing does not
+> have. The profile is known where the geometry is built, so the filter is exact rather than a
+> threshold: a segment lying wholly in a cap plane survives only if its two ends are consecutive
+> points of the outline or of one of its holes. Never add, only remove — a curve's chords must stay
+> exactly as the edge pass left them.
+
 ---
 
 ## Section 4 — UI & Visual Rules (Cross-Module Standards)
@@ -1354,6 +1387,34 @@ Every rule is formatted:
 > the tangent at both ends of the tangent method's curve held the frame perfectly still and took the
 > drawing to 1.1 px/mm, under the 1.3 gate that drops every caption.
 
+> **§6.37 ✅ DO** cite the figure an object is taken from, and audit the object against that figure
+> before trusting either. **❌ NEVER** carry a size as "chosen" without checking whether the figure
+> prints it. *(ADR-221)*
+> Reason: four objects audited against Chapter 19 and every one of them differed. The Cylindrical
+> Block's plate is forked at both ends and was drawn plain, which is the shape only the plan can
+> show — the object was in the topic to teach exactly that and did not have it. The Bearing Block's
+> `37` is the height to the bore centre, dimensioned on the right side view up to the centre line; it
+> was read as the overall height and every other size on the part was then scaled down to fit inside
+> it, three of them wearing a `// chosen` comment for sizes the figure prints plainly. Two of the
+> four `// chosen` markers in that file named values the figure gives — one of them, R6 on a bolt
+> hole, printed with a leader pointing straight at it. A figure number in a comment is not a
+> citation; comparing the drawing with the figure is.
+> **The name is part of the citation.** The object called "Stepped Block" was built from Fig. 19.24,
+> which the book captions "A block"; the only figure it captions "A stepped block" is 19.27, a
+> different part. Nothing catches that but reading the caption.
+
+> **§6.38 ✅ DO** state a cylinder's size as Ø on a linear dimension when the view draws no circle,
+> and derive the number from the radius. **❌ NEVER** read §6.35 as a ban on the symbol wherever
+> there is no arc. *(ADR-223, extends ADR-218)*
+> Reason: §6.35 chooses between Ø and R from the sweep the view draws, and an elevation looking
+> along a boss's side draws no sweep at all — two straight silhouette lines and nothing else. The
+> size between them is still a diameter, and BIS SP 46 / ISO 129-1 say so with a plain linear
+> dimension carrying the Ø prefix, which is what the textbook prints across the top of the
+> Cylindrical Block's boss. Without it that sheet states the boss only as R25 in the plan, and the
+> learner never meets its Ø50 anywhere. The rule that survives both cases is the one that always
+> mattered: **the symbol comes from the geometry and the number from the radius — neither is ever
+> typed.**
+
 ---
 
 ## Section 7 — Cross-Module Harmony Rules
@@ -1523,6 +1584,38 @@ Every rule is formatted:
 - ❌ Reintroduce a per-topic `DESIGN.md`/`PRODUCT.md` instead of consuming the root copies. *(§1.14)*
 - ❌ Conflate Module 1's stub `uiManager.js` with Module 2's controller. *(§7.6)*
 - ❌ Silently reverse a documented decision, or restore an ADR-superseded design. *(§8.4, §8.6)*
+
+> **§6.39 ✅ DO** let the axis a blend is prismatic along decide where a multi-part solid divides,
+> and split it where that axis and the drilling axis occupy disjoint stretches. **❌ NEVER** answer
+> "this piece cannot carry that feature" by overlapping two volumes, and **❌ NEVER** test a claim
+> about a blend against a figure's PICTORIAL when its orthographic views are printed beside it.
+> *(ADR-226, extends ADR-221)*
+> Reason: an extrusion is a profile pushed along one axis, so a fillet that runs the part's depth is
+> an arc in the elevation profile and a bolt hole drilled downwards is a hole in the plan profile,
+> and no one extrusion is both. That is the geometry saying where the part divides, not a limitation
+> to route around. Where the two features occupy disjoint stretches — the Shaft Support's rounds at
+> x = ±44…±50, its bolt holes at ±24…±36 — every seam lands on a plane both sides are flat on, which
+> is the butt joint §3.29 asks for. Where they do not, one of the two features has to go, and which
+> one is a decision to record rather than a default to take.
+> **And read the views, not the picture.** A pictorial suggests a blend wherever a curved surface
+> runs tangentially into a flat one; Fig. 19.20's boss looks filleted for exactly that reason and is
+> not. The elevation meets the plate at a square corner and the plan draws two circles where a blend
+> would need three. A view can settle it; an isometric cannot.
+
+> **§6.40 ✅ DO** find out where a feature ENDS, not only how big it is — and read every printed
+> view for it, because each one states a junction differently. **❌ NEVER** reach for mesh CSG when
+> the curve where two solids meet is known in closed form. *(ADR-227, amends ADR-218's example)*
+> Reason: the Cylindrical Block survived two audits as a boss parked on a plate. Its diameter, its
+> height, its bore and its overhang were all checked and all correct; nobody asked where the bottom
+> of it was, and the figure says all three ways. The elevation runs the plate's top face INBOARD of
+> the column's silhouette and drops a solid line to the bench; the side view is a plain rectangle
+> with the plate nested inside it, not a stepped profile; the plan draws the circle COMPLETE rather
+> than the two arcs standing proud. A view answers the question you put to it and volunteers
+> nothing, so put the question.
+> **And author the union, do not compute it.** Where a plate meets a column the junction is a
+> circle of known radius, so each half of the plate is a profile ending on an exact arc. A boolean
+> library would be a new dependency and a second geometry system, tuned to a tolerance, to produce
+> a curve already available in closed form. Where a junction is NOT analytic this does not apply.
 
 ---
 

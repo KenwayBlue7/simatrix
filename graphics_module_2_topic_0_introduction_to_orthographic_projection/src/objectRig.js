@@ -47,6 +47,54 @@ const LATHE_SEGMENTS = 64;
  */
 const CREASE_DEG = 24;
 
+/**
+ * DROP THE TRIANGULATION SEAMS FROM A NON-CONVEX CAP.
+ *
+ * `EdgesGeometry` decides an internal edge by pairing the two faces that share it, and on a lid
+ * ear-clipped from a NON-CONVEX profile it fails to pair them: a six-point stair comes back with
+ * three diagonals ruled across each of its end faces, drawn at the full outline weight. Measured,
+ * not guessed — the same profile yields 6 unpaired cap segments where a four-point rectangle and a
+ * triangle yield none, and reversing the winding changes nothing. It is why the artefact appeared
+ * the moment a staircase was first extruded along x rather than through its own depth: the seams
+ * had always been there, on faces that happened to point away from the camera.
+ *
+ * The profile is known right here, so the filter is EXACT rather than a heuristic on angles: a
+ * segment lying wholly in one of the two cap planes survives only if its two ends are consecutive
+ * points of the outline or of one of its holes. Everything else in those planes is a seam.
+ * Segments that cross between the caps — every side wall edge there is — are never touched, and
+ * nothing is ever added, so a curve's chords are exactly as `EdgesGeometry` left them.
+ *
+ * @param {THREE.BufferGeometry} edges  straight out of `EdgesGeometry`, still in the shape frame
+ * @param {number[][][]} loops          the outline and its holes, mapped, in that same frame
+ * @param {number} depth                the extrusion depth, so the far cap plane is known
+ */
+function withoutCapSeams(edges, loops, depth) {
+  const key = (x, y) => `${Math.round(x * 1e4)},${Math.round(y * 1e4)}`;
+  const authored = new Set();
+  for (const loop of loops) {
+    for (let i = 0; i < loop.length; i++) {
+      const a = loop[i]; const b = loop[(i + 1) % loop.length];
+      authored.add(`${key(a[0], a[1])}|${key(b[0], b[1])}`);
+      authored.add(`${key(b[0], b[1])}|${key(a[0], a[1])}`);
+    }
+  }
+  const p = edges.getAttribute('position');
+  const kept = [];
+  for (let i = 0; i < p.count; i += 2) {
+    const za = p.getZ(i); const zb = p.getZ(i + 1);
+    const inCap = Math.abs(za - zb) < 1e-6
+      && (Math.abs(za) < 1e-6 || Math.abs(za - depth) < 1e-6);
+    if (inCap && !authored.has(`${key(p.getX(i), p.getY(i))}|${key(p.getX(i + 1), p.getY(i + 1))}`)) {
+      continue;
+    }
+    kept.push(p.getX(i), p.getY(i), za, p.getX(i + 1), p.getY(i + 1), zb);
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.Float32BufferAttribute(kept, 3));
+  edges.dispose();
+  return out;
+}
+
 /** Build a `THREE.Shape` from an outline loop plus optional hole loops, all in a 2D profile frame. */
 function shapeFrom(outline, holes = []) {
   const shape = new THREE.Shape(outline.map(([u, v]) => new THREE.Vector2(u, v)));
@@ -82,12 +130,24 @@ function buildPart(part) {
           ? ([z, y]) => scale([-z, y])    // ZY profile, pushed along +x
           : ([x, y]) => scale([x, y]);    // XY profile, pushed along +z
 
-      const shape = shapeFrom(part.outline.map(map), (part.holes ?? []).map((h) => h.map(map)));
+      const outline = part.outline.map(map);
+      const holes = (part.holes ?? []).map((h) => h.map(map));
+      const shape = shapeFrom(outline, holes);
       const g = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: false, curveSegments: 24 });
+      // The ink comes off the geometry HERE, while the profile that produced it is still to hand
+      // and still in the same frame, so the cap seams can be filtered out exactly; it then takes
+      // the identical placement, and `buildObject()` uses it instead of running `EdgesGeometry`.
+      const edges = withoutCapSeams(
+        new THREE.EdgesGeometry(g, CREASE_DEG), [outline, ...holes], depth,
+      );
 
-      if (axis === 'y') { g.rotateX(-Math.PI / 2); g.translate(0, toWorld(part.from), 0); }
-      else if (axis === 'x') { g.rotateY(Math.PI / 2); g.translate(toWorld(part.from), 0, 0); }
-      else { g.translate(0, 0, toWorld(part.from)); }
+      const place = (geo) => {
+        if (axis === 'y') { geo.rotateX(-Math.PI / 2); geo.translate(0, toWorld(part.from), 0); }
+        else if (axis === 'x') { geo.rotateY(Math.PI / 2); geo.translate(toWorld(part.from), 0, 0); }
+        else { geo.translate(0, 0, toWorld(part.from)); }
+      };
+      place(g); place(edges);
+      g.userData.edges = edges;
       return g;
     }
     case 'lathe': {
@@ -326,9 +386,12 @@ export function buildObject(data, resolution) {
     geometries.push(geometry);
     group.add(new THREE.Mesh(geometry, bodyMaterial));
 
-    const source = new THREE.EdgesGeometry(geometry, CREASE_DEG);
+    // An extrusion hands its own ink over, already filtered of cap seams; a lathe has no cap to
+    // seam, so it is read straight off the geometry as before.
+    const source = geometry.userData.edges ?? new THREE.EdgesGeometry(geometry, CREASE_DEG);
     const lineGeo = new LineSegmentsGeometry().fromEdgesGeometry(source);
     source.dispose();
+    delete geometry.userData.edges;
     geometries.push(lineGeo);
     const edges = new LineSegments2(lineGeo, inkMaterial);
     edges.computeLineDistances();

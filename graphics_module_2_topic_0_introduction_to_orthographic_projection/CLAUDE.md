@@ -28,7 +28,14 @@ aligned system, but it never teaches gaps, overshoots or arrowhead ratios — th
 
 ## The source
 The four objects are the parts worked in **"Intro To Machine Drawing", Chapter 19 (Multiview
-Projection of Objects), pages 252–254**.
+Projection of Objects), pages 252–255**.
+
+> **Audited against the figures on 2026-08-17 and corrected — ADR-221, RULES.md §6.37.** All four
+> objects differed from the figure they cite. Read that ADR before changing any size here; the
+> `CHANGELOG.md` entry of the same date lists the corrections per object. Two traps it records:
+> **19.24 is captioned "A block" and 19.27 is "A stepped block"** — the object named Stepped Block
+> was built from the wrong one; and the Bearing Block's **37 is the height to the bore centre**, not
+> the overall height.
 
 Listed in **picker order** — the order the dropdown reads, which is also `OBJECTS` order and so
 the default object and what Reset returns to. Figure numbers live here, not on the buttons: a
@@ -36,16 +43,42 @@ figure number is a fact about the textbook, not about the object.
 
 | # | Object | Figure | What it introduces | Default side view |
 |---|---|---|---|---|
-| 1 | Cylindrical Block | Fig. 19.20 | Circles, centre lines, a blind bore's hidden lines | Right → drawn LEFT |
+| 1 | Cylindrical Block | Fig. 19.20 | Circles, centre lines, a blind bore's hidden lines, and a forked plate the plan alone can show | Right → drawn LEFT |
 | 2 | Shaft Support | Fig. 19.21 | One hole that is a circle in one view and dashes in two | Left → drawn RIGHT |
 | 3 | Bearing Block | Fig. 19.22 | Two lugs that coincide in the elevation and separate elsewhere | Right → drawn LEFT |
-| 4 | Stepped Block | Fig. 19.24 | The three-view layout, with nothing else going on | Left → drawn RIGHT |
+| 4 | Stepped Block | Fig. 19.27 | The three-view layout with nothing else going on — and two side views that disagree | Left → drawn RIGHT |
 
 Two of each default placement, so the first-angle crossover is something the learner *sees* on both
 sides rather than a sentence they are asked to trust — and the side-view radio lets them flip any
-object to the other side and watch it move. Principal sizes are the figures' own; a size
-that was not legible on the printed scan carries a `// chosen` comment at its definition in
-`src/objectData.js`.
+object to the other side and watch it move. Principal sizes are the figures' own; a size the figure
+genuinely does not print carries a `// chosen` comment at its definition in `src/objectData.js`.
+**That marker is a claim about the figure, and it was wrong twice** — the Shaft Support's bolt hole
+IS printed, as R6 with a leader pointing straight at it, and the Bearing Block carried three for
+sizes the figure gives plainly. **None now survives.** The last one, the Shaft Support's head
+radius, turned out to be derived rather than chosen: the figure's R12 leader points at the BORE, and
+the head's own arc is drawn TANGENT to the lug's two 40 mm faces, so it is half the depth and
+nothing else will close (ADR-226). Before adding the marker, look for what the geometry forces.
+
+**The Cylindrical Block is ONE solid, not a boss on a plate.** Its Ø50 column runs the whole 40 mm
+to the bench and the 100 × 40 × 12 forked plate is merged onto it; since the column is 50 across and
+the plate 40 deep, the plate stops dead against it at ±15 and is therefore TWO extrusions, each
+ending on an exact arc (ADR-227, RULES.md §6.40). No CSG: the junction curve is a circle of known
+radius, so it is authored rather than computed. **When auditing a part, ask where each feature ENDS,
+not only how big it is** — this one passed two audits on diameter, height, bore and overhang while
+its column stopped in the wrong place, because nobody put that question to the views. Each view
+answers it differently: the elevation runs the plate's top face inboard of the column's silhouette,
+the side view is a plain rectangle rather than a stepped one, and the plan draws the circle complete.
+
+**One object is blended, and it decides how its solid is cut up.** Fig. 19.21 prints `R6` twice on
+the Shaft Support's elevation — into the root of the upright and onto the top corner of the base —
+and both are drawn at both ends, so there are four, all running the full 40 mm depth. A blend is an
+arc in the ELEVATION profile pushed along z; a bolt hole is a hole in the PLAN profile pushed along
+y; no one extrusion is both, so the part is eight butt-joined pieces rather than four, split where
+the two features stop overlapping (ADR-226, RULES.md §6.39). The other three objects are square
+everywhere — including the Cylindrical Block's boss, whose apparent blend in Fig. 19.20(a) is the
+overhanging bottom rim of a Ø50 boss on a 40 deep plate. **Test a blend against the printed views,
+never against the pictorial**: the elevation shows a square corner and the plan draws two circles
+where a blend would need three.
 
 ## Project-wide documentation (read before cross-module tasks)
 An **Engineering Graphics** topic, so it consumes the shared EG root docs. Before any task that
@@ -169,9 +202,11 @@ generator, no `meshAnalyzer.js`, no `iShape.js`, no `problems.js`.
   and that inverted the control: turning dimensions on made the drawing vanish (ADR-208, amended).
 - **Camera flights are arcs about the target, never chords.** Left and Right are 180° apart, so
   lerping positions runs the eye through the object. Do not "simplify" `arcBetween()` back.
-- The **Left/Right cameras are correct and have been measured** (Stepped Block: treads visible from
-  the right, concealed from the left). What reads as "swapped" is first-angle PLACEMENT. Say it in
-  the copy; do not "fix" the geometry (RULES.md §3.50, §8.6).
+- The **Left/Right cameras are correct and have been measured** (Stepped Block, since Fig. 19.27:
+  treads visible from the **left**, concealed from the right by the full-height wall at the other
+  end — the reverse of Fig. 19.24's object, which this line used to describe). What reads as
+  "swapped" is first-angle PLACEMENT. Say it in the copy; do not "fix" the geometry (RULES.md
+  §3.50, §8.6).
 - Projection lines **animate, then fade** — to a ghost once the view they carried is inked, and out
   altogether once the sheet is dimensioned. They are never deleted mid-build; a learner going Back
   has to be able to find them again.
@@ -220,6 +255,28 @@ generator, no `meshAnalyzer.js`, no `iShape.js`, no `problems.js`.
   `OrbitControls`' `start` — it fires for the wheel too, and in this topic that swaps the projection,
   the dimension set and the frame in one notch. A drag is 3 px of movement with exactly ONE pointer
   down. `focusOn()` retargets when idle and flights `settle()` with damping off (RULES.md §5.21/§5.22).
+- **A MIRROR IS NOT THE OTHER SIDE VIEW.** The sheet reflects the authored side view to produce the
+  one the learner asks for, and that is exact only where the part is symmetric about its mid-plane.
+  The Stepped Block is not: its wall hides all three treads from the right and none from the left,
+  and reflecting a dashed line cannot make it solid. Objects whose two sides disagree author both —
+  `views.sideFlip`, in the second view's own frame, used as authored. Dimensions still mirror
+  (ADR-222, RULES.md §3.73).
+- **Ø ALSO APPEARS WHERE THERE IS NO CIRCLE.** `acrossDia()` is the third form of the mark: a linear
+  dimension between a cylinder's two silhouette lines, carrying the Ø prefix, its number derived
+  from the radius. It is how the Cylindrical Block's elevation states Ø50 — the plan can only offer
+  R25. Not an exception to `roundDim()`: the symbol still comes from the geometry and the number
+  from the radius, and neither is typed (ADR-223, RULES.md §6.38).
+- **Views are spaced by `markBox()`, not by `boxes`.** `boxes` is the linework alone — right for
+  centring a caption, wrong for spacing two views, because a dimension in a second lane lands on the
+  neighbour. `markBox()` adds the dimension line, the value where `alignedDim()` puts it, and a
+  leader's elbow and shelf. `reachOf()` reads the value's real position too, not an end plus a
+  constant: a value facing ACROSS the sheet reaches no further ALONG it than the view's own edge
+  (ADR-224, RULES.md §3.74).
+- **`EdgesGeometry` cannot pair an ear-clipped lid.** Measured: three unpaired diagonals per cap for
+  a six-point stair profile, none for a rectangle or a triangle, and winding makes no difference.
+  They arrive at full outline weight. `objectRig.js` filters them against the authored profile while
+  it is still to hand — a cap-plane segment survives only if its ends are consecutive profile
+  points. Never add, only remove (ADR-225, RULES.md §3.75).
 - **⌀ or R comes from the SWEEP THE VIEW DRAWS, through `roundDim()`.** Never type the symbol. A
   50 mm boss on a 40 mm plate is a cylinder, and the plan draws 148 deg of it, so the plan says R25.
   Both marks END the same way — slanting leg, horizontal shelf, value LEVEL above it — and differ at

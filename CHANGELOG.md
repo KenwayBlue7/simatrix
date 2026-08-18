@@ -3,6 +3,92 @@
 All notable changes at the Simatrix project root (spanning Module1, Module2, and the
 topic deploy copies). Per-module changelogs live inside each module folder.
 
+## 2026-08-18 b — The Cylindrical Block's column goes to the bench
+- Fixed: **the Cylindrical Block is one continuous solid, not a cylinder parked on a plate.** The
+  Ø50 column runs the full 40 mm to the seating and the 100 × 40 × 12 forked plate is merged onto
+  it; because the column is 50 across and the plate only 40 deep, the plate stops dead against it at
+  ±15. See `DECISIONS.md` **ADR-227** and `RULES.md` **§6.40**.
+- Changed: the plate is now TWO extrusions, each ending on an exact arc of the column's own circle,
+  and the lathe starts at y = 0 instead of y = 12. **No CSG** — the junction curve is known in
+  closed form, so the profiles are authored rather than computed by a boolean.
+- Fixed: **all three views.** The elevation gained the four junction lines the figure prints (the
+  plate's top face carried on to ±15, and its front face ending there); the right side view is now
+  a plain 50 × 40 rectangle with the plate nested inside it, not a stepped outline; the plan draws
+  the Ø50 circle complete instead of two proud arcs.
+- Changed: **`R25` deleted from the plan.** The plan draws 360°, not the 148° it was chosen from —
+  so the symbol came from a misread sweep. ADR-218's rule is untouched and its worked example is
+  amended in place.
+- Corrected: the claim in ADR-221 and two changelogs that the boss "overhangs the plate front and
+  back and its underside hangs in clear air". There is no underside; the column reaches the bench.
+- Re-checked, unchanged: Shaft Support (19.21), Stepped Block (19.27), Bearing Block (19.22) — none
+  has an overhanging feature, and the Bearing Block's 11 mm lugs are flush with its 44 deep base.
+- Oracle: 263 → **264** assertions, all green.
+
+## 2026-08-18 — Chapter 19 blend audit: the Shaft Support is filleted
+- Audited: **the Cylindrical Block and the Shaft Support** against Fig. 19.20 and Fig. 19.21, on the
+  specific question of blended transitions, with the other two objects re-checked. See
+  `DECISIONS.md` **ADR-226** and `RULES.md` **§6.39**.
+- Fixed: **the Shaft Support carries the four R6 blends its figure prints.** A fillet where the
+  upright meets the base, on BOTH flanks, and a round on BOTH top corners of the base — all four
+  running the full 40 mm depth, all four previously square. The elevation's outline was rebuilt
+  around them and the sheet gained the figure's two `R6` leaders.
+- Changed: **the Shaft Support's solid is now eight butt-joined pieces, not four.** A blend runs the
+  depth and a bolt hole is drilled downwards, so no one extrusion can carry both; the two features
+  occupy disjoint stretches of the length, so the part divides between them. No new geometry kind,
+  no new renderer (ADR-226, §6.39).
+- Changed: the elevation states the figure's **20 from the end of the casting** to a bolt centre
+  instead of the 60 mm pitch, and the head radius lost a `// chosen` flag it never deserved — the
+  side view draws that arc tangent to the lug's two faces, so R20 is derived, not chosen.
+- Verified: **no change to the Cylindrical Block.** Fig. 19.20's boss is NOT filleted where it
+  stands on its plate. Its elevation meets the plate at a square corner and its plan draws exactly
+  two circles where a blend would need three; what reads as a blend in the pictorial is the boss's
+  own overhanging bottom rim, which the build already had. Fork, slot depth and prongs re-measured
+  and already correct.
+- Verified: no change to the Stepped Block (Fig. 19.27, re-traced) or the Bearing Block (Fig. 19.22).
+  Neither figure carries a blend.
+- Oracle: 262 → **263** assertions, all green.
+
+## 2026-08-17 b — Chapter 19 textbook audit
+- Audited: **all four objects** of `graphics_module_2_topic_0_introduction_to_orthographic_projection`
+  against the figures they cite in *Intro To Machine Drawing*, Chapter 19. All four differed. See
+  `DECISIONS.md` **ADR-221** and `RULES.md` **§6.37**.
+- Fixed: **the Cylindrical Block is forked.** Fig. 19.20's plate carries a 16 wide × 18 deep slot
+  through the full thickness at each end, leaving 12 mm prongs; it had been drawn as a plain
+  rectangle. Present now in all three views, with the slot's end wall hidden in the elevation, the
+  prongs split 12 | 16 | 12 in the right side view, and the figure's 18 / 12 / 12 on the plan.
+- Changed: **the Stepped Block is Fig. 19.27, not Fig. 19.24.** 19.24 is captioned *"A block"*; the
+  only figure the chapter captions *"A stepped block"* is 19.27, which is a different part —
+  120 × 90 × 64, a stair of three 30 mm treads rising to the back beside a full-height 20 mm wall,
+  dimensioned 3 × 16. Rebuilt from it: new part specs, all three views, a new dimension set and new
+  Step-1 copy.
+- Fixed: **the Shaft Support stands on two feet.** Base 12 → **20**, plus the 8 mm underside relief
+  between two 12 mm feet that Fig. 19.21 draws. Bolt centres moved to ±30 to match the plan, and the
+  figure's own 12 | 28 | 20 | 12 chain and 20 / 24 / 8 now appear where it prints them.
+- Fixed: **the Bearing Block's 37 is the height to the bore centre, not the overall height.** It had
+  been read as the overall, and every other size scaled down to fit inside it. Corrected to the
+  figure throughout: base 9 → **15**, bore Ø20 → **Ø24**, lug 32 long / R16 head → **48 / R24**,
+  overall length 83 → **105** (48 + 35 to the arc centre, then R22), overall height 37 → **61**.
+- Fixed: **a mirror is not the other side view** (ADR-222, RULES.md §3.73). Choosing the Stepped
+  Block's right side view drew its steps DASHED, because the sheet reflected the authored left side
+  view — while the object's own copy told the learner they would be solid. An object whose two sides
+  disagree now authors both (`views.sideFlip`); the three symmetric objects still mirror.
+- Added: **Ø on a view that draws no circle** (ADR-223, RULES.md §6.38). `acrossDia()` — a linear
+  dimension carrying the Ø prefix, its number derived from the radius. It is how the textbook states
+  the Cylindrical Block's boss in the elevation, and without it that sheet never says Ø50 anywhere.
+  ADR-218's rule is unchanged: the symbol still comes from the geometry, never from a typed string.
+- Fixed: **views are spaced by what they put down** (ADR-224, RULES.md §3.74). The plan sat a fixed
+  gap below the elevation's OUTLINE, so the Stepped Block's overall 120 — in a second lane behind
+  the 100 — was drawn along the plan's top edge. The same arithmetic inverted had captions clearing
+  a value that faces across the sheet rather than along it.
+- Fixed: **triangulation seams on a non-convex end face** (ADR-225, RULES.md §3.75). `EdgesGeometry`
+  returns three unpaired diagonals per cap for a six-point stair profile and none for a rectangle or
+  a triangle; winding makes no difference. They were drawn at full outline weight across the Stepped
+  Block's end. Filtered against the authored profile where the geometry is built.
+- Fixed: the viewport chip and the panel toggle, whose 2 mm nudge and shared band were reverted by
+  the `origin/main` merge on this date. Restored with the oracle's own numbers.
+- Verified: `node verify/shipped-module.mjs` → **262 assertions, ALL GREEN** (was 250). Twelve new
+  ones, each calibrated against the geometry it replaced.
+
 ## 2026-08-17
 - Merged: `origin/main` into `feat/mod4` — the second arrival of this branch, five commits after
   ADR-142 merged its first. See `DECISIONS.md` **ADR-219** (the merge) and **ADR-220** (three
