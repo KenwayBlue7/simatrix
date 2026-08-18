@@ -1,5 +1,27 @@
 # Changelog — Projection of Straight Lines
 
+## 2026-08-17 — Compare split gains a construction-active pane ratio: 30/70 (3D/2D) while a construction runs (ADR-168)
+- Added: `body.compare-split` gains a `con-active` class (`main.js` `setConLayout()`, toggled off
+  `conMode` in `enterCon()`/`teardownCon()`) that re-weights the split's columns from 50/50 to
+  30/70 (3D pane / 2D drawing) while True Length & Angles or Show Traces is running — the 2D
+  drawing is the deliverable during a construction, so it now gets more room than a plain 3D↔2D
+  read, mirroring the ratio Show Method's own docked split already uses. Also auto-collapses
+  `#workbench-rail` for the construction's duration (every rail driver already tears the
+  construction down on edit, so the rail has nothing live to show meanwhile) — combined, both
+  changes make the 2D sheet ~38% larger at 1536px rather than the ~10% columns alone would buy,
+  since the sheet's fit is height-limited past a certain pane width. `#rail-toggle` stays live
+  throughout as an escape hatch; a learner's pre-construction rail state (or a live override if
+  they click the toggle themselves mid-construction) is restored on teardown, not discarded.
+- Fixed (caught live during this session's own verification): the initial implementation
+  discarded a learner's manual rail reveal on teardown, always reverting to the pre-construction
+  snapshot — `#rail-toggle`'s click handler now flags a live override while `con-active` is on,
+  and teardown honors it.
+- Added: the split's camera now re-frames after the ratio changes (`reframeIfClipped()`, on a
+  deferred double-`requestAnimationFrame` once the grid has actually reflowed) — a pane that loses
+  width otherwise keeps a camera fitted for its old width (the same bug Module 2 hit entering its
+  own 30/70 split, ADR-163).
+- Docs: `../DECISIONS.md` ADR-168, `../RULES.md` §5.16a amendment.
+
 ## 2026-08-17 — #workbench-rail becomes a two-lane row: Constructions pinned right, sliders shrink instead of wrapping (ADR-167)
 - Changed: `main.js` — `WORKBENCH_GROUPS` entries gain a `lane` field; `ensureWorkbenchRail()` nests
   the Dimensions + Inclination clusters inside a new `#rail-drivers` wrapper, leaving Constructions

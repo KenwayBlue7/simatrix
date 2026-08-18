@@ -8436,6 +8436,112 @@ superseded here on explicit request.
 
 ---
 
+## ADR-168: T6 Compare split gains a construction-active pane ratio — 30/70 (3D/2D) while True Length or Traces is running, narrowing RULES.md §5.16a
+
+**Date:** 2026-08-17
+**Amends:** RULES.md §5.16a (adds a state-conditional exception to the platform-wide "Compare has
+exactly one shape" rule; does not reopen ADR-080 — see Alternatives rejected).
+**Decision:** `graphics_module_1_topic_6_projection_of_straight_lines` runs its two constructions
+(True Length & Angles, Show Traces) *inside* Compare (ADR-165/ADR-166) rather than in a second
+container. While one is active, the 2D drawing is the deliverable and the 3D pictorial is only the
+explanation beside it — but `body.compare-split`'s grid was a hard `1fr 1fr` regardless, so the
+drawing got no more room during a derivation than during a plain 3D↔2D read. `body.compare-split`
+now also carries `con-active` (`main.js` `setConLayout()`, toggled off `conMode` in
+`enterCon()`/`teardownCon()`), which re-weights `grid-template-columns` to `3fr 7fr` — the same
+expression §5.16c's `body.method-split` already uses for its own "genuinely asymmetric job"
+30/70. Nothing else about the grid changes: same `grid-template-areas`, same three §5.13 cards,
+same `#compare-card`, same narrow-viewport restack (an equal-specificity `1fr` reset lives inside
+the `@media (max-width: 767px)` block — see Gotchas).
+
+**Also claims `rail-collapsed` for the construction's duration.** Measured at 1536px: the 2D sheet
+is a *contain* fit against a fixed `sheetAspect` (`compareSheet.js` `setResolution()`,
+`sheet2DLayout.js` `HW=6.2/HH=4.6`) — today it's width-limited, but past ≈55% pane width it flips
+to height-limited, so 30/70 on columns alone bought only ≈+10% linear drawing scale for 40% of the
+3D pane's width (extra width past the crossover becomes side margin, not a bigger drawing).
+Reclaiming the rail's row too (already built: `body.rail-collapsed #workbench-rail{display:none}`,
+`body.compare-split.rail-collapsed` drops the row) pushed both axes to a near-saturated contain fit
+— ≈+38%. This is a legitimate reuse, not scope creep: every rail driver already tears the
+construction down on edit (`main.js:420`), so the rail has nothing live to show for the class's
+duration, and `#rail-toggle` (a direct `<body>` child, never hidden by `rail-collapsed`) stays live
+throughout as the learner's escape hatch.
+
+**Two state-preservation rules, both live-verified (see Verification):**
+1. **Pre-construction snapshot.** `conRailWasCollapsed` captures `rail-collapsed`'s value on the
+   off→on transition only, and `setConLayout(false)` restores it — a learner who had the rail
+   collapsed *before* launching keeps it collapsed after teardown; one who had it open gets it back.
+2. **Live override wins.** `#rail-toggle`'s own click handler (`setupRailToggle()`) sets
+   `conRailUserOverride = true` when clicked while `con-active` is on — teardown then leaves the
+   rail exactly where the learner's own click left it instead of discarding it for the entry
+   snapshot. Without this, a learner who deliberately reveals the rail mid-construction would find
+   it silently re-collapsed (or worse, re-hidden) the moment the construction ends — caught live
+   during this session's own verification pass, not anticipated in the original design (see
+   Gotchas).
+
+**Camera reframe, generalising ADR-163's lesson:** a pane that loses width keeps a camera fitted
+for its old width — `handleResize()`/`syncMainSizing()` sync aspect + fat-line resolution only,
+never distance; `reframeIfClipped()` (ADR-014) runs only at the end of `rebuild()`. `setConLayout()`
+schedules its own double-`requestAnimationFrame` — the grid reflow isn't laid out on frame 1 (same
+reasoning as the existing `remeasureAfterReflow()`) — then calls `handleResize(viewport)` +
+`reframeIfClipped()`. `enterCon()` calls `setConLayout(true)` *after* `ensureCompareForCon()` (the
+cold-open path routes through `enterWorkbench()`, which would otherwise force-reset
+`rail-collapsed`) and *before* `rebuild()` — `rebuild()`'s own synchronous `reframeIfClipped()` call
+still runs once against the stale pre-reflow aspect that same tick, but the deferred double-rAF
+call corrects it for real once the grid has actually settled. Consistent with ADR-014, this is
+push-back only: on teardown (30%→50%) the camera does not dolly back in, mirroring the existing
+gap on plain Compare open (100%→50%, pre-existing, not touched here).
+
+**`enterWorkbench()`'s unconditional `rail-collapsed` reset made con-aware.** It previously always
+removed `rail-collapsed` on entry ("a prior visit's collapse must not carry over"). Since
+`compare.hide()` does not call `teardownCon()`, a construction can survive a Compare close/reopen
+with `conMode` (and `con-active`) still set — re-entering the split would otherwise hand the rail's
+row back while the ratio stayed 30/70. `enterWorkbench()` now reads `con-active` and toggles
+`rail-collapsed` to match instead of unconditionally clearing it — live-verified this correctly
+restores 30/70-with-rail-collapsed on reopen (see Verification, case d) while every other entry
+path (no construction active) keeps the original "no stale collapse carries over" behavior exactly.
+
+**Gotchas / caught live:**
+- **Specificity, not source order.** `body.compare-split.con-active` (0-3-0) outranks the bare
+  mobile `body.compare-split` override (0-2-0) *regardless of where either rule sits in the file*
+  — the mobile block needs its own explicit `body.compare-split.con-active { grid-template-columns:
+  1fr; }` reset, not just a rule ordered after the desktop one. Same class of trap as the
+  2026-08-16 con-nav caption session (memory: `topic6-con-nav-caption-split`).
+- **`#rail-toggle` is unaware of `con-active` by construction** — its click handler blindly toggles
+  `rail-collapsed`, which is exactly what makes it work as an escape hatch (A4: the rail's row
+  spans both grid columns via `"rail rail"`, so its visibility is ratio-independent), but it also
+  means a manual click during a construction needed the explicit `conRailUserOverride` flag above —
+  found only by scripting the full rail-state matrix live (see Verification), not by static review.
+- `php.exe` needs its full XAMPP path to serve `:8123` on this machine (`which php` fails); serving
+  the repo root instead of the topic folder silently returns the *root* `index.html` with a 200 —
+  confirm the served `<title>` matches the topic before trusting any live read.
+- `resize_window` (Chrome MCP) does not actually change `window.innerWidth` in this environment
+  (repeat of an earlier-session finding) — the narrow-viewport (<768px) restack and the mobile
+  specificity reset above were verified by static CSS/specificity analysis only, not live-driven.
+
+**Verification (live, Chrome MCP against `php -S localhost:8123` served from the topic folder):**
+confirmed `getComputedStyle(document.body).gridTemplateColumns` reads `1fr 1fr`-equivalent before
+a launch and `3fr 7fr`-equivalent after, on both constructions; scripted the full rail-state matrix
+— (a) launch with rail shown → auto-collapses, toggle reads "Show", teardown restores shown; (b)
+manually collapse first → launch → teardown leaves it collapsed; (c) manually re-show
+mid-construction → teardown leaves it shown (the override fix above, added mid-session after this
+case first failed); (d) close Compare mid-construction and reopen → 30/70 with the rail still
+collapsed — all four passed after the override fix. Panned the 2D sheet, then toggled the rail
+twice (forcing two reflows): the pan offset survived both, confirming ADR-077's pan/zoom needs no
+new call site (`setResolution()` recomputes the ortho frustum from the live aspect and never
+touches `camera.position`/`zoom`). Latched the Top quick-view in the narrowed 30% pane: not clipped
+at the tested window width. `simAPI.reset()` clears `con-active` (and every other body class) on
+every path via `teardownCon()`'s own `setConLayout(false)` call. `node --check main.js` clean.
+
+**Alternatives rejected:** A second Compare container (path b, e.g. mirroring `body.method-split`
+as an independent grid) — rejected before this session started; the user confirmed the
+"one grid, state-conditional ratio" tradeoff explicitly (this is that decision's implementation,
+not a re-litigation). Continuously tracking live rail-toggle state instead of a snapshot+override
+flag — rejected as needless complexity: the flag only needs to answer "did the learner touch the
+toggle during this construction," which a boolean set by the click handler already answers exactly.
+
+**Status:** Active.
+
+---
+
 *This log was assembled by reading ARCHITECTURE.md, the saved session-memory notes, both modules'
 CHANGELOG and CLAUDE files, and the DESIGN docs. Where evidence was thin it says so. Add new ADRs
 at the bottom using ADR-000.*

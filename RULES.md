@@ -541,6 +541,48 @@ Every rule is formatted:
 > picture-in-picture-style panel with its own title bar and expand/close buttons, sitting on top
 > of the page instead of docked. Removing the second Compare shape removes the state a resize could
 > strand it in.
+>
+> **Amendment (ADR-168, 2026-08-17) — a Compare split MAY re-weight its OWN pane ratio while a
+> construction is running.** T6 runs its constructions (True Length & Angles, Show Traces) *inside*
+> Compare (ADR-165/ADR-166, §5.16), where the 2D drawing is the deliverable and the 3D pictorial is
+> the explanation beside it — the same genuinely asymmetric job §5.16c already recognises for a
+> non-Compare docked split. **✅ DO** let `body.compare-split` carry a second, state-scoped class
+> (T6: `con-active`, toggled off `conMode` in `enterCon()`/`teardownCon()`, `main.js`
+> `setConLayout()`) that re-weights **`grid-template-columns`** — T6 is `1fr 1fr` → `3fr 7fr`, the
+> same expression `body.method-split` uses — and, where the mode's own controls are provably inert
+> for its duration, that reclaims the rail's row through the split's **existing** `rail-collapsed`
+> state rather than a new mechanism. (T6: every rail driver kills the construction on edit,
+> `teardownCon()`; `#rail-toggle` stays live so the learner can pull the rail back at will, and
+> their own pre-construction collapse state — or a live override if they clicked the toggle
+> themselves mid-construction — is restored rather than overwritten.) The grid's
+> `grid-template-areas` and its three §5.13 cards are never touched.
+>
+> **This does NOT permit, and §5.16a still forbids:**
+> - a **second Compare shape** — same one grid, same `grid-template-areas`, same three §5.13
+>   cards, same `#compare-card`; only the column weights change, and only while the state flag
+>   is on. Nothing is created, destroyed, or re-parented at the ratio boundary, so there is no
+>   state a resize can strand (this rule's own founding grievance);
+> - a **floating/compact demotion** — no `position: fixed`/`absolute` Compare card, no head
+>   chrome, no `matchMedia`-driven size state, no `.compare-card[data-size]`;
+> - **skipping the narrow-viewport restack** — below 768px the same split still collapses to
+>   the single `"view" "compare" "rail"` column. The ratio rule MUST be explicitly reset to
+>   `1fr` inside the `@media (max-width: 767px)` block: the state-scoped selector is one class
+>   more specific than the mobile override, so it wins on specificity regardless of source
+>   order and would otherwise leak into the stack;
+> - **re-weighting for anything other than a genuinely asymmetric mode.** The ratio follows a
+>   mode the learner explicitly entered and can explicitly leave, never a viewport measurement.
+>
+> **Required with any ratio change (ADR-163's lesson, generalised):** a pane that LOSES width
+> keeps a camera framed for its old width. `handleResize()`-class helpers typically sync only
+> aspect + renderer resolution, never camera distance. Re-frame the shrinking pane's camera
+> after the grid has actually reflowed (double-rAF, not the same tick), or the mode opens on a
+> clipped/over-zoomed 3D read.
+>
+> Reason: §5.16/ADR-037's 50/50 answers Compare's *default* job — a 3D↔2D read where neither
+> pane should dominate. It was never meant to answer a derivation that Compare itself hosts, in
+> which one pane demonstrably is the subject. §5.16c already accepted that asymmetry for a
+> separate docked grid; this extends the same reasoning to a state *within* Compare, while
+> keeping every invariant this rule actually bought (one shape, one container, one restack).
 
 > **§5.16b ✅ DO** dock ONLY the value drivers of the pane the rail serves — the sibling
 > Module-3 topic docks two groups (`['shape', 'section']`), and Conic Sections docks two

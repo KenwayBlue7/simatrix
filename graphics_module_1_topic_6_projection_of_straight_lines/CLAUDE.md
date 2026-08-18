@@ -94,10 +94,12 @@ sanctioned outbound `postMessage`. Do not add any other `postMessage`/inbound li
   are dedicated per step (TL on step 1, distances on step 2, θ/φ on step 3). Do NOT revert to the
   six fixed-orientation "case" steps (§6.13). Do NOT rename "line AB"/"end A" (§6.15).
 - **Compare / workbench** (ADR-012 / ADR-021 / ADR-037, narrowed by ADR-080): Compare has exactly
-  one shape, at every viewport width — a true 50/50 split, three floating rounded cards (3D
-  viewport, 2D orthographic drawing, docked rail) on a `--color-panel` shell (DESIGN.md §5.13),
-  with an independent `#rail-toggle` Hide/Show control (`setupRailToggle`) floating at the 3D
-  viewport's bottom-left corner. There is no compact/floating fallback card and no
+  one shape, at every viewport width — three floating rounded cards (3D viewport, 2D orthographic
+  drawing, docked rail) on a `--color-panel` shell (DESIGN.md §5.13), with an independent
+  `#rail-toggle` Hide/Show control (`setupRailToggle`) floating at the 3D viewport's bottom-left
+  corner. The split is 50/50 by default, but re-weights to 30/70 (3D/2D) — and auto-collapses the
+  rail — while a construction is running (`body.con-active`, `main.js` `setConLayout()`, RULES.md
+  §5.16a amendment, ADR-168); see that ADR for the pane-ratio mechanics. There is no compact/floating fallback card and no
   `matchMedia`-driven demotion (§5.16a) — below 768px the same split grid restacks to a single
   column instead of switching to a different Compare UI. `WORKBENCH_CONTROLS` re-parents ALL
   seven controls — the geometry drivers (`tl`/`disthp`/`distvp`/`theta`/`phi`) AND the two
