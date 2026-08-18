@@ -1,0 +1,142 @@
+{
+  "main.js": {
+    "mtime": 1786987284.1762953,
+    "ast_hash": "91380159071d039e8f65c7ce9891c7d2",
+    "semantic_hash": ""
+  },
+  "meta.json": {
+    "mtime": 1785395890.8900044,
+    "ast_hash": "19e6c3a55a1b64afa887adb24ae71904",
+    "semantic_hash": ""
+  },
+  "src/anim.js": {
+    "mtime": 1785395890.8900044,
+    "ast_hash": "c5779a0c65585a6e2ae6bd1bf9365a05",
+    "semantic_hash": ""
+  },
+  "src/compareSheet.js": {
+    "mtime": 1785395890.8900044,
+    "ast_hash": "1fcefdb0134ee190bf449ba044092997",
+    "semantic_hash": ""
+  },
+  "src/constructionStepper.js": {
+    "mtime": 1786733662.8273046,
+    "ast_hash": "6ac3317234a4333625fe9aaea2f49291",
+    "semantic_hash": ""
+  },
+  "src/dimensions.js": {
+    "mtime": 1785395890.8900044,
+    "ast_hash": "5f2b6d7fec7bea03af46538992a267f7",
+    "semantic_hash": ""
+  },
+  "src/labelPlacement.js": {
+    "mtime": 1785395890.8900044,
+    "ast_hash": "d6c4ce502a9f320b336b909bc4963419",
+    "semantic_hash": ""
+  },
+  "src/labels.js": {
+    "mtime": 1785395890.8900044,
+    "ast_hash": "e44991f3c4e1e88b6df3999368db0384",
+    "semantic_hash": ""
+  },
+  "src/labels/LabelFactory.js": {
+    "mtime": 1785395890.8900044,
+    "ast_hash": "05931935ed7cd88ef0c3bdff6077a759",
+    "semantic_hash": ""
+  },
+  "src/labels/LabelManager.js": {
+    "mtime": 1785395890.8900044,
+    "ast_hash": "b7c2141d250dd6ea88ba7fdc398609ba",
+    "semantic_hash": ""
+  },
+  "src/labels/LabelPlacement.js": {
+    "mtime": 1785395890.8900044,
+    "ast_hash": "a6e5f4e23755726894955d726d5960ff",
+    "semantic_hash": ""
+  },
+  "src/labels/LabelStyles.js": {
+    "mtime": 1785395890.8900044,
+    "ast_hash": "1a690ea32a6d4c15749c086ee6738ae6",
+    "semantic_hash": ""
+  },
+  "src/lineData.js": {
+    "mtime": 1786292925.6059995,
+    "ast_hash": "a74c0fb738c4990d0a1810b411f3c411",
+    "semantic_hash": ""
+  },
+  "src/lineProblems.js": {
+    "mtime": 1785395890.8900044,
+    "ast_hash": "950f3e6150aeaa2e92533d7fbc91ee1b",
+    "semantic_hash": ""
+  },
+  "src/lineRig.js": {
+    "mtime": 1786528754.962964,
+    "ast_hash": "fc3ce69ef62412ac9cd05c1ef98dc8f4",
+    "semantic_hash": ""
+  },
+  "src/lineSteps.js": {
+    "mtime": 1785395890.8900044,
+    "ast_hash": "3fe4b7ac2a2978e3522e2d551c03ac96",
+    "semantic_hash": ""
+  },
+  "src/methodView.js": {
+    "mtime": 1786688063.5930738,
+    "ast_hash": "364b5568a4efd2237ac80588cf286fb9",
+    "semantic_hash": ""
+  },
+  "src/onboarding.js": {
+    "mtime": 1785395890.8900044,
+    "ast_hash": "712ec5d5cfa7d95a6110be91cf4aff99",
+    "semantic_hash": ""
+  },
+  "src/problemLibrary.js": {
+    "mtime": 1785395890.8900044,
+    "ast_hash": "d4ddf00a7e418ca7de5f08f4ba23c35d",
+    "semantic_hash": ""
+  },
+  "src/sheet2DLayout.js": {
+    "mtime": 1786292925.607024,
+    "ast_hash": "9bdc3b565c6926a71480e263712ecb45",
+    "semantic_hash": ""
+  },
+  "src/stepper.js": {
+    "mtime": 1786688100.6276755,
+    "ast_hash": "88e3474c447a5251861f4a4fddaf74d4",
+    "semantic_hash": ""
+  },
+  "src/terms.js": {
+    "mtime": 1785395890.8900044,
+    "ast_hash": "330c07fb505403688ccef85dd32caeb3",
+    "semantic_hash": ""
+  },
+  "src/traces.js": {
+    "mtime": 1786292925.6080234,
+    "ast_hash": "194fbd1dbfe6b402cbe02f804a6fe6ea",
+    "semantic_hash": ""
+  },
+  "src/trueLength.js": {
+    "mtime": 1786688040.273682,
+    "ast_hash": "28a3706e42c3060e445146f2a538e82c",
+    "semantic_hash": ""
+  },
+  "src/uiManager.js": {
+    "mtime": 1786292925.6100156,
+    "ast_hash": "b886af6a44e7e832d414a86f0e2f83b1",
+    "semantic_hash": ""
+  },
+  "CHANGELOG.md": {
+    "mtime": 1786987512.723608,
+    "ast_hash": "8d6244b7611e93bdab41c9d29d13362d",
+    "semantic_hash": ""
+  },
+  "CLAUDE.md": {
+    "mtime": 1786987523.707793,
+    "ast_hash": "c1c15278f84fa4099aaf0eb0dacc9e4b",
+    "semantic_hash": ""
+  },
+  "index.html": {
+    "mtime": 1786987668.6976209,
+    "ast_hash": "21aba7233f5cd568d4a7984c5b19f5d8",
+    "semantic_hash": ""
+  }
+}
